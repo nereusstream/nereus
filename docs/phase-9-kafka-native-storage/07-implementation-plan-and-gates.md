@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss and release-process physical-deletion/fresh-JVM NCP2 fallback are implemented；release-process response-loss restart、multi-broker/controller、remaining M4 internal-topic cuts and inherited final gates remain open
+> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss、release-process physical-deletion/fresh-JVM NCP2 fallback and real-Oxia two-runtime Object-WAL live leader takeover are implemented；release-process response-loss restart、two Kafka-process/multi-controller takeover、remaining M4 internal-topic cuts and inherited final gates remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -234,7 +234,7 @@ shared gate service。
 
 ### 5.1 Current implementation evidence（2026-07-23）
 
-- `phase9SourceLockCheck` locks AutoMQ `1c648d...` / `3.9.0-SNAPSHOT` and 28 current Nereus ranged/head/session/planner/provider-composition source blobs；
+- `phase9SourceLockCheck` locks AutoMQ `1c648d...` / `3.9.0-SNAPSHOT` and 29 current Nereus ranged/head/session/planner/provider-composition source blobs；
 - `phase9M1Check --rerun-tasks` passes API、conditional append/result、semantic read、Object WAL、BookKeeper、
   exact reader registry/capability and materialization tests；
 - `:nereus-object-store:rangedFormatS3IntegrationTest --rerun-tasks` passes NCP2 and NTC2 upload/read/full verification
@@ -332,6 +332,7 @@ Kafka fork: nereusF9ProduceFetchTest
 Kafka fork: nereusF9DisabledCompatibilityTest
 Nereus: :nereus-kafka-adapter:f9M3IntegrationTest
 Nereus: :nereus-kafka-adapter:f9M3ProviderIntegrationTest
+Nereus: :nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest
 Nereus: phase9M3ProviderCheck
 Nereus: phase9M3KafkaCheck
 Nereus: phase9M3Check
@@ -373,6 +374,17 @@ coordinator/transaction/compaction remain M4/M5。
 - `KafkaPartitionLeaderManagerTest` proves exact-open deduplication、higher leader-term and same-owner broker-epoch takeover、
   conflicting/stale authority rejection、late-old-open fencing、stale-resign isolation、shutdown fencing and strict
   opener-result identity/epoch/state validation；durable authority acquire/recovery remains the opener responsibility；
+- `f9MultiBrokerTakeoverProviderIntegrationTest` supplies that durable authority/recovery layer with two independent
+  activated Object-WAL runtime graphs against real Oxia and one shared provider root：broker B's higher leader epoch
+  immediately preempts broker A before TTL，recovers A's exact committed batch，forces A's next append into
+  `WRITE_FENCED_RECOVERY_REQUIRED` and continues at the recovered end。`DefaultKafkaPartitionStorageTest` separately locks
+  the implementation rule that `FENCED_APPEND`/expired-session/head-offset conflicts fence even when the failed append is
+  provably known-not-committed。This is R-tier provider evidence；two Kafka processes、old in-flight append publication and
+  BookKeeper/profile takeover cuts remain open；
+- fresh `phase9M3ProviderCheck --rerun-tasks` passes 64/64 actionable tasks on this source。The aggregate reruns the
+  146/146 scenario manifest、29-blob Nereus source lock、Apache Kafka baseline lock、M1/M2/M3 codec predecessors and all
+  three provider gates：Object sync/async round trip、two-bookie BookKeeper WAL-only/profile composition and the new live
+  two-runtime takeover；
 - `KafkaStorageProfilePolicyTest` freezes exactly five activated canonical profiles and proves every adapter append uses the
   profile default durability plus `PROFILE_DEFAULT` completion；legacy alias、non-default durability and weakened completion
   are rejected before I/O。This is deterministic partial evidence for KF-APP-016 only；the real provider/KRaft profile
@@ -417,6 +429,10 @@ coordinator/transaction/compaction remain M4/M5。
   `f9M3ProviderIntegrationTest` passes against real Oxia plus the filesystem ObjectStore provider and covers deterministic
   ACTIVE/readiness seeding、runtime capability resume/verification、binding、authority acquire/recovery、leader open、stable
   Produce、committed Fetch、async NCP2 publication/byte-exact normal read and owned provider shutdown。
+  `f9MultiBrokerTakeoverProviderIntegrationTest` uses the same production factory but constructs two independent runtime
+  ownership graphs over one real durable authority；the higher KRaft leader epoch replaces the live old head session，
+  performs exact committed replay，fences the old runtime on its next append and continues Produce/Fetch at the recovered
+  offset。`phase9M3ProviderCheck` now depends on this task；
   `f9BookKeeperWalOnlyProviderIntegrationTest` separately provisions the exact F1-BK ledger-ID namespace/publication
   activation，borrows a real two-bookie client，then proves Kafka leader open、strict append、physical-reference publication
   and cold generation-zero Fetch against the shared Oxia graph。The BookKeeper client remains borrowed and the provider-neutral
@@ -544,7 +560,8 @@ coordinator/transaction/compaction remain M4/M5。
   and the artifact runtime deterministically schedules first activation only while locally current。The real single-node
   release-distribution provider-backed KRaft baseline and same-node fresh-JVM user/group/transaction-state cold restart pass；
   stable open-transaction forced-exit/abort recovery and the separate two-bookie `BOOKKEEPER_WAL_ONLY`
-  release-distribution cold restart also pass，while multi-controller/live takeover、
+  release-distribution cold restart also pass；the in-process two-runtime Object-WAL live takeover also passes，while
+  multi-controller/two Kafka-process live takeover、BookKeeper-profile takeover、
   checkpoint/virtual-segment and broader kill-cut final gates remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
@@ -876,8 +893,9 @@ The recovery coordinator retries retriable page-read failures at the exact curso
 the original deadline；the deterministic regression requires two reads but exactly one publication。The root build now
 recognizes M6 feature/process and direct
 process-test task names as F9 development gates，so the published coordinate cannot silently remain an older
-`0.1.0-f9-dev` artifact。Durable in-flight epoch fencing、multi-controller/live takeover、priority budgets、
-multi-broker takeover and checkpoint/virtual-segment cuts remain open。
+`0.1.0-f9-dev` artifact。The provider-level Object-WAL old-token fence is covered；durable already-in-flight append cuts、
+multi-controller/two Kafka-process live takeover、priority budgets、BookKeeper-profile takeover and
+checkpoint/virtual-segment cuts remain open。
 
 ### Tasks
 

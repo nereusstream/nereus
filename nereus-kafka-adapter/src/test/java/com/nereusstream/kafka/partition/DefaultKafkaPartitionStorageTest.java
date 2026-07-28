@@ -138,6 +138,50 @@ class DefaultKafkaPartitionStorageTest {
     }
 
     @Test
+    void knownNotCommittedAuthorityOrHeadFailureStillFencesTheOldLeader() {
+        for (ErrorCode code :
+                new ErrorCode[] {
+                    ErrorCode.FENCED_APPEND,
+                    ErrorCode.APPEND_SESSION_EXPIRED,
+                    ErrorCode.OFFSET_CONFLICT
+                }) {
+            Fixture fixture = fixture(0, 0);
+            CompletableFuture<KafkaStableAppendResult> append =
+                    fixture.storage.append(
+                            ByteBuffer.wrap(
+                                    KafkaPartitionStorageTestSupport.batch(
+                                            0,
+                                            CompressionType.NONE,
+                                            1_000,
+                                            "old-leader")),
+                            context(0, (short) 1));
+
+            fixture.streams.failNext(
+                    new NereusException(
+                            code,
+                            false,
+                            "durable authority or head conflict",
+                            AppendOutcome.KNOWN_NOT_COMMITTED));
+
+            assertFailureCode(append, code);
+            assertThat(fixture.storage.state())
+                    .isEqualTo(
+                            KafkaPartitionState
+                                    .WRITE_FENCED_RECOVERY_REQUIRED);
+            assertFailureCode(
+                    fixture.storage.append(
+                            ByteBuffer.wrap(
+                                    KafkaPartitionStorageTestSupport.batch(
+                                            0,
+                                            CompressionType.NONE,
+                                            2_000,
+                                            "must-recover")),
+                            context(0, (short) 1)),
+                    ErrorCode.FENCED_APPEND);
+        }
+    }
+
+    @Test
     void uncertainFailureFencesWritesButKeepsLastStableSnapshotReadable() {
         Fixture fixture = fixture(0, 0);
         CompletableFuture<KafkaStableAppendResult> append = fixture.storage.append(

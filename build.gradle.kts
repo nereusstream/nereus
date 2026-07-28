@@ -64,6 +64,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
     task.startsWith("phase9M3")
         || task.startsWith("phase9M6Kafka")
         || task == "f9M6KafkaProcessIntegrationTest"
+        || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
         || task == "f9BookKeeperWalOnlyProcessIntegrationTest"
         || task == "f9BookKeeperWalAsyncObjectProcessIntegrationTest"
         || task == "f9BookKeeperWalSyncObjectProcessIntegrationTest"
@@ -129,6 +130,7 @@ val dockerBackedSubprojectTasks = mapOf(
     ),
     ":nereus-kafka-adapter" to setOf(
         "f9M3ProviderIntegrationTest",
+        "f9MultiBrokerTakeoverProviderIntegrationTest",
         "f9BookKeeperWalOnlyProviderIntegrationTest",
         "f9BookKeeperLedgerDeletionProviderIntegrationTest",
         "f9M6KafkaProcessIntegrationTest",
@@ -3173,9 +3175,11 @@ tasks.register("phase9M3CodecCheck") {
 
 tasks.register("phase9M3ProviderCheck") {
     group = "verification"
-    description = "Run the partial F9-M3 provider-backed Object-WAL and BookKeeper-WAL-only gates."
+    description =
+        "Run the partial F9-M3 provider-backed Object-WAL, live two-broker takeover, and BookKeeper-WAL-only gates."
     dependsOn("phase9M3CodecCheck")
     dependsOn(":nereus-kafka-adapter:f9M3ProviderIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProviderIntegrationTest")
 }
 

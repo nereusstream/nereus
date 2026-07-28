@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart，以及 BookKeeper WAL-only/async/sync cold-restart gates 均通过；multi-controller failover、live takeover and extended kill/chaos process gates remain open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart、BookKeeper WAL-only/async/sync cold-restart and real-Oxia two-runtime Object-WAL live takeover gates 均通过；multi-controller failover、two Kafka-process live takeover and extended kill/chaos process gates remain open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -292,8 +292,9 @@ earliest=0/latest=1、正常停机、fresh-JVM offset 0 恢复、offset 1 继续
 `OBJECT_WAL_ASYNC_OBJECT`，完成首 JVM offset 0 与 fresh-JVM offset 0 恢复/offset 1 继续追加，
 并冻结 earliest=0/latest=2。BookKeeper async gate 写入四个 batch、等待真实 LocalStack NCP2 object、正常停机后
 fresh-JVM 恢复并继续追加；sync gate 写入一个 batch，并以 append 返回前 required NCP2 COMMITTED/readable
-作为同步语义证据，再完成 fresh-JVM 恢复。尚未实现的是真实 controller failover、live takeover 和更广 kill-cut
-process tests。显式
+作为同步语义证据，再完成 fresh-JVM 恢复。独立 provider gate 已覆盖 real Oxia 上的 two-runtime Object-WAL
+live takeover；尚未实现的是真实 controller failover、two Kafka-process KRaft takeover 和更广 kill-cut process
+tests。显式
 launcher/KafkaRaftServer broker/controller factory selection 已实现；`phase9M6KafkaProcessCheck` 现使用真实 release
 distribution、四分片 Oxia 和 pinned LocalStack S3 覆盖显式 feature format、broker/controller registration、
 activation、Admin create、Produce/Fetch/ListOffsets、S3 object existence 和 SIGTERM shutdown，并以同一 KRaft
@@ -302,8 +303,9 @@ subscribe/rebalance 并提交 offset；第二 JVM 验证 higher broker epoch rea
 internal topics 的并发 remote recovery、原 group committed offset reload、同一 transactional ID 的下一次 commit、
 group 从下一可见 offset 恢复，以及最终 earliest=0/latest=5。随后第三 JVM 在 open-transaction data offset 5
 stable 后被强制终止；第四 JVM 恢复同一 transactional ID，生成 ABORT marker 6、提交 data/marker 7/8，并证明
-read-committed/group 都跳过 aborted data、latest=9。该切片仍不包含 multi-broker live takeover、
-checkpoint/virtual-segment transaction cut 或 provider-profile matrix，仍不足以宣称 production rollout ready。
+read-committed/group 都跳过 aborted data、latest=9。该切片仍不包含 two Kafka-process live takeover、
+checkpoint/virtual-segment transaction cut 或 provider-profile matrix；现有 provider-level two-runtime takeover
+不能替代这些 Kafka-process cuts，仍不足以宣称 production rollout ready。
 
 ### 3.3 `core/.../kafka/log/LogManager.scala`
 
@@ -933,7 +935,7 @@ reservation、password file/version 与 readiness SHA-256。`StorageTool` 仍在
 outer 109/109 tasks 全部重新执行成功；nested stock/artifact-enabled Kafka 构建分别通过 92/92 与 95/95
 actionable tasks，后续 feature/control focused builds 通过 86/86、42/42、74/74 与 20/20。该证据确认新的
 enabled-format fixture、source lock 和当前 product planner/physical-deletion slice 能在同一次 clean task
-selection 中组合；它不替代尚未实现的 multi-broker、multi-controller 和 M7 final aggregate。
+selection 中组合；它不替代尚未实现的 two Kafka-process takeover、multi-controller 和 M7 final aggregate。
 默认 disabled/dry-run
 不会启动 scanner；enabled/non-dry-run 只有在 materialization runtime 已激活时才允许创建 retention service。
 Product adapter 现已把 provider-neutral deletion coordinator 下沉到 `nereus-bookkeeper`，并新增 Kafka-owned
@@ -959,6 +961,13 @@ root `DELETED` 并以独立 client 证明 `NoSuchLedger`；首 JVM 正常停机�
 并继续 append/fetch/ListOffsets。Provider-level applied-delete response loss 已覆盖；release-process
 response-loss restart 和 multi-broker takeover 仍需后续 process gate，
 当前不能把这条 R-tier evidence 等同于完整 KF-RET-009。
+An independent Object-WAL gate now starts two product runtime ownership graphs against the same real Oxia and provider
+root。Both broker capability records participate in ACTIVE readiness。Broker B's higher leader epoch preempts broker A's
+still-live durable session，replays A's exact committed batch and continues at the recovered end；A's next old-token append
+is rejected and the local storage enters `WRITE_FENCED_RECOVERY_REQUIRED`。The companion deterministic regression ensures
+the known-not-committed outcome cannot override an authority/session/head fence。This gate is
+`:nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest` and is included in `phase9M3ProviderCheck`；it does not
+start two Kafka fork processes or exercise an already-dispatched old append。
 真实 combined-node
 KRaft/Oxia/S3 process baseline 已通过；
 同节点 fresh-JVM cold restart 也已通过；独立 BookKeeper WAL-only/async/sync release-distribution
@@ -1110,7 +1119,9 @@ LSO 继续由 stock ProducerStateManager/first unstable offset 算法计算，re
 该 manager 不替代 durable Oxia/head authority CAS；`KafkaPartitionOpener` 必须先完成文档 04 的 session acquisition
 和 fresh recovery。Kafka fork metadata callback、BrokerServer config/runtime factory、manager ownership、ordered
 shutdown wiring、显式 native-storage CLI selection 与 controller-leader-only first-activation scheduling 已实现；
-combined-node native-storage KRaft process baseline 已通过，真实 controller failover 与 restart/takeover 尚未实现。
+combined-node native-storage KRaft process baseline 已通过；real-Oxia two-runtime Object-WAL gate 已覆盖 durable
+live preemption/replay/old-token fencing。真实 controller failover、two Kafka-process KRaft reassignment、old
+in-flight append cut 与 BookKeeper-profile takeover 尚未实现。
 
 ## 8. Fetch execution
 

@@ -641,11 +641,13 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 }
             } else {
                 boolean knownNotCommitted = isKnownNotCommitted(failure);
+                boolean authorityOrHeadConflict = requiresRecoveryFence(failure);
                 rejected = new ArrayList<>(appendQueue);
                 appendQueue.clear();
                 admittedEndOffset = stableSnapshot.stableEndOffset();
                 appendRunning = false;
-                if (!knownNotCommitted && state == KafkaPartitionState.LEADER_WRITABLE) {
+                if ((!knownNotCommitted || authorityOrHeadConflict)
+                        && state == KafkaPartitionState.LEADER_WRITABLE) {
                     state = KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED;
                 }
                 rejectBecauseFenced = state == KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED;
@@ -873,6 +875,13 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         return failure instanceof NereusException nereus
                 && nereus.appendOutcome().orElse(AppendOutcome.MAY_HAVE_COMMITTED)
                         == AppendOutcome.KNOWN_NOT_COMMITTED;
+    }
+
+    private static boolean requiresRecoveryFence(Throwable failure) {
+        if (!(failure instanceof NereusException nereus)) return false;
+        return nereus.code() == ErrorCode.FENCED_APPEND
+                || nereus.code() == ErrorCode.APPEND_SESSION_EXPIRED
+                || nereus.code() == ErrorCode.OFFSET_CONFLICT;
     }
 
     private static Throwable unwrap(Throwable failure) {

@@ -541,6 +541,34 @@ write admission，resets speculative admission to the last stable end and publis
 append is not cancelled because it may commit；after its exact completion no queued successor is dispatched。`resign()` cancels
 the pending timer but does not close the shared scheduler。
 
+### 7.2 Current live two-broker provider boundary（2026-07-28）
+
+`f9MultiBrokerTakeoverProviderIntegrationTest` now runs two independently owned
+`NereusKafkaObjectWalRuntimeFactory` graphs against the same real four-shard Oxia authority and the same Object-WAL root。
+The activation proof contains two exact `(brokerId, brokerEpoch)` capability records with one compatibility/provider digest
+and one broker-set digest；each runtime owns a separate Oxia client/runtime、ObjectStore instance、partition manager、
+callback executor and renewal scheduler。The test executes this exact sequence：
+
+1. broker A opens `(leaderId=1, leaderEpoch=7, brokerEpoch=31)` and stably commits Kafka batch `[0,1)`；
+2. while broker A and its 30-second append session remain live，broker B opens
+   `(leaderId=2, leaderEpoch=8, brokerEpoch=41)`；
+3. B's `acquireAppendSession` atomically preempts the head session because `leaderEpoch=8` dominates，without waiting for
+   lease expiry；B then freezes the new head，replays A's exact committed RecordBatch into a fresh recovery state and installs
+   writable end `1`；
+4. A submits offset `1` with its old token。The durable head CAS returns `FENCED_APPEND` even though the provider can prove
+   `AppendOutcome.KNOWN_NOT_COMMITTED`；
+5. `DefaultKafkaPartitionStorage.completeHeadAppend` treats `FENCED_APPEND`、`APPEND_SESSION_EXPIRED` and
+   `OFFSET_CONFLICT` as authority/head conflicts before applying the generic safe-retry rule。Therefore A transitions to
+   `WRITE_FENCED_RECOVERY_REQUIRED` and cannot dispatch another append；an unrelated explicit known-not-committed timeout
+   still resets to the stable end and remains writable；
+6. B appends `[1,2)` under leader epoch `8` and Fetches the byte-exact concatenation of A and B batches。
+
+The focused deterministic regression is
+`DefaultKafkaPartitionStorageTest.knownNotCommittedAuthorityOrHeadFailureStillFencesTheOldLeader`。The real gate is wired into
+`phase9M3ProviderCheck` as `:nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest`。This closes an R-tier
+two-runtime Object-provider live-preemption slice for KF-META-007/KF-META-012；it is not yet a two Kafka-process/KRaft
+failover、old in-flight append publication cut、BookKeeper-profile takeover or multi-controller proof。
+
 The executable recovery boundary is now split by resource ownership：
 
 1. `NereusKafkaObjectWalRuntimeFactory` owns `DefaultObjectReadPinManager`、`KafkaCheckpointReader`、
@@ -921,6 +949,10 @@ F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kaf
 - `StreamHeadV2CodecTest`、`KafkaLeaderAuthorityPropertyTest` and `KafkaLeaderAuthorityIntegrationTest` prove V1 decode,
   V2 round trip, schema mismatch rejection, leader/broker term ordering, immediate live-session preemption and old-session
   fencing；
+- `f9MultiBrokerTakeoverProviderIntegrationTest` starts two independent activated Object-WAL runtime graphs against real
+  Oxia/shared provider state，preempts broker A before its session TTL with broker B's higher leader epoch，replays A's exact
+  committed batch、fences A's next durable append and lets B continue at the recovered end。The companion partition test locks
+  the rule that a known-not-committed authority/head conflict is still a recovery-required fence；
 - config-free Kafka identity/domain values、the `nereus-kafka-adapter` module skeleton、canonical binding/registry keys、
   all 25 binding-root fields、closed lifecycle/mapping/operation wire IDs and explicit V1 codecs are implemented；
 - frozen Kafka metadata envelope SHA-256 values are binding

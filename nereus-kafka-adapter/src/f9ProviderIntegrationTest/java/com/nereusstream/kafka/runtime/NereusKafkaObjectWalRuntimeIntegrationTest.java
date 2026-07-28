@@ -4,6 +4,8 @@ package com.nereusstream.kafka.runtime;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadiness;
@@ -80,6 +82,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.client.api.LedgerEntries;
@@ -344,6 +347,241 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
             scheduler.shutdownNow();
         }
         assertThat(provider.closed()).isTrue();
+    }
+
+    @Test
+    void higherLeaderEpochTakesOverLiveBrokerAndRecoversCommittedKafkaBatch() {
+        String nereusCluster =
+                "f9-provider-takeover-" + java.util.UUID.randomUUID();
+        String kafkaCluster = "kraft-takeover-cluster";
+        String writerA = "kafka-broker-1-epoch-31";
+        String writerB = "kafka-broker-2-epoch-41";
+        Clock clock = Clock.systemUTC();
+        OxiaClientConfiguration oxia =
+                new OxiaClientConfiguration(
+                        OXIA.getServiceAddress(),
+                        "default",
+                        Duration.ofSeconds(10),
+                        Duration.ofSeconds(30),
+                        10_000,
+                        1_024);
+        Path objectRoot = root.resolve("takeover-objects");
+        LocalObjectStoreProvider providerA =
+                new LocalObjectStoreProvider(objectRoot);
+        LocalObjectStoreProvider providerB =
+                new LocalObjectStoreProvider(objectRoot);
+        ScheduledExecutorService schedulerA =
+                Executors.newSingleThreadScheduledExecutor();
+        ScheduledExecutorService schedulerB =
+                Executors.newSingleThreadScheduledExecutor();
+        KafkaBrokerIdentity brokerA = new KafkaBrokerIdentity(1, 31);
+        KafkaBrokerIdentity brokerB = new KafkaBrokerIdentity(2, 41);
+        Set<StorageProfile> profiles =
+                Set.of(
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT);
+        KafkaBrokerCapabilitySpecification capabilityA =
+                objectCapability(
+                        kafkaCluster,
+                        brokerA,
+                        writerA,
+                        profiles);
+        KafkaBrokerCapabilitySpecification capabilityB =
+                objectCapability(
+                        kafkaCluster,
+                        brokerB,
+                        writerB,
+                        profiles);
+        KafkaStorageClusterSnapshot clusterSnapshot =
+                new KafkaStorageClusterSnapshot(
+                        kafkaCluster,
+                        301,
+                        KafkaStorageProtocolActivationRecord
+                                .KAFKA_FEATURE_LEVEL,
+                        List.of(brokerA, brokerB),
+                        false,
+                        false,
+                        false);
+        seedActiveAuthority(
+                oxia,
+                nereusCluster,
+                List.of(capabilityA, capabilityB),
+                clusterSnapshot,
+                clock);
+
+        AtomicReference<List<KafkaReplayBatch>> recoveredByA =
+                new AtomicReference<>();
+        AtomicReference<List<KafkaReplayBatch>> recoveredByB =
+                new AtomicReference<>();
+        NereusKafkaRuntime runtimeA = null;
+        NereusKafkaRuntime runtimeB = null;
+        try {
+            runtimeA =
+                    createObjectRuntime(
+                            nereusCluster,
+                            kafkaCluster,
+                            writerA,
+                            31,
+                            oxia,
+                            providerA,
+                            schedulerA,
+                            capabilityA,
+                            clusterSnapshot,
+                            root.resolve("takeover-materialization-a"),
+                            clock,
+                            recoveredByA);
+            runtimeA.start().toCompletableFuture().join();
+
+            KafkaPartitionIdentity identity =
+                    new KafkaPartitionIdentity(
+                            kafkaCluster,
+                            "AAAAAAAAAAAAAAAAAAAAHw",
+                            0,
+                            "takeover-orders");
+            KafkaPartitionStorage storageA =
+                    runtimeA
+                            .partitionStorageManager()
+                            .openLeader(
+                                    new KafkaPartitionLeaderOpenRequest(
+                                            identity,
+                                            1,
+                                            7,
+                                            31,
+                                            StorageProfile
+                                                    .OBJECT_WAL_SYNC_OBJECT,
+                                            302,
+                                            Duration.ofSeconds(20)))
+                            .join();
+            byte[] firstBatch =
+                    appendKafkaBatch(
+                            storageA,
+                            0,
+                            7,
+                            7_000,
+                            "broker-a-value");
+            assertThat(recoveredByA.get()).isEmpty();
+
+            runtimeB =
+                    createObjectRuntime(
+                            nereusCluster,
+                            kafkaCluster,
+                            writerB,
+                            41,
+                            oxia,
+                            providerB,
+                            schedulerB,
+                            capabilityB,
+                            clusterSnapshot,
+                            root.resolve("takeover-materialization-b"),
+                            clock,
+                            recoveredByB);
+            runtimeB.start().toCompletableFuture().join();
+            KafkaPartitionStorage storageB =
+                    runtimeB
+                            .partitionStorageManager()
+                            .openLeader(
+                                    new KafkaPartitionLeaderOpenRequest(
+                                            identity,
+                                            2,
+                                            8,
+                                            41,
+                                            StorageProfile
+                                                    .OBJECT_WAL_SYNC_OBJECT,
+                                            303,
+                                            Duration.ofSeconds(20)))
+                            .join();
+
+            assertThat(storageB.stableSnapshot().stableEndOffset())
+                    .isEqualTo(1);
+            assertThat(recoveredByB.get())
+                    .singleElement()
+                    .satisfies(
+                            replay -> {
+                                assertThat(replay.baseOffset()).isZero();
+                                assertThat(replay.lastOffset()).isZero();
+                                assertThat(replay.encodedBatch())
+                                        .containsExactly(firstBatch);
+                            });
+
+            ByteBuffer staleRecords =
+                    kafkaBatch(1, 8_000, "stale-broker-a");
+            assertFailureCode(
+                    storageA.append(
+                            staleRecords,
+                            new KafkaAppendContext(
+                                    1,
+                                    7,
+                                    (short) -1,
+                                    Duration.ofSeconds(10),
+                                    Map.of())),
+                    ErrorCode.FENCED_APPEND);
+            assertThat(storageA.state())
+                    .isEqualTo(
+                            KafkaPartitionState
+                                    .WRITE_FENCED_RECOVERY_REQUIRED);
+
+            ByteBuffer currentRecords =
+                    kafkaBatch(1, 8_001, "current-broker-b");
+            byte[] secondBatch =
+                    new byte[currentRecords.remaining()];
+            currentRecords.duplicate().get(secondBatch);
+            KafkaStableAppendResult currentAppend =
+                    storageB
+                            .append(
+                                    currentRecords,
+                                    new KafkaAppendContext(
+                                            1,
+                                            8,
+                                            (short) -1,
+                                            Duration.ofSeconds(10),
+                                            Map.of()))
+                            .join();
+            assertThat(
+                            currentAppend
+                                    .stableSnapshot()
+                                    .stableEndOffset())
+                    .isEqualTo(2);
+            storageB.publishDerivedOffsets(2, 2, 2);
+
+            ByteArrayOutputStream expected =
+                    new ByteArrayOutputStream();
+            expected.writeBytes(firstBatch);
+            expected.writeBytes(secondBatch);
+            assertThat(
+                            storageB
+                                    .read(
+                                            new KafkaStorageReadRequest(
+                                                    0,
+                                                    2,
+                                                    10,
+                                                    1024 * 1024,
+                                                    1024 * 1024,
+                                                    true,
+                                                    0,
+                                                    0,
+                                                    Duration.ofSeconds(20)))
+                                    .join()
+                                    .fetchAssembly()
+                                    .encodedRecords())
+                    .containsExactly(expected.toByteArray());
+            assertThat(
+                            runtimeA
+                                    .partitionStorageManager()
+                                    .current(identity))
+                    .contains(storageA);
+            assertThat(
+                            runtimeB
+                                    .partitionStorageManager()
+                                    .current(identity))
+                    .contains(storageB);
+        } finally {
+            if (runtimeB != null) runtimeB.close();
+            if (runtimeA != null) runtimeA.close();
+            schedulerB.shutdownNow();
+            schedulerA.shutdownNow();
+        }
+        assertThat(providerA.closed()).isTrue();
+        assertThat(providerB.closed()).isTrue();
     }
 
     @Test
@@ -999,21 +1237,189 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
         return expectedBytes.toByteArray();
     }
 
+    private static byte[] appendKafkaBatch(
+            KafkaPartitionStorage storage,
+            long offset,
+            int leaderEpoch,
+            long timestamp,
+            String value) {
+        ByteBuffer records =
+                kafkaBatch(offset, timestamp, value);
+        byte[] expected = new byte[records.remaining()];
+        records.duplicate().get(expected);
+        KafkaStableAppendResult result =
+                storage
+                        .append(
+                                records,
+                                new KafkaAppendContext(
+                                        offset,
+                                        leaderEpoch,
+                                        (short) -1,
+                                        Duration.ofSeconds(10),
+                                        Map.of()))
+                        .join();
+        assertThat(result.stableSnapshot().stableEndOffset())
+                .isEqualTo(offset + 1);
+        storage.publishDerivedOffsets(
+                offset + 1,
+                offset + 1,
+                offset + 1);
+        return expected;
+    }
+
+    private static ByteBuffer kafkaBatch(
+            long offset, long timestamp, String value) {
+        return MemoryRecords.withRecords(
+                        offset,
+                        Compression.of(CompressionType.NONE).build(),
+                        new SimpleRecord(timestamp, value.getBytes()))
+                .buffer()
+                .duplicate();
+    }
+
+    private static NereusKafkaRuntime createObjectRuntime(
+            String nereusCluster,
+            String kafkaCluster,
+            String writer,
+            long brokerEpoch,
+            OxiaClientConfiguration oxia,
+            LocalObjectStoreProvider provider,
+            ScheduledExecutorService scheduler,
+            KafkaBrokerCapabilitySpecification capability,
+            KafkaStorageClusterSnapshot clusterSnapshot,
+            Path materializationRoot,
+            Clock clock,
+            AtomicReference<List<KafkaReplayBatch>> recoveredBatches) {
+        Set<StorageProfile> profiles =
+                Set.of(
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT);
+        NereusKafkaRuntimeConfiguration runtimeConfiguration =
+                new NereusKafkaRuntimeConfiguration(
+                        nereusCluster,
+                        kafkaCluster,
+                        writer,
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(5),
+                        writer,
+                        brokerEpoch,
+                        Duration.ofSeconds(30),
+                        100_000,
+                        256 * 1024 * 1024,
+                        profiles);
+        NereusKafkaObjectWalRuntimeConfiguration configuration =
+                new NereusKafkaObjectWalRuntimeConfiguration(
+                        runtimeConfiguration,
+                        streamConfiguration(nereusCluster, writer),
+                        oxia,
+                        objectConfiguration(provider),
+                        Duration.ofMinutes(10),
+                        Duration.ofSeconds(5),
+                        Duration.ofHours(24),
+                        2,
+                        MaterializationConfig.kafkaDefaults(
+                                materializationRoot.toAbsolutePath()));
+        return NereusKafkaObjectWalRuntimeFactory.createActivated(
+                configuration,
+                new NereusKafkaObjectWalRuntimeContext(
+                        provider,
+                        reference -> Optional.empty(),
+                        scheduler,
+                        request ->
+                                new KafkaRecoveryState<>(
+                                        new AcceptingRecoveryStateCodec(),
+                                        recovered -> {
+                                            recoveredBatches.set(
+                                                    List.copyOf(
+                                                            recovered
+                                                                    .state()));
+                                            return CompletableFuture
+                                                    .completedFuture(null);
+                                        }),
+                        clock,
+                        () -> CompletableFuture.completedFuture(null)),
+                new NereusKafkaObjectWalActivationContext(
+                        capability,
+                        () -> CompletableFuture.completedFuture(
+                                clusterSnapshot),
+                        Duration.ofSeconds(10),
+                        Duration.ofMillis(100)));
+    }
+
+    private static KafkaBrokerCapabilitySpecification objectCapability(
+            String kafkaCluster,
+            KafkaBrokerIdentity broker,
+            String writer,
+            Set<StorageProfile> profiles) {
+        return new KafkaBrokerCapabilitySpecification(
+                kafkaCluster,
+                broker,
+                writer,
+                "4.3.0",
+                "f9-provider-takeover-test",
+                System.getProperty("java.version"),
+                profiles,
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                bytes(31),
+                bytes(32),
+                bytes(33),
+                Duration.ofSeconds(1),
+                Duration.ofMinutes(5));
+    }
+
     private static void seedActiveAuthority(
             OxiaClientConfiguration oxia,
             String nereusCluster,
             KafkaBrokerCapabilitySpecification specification,
             KafkaStorageClusterSnapshot snapshot,
             Clock clock) {
+        seedActiveAuthority(
+                oxia,
+                nereusCluster,
+                List.of(specification),
+                snapshot,
+                clock);
+    }
+
+    private static void seedActiveAuthority(
+            OxiaClientConfiguration oxia,
+            String nereusCluster,
+            List<KafkaBrokerCapabilitySpecification> specifications,
+            KafkaStorageClusterSnapshot snapshot,
+            Clock clock) {
+        if (specifications.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Kafka activation requires at least one capability");
+        }
         try (SharedOxiaClientRuntime shared = SharedOxiaClientRuntime.connect(oxia, clock);
                 KafkaStorageActivationMetadataStore store =
                         KafkaStorageActivationMetadataStore.usingSharedRuntime(
                                 oxia, shared, nereusCluster, snapshot.kafkaClusterId())) {
             long now = clock.millis();
-            KafkaBrokerCapabilityRecord capability = specification.initialRecord(now);
-            byte[] capabilitySha256 = KafkaStorageCapabilityDigests.compatibilitySha256(capability);
+            KafkaBrokerCapabilitySpecification specification =
+                    specifications.get(0);
+            KafkaBrokerCapabilityRecord capability =
+                    specification.initialRecord(now);
+            byte[] capabilitySha256 =
+                    KafkaStorageCapabilityDigests.compatibilitySha256(
+                            capability);
+            for (KafkaBrokerCapabilitySpecification exact :
+                    specifications) {
+                KafkaBrokerCapabilityRecord candidate =
+                        exact.initialRecord(now);
+                if (!java.util.Arrays.equals(
+                                capabilitySha256,
+                                KafkaStorageCapabilityDigests
+                                        .compatibilitySha256(candidate))
+                        || !java.util.Arrays.equals(
+                                specification.providerScopeSha256(),
+                                exact.providerScopeSha256())) {
+                    throw new IllegalArgumentException(
+                            "Kafka activation capabilities are incompatible");
+                }
+                store.createCapability(candidate).join();
+            }
             byte[] brokerSetSha256 = KafkaStorageReadinessRecord.brokerSetSha256(snapshot.brokers());
-            store.createCapability(capability).join();
             store.createReadiness(new KafkaStorageReadinessRecord(
                     KafkaStorageReadinessRecord.RECORD_VERSION,
                     snapshot.kafkaClusterId(),
@@ -1699,6 +2105,65 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty());
+    }
+
+    private static void assertFailureCode(
+            CompletableFuture<?> completion, ErrorCode expected) {
+        Throwable failure =
+                completion.handle((ignored, exact) -> exact).join();
+        while (failure instanceof java.util.concurrent.CompletionException
+                && failure.getCause() != null) {
+            failure = failure.getCause();
+        }
+        assertThat(failure)
+                .isInstanceOfSatisfying(
+                        NereusException.class,
+                        exact ->
+                                assertThat(exact.code())
+                                        .isEqualTo(expected));
+    }
+
+    private static final class AcceptingRecoveryStateCodec
+            implements KafkaRecoveryStateCodec<List<KafkaReplayBatch>> {
+        @Override
+        public List<KafkaReplayBatch> freshState() {
+            return new ArrayList<>();
+        }
+
+        @Override
+        public void hydrateCheckpoint(
+                List<KafkaReplayBatch> state,
+                List<com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointSection>
+                        sections,
+                long checkpointOffset) {
+            throw new AssertionError(
+                    "takeover provider test does not publish checkpoints");
+        }
+
+        @Override
+        public void replayBatch(
+                List<KafkaReplayBatch> state,
+                KafkaReplayBatch batch) {
+            long nextOffset =
+                    state.isEmpty()
+                            ? 0
+                            : state.get(state.size() - 1).lastOffset() + 1;
+            assertThat(batch.baseOffset()).isEqualTo(nextOffset);
+            state.add(batch);
+        }
+
+        @Override
+        public void validateRecoveredState(
+                List<KafkaReplayBatch> state,
+                com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState
+                        frozenSource) {
+            long recoveredEnd =
+                    state.isEmpty()
+                            ? 0
+                            : state.get(state.size() - 1).lastOffset() + 1;
+            assertThat(recoveredEnd)
+                    .isEqualTo(frozenSource.endOffset());
+        }
     }
 
     private static final class EmptyRecoveryStateCodec

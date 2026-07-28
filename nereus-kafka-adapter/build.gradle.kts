@@ -105,6 +105,22 @@ tasks.register<Test>("f9M3ProviderIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9MultiBrokerTakeoverProviderIntegrationTest") {
+    group = "verification"
+    description =
+        "Run the F9 live two-broker higher-leader-epoch takeover gate against real Oxia and Object-WAL."
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.named("f9M3ProviderIntegrationTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
+                "higherLeaderEpochTakesOverLiveBrokerAndRecoversCommittedKafkaBatch",
+        )
+    }
+}
+
 tasks.register<Test>("f9BookKeeperWalOnlyProviderIntegrationTest") {
     group = "verification"
     description = "Run the F9 BookKeeper-WAL-only leader open/Produce/Fetch gate against real Oxia and BookKeeper."

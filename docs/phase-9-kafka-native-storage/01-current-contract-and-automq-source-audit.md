@@ -195,6 +195,7 @@ API/core/primary-reader/NCP2/NTC2/materialization rows 是当前已实现事实�
 | `nereus-bookkeeper/.../BookKeeperPrimaryWalRuntime.java` | `32ef63f4979fb1af4b4e00acd69e56e58a4eddc9` | default client construction delegates to one explicit borrowed operations boundary used consistently by append/read/recovery/activation/retention |
 | `nereus-kafka-adapter/.../NereusKafkaBookKeeperWalRuntimeContext.java` | `988fe111e021d7d9d660abe301fe9d8ff54b0872` | three-argument production compatibility constructor supplies the standard adapter；explicit operations decorators remain borrowed |
 | `nereus-kafka-adapter/.../NereusKafkaObjectWalRuntimeFactory.java` | `831eefecbac96998d4619d507d4a6addcf9110ec` | passes the exact operations identity into the provider-neutral BookKeeper graph without changing client ownership |
+| `nereus-kafka-adapter/.../DefaultKafkaPartitionStorage.java` | `a388cb0c831475abbe0e1c4cdefd8f4573e0fbcd` | a durable authority/head conflict always moves the old leader to `WRITE_FENCED_RECOVERY_REQUIRED` even when the rejected append is provably `KNOWN_NOT_COMMITTED` |
 | `nereus-materialization/.../DefaultTopicCompactionEngine.java` | `c4849680050a2be4b0059161509564b36daa350d` | NTC1 collector assumes one logical row per batch |
 | `nereus-metadata-oxia/.../OxiaJavaClientMetadataStore.java` | `3c7d29d7a2b7f4f87e240c65503f46f05c03e464` | live other-writer session rejected until expiry |
 
@@ -606,6 +607,19 @@ registers one real Object provider resolver under both Object sync and async pro
 async profile as default without constructing another provider graph。The first real JVM writes/fetches offset 0 and verifies
 earliest=0/latest=1；after normal shutdown a fresh JVM recovers offset 0、writes/fetches offset 1 and verifies
 earliest=0/latest=2 over the same formatted KRaft directories、Oxia and LocalStack S3。
+
+The same product head now has a real-Oxia live authority gate independent of the release cold-restart gate。
+`f9MultiBrokerTakeoverProviderIntegrationTest` seeds two compatible broker capabilities/readiness identities and starts two
+separately owned production Object-WAL runtimes over one durable authority/root。Broker A commits offset 0 under leader epoch
+7；broker B acquires leader epoch 8 before A's 30-second session TTL、replays the exact committed batch and installs stable end
+1。A's next old-token append returns durable `FENCED_APPEND` and the local storage enters
+`WRITE_FENCED_RECOVERY_REQUIRED` even though the rejected append is `KNOWN_NOT_COMMITTED`；B commits offset 1 and Fetches
+both RecordBatches byte-exactly。The companion deterministic regression fixes the same classification seam。This is an
+R-tier two-runtime provider proof；a two Kafka-process/KRaft reassignment、already-in-flight old append and BookKeeper
+profile matrix remain outside this evidence。
+Fresh `phase9M3ProviderCheck --rerun-tasks` passes 64/64 actionable tasks and composes this gate with the existing Object
+and two-bookie BookKeeper provider gates、M1/M2/M3 deterministic predecessors、146/146 scenario synchronization and the
+updated 29-source Nereus lock。
 
 The 2026-07-28 fresh partial aggregate exposed a second-generation BookKeeper materialization planner defect after the first
 source ledger had already completed terminal retirement and physical deletion。The next wider task must select the committed

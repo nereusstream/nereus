@@ -42,7 +42,23 @@ offset 0 in the first JVM and recovered offset 0 plus offset 1 in a fresh JVM，
 Oxia/LocalStack。The BookKeeper async process gate appends four batches、waits for the real NCP2 S3 object、normally
 stops and recovers/appends in a fresh JVM；the sync gate appends one batch only after required NCP2
 COMMITTED/readable completion and then performs the same cold recovery。All profile-matrix rows remain `PLANNED` because
-single-node evidence does not satisfy their multi-broker takeover、failure-cut and aggregate tiers。
+the new live-takeover gate covers only Object-WAL at provider/runtime tier；BookKeeper-profile takeover、two Kafka-process
+KRaft failover、failure cuts and aggregate tiers are still absent。
+
+Current live authority evidence（product 2026-07-28）：
+`f9MultiBrokerTakeoverProviderIntegrationTest` starts two independently owned activated Object-WAL runtime graphs against the
+same real four-shard Oxia authority and local-file Object root。Readiness contains both exact broker registrations。
+Broker A commits `[0,1)` under `(leaderId=1, leaderEpoch=7, brokerEpoch=31)`；while A's 30-second session is live，broker B
+opens `(2,8,41)`，atomically replaces the head session、replays A's exact batch and installs writable end `1`。A's next
+offset-1 append is rejected by the old durable token and its local storage enters
+`WRITE_FENCED_RECOVERY_REQUIRED` even though the rejected request is known-not-committed；B then commits `[1,2)` and reads
+both batches byte-exactly。`DefaultKafkaPartitionStorageTest` locks the corresponding local classification rule，and the
+task is a dependency of `phase9M3ProviderCheck`。This supplies R-tier partial evidence for KF-META-007/KF-META-012 and the
+post-takeover portion of KF-APP-014。The rows stay `PLANNED` because two release Kafka processes/KRaft reassignment、
+an already in-flight old append cut、BookKeeper/profile takeover and P/C/A tiers have not run。
+Fresh `phase9M3ProviderCheck --rerun-tasks` passes 64/64 actionable tasks，including 146/146 scenario synchronization、
+the 29-source Nereus lock、Kafka baseline lock、M1/M2/M3 deterministic predecessors and the Object、BookKeeper and
+two-runtime takeover provider gates。
 
 Current deterministic M4 fork evidence（local `ec7f0db991` + `032974067c`）：`NereusProducerStateManagerTest`、
 `NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
@@ -288,12 +304,12 @@ hash。Markdown/JSON ID sets must match。
 | KF-META-004 | every create response-loss cut reloads/converges without extra stream | `KafkaBindingRaceIntegrationTest` | R,C | M2 |
 | KF-META-005 | binding profile/mapping/authority attributes are immutable and mismatch becomes CORRUPT | `KafkaBindingTransitionTest` | D,R | M2 |
 | KF-META-006 | lower KRaft leader epoch cannot acquire/renew session | `KafkaLeaderAuthorityPropertyTest` | D,M,R | M2 |
-| KF-META-007 | higher leader epoch immediately preempts live old session before TTL | `KafkaLeaderAuthorityIntegrationTest` | R,P,C | M2 |
+| KF-META-007 | higher leader epoch immediately preempts live old session before TTL | product `f9MultiBrokerTakeoverProviderIntegrationTest`（real Oxia/two independent Object-WAL runtimes R partial）；`KafkaLeaderAuthorityIntegrationTest`；two Kafka-process cut pending | R,P,C | M2 |
 | KF-META-008 | same leader/owner term renews only exact writer/token；different owner is fenced | `KafkaLeaderAuthorityPropertyTest` | D,M | M2 |
 | KF-META-009 | same broker restart with higher broker epoch preempts same leader term | `KafkaLeaderAuthorityIntegrationTest` | R,P | M2 |
 | KF-META-010 | higher broker epoch from different owner at same leader epoch is rejected | `KafkaLeaderAuthorityPropertyTest` | D,M | M2 |
 | KF-META-011 | legacy caller cannot acquire authority-required Kafka stream after lease expiry | `KafkaLeaderAuthorityIntegrationTest` | D,R | M2 |
-| KF-META-012 | old writer primary/protection/head CAS fails after authority preemption | `KafkaLeaderAuthorityIntegrationTest` | R,P,C | M2 |
+| KF-META-012 | old writer primary/protection/head CAS fails after authority preemption | product `f9MultiBrokerTakeoverProviderIntegrationTest` + `DefaultKafkaPartitionStorageTest`（old head-CAS rejection/local recovery fence R/D partial）；`KafkaLeaderAuthorityIntegrationTest` | R,P,C | M2 |
 | KF-META-013 | StreamHead V1 goldens decode to empty authority；V2 round-trip and old reader rejects | `StreamHeadV2CodecTest` | D | M2 |
 | KF-META-014 | NKC1 all required sections/golden SHA/CRC/EOF round-trip deterministically | `KafkaCheckpointFormatTest` | D | M2 |
 | KF-META-015 | NKC1 length/flag/section/checksum/duplicate/unknown-required corruption fails before unsafe allocation | `KafkaCheckpointCorruptionTest` | D,M | M2 |
@@ -322,7 +338,7 @@ hash。Markdown/JSON ID sets must match。
 | KF-APP-011 | append executor queue/byte rejection occurs before IO and releases owned buffer | fork `NereusProduceBufferTest` | D,M | M3 |
 | KF-APP-012 | client disconnect/cancel after enqueue cannot cancel uncertain append；callback/buffer terminal once | fork `NereusProduceBufferTest` | D,R,C | M3 |
 | KF-APP-013 | different partitions run concurrently，same partition never reorders under saturation | `KafkaAppendExecutorIntegrationTest` | D,R,M | M3 |
-| KF-APP-014 | leader takeover during old in-flight append leaves only current-term publication | `KafkaNativeLeaderTakeoverIntegrationTest` | P,C | M3 |
+| KF-APP-014 | leader takeover during old in-flight append leaves only current-term publication | product `f9MultiBrokerTakeoverProviderIntegrationTest`（post-takeover old append fenced R partial；already-in-flight cut pending）；`KafkaNativeLeaderTakeoverIntegrationTest` | P,C | M3 |
 | KF-APP-015 | broker kill before/after each append cut recovers exact LEO/HW/bytes | `KafkaNativeProcessCutIntegrationTest` | P,C | M3/M7 |
 | KF-APP-016 | each claimed Nereus storage profile passes identical Produce correctness contract | `KafkaNativeProfileMatrixIntegrationTest` | R,P | M3/M7 |
 
