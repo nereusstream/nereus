@@ -422,7 +422,7 @@ coordinator/transaction/compaction remain M4/M5。
   and cold generation-zero Fetch against the shared Oxia graph。The BookKeeper client remains borrowed and the provider-neutral
   runtime/stores/readers are closed through the product ledger。The same gate now opens `BOOKKEEPER_WAL_ASYNC_OBJECT` and
   `BOOKKEEPER_WAL_SYNC_OBJECT`，verifies NCP2 COMMITTED publication、byte-exact normal reads and the sync append
-  required-generation completion barrier。Fork `116052aa53` adds the complete stock-owned typed
+  required-generation completion barrier。Fork `b443750be4` adds the complete stock-owned typed
   BookKeeper binding、exact file/version secret reference、pre-I/O cross-field validation、BookKeeper client construction and
   product-before-client close wrapper；six server config tests、eight mapper/ownership tests、Checkstyle、SpotBugs and
   Spotless pass。`f9BookKeeperWalOnlyProcessIntegrationTest` now adds real release-distribution P-tier evidence：stock
@@ -497,12 +497,13 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@116052aa53` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@b443750be4` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
   compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
   controller activation scheduling commit、one durable feature/control commit、one aggregate Spotless alignment commit and one
   cache-directory KRaft identity commit、one typed BookKeeper runtime/client-ownership commit、one async Object-WAL
-  profile-mapping commit and one BookKeeper Object-profile/cache-root NCP2 mapping commit。The
+  profile-mapping commit、one BookKeeper Object-profile/cache-root NCP2 mapping commit and one BookKeeper ledger-GC
+  configuration/digest-mapping commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
@@ -598,7 +599,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@116052aa53` branch。
+`nereus/future9-native-kafka-storage@b443750be4` branch。
 The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、fresh
 process restart/takeover index recovery、real internal-topic coordinator replay/restart/failover、upstream focused suites
 and real two-broker evidence are still required before M4 completion。

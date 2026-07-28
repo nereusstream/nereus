@@ -282,7 +282,7 @@ BookKeeper 模式复用 provider-neutral `BookKeeperPrimaryWalRuntime`、Oxia na
 physical-reference publisher、profile resolver 和 exact reader registry；只有 F1-BK namespace 与 ACTIVE publication
 已由 operator provision、broker readiness exact 匹配时才允许启动。`f9BookKeeperWalOnlyProviderIntegrationTest`
 用真实四分片 Oxia + 两个 bookie 证明 leader open、strict append 和 cold generation-zero Fetch。Fork
-`116052aa53` 已实现完整 91-key typed BookKeeper 配置映射、password file/version identity、pre-I/O cross-field
+`b443750be4` 已实现完整 97-key typed BookKeeper 配置映射、password file/version identity、pre-I/O cross-field
 validation、fork-owned client 和 product-first/client-second close wrapper。`f9BookKeeperWalOnlyProcessIntegrationTest`
 进一步从真实 release tarball 启动 combined-node Kafka，使用 stock
 `zk+longhierarchical://127.0.0.1:<port>/ledgers` 管理 BookKeeper 自身元数据，同时把 Nereus
@@ -907,12 +907,16 @@ format、dedicated-controller validation、activation feature wait 和 single-co
 `5ebf31cde8` 修正 aggregate `core:spotlessCheck` 捕获的 controller runtime test import order；第三十一个
 `ecde6964c5` 为 Nereus authoritative cache root 创建/校验 KRaft V1 `meta.properties` 与 non-reserved directory ID，
 使 broker registration 能携带有效 directory identity；第三十二个 `50b46aab2d` 新增 stock-owned
-`NereusKafkaBookKeeperConfig`、91-key `ConfigDef`、BookKeeper cross-field validation、WAL/runtime/capability mapping、
+`NereusKafkaBookKeeperConfig`、97-key `ConfigDef`、BookKeeper cross-field validation、WAL/runtime/capability mapping、
 password-file exact identity、fork-owned client construction，以及 product-first/client-second idempotent close wrapper。
 第三十三个 `80445853a3` 把同一已安装 Object provider 显式暴露为 sync/async 两个 executable profile，并保留所选
 Object profile 作为 default；第三十四个 `116052aa53` 将 BookKeeper async/sync 映射到同一
 BookKeeper-primary + Object-materialization graph，暴露完整五档 capability/default，并把 staging 目录锚定到
-authoritative cache root。真实 combined-node
+authoritative cache root；第三十五个 `b443750be4` 增加六个 ledger-GC rollout key、typed snapshot/cross-field
+validation、compatibility-digest binding 以及 `BookKeeperLedgerGcConfiguration` 映射。默认 disabled/dry-run
+不会启动 scanner；enabled/non-dry-run 只有在 materialization runtime 已激活时才允许创建 retention service。
+Kafka stream-coverage deletion activation 与真实 ledger 删除仍需后续 gate，当前不能把配置/扫描器组装等同于
+物理删除授权。真实 combined-node
 KRaft/Oxia/S3 process baseline 已通过；
 同节点 fresh-JVM cold restart 也已通过；独立 BookKeeper WAL-only/async/sync release-distribution
 首启/冷重启 gates 也在同一 fork head 通过。这些 gates 没有给 Kafka 引入 Pulsar metadata runtime：

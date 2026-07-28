@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "34" ]] \
-    || fail "expected thirty-four reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "35" ]] \
+    || fail "expected thirty-five reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -215,7 +215,7 @@ c49b0fdc4f8c70f13c60696ef6af646cf8d0c323 core/src/main/java/kafka/server/nereus/
 22d198549a1854c1f2e16b6213f84931be75f89e core/src/main/java/kafka/server/nereus/NereusKafkaProductRuntimeCreator.java
 bf0b8ed32d850cda69ba3e05b5ba64fe288bf452 core/src/main/java/kafka/server/nereus/NereusKafkaRecoveryStateFactory.java
 b903540487b6553d4a1944b5f36e9567fc9262ba core/src/main/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryBridge.java
-d468272019ab5ee17ed32599dc36922d4d5934c6 core/src/main/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapper.java
+7ac20ad6d50e0c92ecbb515158802fa2b9ebf8e4 core/src/main/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapper.java
 1970537a48ac13fd77c6bc32fd2bf1e99fb31670 core/src/main/java/kafka/server/nereus/NereusKafkaStorageClusterSnapshotProvider.java
 ae2387ee9d6b318eaf37f62840d8ca3ac44f4e9b core/src/main/scala/kafka/Kafka.scala
 d477c7485376ae62f82abcb8393c9582be8794df core/src/main/scala/kafka/cluster/Partition.scala
@@ -263,7 +263,7 @@ d7f0b8cca7dec9cfa4de9a542c8eb1b3c3c9cfe5 core/src/test/java/kafka/server/nereus/
 019ec4a4007cde8e4bb1143fe101f06d5fc6e352 core/src/test/java/kafka/server/nereus/NereusKafkaOwnedProviderRuntimeTest.java
 ec32f2b8e23e9548a7a8b4e8bdb717a7949dc788 core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryBridgeTest.java
 0dad9ef15898372476787e354ce96ac2415a8a3c core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryTest.java
-482c51940f9e1b8818e761bf4a39e46273b26c3f core/src/test/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapperTest.java
+123a681adccf746e172586c1537a57467fd21119 core/src/test/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapperTest.java
 e06ff96da5853e2ab0afc1cbc3e4153b981f7b7d core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
 c28a29d488b51c0630cb1197b95b30bc6bf43a68 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 ba0bcb6a45f1715683ac23611873dcb83ce5a474 core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
@@ -294,11 +294,11 @@ e4cfd9a94228abfd06c80d84982431d4029eac1b server-common/src/main/java/org/apache/
 cc4e0b9ab0f32fb83c0f7ab0c0fd8d5e3bbd41f2 server-common/src/test/java/org/apache/kafka/server/common/FeatureTest.java
 3b6f063deb7be47b2676a0a44300eab9173278e9 server/src/main/java/org/apache/kafka/server/BrokerFeatures.java
 3036df4e77ad23fabb6533d1dc173458356ea6b3 server/src/main/java/org/apache/kafka/server/config/AbstractKafkaConfig.java
-1b3bc11344dcdfc5938d15db1a034084b192bba4 server/src/main/java/org/apache/kafka/server/config/NereusKafkaBookKeeperConfig.java
-5ae118f51abc9f1845cc32b118e960260d3f125f server/src/main/java/org/apache/kafka/server/config/NereusKafkaConfigs.java
-36549342543c3e58c0b1171e49c8d5a336f168de server/src/main/java/org/apache/kafka/server/config/NereusKafkaStorageConfig.java
+b6b90dde2d8d4f51a44712d55754278588510026 server/src/main/java/org/apache/kafka/server/config/NereusKafkaBookKeeperConfig.java
+213593d47e79e7b8ce00de1b105381930fd2c734 server/src/main/java/org/apache/kafka/server/config/NereusKafkaConfigs.java
+14caa394003a6c2dfce077fc45875b50a6076ab2 server/src/main/java/org/apache/kafka/server/config/NereusKafkaStorageConfig.java
 1c979a97392a3d7b42769864dbcdf4d4211fa677 server/src/test/java/org/apache/kafka/server/BrokerFeaturesTest.java
-58aa5163a37b2c497343d8bf291f15eb7b732b4d server/src/test/java/org/apache/kafka/server/config/NereusKafkaStorageConfigTest.java
+1efd355b15f71bc76a33217bfe2aafb3eba2728c server/src/test/java/org/apache/kafka/server/config/NereusKafkaStorageConfigTest.java
 168371ca93e4cc0aa8e7168f82c880396dd723a2 server/src/test/java/org/apache/kafka/server/util/SchedulerTest.java
 6a9a43c81b0b60e69fb95099a76d80e7894ba453 storage/src/main/java/org/apache/kafka/storage/internals/log/LeaderEpochAwareOffsetLookup.java
 9920d51f0f7740f1db62064868ac6224a0db18b0 storage/src/main/java/org/apache/kafka/storage/internals/log/LeaderEpochAwareRecoveryState.java
@@ -852,4 +852,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; thirty-four commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control blobs and markers match"
+echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; thirty-five commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control blobs and markers match"

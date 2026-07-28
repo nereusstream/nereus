@@ -3,6 +3,7 @@ package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
+import com.nereusstream.bookkeeper.BookKeeperLedgerGcConfiguration;
 import com.nereusstream.bookkeeper.BookKeeperSecretRef;
 import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.core.StreamStorageConfig;
@@ -15,6 +16,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class NereusKafkaObjectWalRuntimeConfigurationTest {
@@ -65,23 +67,58 @@ class NereusKafkaObjectWalRuntimeConfigurationTest {
 
     @Test
     void acceptsExactObjectAndAllBookKeeperCompositions() {
-        new NereusKafkaObjectWalRuntimeConfiguration(
-                runtime(Set.of(
-                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
-                        StorageProfile.BOOKKEEPER_WAL_ONLY,
-                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
-                        StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT)),
-                streams(false),
-                oxia(),
-                objects(),
-                Duration.ofMinutes(10),
-                Duration.ofSeconds(5),
-                Duration.ofHours(24),
-                2,
-                Optional.of(new NereusKafkaBookKeeperWalRuntimeConfiguration(
-                        "deployment-a",
-                        bookKeeper())));
+        NereusKafkaObjectWalRuntimeConfiguration configuration =
+                new NereusKafkaObjectWalRuntimeConfiguration(
+                        runtime(Set.of(
+                                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                                StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
+                                StorageProfile.BOOKKEEPER_WAL_ONLY,
+                                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT)),
+                        streams(false),
+                        oxia(),
+                        objects(),
+                        Duration.ofMinutes(10),
+                        Duration.ofSeconds(5),
+                        Duration.ofHours(24),
+                        2,
+                        Optional.of(new NereusKafkaBookKeeperWalRuntimeConfiguration(
+                                "deployment-a",
+                                bookKeeper())));
+
+        BookKeeperLedgerGcConfiguration ledgerGc =
+                configuration.bookKeeper().orElseThrow().ledgerGc();
+        assertThat(ledgerGc.enabled()).isFalse();
+        assertThat(ledgerGc.dryRun()).isTrue();
+    }
+
+    @Test
+    void validatesBookKeeperLedgerGcAgainstReaderLeaseAuthority() {
+        assertThatThrownBy(
+                        () ->
+                                new NereusKafkaBookKeeperWalRuntimeConfiguration(
+                                        "deployment-a",
+                                        bookKeeper(),
+                                        new BookKeeperLedgerGcConfiguration(
+                                                1,
+                                                Duration.ofSeconds(30),
+                                                Duration.ofMinutes(2),
+                                                Duration.ofDays(7),
+                                                true,
+                                                false)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reader lease TTL plus clock skew");
+
+        new NereusKafkaBookKeeperWalRuntimeConfiguration(
+                "deployment-a",
+                bookKeeper(),
+                new BookKeeperLedgerGcConfiguration(
+                        1,
+                        Duration.ofSeconds(30),
+                        Duration.ofMinutes(3),
+                        Duration.ofDays(7),
+                        true,
+                        false));
     }
 
     private static NereusKafkaRuntimeConfiguration runtime(Set<StorageProfile> profiles) {

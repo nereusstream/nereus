@@ -4,6 +4,7 @@ package com.nereusstream.kafka.runtime;
 import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.keys.DeterministicIds;
+import com.nereusstream.bookkeeper.BookKeeperLedgerRetentionService;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryPhysicalReferenceAdapter;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryWalRuntime;
 import com.nereusstream.bookkeeper.OxiaBookKeeperLedgerIdNamespaceReservationStore;
@@ -80,6 +81,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -254,6 +256,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                         exactContext.clock());
             }
             BookKeeperPrimaryWalRuntime bookKeeperRuntime = null;
+            KafkaObjectMaterializationRuntime objectMaterializationRuntime = null;
             List<BookKeeperPrimaryPhysicalReferenceAdapter> additionalPhysicalReferences =
                     List.of();
             if (exactConfiguration.bookKeeper().isPresent()) {
@@ -411,6 +414,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                                         materializationWorkers,
                                         callbackExecutor,
                                         exactContext.clock());
+                objectMaterializationRuntime = exactMaterialization;
                 providerResources.add(
                         registerOwned(
                                 constructedResources,
@@ -450,6 +454,44 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                 requiredObjectGeneration =
                         exactMaterialization
                                 .requiredObjectGenerationCompletion();
+            }
+            if (bookKeeperRuntime != null) {
+                NereusKafkaBookKeeperWalRuntimeConfiguration
+                        bookKeeperConfiguration =
+                                exactConfiguration
+                                        .bookKeeper()
+                                        .orElseThrow();
+                if (bookKeeperConfiguration.ledgerGc().enabled()
+                        && !bookKeeperConfiguration.ledgerGc().dryRun()
+                        && objectMaterializationRuntime == null) {
+                    throw new IllegalArgumentException(
+                            "enabled BookKeeper ledger GC requires the activated Kafka materialization runtime");
+                }
+                if (objectMaterializationRuntime != null) {
+                    KafkaObjectMaterializationRuntime exactMaterialization =
+                            objectMaterializationRuntime;
+                    bookKeeperRuntime
+                            .createRetentionService(
+                                    bookKeeperConfiguration.ledgerGc(),
+                                    l0MetadataStore,
+                                    exactMaterialization
+                                            .committedGenerationRetirementAuthority(),
+                                    exactMaterialization.streamTrigger(),
+                                    exactContext.renewalScheduler(),
+                                    callbackExecutor)
+                            .ifPresent(
+                                    retention -> {
+                                        providerResources.add(
+                                                registerOwned(
+                                                        constructedResources,
+                                                        "bookkeeper-ledger-retention-service",
+                                                        retention));
+                                        backgroundServiceFactories.add(
+                                                ignored ->
+                                                        retentionBackgroundService(
+                                                                retention));
+                                    });
+                }
             }
             PrimaryWalRegistry objectWalRegistry =
                     AppendCoordinator.productionObjectWalRegistry(
@@ -671,6 +713,23 @@ public final class NereusKafkaObjectWalRuntimeFactory {
             throw new IllegalArgumentException("runtimeProcessId cannot be blank");
         }
         return DeterministicIds.stableHashComponent(exact);
+    }
+
+    private static KafkaRuntimeBackgroundService retentionBackgroundService(
+            BookKeeperLedgerRetentionService retention) {
+        BookKeeperLedgerRetentionService exact =
+                Objects.requireNonNull(retention, "retention");
+        return new KafkaRuntimeBackgroundService() {
+            @Override
+            public CompletionStage<Void> start() {
+                return exact.start();
+            }
+
+            @Override
+            public CompletionStage<Void> closeAsync() {
+                return exact.closeAsync();
+            }
+        };
     }
 
     private static void validateActivationContext(

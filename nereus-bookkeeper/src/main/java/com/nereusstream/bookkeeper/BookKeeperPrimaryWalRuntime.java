@@ -1,15 +1,20 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.bookkeeper;
 
+import com.nereusstream.materialization.CommittedGenerationRetirementAuthority;
 import com.nereusstream.materialization.MaterializationSourceProvider;
+import com.nereusstream.materialization.MaterializationStreamTrigger;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.OxiaJavaBookKeeperMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.bookkeeper.client.api.BookKeeper;
 
@@ -315,6 +320,107 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
     public MaterializationSourceProvider materializationSourceProvider() {
         ensureOpen();
         return walRuntime.materializationSourceProvider(sourceProtections);
+    }
+
+    /**
+     * Creates the single provider-neutral whole-ledger collector for this runtime.
+     *
+     * <p>The returned service borrows this runtime, the shared materialization graph and both
+     * executors. Callers must start it after materialization starts and close it before any borrowed
+     * dependency. Disabled and dry-run configurations deliberately create no scanner and perform no
+     * reference mutation.
+     */
+    public Optional<BookKeeperLedgerRetentionService> createRetentionService(
+            BookKeeperLedgerGcConfiguration gcConfiguration,
+            OxiaMetadataStore l0,
+            CommittedGenerationRetirementAuthority committedGenerations,
+            MaterializationStreamTrigger materializationTrigger,
+            ScheduledExecutorService scheduler,
+            Executor callbackExecutor) {
+        ensureOpen();
+        BookKeeperLedgerGcConfiguration exactGc =
+                Objects.requireNonNull(gcConfiguration, "gcConfiguration");
+        exactGc.validateAgainst(configuration);
+        if (!exactGc.enabled() || exactGc.dryRun()) {
+            return Optional.empty();
+        }
+        BookKeeperWalOnlyRetirementAuthority commonAuthority =
+                new BookKeeperWalOnlyRetirementAuthority(
+                        cluster,
+                        Objects.requireNonNull(l0, "l0"),
+                        metadata);
+        BookKeeperAsyncObjectRetirementAuthority retirementAuthority =
+                new BookKeeperAsyncObjectRetirementAuthority(
+                        cluster,
+                        configuration,
+                        commonAuthority,
+                        Objects.requireNonNull(
+                                committedGenerations,
+                                "committedGenerations"),
+                        metadata);
+        BookKeeperWalReferenceManager referenceManager =
+                new BookKeeperWalReferenceManager(
+                        cluster,
+                        configuration,
+                        metadata,
+                        retirementAuthority);
+        BookKeeperWalOnlyReferenceRetirementCoordinator referenceRetirement =
+                new BookKeeperWalOnlyReferenceRetirementCoordinator(
+                        cluster,
+                        configuration,
+                        metadata,
+                        retirementAuthority,
+                        referenceManager);
+        BookKeeperSealedLedgerMaterializationTrigger sealedTrigger =
+                new BookKeeperSealedLedgerMaterializationTrigger(
+                        cluster,
+                        configuration,
+                        metadata,
+                        Objects.requireNonNull(
+                                materializationTrigger,
+                                "materializationTrigger"));
+        BookKeeperWalRetentionGate gate =
+                new BookKeeperWalRetentionGate(
+                        cluster,
+                        configuration,
+                        exactGc,
+                        metadata,
+                        metadata,
+                        namespaceVerifier,
+                        activationVerifier,
+                        operations,
+                        clock);
+        BookKeeperLedgerRetentionManager manager =
+                new BookKeeperLedgerRetentionManager(
+                        cluster,
+                        configuration,
+                        exactGc,
+                        metadata,
+                        namespaceVerifier,
+                        activationVerifier,
+                        operations,
+                        gate,
+                        clock);
+        BookKeeperLedgerRetentionScanner scanner =
+                new BookKeeperLedgerRetentionScanner(
+                        cluster,
+                        configuration,
+                        exactGc,
+                        namespace.ledgerIdNamespaceSha256().value(),
+                        metadata,
+                        sealedTrigger,
+                        referenceRetirement,
+                        gate,
+                        manager);
+        return Optional.of(
+                new BookKeeperLedgerRetentionService(
+                        scanner,
+                        configuration.retentionScanInterval(),
+                        configuration.operationTimeout(),
+                        Objects.requireNonNull(scheduler, "scheduler"),
+                        Objects.requireNonNull(
+                                callbackExecutor,
+                                "callbackExecutor")));
     }
 
     public Optional<BookKeeperPrimaryWalRuntimeCapabilityBinding> capabilityBinding() {
