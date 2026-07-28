@@ -7,6 +7,9 @@ import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
 import com.nereusstream.metadata.oxia.records.KafkaStorageActivationLifecycle;
 import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.KafkaStorageReadinessRecord;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
 
@@ -105,6 +108,27 @@ class KafkaStorageActivationMetadataStoreContractTest {
                 readiness, regression));
     }
 
+    @Test
+    void normalizesRawTransportFailuresAsRetriableMetadataUnavailable() {
+        TransportFailurePartitionedOxiaBackend backend =
+                new TransportFailurePartitionedOxiaBackend();
+        KafkaStorageActivationMetadataStore store = store(backend);
+        try {
+            backend.failNext(TransportFailurePartitionedOxiaBackend.Operation.GET);
+            assertMetadataUnavailable(
+                    () -> store.getActivation().join(),
+                    "failed to read Kafka activation metadata");
+
+            backend.failNext(TransportFailurePartitionedOxiaBackend.Operation.PUT_IF_ABSENT);
+            assertMetadataUnavailable(
+                    () -> store.createReadiness(
+                            KafkaActivationTestValues.readiness(7, 101, 1_300)).join(),
+                    "failed to create Kafka activation metadata");
+        } finally {
+            store.close();
+        }
+    }
+
     private static KafkaStorageActivationMetadataStore store(
             PartitionedOxiaClient.Backend backend) {
         return new OxiaJavaKafkaStorageActivationMetadataStore(
@@ -190,11 +214,112 @@ class KafkaStorageActivationMetadataStoreContractTest {
         });
     }
 
+    private static void assertMetadataUnavailable(Runnable operation, String message) {
+        assertThatThrownBy(operation::run).satisfies(failure -> {
+            Throwable exact = unwrap(failure);
+            assertThat(exact).isInstanceOf(NereusException.class);
+            NereusException nereus = (NereusException) exact;
+            assertThat(nereus.code()).isEqualTo(ErrorCode.METADATA_UNAVAILABLE);
+            assertThat(nereus.retriable()).isTrue();
+            assertThat(nereus).hasMessage(message);
+            assertThat(nereus.getCause())
+                    .isInstanceOf(TransportFailurePartitionedOxiaBackend.TransportFailure.class);
+        });
+    }
+
     private static Throwable unwrap(Throwable supplied) {
         Throwable current = supplied;
         while (current instanceof CompletionException && current.getCause() != null) {
             current = current.getCause();
         }
         return current;
+    }
+
+    private static final class TransportFailurePartitionedOxiaBackend
+            implements PartitionedOxiaClient.Backend {
+        private final InMemoryPartitionedOxiaBackend delegate =
+                new InMemoryPartitionedOxiaBackend();
+        private Operation armed;
+
+        private void failNext(Operation operation) {
+            armed = operation;
+        }
+
+        @Override
+        public CompletableFuture<Optional<PartitionedOxiaClient.VersionedValue>> get(
+                String key, PartitionKey partitionKey) {
+            if (take(Operation.GET)) {
+                return CompletableFuture.failedFuture(
+                        new TransportFailure("Oxia transport is unavailable"));
+            }
+            return delegate.get(key, partitionKey);
+        }
+
+        @Override
+        public CompletableFuture<PartitionedOxiaClient.WriteResult> putIfAbsent(
+                String key, byte[] value, PartitionKey partitionKey) {
+            if (take(Operation.PUT_IF_ABSENT)) {
+                return CompletableFuture.failedFuture(
+                        new TransportFailure("Oxia transport is unavailable"));
+            }
+            return delegate.putIfAbsent(key, value, partitionKey);
+        }
+
+        @Override
+        public CompletableFuture<PartitionedOxiaClient.WriteResult> putIfVersion(
+                String key,
+                byte[] value,
+                long expectedVersion,
+                PartitionKey partitionKey) {
+            return delegate.putIfVersion(key, value, expectedVersion, partitionKey);
+        }
+
+        @Override
+        public CompletableFuture<Void> deleteIfVersion(
+                String key, long expectedVersion, PartitionKey partitionKey) {
+            return delegate.deleteIfVersion(key, expectedVersion, partitionKey);
+        }
+
+        @Override
+        public CompletableFuture<List<String>> list(
+                String fromInclusive, String toExclusive, PartitionKey partitionKey) {
+            return delegate.list(fromInclusive, toExclusive, partitionKey);
+        }
+
+        @Override
+        public CompletableFuture<List<PartitionedOxiaClient.VersionedValue>> rangeScan(
+                String fromInclusive,
+                String toExclusive,
+                int limit,
+                PartitionKey partitionKey) {
+            return delegate.rangeScan(fromInclusive, toExclusive, limit, partitionKey);
+        }
+
+        @Override
+        public WatchRegistration watchPrefix(
+                String prefix,
+                PartitionKey partitionKey,
+                Runnable invalidationCallback) {
+            return delegate.watchPrefix(prefix, partitionKey, invalidationCallback);
+        }
+
+        private boolean take(Operation operation) {
+            if (armed != operation) {
+                return false;
+            }
+            armed = null;
+            return true;
+        }
+
+        private enum Operation {
+            GET,
+            PUT_IF_ABSENT
+        }
+
+        private static final class TransportFailure extends RuntimeException {
+            private TransportFailure(String message) {
+                super(message);
+            }
+        }
     }
 }

@@ -38,8 +38,9 @@ provider has durably applied `createReadiness`、`createActivation(PREPARED)` or
 coordinator observes completion。The replacement controller preserves the readiness-only/PREPARED facts or byte-identical
 ACTIVE authority，publishes non-regressing readiness for broker `[4]`，and the broker subsequently completes native
 Produce/Fetch/ListOffsets with Object persistence。The same gate also covers the before-provider side of all three store
-operations，including activation-absent recovery from an existing readiness tuple。These are still partial F9 results；
-initial empty-cluster snapshot/proof and capability aggregation、actual transport-error cuts、coordinator/checkpoint migration、
+operations，including activation-absent recovery from an existing readiness tuple。A real Oxia connection-reset gate now
+also proves same-controller-epoch retry after transport recovery。These are still partial F9 results；initial empty-cluster
+snapshot/proof and capability-aggregation process cuts、coordinator/checkpoint migration、
 release-process response-loss restart and the stock retention oracle remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
@@ -141,8 +142,9 @@ cluster with stock ZooKeeper long-hierarchical metadata，then restarts the exac
 recovers offset 0 and appends offset 1 with earliest=0/latest=2；
 The current process suite additionally covers Object/BookKeeper live takeover、ACTIVE-state three-voter controller
 failover and the complete before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store-publication
-matrix。Checkpoint/virtual-segment cuts、initial empty-cluster snapshot/proof and capability aggregation、actual
-transport-error and wider chaos evidence remain future work，so this is not yet a production-rollout claim.
+matrix plus actual first-activation Oxia transport reset/retry。Checkpoint/virtual-segment cuts、initial empty-cluster
+snapshot/proof and capability-aggregation process cuts and wider chaos evidence remain future work，so this is not yet a
+production-rollout claim.
 
 ## Current Phase
 

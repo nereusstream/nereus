@@ -48,8 +48,10 @@ public final class OxiaJavaKafkaStorageActivationMetadataStore
     @Override
     public CompletableFuture<Optional<VersionedKafkaStorageProtocolActivation>> getActivation() {
         ensureOpen();
-        return client.get(keys.activationKey(), keys.activationPartitionKey())
-                .thenApply(optional -> optional.map(this::activation));
+        return metadataRead(
+                () -> client.get(keys.activationKey(), keys.activationPartitionKey())
+                        .thenApply(optional -> optional.map(this::activation)),
+                "failed to read Kafka activation metadata");
     }
 
     @Override
@@ -59,8 +61,9 @@ public final class OxiaJavaKafkaStorageActivationMetadataStore
         KafkaStorageProtocolActivationRecord exact = requireActivation(value);
         byte[] bytes = KafkaMetadataCodecs.encodeEnvelope(
                 exact, KafkaStorageProtocolActivationRecord.class);
-        CompletableFuture<VersionedKafkaStorageProtocolActivation> write = client.putIfAbsent(
-                        keys.activationKey(), bytes, keys.activationPartitionKey())
+        CompletableFuture<VersionedKafkaStorageProtocolActivation> write = invoke(
+                        () -> client.putIfAbsent(
+                                keys.activationKey(), bytes, keys.activationPartitionKey()))
                 .thenApply(result -> activation(exact, result.version(), bytes));
         return recoverCreate(write, this::getActivation, exact, current ->
                 current.value().withMetadataVersion(0));
@@ -76,11 +79,12 @@ public final class OxiaJavaKafkaStorageActivationMetadataStore
         KafkaStorageActivationTransitions.requireActivationReplacement(current.value(), exact);
         byte[] bytes = KafkaMetadataCodecs.encodeEnvelope(
                 exact, KafkaStorageProtocolActivationRecord.class);
-        CompletableFuture<VersionedKafkaStorageProtocolActivation> write = client.putIfVersion(
-                        keys.activationKey(),
-                        bytes,
-                        current.metadataVersion(),
-                        keys.activationPartitionKey())
+        CompletableFuture<VersionedKafkaStorageProtocolActivation> write = invoke(
+                        () -> client.putIfVersion(
+                                keys.activationKey(),
+                                bytes,
+                                current.metadataVersion(),
+                                keys.activationPartitionKey()))
                 .thenApply(result -> activation(exact, result.version(), bytes));
         return recoverCas(write, this::getActivation, exact, current.metadataVersion(), loaded ->
                 loaded.value().withMetadataVersion(0));
@@ -91,10 +95,12 @@ public final class OxiaJavaKafkaStorageActivationMetadataStore
             KafkaBrokerIdentity identity) {
         ensureOpen();
         KafkaBrokerIdentity exact = Objects.requireNonNull(identity, "identity");
-        return client.get(
-                        keys.capabilityKey(exact.brokerId(), exact.brokerEpoch()),
-                        keys.activationPartitionKey())
-                .thenApply(optional -> optional.map(stored -> capability(stored, exact)));
+        return metadataRead(
+                () -> client.get(
+                                keys.capabilityKey(exact.brokerId(), exact.brokerEpoch()),
+                                keys.activationPartitionKey())
+                        .thenApply(optional -> optional.map(stored -> capability(stored, exact))),
+                "failed to read Kafka broker capability metadata");
     }
 
     @Override
@@ -104,8 +110,8 @@ public final class OxiaJavaKafkaStorageActivationMetadataStore
         KafkaBrokerCapabilityRecord exact = requireCapability(value);
         String key = keys.capabilityKey(exact.brokerId(), exact.brokerEpoch());
         byte[] bytes = KafkaMetadataCodecs.encodeEnvelope(exact, KafkaBrokerCapabilityRecord.class);
-        CompletableFuture<VersionedKafkaBrokerCapability> write = client.putIfAbsent(
-                        key, bytes, keys.activationPartitionKey())
+        CompletableFuture<VersionedKafkaBrokerCapability> write = invoke(
+                        () -> client.putIfAbsent(key, bytes, keys.activationPartitionKey()))
                 .thenApply(result -> capability(key, exact, result.version(), bytes));
         return recoverCreate(write, () -> getCapability(exact.identity()), exact, current ->
                 current.value().withMetadataVersion(0));
@@ -121,8 +127,12 @@ public final class OxiaJavaKafkaStorageActivationMetadataStore
         KafkaStorageActivationTransitions.requireCapabilityHeartbeat(current.value(), exact);
         String key = keys.capabilityKey(exact.brokerId(), exact.brokerEpoch());
         byte[] bytes = KafkaMetadataCodecs.encodeEnvelope(exact, KafkaBrokerCapabilityRecord.class);
-        CompletableFuture<VersionedKafkaBrokerCapability> write = client.putIfVersion(
-                        key, bytes, current.metadataVersion(), keys.activationPartitionKey())
+        CompletableFuture<VersionedKafkaBrokerCapability> write = invoke(
+                        () -> client.putIfVersion(
+                                key,
+                                bytes,
+                                current.metadataVersion(),
+                                keys.activationPartitionKey()))
                 .thenApply(result -> capability(key, exact, result.version(), bytes));
         return recoverCas(
                 write,
@@ -135,8 +145,10 @@ public final class OxiaJavaKafkaStorageActivationMetadataStore
     @Override
     public CompletableFuture<Optional<VersionedKafkaStorageReadiness>> getReadiness() {
         ensureOpen();
-        return client.get(keys.readinessKey(), keys.activationPartitionKey())
-                .thenApply(optional -> optional.map(this::readiness));
+        return metadataRead(
+                () -> client.get(keys.readinessKey(), keys.activationPartitionKey())
+                        .thenApply(optional -> optional.map(this::readiness)),
+                "failed to read Kafka readiness metadata");
     }
 
     @Override
@@ -145,8 +157,9 @@ public final class OxiaJavaKafkaStorageActivationMetadataStore
         ensureOpen();
         KafkaStorageReadinessRecord exact = requireReadiness(value);
         byte[] bytes = KafkaMetadataCodecs.encodeEnvelope(exact, KafkaStorageReadinessRecord.class);
-        CompletableFuture<VersionedKafkaStorageReadiness> write = client.putIfAbsent(
-                        keys.readinessKey(), bytes, keys.activationPartitionKey())
+        CompletableFuture<VersionedKafkaStorageReadiness> write = invoke(
+                        () -> client.putIfAbsent(
+                                keys.readinessKey(), bytes, keys.activationPartitionKey()))
                 .thenApply(result -> readiness(exact, result.version(), bytes));
         return recoverCreate(write, this::getReadiness, exact, current ->
                 current.value().withMetadataVersion(0));
@@ -161,11 +174,12 @@ public final class OxiaJavaKafkaStorageActivationMetadataStore
         KafkaStorageReadinessRecord exact = requireReadiness(replacement);
         KafkaStorageActivationTransitions.requireReadinessReplacement(current.value(), exact);
         byte[] bytes = KafkaMetadataCodecs.encodeEnvelope(exact, KafkaStorageReadinessRecord.class);
-        CompletableFuture<VersionedKafkaStorageReadiness> write = client.putIfVersion(
-                        keys.readinessKey(),
-                        bytes,
-                        current.metadataVersion(),
-                        keys.activationPartitionKey())
+        CompletableFuture<VersionedKafkaStorageReadiness> write = invoke(
+                        () -> client.putIfVersion(
+                                keys.readinessKey(),
+                                bytes,
+                                current.metadataVersion(),
+                                keys.activationPartitionKey()))
                 .thenApply(result -> readiness(exact, result.version(), bytes));
         return recoverCas(write, this::getReadiness, exact, current.metadataVersion(), loaded ->
                 loaded.value().withMetadataVersion(0));
@@ -390,10 +404,11 @@ public final class OxiaJavaKafkaStorageActivationMetadataStore
     }
 
     private static RuntimeException metadataFailure(String message, Throwable failure) {
-        if (failure instanceof RuntimeException runtime) {
-            return runtime;
+        Throwable exact = F4MetadataStoreSupport.unwrap(failure);
+        if (exact instanceof NereusException nereus) {
+            return nereus;
         }
-        return new NereusException(ErrorCode.METADATA_UNAVAILABLE, true, message, failure);
+        return new NereusException(ErrorCode.METADATA_UNAVAILABLE, true, message, exact);
     }
 
     private static NereusException invariant(String message, Throwable failure) {
@@ -412,5 +427,21 @@ public final class OxiaJavaKafkaStorageActivationMetadataStore
 
     private static <T> CompletableFuture<T> failed(Throwable failure) {
         return CompletableFuture.failedFuture(failure);
+    }
+
+    private static <T> CompletableFuture<T> invoke(
+            Supplier<CompletableFuture<T>> operation) {
+        try {
+            return Objects.requireNonNull(operation.get(), "Oxia metadata operation future");
+        } catch (Throwable failure) {
+            return failed(failure);
+        }
+    }
+
+    private static <T> CompletableFuture<T> metadataRead(
+            Supplier<CompletableFuture<T>> operation,
+            String failureMessage) {
+        return invoke(operation).exceptionallyCompose(
+                failure -> failed(metadataFailure(failureMessage, failure)));
     }
 }

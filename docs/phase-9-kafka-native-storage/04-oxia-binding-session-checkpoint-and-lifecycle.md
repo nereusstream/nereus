@@ -1,7 +1,7 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
 > 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs/full composition and Object-WAL exact-reference durable checkpoint quarantine partial slices implemented
-> 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；真实两 Bookie/两 Kafka release-process gate 闭合 BookKeeper 三 profile 的 post-handoff recovery/continuation；test-only agent gate further proves Bookie-acked/metadata-`WRITING` stale append recovery and fencing；three-voter/three-combined-node gate further proves ACTIVE activation remains immutable across controller kill and readiness epoch does not regress；a second fault-agent test now proves all six readiness-create/PREPARED-create/ACTIVE-CAS before-provider and after-provider publication boundaries survive exact-controller loss；initial empty-cluster proof/capability aggregation、transport-error、checkpoint/virtual-segment 与 coordinator migration cuts 仍 open
+> 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；真实两 Bookie/两 Kafka release-process gate 闭合 BookKeeper 三 profile 的 post-handoff recovery/continuation；test-only agent gate further proves Bookie-acked/metadata-`WRITING` stale append recovery and fencing；three-voter/three-combined-node gate further proves ACTIVE activation remains immutable across controller kill and readiness epoch does not regress；a second fault-agent test now proves all six readiness-create/PREPARED-create/ACTIVE-CAS before-provider and after-provider publication boundaries survive exact-controller loss；a real Toxiproxy/Oxia connection-reset gate additionally proves raw transport failures are normalized to retriable metadata failures and the same controller epoch completes first activation after recovery；initial empty-cluster proof/capability-aggregation process cuts、checkpoint/virtual-segment 与 coordinator migration cuts 仍 open
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -791,10 +791,49 @@ regression。
 
 This supplies process P/C evidence for the complete three-operation store-publication boundary matrix without adding
 controller epoch or test markers to durable schemas。It does not prove leadership loss during the initial empty-cluster
-snapshot/capability aggregation、an actual provider/transport error，or the final aggregate。Accordingly KF-OPS-005 remains
-`PLANNED` until those cuts and the final aggregate close。
+snapshot/capability aggregation or the final aggregate；the following independent gate owns actual Oxia transport failure
+and same-epoch retry。Accordingly KF-OPS-005 remains `PLANNED` until the remaining cuts and final aggregate close。
 
-### 7.9 Recovery component ownership
+### 7.9 Actual Oxia transport failure and same-epoch retry（2026-07-29）
+
+`OxiaJavaKafkaStorageActivationMetadataStore` is the abstraction boundary between Oxia client failures and the controller /
+broker activation state machines。Before this checkpoint，its read methods returned raw exceptional futures and
+`metadataFailure` returned any `RuntimeException` unchanged。A gRPC/Oxia transport exception was therefore not a
+`NereusException(retriable=true)`；the fork's `NereusControllerStorageRuntime` classified it as durable，set
+`terminalFailure=true` for the current controller epoch and stopped scheduling activation attempts even after transport
+recovered。
+
+The store now applies one explicit failure contract：
+
+| Boundary | Condition/invariant failure | Unknown provider/transport failure |
+| --- | --- | --- |
+| `getActivation` / `getCapability` / `getReadiness` | preserve an existing typed `NereusException` | wrap as `METADATA_UNAVAILABLE`, `retriable=true`, retaining the exact cause |
+| create/CAS invocation | preserve condition failures for winner reload | convert synchronous provider throws to failed futures before recovery |
+| create/CAS response-loss recovery | accept a byte-equivalent applied winner；otherwise preserve typed condition/invariant failures | wrap the original non-Nereus failure as retriable metadata unavailable |
+
+`invoke(Supplier<CompletableFuture<T>>)` ensures a provider that throws before returning a future still obeys the asynchronous
+store contract。`metadataRead(...)` performs the read-side normalization。`metadataFailure(...)` preserves only an existing
+typed `NereusException`; an arbitrary runtime exception is no longer treated as proof of a durable contradiction。
+`KafkaStorageActivationMetadataStoreContractTest.normalizesRawTransportFailuresAsRetriableMetadataUnavailable` first
+reproduced the raw exception escape and now freezes both read and non-applied write behavior；the complete store contract
+still passes its create/CAS monotonicity and applied-response-loss cases。
+
+`:nereus-kafka-adapter:f9ActivationTransportRecoveryProcessIntegrationTest --rerun-tasks` supplies real P/C evidence。It
+formats one dedicated controller (node 1) and one dedicated broker (node 2) against one single-voter KRaft quorum、shared
+LocalStack S3 and an Oxia endpoint routed through Toxiproxy。The controller first reaches a healthy KRaft leader epoch while
+no broker capability exists。The harness then installs a downstream `reset_peer` toxic and starts the broker；for a four
+second fault window both JVMs must remain alive and direct, non-proxied Oxia reads must show no readiness or activation。
+After removing the toxic，the same controller ID and epoch—not a leadership replacement—must emit its exact reconciliation
+marker，Oxia must expose ACTIVE plus readiness brokers `[2]`，and the broker must pass RF1 offset-0
+Produce/Fetch/ListOffsets `0/1` with a positive Object count。The controller log must never contain the durable-failure fault
+message。
+
+Fresh execution passes 73/73 actionable tasks in 1m10s；the JUnit scenario itself completes in 36.512s with zero
+failure/error and is included in `phase9M6KafkaProcessCheck`。This closes actual Oxia connection-reset recovery during first
+activation。It does not claim arbitrary provider failures、initial snapshot/capability-aggregation process loss、rolling
+capability mismatch or the M7 chaos aggregate。
+
+### 7.10 Recovery component ownership
 
 The executable recovery boundary is now split by resource ownership：
 

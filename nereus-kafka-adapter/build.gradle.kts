@@ -321,12 +321,41 @@ tasks.register<Test>("f9ActivationCutFailoverProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9ActivationTransportRecoveryProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Cut the real Oxia transport during first activation and prove same-epoch controller retry and native IO."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9ActivationCutFailoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-activation-transport-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "controllerRetriesActualOxiaTransportFailureDuringFirstActivation",
+        )
+    }
+}
+
 tasks.register<Test>("f9InFlightTakeoverProcessIntegrationTest") {
     group = "verification"
     description =
         "Hold an old broker inside real Object-WAL IO while a separate controller reassigns its partition."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
-    shouldRunAfter(tasks.named("f9ActivationCutFailoverProcessIntegrationTest"))
+    shouldRunAfter(tasks.named("f9ActivationTransportRecoveryProcessIntegrationTest"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
     classpath = f9ProviderIntegrationTest.runtimeClasspath
     systemProperty(

@@ -1014,6 +1014,351 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    @Test
+    @Timeout(value = 6, unit = TimeUnit.MINUTES)
+    void controllerRetriesActualOxiaTransportFailureDuringFirstActivation()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome =
+                extractReleaseDistribution(
+                        kafkaCheckout,
+                        root.resolve(
+                                "kafka-activation-transport-distribution"));
+        Path formatScript =
+                executable(
+                        kafkaHome.resolve(
+                                "bin/kafka-storage.sh"));
+        Path startScript =
+                executable(
+                        kafkaHome.resolve(
+                                "bin/nereus-kafka-server-start.sh"));
+        Path controllerConfig =
+                root.resolve(
+                        "activation-transport-controller.properties");
+        Path brokerConfig =
+                root.resolve(
+                        "activation-transport-broker.properties");
+        Path controllerFormatLog =
+                root.resolve(
+                        "activation-transport-controller-format.log");
+        Path brokerFormatLog =
+                root.resolve(
+                        "activation-transport-broker-format.log");
+        Path controllerServerLog =
+                root.resolve(
+                        "activation-transport-controller-server.log");
+        Path brokerServerLog =
+                root.resolve(
+                        "activation-transport-broker-server.log");
+        int controllerBrokerPort = freePort();
+        int controllerPort =
+                differentFreePort(
+                        controllerBrokerPort);
+        int brokerPort =
+                differentFreePort(
+                        controllerBrokerPort,
+                        controllerPort);
+        String controllerBootstrap =
+                "127.0.0.1:" + controllerPort;
+        String brokerBootstrap =
+                "127.0.0.1:" + brokerPort;
+        String controllerQuorumVoters =
+                "1@127.0.0.1:" + controllerPort;
+        String bucket =
+                "nereus-act-transport-"
+                        + UUID.randomUUID();
+        String topic =
+                "activation-transport-"
+                        + UUID.randomUUID();
+        String nereusCluster =
+                "f9-activation-transport-"
+                        + UUID.randomUUID();
+        String kafkaClusterId =
+                org.apache.kafka.common.Uuid
+                        .randomUuid()
+                        .toString();
+        String toxicName =
+                "cut-oxia-transport";
+
+        createBucket(bucket);
+        org.testcontainers.Testcontainers.exposeHostPorts(
+                OXIA.getMappedPort(
+                        OxiaContainer.OXIA_PORT));
+        try (ToxiproxyContainer toxiproxy =
+                new ToxiproxyContainer(TOXIPROXY_IMAGE)) {
+            toxiproxy.start();
+            ToxiproxyContainer.ContainerProxy oxiaProxy =
+                    toxiproxy.getProxy(
+                            "host.testcontainers.internal",
+                            OXIA.getMappedPort(
+                                    OxiaContainer.OXIA_PORT));
+            String proxiedOxiaAddress =
+                    oxiaProxy.getContainerIpAddress()
+                            + ":"
+                            + oxiaProxy.getProxyPort();
+            String objectEndpoint =
+                    LOCALSTACK
+                            .getEndpointOverride(
+                                    LocalStackContainer.Service.S3)
+                            .toString();
+            writeConfiguration(
+                    controllerConfig,
+                    controllerBrokerPort,
+                    controllerPort,
+                    bucket,
+                    root.resolve(
+                            "activation-transport-controller-log"),
+                    root.resolve(
+                            "activation-transport-controller-metadata"),
+                    root.resolve(
+                            "activation-transport-controller-cache"),
+                    "OBJECT_WAL_SYNC_OBJECT",
+                    null,
+                    1,
+                    KafkaProcessRole.CONTROLLER,
+                    controllerQuorumVoters,
+                    nereusCluster,
+                    objectEndpoint,
+                    proxiedOxiaAddress);
+            writeConfiguration(
+                    brokerConfig,
+                    brokerPort,
+                    controllerPort,
+                    bucket,
+                    root.resolve(
+                            "activation-transport-broker-log"),
+                    root.resolve(
+                            "activation-transport-broker-metadata"),
+                    root.resolve(
+                            "activation-transport-broker-cache"),
+                    "OBJECT_WAL_SYNC_OBJECT",
+                    null,
+                    2,
+                    KafkaProcessRole.BROKER,
+                    controllerQuorumVoters,
+                    nereusCluster,
+                    objectEndpoint,
+                    proxiedOxiaAddress);
+            overrideConfiguration(
+                    controllerConfig,
+                    Map.of(
+                            "nereus.kafka.storage.append.timeout.ms",
+                            "1000",
+                            "nereus.kafka.storage.fetch.timeout.ms",
+                            "1000"));
+            overrideConfiguration(
+                    brokerConfig,
+                    Map.of(
+                            "nereus.kafka.storage.append.timeout.ms",
+                            "1000",
+                            "nereus.kafka.storage.fetch.timeout.ms",
+                            "1000"));
+            formatStorage(
+                    formatScript,
+                    kafkaHome,
+                    controllerConfig,
+                    controllerFormatLog,
+                    kafkaClusterId);
+            formatStorage(
+                    formatScript,
+                    kafkaHome,
+                    brokerConfig,
+                    brokerFormatLog,
+                    kafkaClusterId);
+
+            Process controller = null;
+            Process broker = null;
+            boolean toxicInstalled = false;
+            Throwable failure = null;
+            try {
+                controller =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        controllerConfig.toString()),
+                                kafkaHome,
+                                controllerServerLog);
+                ControllerQuorumEvidence controllerQuorum =
+                        awaitControllerQuorum(
+                                controllerAdminProperties(
+                                        controllerBootstrap),
+                                List.of(1),
+                                -1,
+                                -1,
+                                List.of(controller),
+                                controllerServerLog);
+                oxiaProxy
+                        .toxics()
+                        .resetPeer(
+                                toxicName,
+                                ToxicDirection.DOWNSTREAM,
+                                0);
+                toxicInstalled = true;
+                broker =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        brokerConfig.toString()),
+                                kafkaHome,
+                                brokerServerLog);
+                awaitTransportCutWindow(
+                        controller,
+                        broker,
+                        controllerServerLog,
+                        brokerServerLog,
+                        Duration.ofSeconds(4));
+                assertActivationControlPlaneAbsent(
+                        nereusCluster,
+                        kafkaClusterId);
+
+                removeToxic(
+                        oxiaProxy,
+                        toxicName);
+                toxicInstalled = false;
+                awaitBroker(
+                        brokerBootstrap,
+                        broker,
+                        brokerServerLog);
+                awaitControllerActivationReconciliation(
+                        controller,
+                        controllerServerLog,
+                        controllerQuorum);
+                awaitActiveActivation(
+                        nereusCluster,
+                        kafkaClusterId,
+                        List.of(2),
+                        new Path[] {
+                                controllerServerLog,
+                                brokerServerLog
+                        },
+                        Duration.ofSeconds(45));
+                assertThat(
+                                readLog(
+                                        controllerServerLog))
+                        .doesNotContain(
+                                "Nereus Kafka first activation failed durably");
+
+                try (Admin admin =
+                        Admin.create(
+                                adminProperties(
+                                        brokerBootstrap))) {
+                    admin.createTopics(
+                                    List.of(
+                                            new NewTopic(
+                                                    topic,
+                                                    Map.of(
+                                                            0,
+                                                            List.of(2)))))
+                            .all()
+                            .get(
+                                    CLIENT_TIMEOUT.toSeconds(),
+                                    TimeUnit.SECONDS);
+                }
+                byte[] value =
+                        "activation-transport-recovered"
+                                .getBytes(
+                                        StandardCharsets.UTF_8);
+                RecordMetadata produced =
+                        produce(
+                                brokerBootstrap,
+                                topic,
+                                "transport-key"
+                                        .getBytes(
+                                                StandardCharsets.UTF_8),
+                                value);
+                assertThat(produced.offset())
+                        .isZero();
+                TopicPartition partition =
+                        new TopicPartition(
+                                topic,
+                                0);
+                assertThat(
+                                fetch(
+                                                brokerBootstrap,
+                                                partition,
+                                                0,
+                                                brokerServerLog)
+                                        .value())
+                        .isEqualTo(value);
+                try (Admin admin =
+                        Admin.create(
+                                adminProperties(
+                                        brokerBootstrap))) {
+                    assertOffsets(
+                            admin,
+                            partition,
+                            0,
+                            1);
+                }
+                assertThat(
+                                objectCount(
+                                        bucket))
+                        .isPositive();
+            } catch (Throwable operationFailure) {
+                failure = operationFailure;
+            }
+            if (toxicInstalled) {
+                try {
+                    removeToxic(
+                            oxiaProxy,
+                            toxicName);
+                } catch (Throwable cleanupFailure) {
+                    failure =
+                            mergeFailure(
+                                    failure,
+                                    cleanupFailure);
+                }
+            }
+            Process[] processes = {
+                    controller,
+                    broker
+            };
+            Path[] serverLogs = {
+                    controllerServerLog,
+                    brokerServerLog
+            };
+            for (int index = processes.length - 1;
+                    index >= 0;
+                    index--) {
+                Process process =
+                        processes[index];
+                if (process == null
+                        || !process.isAlive()) {
+                    continue;
+                }
+                try {
+                    killBroker(
+                            process,
+                            serverLogs[index]);
+                } catch (Throwable shutdownFailure) {
+                    failure =
+                            mergeFailure(
+                                    failure,
+                                    shutdownFailure);
+                }
+            }
+            if (failure != null) {
+                try {
+                    preserveMultiControllerFailureEvidence(
+                            new Path[] {
+                                    controllerConfig,
+                                    brokerConfig
+                            },
+                            new Path[] {
+                                    controllerFormatLog,
+                                    brokerFormatLog
+                            },
+                            serverLogs);
+                } catch (AssertionError evidenceFailure) {
+                    failure.addSuppressed(
+                            evidenceFailure);
+                }
+                rethrow(failure);
+            }
+        }
+    }
+
     private void runActivationPublicationCut(
             Path kafkaHome,
             Path formatScript,
@@ -3139,6 +3484,41 @@ class NereusKafkaNativeProcessIntegrationTest {
             String nereusCluster,
             String objectEndpoint
     ) throws IOException {
+        return writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                logDirectory,
+                metadataDirectory,
+                cacheDirectory,
+                storageProfile,
+                bookKeeper,
+                nodeId,
+                processRole,
+                controllerQuorumVoters,
+                nereusCluster,
+                objectEndpoint,
+                OXIA.getServiceAddress());
+    }
+
+    private String writeConfiguration(
+            Path config,
+            int brokerPort,
+            int controllerPort,
+            String bucket,
+            Path logDirectory,
+            Path metadataDirectory,
+            Path cacheDirectory,
+            String storageProfile,
+            BookKeeperProcessConfiguration bookKeeper,
+            int nodeId,
+            KafkaProcessRole processRole,
+            String controllerQuorumVoters,
+            String nereusCluster,
+            String objectEndpoint,
+            String oxiaServiceAddress
+    ) throws IOException {
         boolean bookKeeperProfile = storageProfile.startsWith("BOOKKEEPER_WAL_");
         if (bookKeeperProfile != (bookKeeper != null)) {
             throw new IllegalArgumentException(
@@ -3158,6 +3538,11 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
         if (objectEndpoint == null || objectEndpoint.isBlank()) {
             throw new IllegalArgumentException("objectEndpoint must be non-blank");
+        }
+        if (oxiaServiceAddress == null
+                || oxiaServiceAddress.isBlank()) {
+            throw new IllegalArgumentException(
+                    "oxiaServiceAddress must be non-blank");
         }
         Files.createDirectories(logDirectory);
         Files.createDirectories(metadataDirectory);
@@ -3209,7 +3594,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 storageProfile);
         properties.setProperty(
                 "nereus.kafka.storage.oxia.service.address",
-                OXIA.getServiceAddress());
+                oxiaServiceAddress);
         properties.setProperty("nereus.kafka.storage.oxia.namespace", "default");
         properties.setProperty("nereus.kafka.storage.object.provider", "s3");
         properties.setProperty("nereus.kafka.storage.object.bucket", bucket);
@@ -3244,6 +3629,29 @@ class NereusKafkaNativeProcessIntegrationTest {
             properties.store(writer, "F9 native Kafka provider-backed process gate");
         }
         return nereusCluster;
+    }
+
+    private static void overrideConfiguration(
+            Path config,
+            Map<String, String> overrides
+    ) throws IOException {
+        Properties properties =
+                new Properties();
+        try (var input =
+                Files.newInputStream(
+                        config)) {
+            properties.load(input);
+        }
+        overrides.forEach(
+                properties::setProperty);
+        try (Writer writer =
+                Files.newBufferedWriter(
+                        config,
+                        StandardCharsets.UTF_8)) {
+            properties.store(
+                    writer,
+                    "F9 native Kafka provider-backed process gate");
+        }
     }
 
     private static void addBookKeeperConfiguration(
@@ -4990,6 +5398,61 @@ class NereusKafkaNativeProcessIntegrationTest {
                 + quorum.leaderId()
                 + " at epoch "
                 + quorum.leaderEpoch();
+    }
+
+    private static void awaitTransportCutWindow(
+            Process controller,
+            Process broker,
+            Path controllerLog,
+            Path brokerLog,
+            Duration duration
+    ) throws Exception {
+        long deadline =
+                System.nanoTime()
+                        + duration.toNanos();
+        while (System.nanoTime() < deadline) {
+            assertProcessesAlive(
+                    List.of(
+                            controller,
+                            broker),
+                    controllerLog,
+                    brokerLog);
+            Thread.sleep(100);
+        }
+    }
+
+    private static void assertActivationControlPlaneAbsent(
+            String nereusCluster,
+            String kafkaClusterId
+    ) {
+        OxiaClientConfiguration oxia =
+                oxiaConfiguration();
+        Clock clock =
+                Clock.systemUTC();
+        try (SharedOxiaClientRuntime shared =
+                        SharedOxiaClientRuntime.connect(
+                                oxia,
+                                clock);
+                KafkaStorageActivationMetadataStore store =
+                        KafkaStorageActivationMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        shared,
+                                        nereusCluster,
+                                        kafkaClusterId)) {
+            assertThat(
+                            store.getActivation()
+                                    .join())
+                    .as(
+                            "transport cut must prevent activation publication")
+                    .isEmpty();
+            assertThat(
+                            store.getReadiness()
+                                    .join())
+                    .as(
+                            "transport cut must prevent readiness publication")
+                    .isEmpty();
+        }
     }
 
     private static KafkaActivationCutEvidence

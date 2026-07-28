@@ -699,8 +699,19 @@ The first before-PREPARED execution found that replacement recovery reused valid
 with a newer snapshot offset `s`，which immediately violated the exact PREPARED/readiness tuple。Production
 `createPrepared` now stores `readiness.kraftMetadataOffset()` and
 `resumesAbsentActivationFromExistingReadinessAfterControllerFailure` provides a narrow deterministic regression。The
-store-publication matrix is closed；initial empty-cluster snapshot/capability aggregation、an actual transport error and the M7 aggregate
-remain before KF-OPS-005 can leave `PLANNED`。
+store-publication matrix is closed。
+
+`f9ActivationTransportRecoveryProcessIntegrationTest` now closes the adjacent actual Oxia transport-reset boundary。It routes
+one dedicated controller and one dedicated broker through Toxiproxy，establishes the controller's exact KRaft epoch，then
+installs a downstream connection reset before the broker publishes capability。During the four-second cut both processes
+stay alive and direct Oxia inspection requires readiness/activation absent；after proxy recovery the same controller epoch
+must reconcile to ACTIVE and node 2 must pass native Produce/Fetch/ListOffsets `0/1` plus Object persistence。This process
+gate exposed that `OxiaJavaKafkaStorageActivationMetadataStore` returned arbitrary runtime transport failures unchanged，
+causing the fork controller runtime to mark the epoch terminal。The store now preserves typed Nereus/condition/invariant
+failures but normalizes unknown read/write provider failures to retriable `METADATA_UNAVAILABLE`，including synchronous
+provider throws converted to failed futures。The narrow store regression and its complete contract pass；the process gate
+passes 73/73 actionable tasks in 1m10s。Initial empty-cluster snapshot/capability-aggregation process loss and the M7
+aggregate remain before KF-OPS-005 can leave `PLANNED`。
 
 The 2026-07-28 fresh partial aggregate exposed a second-generation BookKeeper materialization planner defect after the first
 source ledger had already completed terminal retirement and physical deletion。The next wider task must select the committed
