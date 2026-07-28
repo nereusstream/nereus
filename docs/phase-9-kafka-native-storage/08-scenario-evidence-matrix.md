@@ -34,7 +34,7 @@ and TV2 marker through the configured storage executor。`BrokerMetadataPublishe
 `NereusTopicDeltaLifecycleTest` cover the deterministic ordering part of KF-TXN-011/012：both elections wait for ready，
 and transaction-state ready waits for exact recovered storage installation。Rows stay `PLANNED` because required
 real-service、process/restart、takeover and aggregate tiers have not run。The fork commits are published in
-`nereusstream/kafka:nereus/future9-native-kafka-storage@58342d9dca`。
+`nereusstream/kafka:nereus/future9-native-kafka-storage@3bd92c7244`。
 
 Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
 `3eb6b63` + `57dcf35`）：stock DeleteRecords normalization/capture invokes the shared checkpoint-before-trim path；
@@ -42,13 +42,20 @@ the fork exposes bounded owned writable partitions and the same `NereusUnifiedLo
 non-overlapping maintenance；and canonical virtual segment/config/time/logical state is rebuilt from checkpoint plus
 committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、Checkstyle and SpotBugs evidence passes。Rows
 remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing。The Kafka
-fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@58342d9dca`。
+fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@3bd92c7244`。
 
 Current deterministic compaction fork evidence（product `e18bf36`；fork `58342d9dca`）：typed bounded runtime config、
 one-time product composition、leader-only owned-partition registration、internal/user work classification、partition-lock
 canonical/HW/LSO capture and stock `CleanedTransactionMetadata` marker pre-scan pass focused adapter/fork tests plus
-Checkstyle、SpotBugs and the executable 25-commit/86-file source lock。Rows remain `PLANNED` until real-provider
+Checkstyle、SpotBugs and the executable 27-commit/92-file source lock。Rows remain `PLANNED` until real-provider
 fresh-process/restart/takeover and full LogCleaner differential evidence exist。
+
+Current deterministic M6 launcher/isolation evidence（fork `faaffc8a75` + `3bd92c7244`）：stock maintenance
+paths compile only against `BrokerStorageManagedLog`/`PartitionLeaderAuthority`；artifact-free stock main/test compilation
+and `PartitionTest` pass without Nereus classes。The artifact-only `NereusKafka` launcher selects a fresh production factory
+and delegates signal/startup/shutdown/await behavior to the shared stock `Kafka.run` path；the executable server-start script
+selects that class。Focused launcher/runtime tests、Checkstyle、SpotBugs and the executable 27-commit/92-file source lock pass。
+Rows remain `PLANNED` until a real provider-backed KRaft process proves startup、Produce/Fetch/ListOffsets and shutdown cuts。
 
 ## 2. Machine-readable manifest target
 

@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture is implemented locally；Kafka compaction config/owned-partition capture 的 fork mapping、Kafka controller scheduling、CLI/KafkaRaftServer production selection、BookKeeper/async providers and observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation 与 explicit native-storage launcher are implemented locally；Kafka controller scheduling、BookKeeper/async providers、durable checkpoint-failure quarantine/audit、real KRaft process gate and observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -91,8 +91,11 @@ side-effect-free typed-config/broker-identity mapping。The production companion
 the exact registered broker epoch at `start()`，constructs the activation-backed S3/Object-WAL provider graph with borrowed Kafka
 scheduler/clock，captures one KRaft image plus conservative local-log facts，and binds a one-time recovery-state factory bridge
 to the exact ReplicaManager。Product-owned checkpoint/read-pin/paged replay and fork-owned fresh state construction/exact
-Partition publication are executable。Kafka controller activation scheduling、CLI/KafkaRaftServer factory selection and native
-log selection remain open。
+Partition publication are executable。Fork `faaffc8a75` keeps stock maintenance compilation artifact-free through
+`BrokerStorageManagedLog`/`PartitionLeaderAuthority`；`3bd92c7244` adds `kafka.server.nereus.NereusKafka` and
+`bin/nereus-kafka-server-start.sh`，selecting a fresh production factory before delegating to the same stock
+`Kafka.run`/`KafkaRaftServer` lifecycle。Kafka controller activation scheduling and the real native-storage process gate
+remain open。
 
 ### 1.2 Resource ownership
 
@@ -356,8 +359,9 @@ executor 在 submit 返回前复制 exact bytes，以 `TopicIdPartition` FIFO、
 已接纳任务。`bba3ef0121` 把 whole-request Fetch wave 移到第二个 runtime-owned bounded worker，并使用独立 bounded
 callback executor；subscription、deadline、logical permit 均由 operation terminal cleanup。`NereusBrokerStorageRuntime.beginDrain`
 先停止 append/fetch 两个 executor 的新 admission；`awaitDrained` 对两个 executor termination 与 product runtime
-drained future 做 caller-local `allOf + orTimeout`，不取消底层已接纳 Produce/Fetch。真实 KRaft process gate 与
-production factory selection 未闭合，所以整个路径仍不能用于 production rollout readiness。
+drained future 做 caller-local `allOf + orTimeout`，不取消底层已接纳 Produce/Fetch。production factory selection
+已由显式 launcher 闭合；真实 provider-backed KRaft process gate 未闭合，所以整个路径仍不能用于 production
+rollout readiness。
 
 The selected shell is not a durability shortcut：`NereusUnifiedLogFactory` uses only
 `${cacheDir}/{brokerId}/partition-logs`，sets `loadExistingLogs=false` and `scheduleLocalMaintenance=false`，and rejects local

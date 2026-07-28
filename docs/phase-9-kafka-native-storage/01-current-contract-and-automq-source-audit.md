@@ -388,7 +388,7 @@ baseline-only completion evidence。
 `github.com/nereusstream/kafka` 已存在且是 `apache/kafka` fork；审计时 remote `trunk` 为
 `c300006a7705c240642db6950b5a95fec982bfc5`，并包含锁定 Apache base
 `427b409cf440f745ad6195673d3342f6bd3974d4`。当前 working clone
-`/Users/liusinan/apps/ideaproject/GITHUB/nereusstream` 的 branch
+`/Users/liusinan/apps/ideaproject/nereusstream/kafka` 的 branch
 `nereus/future9-native-kafka-storage` 从该 base 创建；首个 exact-record bridge commit 是
 `2379c63933dd0a155d5a5bf90fca85c7b24db58b`，第二个 async ListOffsets/error-mapping commit 是
 `c2b1b4b3a00fb7cfa222a3e6df659011795f3b3e`，第三个 stock request-path seam commit 是
@@ -412,15 +412,18 @@ baseline-only completion evidence。
 `ec7f0db991`，第二十一个 transaction handoff/coordinator ordering test 是 `032974067c`，第二十二个
 checkpoint-before-DeleteRecords trim 是 `4c060aec89`，第二十三个 partition retention scheduling 是
 `feabf6c686`，第二十四个 virtual log segment state 是 `378e9f8967`，第二十五个 compaction partition
-authority capture 是 `58342d9dca31009bb63b2c6a3be8a7c7ff68f9ec`。该 head 已通过 SSH 发布到
+authority capture 是 `58342d9dca31009bb63b2c6a3be8a7c7ff68f9ec`，第二十六个 stock maintenance
+source-isolation fix 是 `faaffc8a75`，第二十七个 native-storage launcher 是
+`3bd92c7244d84870f48e4819bf2930ca9248c278`。该 head 已通过 SSH 发布到
 `origin/nereus/future9-native-kafka-storage`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/twenty-five-commit
-count/version、组织 fork fetch/push identity、cached organization trunk ancestry、八十六文件 exact change set/blob、
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/twenty-seven-commit
+count/version、组织 fork fetch/push identity、cached organization trunk ancestry、九十二文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
-BrokerServer runtime create/ready/drain/close signature、typed adapter factory/ReplicaManager binding，以及 package-wide
-no-reflection/no-service-loader 规则；新增 runtime composition 还锁定 executable-profile、explicit-provider、
+BrokerServer runtime create/ready/drain/close signature、typed adapter factory/ReplicaManager binding、stock-only
+maintenance interfaces、共享 `Kafka.run` factory 传递、artifact-only launcher 与 executable script，以及 package-wide
+no-reflection/no-service-loader/no-stock-product-import 规则；新增 runtime composition 还锁定 executable-profile、explicit-provider、
 broker-capability、activation-backed Object-WAL creator、borrowed scheduler、single-image KRaft snapshot、
 post-registration broker epoch、per-operation admission recheck、one-time recovery-state-factory binding、stock
 `RecordBatch` CRC/fresh-state/frozen-source validation、exact `Partition` publication，以及 stock-local
@@ -544,5 +547,5 @@ KRaft restart、the simultaneous-wakeup regression and all Checkstyle/SpotBugs/S
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`58342d9dca31009bb63b2c6a3be8a7c7ff68f9ec`。Executable source-lock expectation 已更新到该 reviewed、
+`3bd92c7244d84870f48e4819bf2930ca9248c278`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

@@ -79,13 +79,13 @@ F9-M2 binding/checkpoint/recovery boundary and the M3 raw Kafka batch、stable p
 authority-session renewal and exact bounded ListOffsets scan slices；the isolated Kafka fork branch owns the exact
 record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHolder` bridge、optional stock
 `Partition`/`ReplicaManager` request seam、a generic
-`BrokerServer` runtime lifecycle injection boundary and the typed adapter-backed runtime bridge。Its code-level
+`BrokerServer` runtime lifecycle injection boundary、the typed adapter-backed runtime bridge、stock-only maintenance
+interfaces and an explicit native-storage launcher。Its code-level
 target and locked AutoMQ reference audit live in
-[`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The fork branch is not yet pushed because
-the current GitHub credential has read-only fork access；the concrete provider-backed broker factory exists but is not selected
-by KafkaRaftServer/CLI，and `UnifiedLog`/log wiring plus
-end-to-end native Produce/Fetch remain future work，
-so this is not a current broker-runtime claim.
+[`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The SSH-published fork head is
+`nereus/future9-native-kafka-storage@3bd92c7244`；`bin/nereus-kafka-server-start.sh` selects a fresh production factory
+through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。A real provider-backed KRaft process gate and
+end-to-end native Produce/Fetch/ListOffsets evidence remain future work，so this is not yet a production-rollout claim.
 
 ## Current Phase
 

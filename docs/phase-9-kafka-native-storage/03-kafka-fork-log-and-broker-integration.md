@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index、transactional request handoff 与 internal-topic ready ordering deterministic slices implemented locally；M5 checkpoint-before-DeleteRecords、周期性 owned-partition retention、virtual segment/config history/derived index 与 timestamp lookup deterministic slices implemented locally；KafkaRaftServer production selection、真实 internal-topic coordinator recovery、compaction fork capture and real KRaft process gate remain open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index、transactional request handoff 与 internal-topic ready ordering deterministic slices implemented locally；M5 checkpoint-before-DeleteRecords、周期性 owned-partition retention、virtual segment/config history/derived index、timestamp lookup 与 compaction fork capture deterministic slices implemented locally；stock-source isolation 与显式 `NereusKafka`/server-start production-factory launcher 已实现；真实 internal-topic coordinator recovery、controller scheduling and real native-storage KRaft process gate remain open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -51,6 +51,8 @@ Request handler
 | `kafka.log.nereus.NereusUnifiedLogFactory` | authoritative factory | select dedicated cache root；disable local scan/maintenance；require topicId |
 | `kafka.log.nereus.NereusUnifiedLog` | extends `UnifiedLog` | exact publication；stock-validated stable append；bounded adapter read/Fetch assembly |
 | `kafka.log.nereus.NereusLocalLog` | extends `LocalLog` | stable-append callback + ephemeral LEO/segment state；never writes record bytes |
+| `org.apache.kafka.storage.internals.log.BrokerStorageManagedLog` | stock inert maintenance seam | metadata-offset update、owned-leader enumeration 与 DeleteRecords hook，不链接 Nereus artifact |
+| `org.apache.kafka.storage.internals.log.PartitionLeaderAuthority` | stock inert partition-lock seam | generic capture/publish closure 必须在 `leaderIsrUpdateLock` 内执行 |
 | `org.apache.kafka.storage.internals.log.RequiredAcksAwareAppend` | optional stock inert seam | preserve exact protocol required-acks without changing ordinary UnifiedLog |
 | `kafka.log.nereus.NereusLogSegment` | extends `LogSegment` | virtual roll/size/index facade；no durable file |
 | `kafka.log.nereus.NereusCanonicalLogState` | partition-lock-owned state | stable-only virtual roll/config history/time-index/logical-position state；checkpoint + committed-tail rebuild |
@@ -71,6 +73,7 @@ Request handler
 | `org.apache.kafka.storage.internals.log.LeaderEpochAwareRecoveryState` | stock inert seam | keep `Partition` compilable without unpublished Nereus artifacts |
 | `kafka.server.nereus.NereusBrokerStorageRuntime` | runtime bridge | exact ReplicaManager binding、boot/readiness/drain/shutdown delegation |
 | `kafka.server.nereus.NereusBrokerStorageRuntimeFactory` | typed factory | disabled isolation、explicit runtime/scan-limit creators、failure rollback |
+| `kafka.server.nereus.NereusKafka` | artifact-only launcher | select a fresh production runtime factory and delegate the unchanged lifecycle to `Kafka.run` |
 
 Adapter-side counterpart：
 
@@ -164,6 +167,16 @@ mapper；`c27305a7ad955ebc876de20da0fd045e97beba55` 增加 deferred activation-b
   `asyncTopicDeltaLifecycle(exactReplicaManager)`，在此之前 recovery 返回 retriable `METADATA_UNAVAILABLE`；
   `NereusListOffsetsLifecycle.beginDrain` 只负责 admission/revocation，standalone `shutdown` 仍 deduplicate manager shutdown；
 - stock/no-artifact factory tests 和 single-node KRaft start→shutdown→restart 已通过。
+- `faaffc8a75` 新增 stock-only `BrokerStorageManagedLog` 与 `PartitionLeaderAuthority`。`Partition` 只构造
+  JDK `Supplier`/`Runnable` closure 并在 `leaderIsrUpdateLock` 内执行；`LogManager`/`ReplicaManager` 只匹配
+  stock interface。由此 artifact-free `:core:test --tests kafka.KafkaConfigTest` 可完整编译 stock main/test，
+  stock source 不再直接 import `com.nereusstream.*` 或 `kafka.*.nereus`；
+- stock `kafka.Kafka.main` 现在调用 `run(args, BrokerStorageRuntimeFactory.Disabled)`；
+  package-visible `Kafka.run` 仍完整拥有 signal、shutdown hook、server startup 与 `awaitShutdown`，仅把显式 factory
+  传给 `KafkaRaftServer`。artifact-only `kafka.server.nereus.NereusKafka.main` 每次调用
+  `NereusBrokerStorageRuntimeFactory.production()`，再委托同一 `Kafka.run`；可执行
+  `bin/nereus-kafka-server-start.sh` 只把 main class 切到该 launcher，不使用 reflection、`ServiceLoader` 或
+  process-global registry。该切片由 `3bd92c7244` 发布并通过 focused launcher test 与 stock compile gate。
 
 product adapter 已实现 `NereusKafkaRuntimeFactory`，并新增仅支持 `OBJECT_WAL_SYNC_OBJECT` 的 concrete
 `NereusKafkaObjectWalRuntimeFactory`：显式组装 Object provider、shared Oxia、L0/physical/binding stores、protection、
@@ -171,11 +184,11 @@ callback executor、durable checkpoint read pins、checkpoint reader/verifier/re
 source、concrete recovery launcher 和同一 manager/runtime graph；real Oxia + local-file provider 的 leader
 open/Produce/Fetch gate 已通过。Fork 不再承担 ObjectStore/Oxia/read-pin orchestration，只在 exact ReplicaManager
 可用后为每次 open 创建 fresh state codec 和 exact Partition publisher。尚未实现的是 BookKeeper/async-object
-creator、controller activation scheduling、CLI/KafkaRaftServer production factory selection、durable
-checkpoint-failure quarantine observer 和 native-storage KRaft process
-test。当前已有可执行的 Object-WAL provider/runtime/recovery composition、log-shell selection、直接
-`NereusUnifiedLog` correctness I/O bridge，以及 bounded Produce/Fetch handoff，但还没有一条可从 stock Kafka CLI 启用并完成
-真实 KRaft Produce/Fetch 的 production path。
+creator、controller activation scheduling、durable checkpoint-failure quarantine observer 和 native-storage
+KRaft process test。显式 launcher/KafkaRaftServer factory selection 已实现；当前已有可执行的 Object-WAL
+provider/runtime/recovery composition、log-shell selection、直接 `NereusUnifiedLog` correctness I/O bridge，以及
+bounded Produce/Fetch handoff，但还没有真实 provider-backed KRaft Produce/Fetch 进程证据，不能据此宣称
+production rollout ready。
 
 ### 3.3 `core/.../kafka/log/LogManager.scala`
 
@@ -741,8 +754,10 @@ canonical source/HW/LSO 与 producer/transaction state。选择 exact decision h
 使用 stock `CleanedTransactionMetadata` 扫描 dense RecordBatch，逐 control marker 冻结
 `RETAIN_REQUIRED/DELETE_ELIGIBLE`，保留 active producer last marker，并在返回前再次校验 source 和
 producer/transaction image。该 branch 已通过 SSH 推送到 `nereusstream/kafka`，工作 clone 为
-`/Users/liusinan/apps/ideaproject/GITHUB/nereusstream`。Controller activation scheduling、
-CLI/KafkaRaftServer production selection、real KRaft/provider process gate 与完整 stock cleaner differential
+`/Users/liusinan/apps/ideaproject/nereusstream/kafka`。第二十六个 `faaffc8a75` 以 stock-only maintenance
+interfaces 恢复 artifact-free stock compilation；第二十七个 `3bd92c7244` 新增显式 native-storage launcher，
+并把 production factory 传进共享 Kafka/KafkaRaftServer lifecycle。Controller activation scheduling、
+real KRaft/provider process gate 与完整 stock cleaner differential
 matrix 尚未实现；bounded Produce/Fetch/M4/M5 deterministic 证据仍不构成真实 KRaft runtime claim。
 
 ## 6. Produce execution and threading
@@ -884,8 +899,9 @@ LSO 继续由 stock ProducerStateManager/first unstable offset 算法计算，re
   走 superseded close path。
 
 该 manager 不替代 durable Oxia/head authority CAS；`KafkaPartitionOpener` 必须先完成文档 04 的 session acquisition
-和 fresh recovery。Kafka fork metadata callback、BrokerServer config/runtime factory、manager ownership 与 ordered
-shutdown wiring 已实现；controller activation scheduling、CLI production selection 与真实 KRaft process gate 尚未实现。
+和 fresh recovery。Kafka fork metadata callback、BrokerServer config/runtime factory、manager ownership、ordered
+shutdown wiring 与显式 native-storage CLI selection 已实现；controller activation scheduling 与真实
+native-storage KRaft process gate 尚未实现。
 
 ## 8. Fetch execution
 

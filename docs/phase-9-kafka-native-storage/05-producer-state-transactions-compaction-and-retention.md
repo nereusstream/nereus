@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords and periodic retention runtime deterministic slices implemented locally；real checkpoint/process/coordinator/retention gates and compaction fork capture remain in progress
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture deterministic slices implemented locally；real checkpoint/process/coordinator/retention/compaction gates and full stock cleaner differential remain in progress
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -144,7 +144,7 @@ calling the scalar-mutating add path，so a later marker-updated `lastTimestamp`
 into a fresh manager and immediately re-exported for exact canonical equality；ordinary local snapshot IO remains disabled。
 Deterministic tests cover sequence wrap、five-batch retention、marker timestamp preservation、checkpoint encode/decode and
 replay equality。该 commit 现已作为 published F9 branch 的第二十个 commit 包含在
-`nereusstream/kafka:nereus/future9-native-kafka-storage@58342d9dca`。
+`nereusstream/kafka:nereus/future9-native-kafka-storage@3bd92c7244`。
 
 ## 4. Transaction state and indexes
 
