@@ -57,6 +57,58 @@ class MaterializationPolicyFactoryTest {
     }
 
     @Test
+    void freezesKafkaLosslessCommittedAsADistinctNcp2PolicyIdentity() {
+        MaterializationPolicy ncp1 =
+                MaterializationPolicyFactory.losslessCommitted(
+                        2,
+                        128,
+                        1_048_576,
+                        256L * 1024 * 1024,
+                        65_536,
+                        "ZSTD");
+        MaterializationPolicy ncp2 =
+                MaterializationPolicyFactory.kafkaLosslessCommitted(
+                        2,
+                        128,
+                        1_048_576,
+                        256L * 1024 * 1024,
+                        65_536,
+                        "ZSTD");
+
+        assertThat(ncp2.policyId())
+                .isEqualTo("nereus-kafka-committed-v2");
+        assertThat(ncp2.targetPhysicalFormat())
+                .isEqualTo(
+                        MaterializationPolicy
+                                .KAFKA_COMMITTED_FORMAT);
+        assertThat(ncp2.view()).isEqualTo(ReadView.COMMITTED);
+        assertThat(ncp2.taskKind())
+                .isEqualTo(TaskKind.LOSSLESS_REWRITE);
+        assertThat(ncp2.topicCompaction()).isEmpty();
+        assertThat(ncp2.policyVersion())
+                .isNotEqualTo(ncp1.policyVersion());
+        assertThat(ncp2.digestSha256())
+                .isNotEqualTo(ncp1.digestSha256());
+        assertThat(MaterializationPolicyFactory
+                        .kafkaLosslessCommitted(
+                                2,
+                                128,
+                                1_048_576,
+                                256L * 1024 * 1024,
+                                65_536,
+                                "ZSTD"))
+                .isEqualTo(ncp2);
+        assertThat(MaterializationPolicy
+                        .isLosslessCommittedFormat(
+                                ncp1.targetPhysicalFormat()))
+                .isTrue();
+        assertThat(MaterializationPolicy
+                        .isLosslessCommittedFormat(
+                                ncp2.targetPhysicalFormat()))
+                .isTrue();
+    }
+
+    @Test
     void freezesKafkaTopicCompactionAsADistinctNtc2PolicyIdentity() {
         TopicCompactionSpec spec = new TopicCompactionSpec("kafka-log-cleaner-v1", 1, "KCK2");
 

@@ -15,9 +15,11 @@ import com.nereusstream.core.append.RequiredObjectGenerationCompletion;
 import com.nereusstream.core.append.RequiredObjectGenerationProof;
 import com.nereusstream.core.append.RequiredObjectGenerationRequest;
 import com.nereusstream.core.capability.GenerationActivationProof;
+import com.nereusstream.core.capability.GenerationActivationSubject;
 import com.nereusstream.core.capability.GenerationOperation;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.capability.LiveProjectionSubject;
+import com.nereusstream.core.capability.LiveStreamSubject;
 import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
@@ -55,6 +57,7 @@ public final class RequiredObjectGenerationCoordinator
     private final MaterializationPolicy policy;
     private final int taskScanPageSize;
     private final ScheduledExecutorService scheduler;
+    private final MaterializationStreamAuthorityMode authorityMode;
 
     public RequiredObjectGenerationCoordinator(
             String cluster,
@@ -69,6 +72,37 @@ public final class RequiredObjectGenerationCoordinator
             MaterializationPolicy policy,
             int taskScanPageSize,
             ScheduledExecutorService scheduler) {
+        this(
+                cluster,
+                l0,
+                generations,
+                activation,
+                planner,
+                tasks,
+                recovery,
+                service,
+                authority,
+                policy,
+                taskScanPageSize,
+                scheduler,
+                MaterializationStreamAuthorityMode
+                        .PROJECTION_REQUIRED);
+    }
+
+    public RequiredObjectGenerationCoordinator(
+            String cluster,
+            OxiaMetadataStore l0,
+            GenerationMetadataStore generations,
+            GenerationProtocolActivationGuard activation,
+            MaterializationPlanner planner,
+            MaterializationTaskStore tasks,
+            MaterializationTaskRecovery recovery,
+            MaterializationService service,
+            CommittedObjectGenerationAuthority authority,
+            MaterializationPolicy policy,
+            int taskScanPageSize,
+            ScheduledExecutorService scheduler,
+            MaterializationStreamAuthorityMode authorityMode) {
         this.cluster = text(cluster, "cluster");
         this.l0 = Objects.requireNonNull(l0, "l0");
         this.generations = Objects.requireNonNull(generations, "generations");
@@ -84,6 +118,8 @@ public final class RequiredObjectGenerationCoordinator
         }
         this.taskScanPageSize = taskScanPageSize;
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.authorityMode = Objects.requireNonNull(
+                authorityMode, "authorityMode");
     }
 
     @Override
@@ -128,24 +164,21 @@ public final class RequiredObjectGenerationCoordinator
                             ErrorCode.METADATA_CONDITION_FAILED,
                             true,
                             "sync-profile materialization registration is absent"));
-                    ProjectionRef projection = requireAdmission(request, stream, registered);
-                    return new LiveProjectionSubject(
-                            request.streamId(),
-                            projection,
-                            new Checksum(
-                                    ChecksumType.SHA256,
-                                    registered.value().projectionIdentitySha256()));
+                    return requireAdmission(
+                            request, stream, registered);
                 })
                 .thenCompose(subject -> deadline.bound(
                         () -> activation.requireReady(
                                 GenerationOperation.GENERATION_PUBLISH,
                                 subject,
-                                true),
+                                authorityMode
+                                        == MaterializationStreamAuthorityMode
+                                                .PROJECTION_REQUIRED),
                         "admit required Object-generation publication"))
                 .thenApply(Admission::new);
     }
 
-    private ProjectionRef requireAdmission(
+    private GenerationActivationSubject requireAdmission(
             RequiredObjectGenerationRequest request,
             StreamMetadataSnapshot snapshot,
             VersionedMaterializationStreamRegistration registration) {
@@ -171,13 +204,45 @@ public final class RequiredObjectGenerationCoordinator
                 || profile != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT
                 || registeredProfile != profile
                 || !registration.value().streamId().equals(request.streamId().value())
-                || projection.isEmpty()) {
+                ) {
             throw failure(
                     ErrorCode.METADATA_CONDITION_FAILED,
                     true,
                     "stream no longer admits synchronous BookKeeper Object publication");
         }
-        return projection.orElseThrow();
+        Checksum identity = new Checksum(
+                ChecksumType.SHA256,
+                registration.value()
+                        .projectionIdentitySha256());
+        if (authorityMode
+                == MaterializationStreamAuthorityMode
+                        .DIRECT_STREAM) {
+            Checksum expected =
+                    DirectMaterializationStreamAuthority
+                            .identitySha256(
+                                    request.streamId(),
+                                    profile);
+            if (projection.isPresent()
+                    || !registration.value().projectionRef()
+                            .equals(
+                                    DirectMaterializationStreamAuthority
+                                            .encodedProjectionRef())
+                    || !identity.equals(expected)) {
+                throw failure(
+                        ErrorCode.METADATA_CONDITION_FAILED,
+                        true,
+                        "sync-profile materialization registration has stale direct-stream authority");
+            }
+            return new LiveStreamSubject(
+                    request.streamId(), expected);
+        }
+        return new LiveProjectionSubject(
+                request.streamId(),
+                projection.orElseThrow(() -> failure(
+                        ErrorCode.METADATA_CONDITION_FAILED,
+                        true,
+                        "sync-profile materialization registration has no live projection")),
+                identity);
     }
 
     private CompletableFuture<Void> convergeTask(

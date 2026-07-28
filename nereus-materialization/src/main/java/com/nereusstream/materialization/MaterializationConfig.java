@@ -192,10 +192,11 @@ public record MaterializationConfig(
         Objects.requireNonNull(policy, "committedPolicy");
         if (policy.view() != ReadView.COMMITTED
                 || policy.taskKind() != TaskKind.LOSSLESS_REWRITE
-                || !policy.targetPhysicalFormat().equals(MaterializationPolicy.COMMITTED_FORMAT)
+                || !MaterializationPolicy.isLosslessCommittedFormat(
+                        policy.targetPhysicalFormat())
                 || policy.topicCompaction().isPresent()) {
             throw new IllegalArgumentException(
-                    "committedPolicy must be the lossless COMMITTED NCP1 policy");
+                    "committedPolicy must be a lossless COMMITTED NCP1/NCP2 policy");
         }
         return policy;
     }

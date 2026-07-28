@@ -7,6 +7,8 @@ import java.util.Optional;
 /** Constructs versioned built-in policies from validated operator-controlled semantic fields. */
 public final class MaterializationPolicyFactory {
     public static final String LOSSLESS_COMMITTED_POLICY_ID = "nereus-committed-default";
+    public static final String KAFKA_LOSSLESS_COMMITTED_POLICY_ID =
+            "nereus-kafka-committed-v2";
     public static final String TOPIC_COMPACTED_POLICY_ID = "nereus-topic-compacted-default";
     public static final String KAFKA_TOPIC_COMPACTED_POLICY_ID =
             "nereus-kafka-topic-compacted-v2";
@@ -34,6 +36,35 @@ public final class MaterializationPolicyFactory {
                 ReadView.COMMITTED,
                 TaskKind.LOSSLESS_REWRITE,
                 MaterializationPolicy.COMMITTED_FORMAT,
+                minMergeSourceRanges,
+                maxSourceRanges,
+                maxRangeRecords,
+                targetObjectBytes,
+                targetRowGroupRecords,
+                compression,
+                Optional.empty());
+    }
+
+    public static MaterializationPolicy kafkaLosslessCommitted(
+            int minMergeSourceRanges,
+            int maxSourceRanges,
+            long maxRangeRecords,
+            long targetObjectBytes,
+            int targetRowGroupRecords,
+            String compression) {
+        long policyVersion = MaterializationCanonical.kafkaOperatorPolicyVersion(
+                minMergeSourceRanges,
+                maxSourceRanges,
+                maxRangeRecords,
+                targetObjectBytes,
+                targetRowGroupRecords,
+                compression);
+        return new MaterializationPolicy(
+                KAFKA_LOSSLESS_COMMITTED_POLICY_ID,
+                policyVersion,
+                ReadView.COMMITTED,
+                TaskKind.LOSSLESS_REWRITE,
+                MaterializationPolicy.KAFKA_COMMITTED_FORMAT,
                 minMergeSourceRanges,
                 maxSourceRanges,
                 maxRangeRecords,

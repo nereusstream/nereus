@@ -898,11 +898,11 @@ public final class DefaultMaterializationLagSnapshotReader
         if (policy.view() != ReadView.COMMITTED
                 || policy.taskKind()
                         != TaskKind.LOSSLESS_REWRITE
-                || !policy.targetPhysicalFormat().equals(
-                        MaterializationPolicy.COMMITTED_FORMAT)
+                || !MaterializationPolicy.isLosslessCommittedFormat(
+                        policy.targetPhysicalFormat())
                 || policy.topicCompaction().isPresent()) {
             throw new IllegalArgumentException(
-                    "lag reader requires the lossless COMMITTED NCP1 policy");
+                    "lag reader requires a lossless COMMITTED NCP1/NCP2 policy");
         }
         return policy;
     }

@@ -10,9 +10,11 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
+import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ReadView;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.ObjectProtectionManager;
@@ -20,6 +22,7 @@ import com.nereusstream.core.physical.ObjectProtectionOwner;
 import com.nereusstream.core.physical.ObjectProtectionRequest;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
+import com.nereusstream.core.read.PhysicalObjectIdentityResolver;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStoreTestFactory;
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
@@ -27,8 +30,12 @@ import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import com.nereusstream.objectstore.compacted.CompactedObjectVerifier;
+import com.nereusstream.objectstore.compacted.ParquetKafkaTopicCompactedReader;
 import com.nereusstream.objectstore.compacted.ParquetCompactedObjectReader;
 import com.nereusstream.objectstore.compacted.ParquetCompactedObjectWriter;
+import com.nereusstream.objectstore.compacted.ParquetRangedCompactedObjectReader;
+import com.nereusstream.objectstore.compacted.ParquetRangedCompactedObjectWriter;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectVerifier;
 import com.nereusstream.objectstore.staging.StagingFileManager;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import java.nio.file.Files;
@@ -139,6 +146,165 @@ class MaterializationWorkerTest {
             assertThat(protections.acquired).hasValue(3);
             assertThat(protections.transferred).hasValue(5);
             assertThat(protections.released).hasValue(0);
+            assertThat(staging.reservedBytes()).isZero();
+        } finally {
+            scheduler.shutdownNow();
+        }
+    }
+
+    @Test
+    void streamsKafkaRangesIntoStrictNcp2AndFreezesOutputReady()
+            throws Exception {
+        List<VersionedGenerationCandidate> candidates =
+                List.of(
+                        MaterializationPlannerTestSupport.kafkaZero(
+                                "/index/kafka-worker-2",
+                                0,
+                                2,
+                                0,
+                                100,
+                                2),
+                        MaterializationPlannerTestSupport.kafkaZero(
+                                "/index/kafka-worker-5",
+                                2,
+                                5,
+                                100,
+                                100,
+                                5));
+        MaterializationPolicy policy =
+                MaterializationPolicyFactory.kafkaLosslessCommitted(
+                        2,
+                        16,
+                        1_000,
+                        1_000_000,
+                        128,
+                        "ZSTD");
+        MaterializationTask task =
+                MaterializationPlannerTestSupport.directPlanner(
+                                candidates,
+                                List.of(),
+                                0,
+                                5,
+                                StorageProfile
+                                        .BOOKKEEPER_WAL_ASYNC_OBJECT)
+                        .plan(
+                                STREAM,
+                                new OffsetRange(0, 5),
+                                policy,
+                                1)
+                        .join()
+                        .get(0);
+        GenerationMetadataStore durable =
+                GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        GenerationMetadataStore generations =
+                MaterializationPlannerTestSupport.generationStore(
+                        candidates,
+                        List.of(),
+                        durable,
+                        StorageProfile
+                                .BOOKKEEPER_WAL_ASYNC_OBJECT,
+                        MaterializationStreamAuthorityMode
+                                .DIRECT_STREAM);
+        MaterializationTaskStore taskStore =
+                new MaterializationTaskStore(
+                        CLUSTER, generations, CLOCK);
+        taskStore.create(task).join();
+        TrackingProtections protections = new TrackingProtections();
+        TrackingExactReader exactReader = new TrackingExactReader();
+        Path stagingPath =
+                Files.createDirectory(
+                        temporaryDirectory.resolve(
+                                "kafka-ncp2-staging"));
+        Files.setPosixFilePermissions(
+                stagingPath,
+                PosixFilePermissions.fromString("rwx------"));
+        ScheduledExecutorService scheduler =
+                Executors.newSingleThreadScheduledExecutor();
+        try (StagingFileManager staging =
+                        new StagingFileManager(
+                                stagingPath,
+                                32L << 20,
+                                StagingFileManager
+                                        .MIN_UPLOAD_CHUNK_BYTES,
+                                Duration.ofHours(1),
+                                Runnable::run);
+                LocalFileObjectStore objects =
+                        new LocalFileObjectStore(
+                                temporaryDirectory.resolve(
+                                        "kafka-ncp2-objects"))) {
+            var rangedReader =
+                    new ParquetRangedCompactedObjectReader(
+                            objects, Runnable::run);
+            var verifier =
+                    new DefaultMaterializationOutputVerifier(
+                            objects,
+                            new RangedMaterializationFormatVerifier(
+                                    new RangedCompactedObjectVerifier(
+                                            objects,
+                                            rangedReader,
+                                            new ParquetKafkaTopicCompactedReader(
+                                                    objects,
+                                                    Runnable::run))));
+            PhysicalObjectIdentityResolver identities =
+                    (target, view) ->
+                            CompletableFuture.completedFuture(
+                                    sourceIdentity(target));
+            var sourceProtections =
+                    new MaterializationSourceProtectionRegistry(
+                            List.of(
+                                    new ObjectMaterializationSourceProtectionAdapter(
+                                            identities,
+                                            protections)));
+            DefaultMaterializationWorker worker =
+                    new DefaultMaterializationWorker(
+                            CLUSTER,
+                            "r".repeat(26),
+                            taskStore,
+                            generations,
+                            identities,
+                            protections,
+                            sourceProtections,
+                            ignored -> exactReader,
+                            new ParquetRangedCompactedObjectWriter(
+                                    staging, Runnable::run),
+                            objects,
+                            verifier,
+                            5,
+                            64 * 1024,
+                            Duration.ofSeconds(30),
+                            Duration.ofSeconds(5),
+                            Duration.ofSeconds(1),
+                            3,
+                            Duration.ofSeconds(10),
+                            "nereus-kafka-worker-test",
+                            scheduler,
+                            Runnable::run,
+                            CLOCK);
+
+            MaterializationOutput output =
+                    worker.execute(task).join();
+
+            assertThat(output.physicalFormat())
+                    .isEqualTo(
+                            MaterializationPolicy
+                                    .KAFKA_COMMITTED_FORMAT);
+            assertThat(output.logicalFormat())
+                    .isEqualTo("KAFKA_RECORD_BATCH_V1");
+            assertThat(output.sourceRecordCount()).isEqualTo(5);
+            assertThat(output.outputRecordCount()).isEqualTo(5);
+            assertThat(output.entryCount()).isEqualTo(2);
+            assertThat(output.logicalBytes()).isEqualTo(200);
+            assertThat(
+                            taskStore
+                                    .get(STREAM, task.taskId())
+                                    .join()
+                                    .orElseThrow()
+                                    .value()
+                                    .lifecycle())
+                    .isEqualTo(TaskLifecycle.OUTPUT_READY);
+            assertThat(exactReader.maxActive).hasValue(1);
+            assertThat(exactReader.completedSources)
+                    .hasValue(2);
             assertThat(staging.reservedBytes()).isZero();
         } finally {
             scheduler.shutdownNow();
@@ -393,6 +559,46 @@ class MaterializationWorkerTest {
                             if (count <= 0) {
                                 terminal = true;
                                 subscriber.onError(new IllegalArgumentException("demand"));
+                                return;
+                            }
+                            if (source.payloadFormat()
+                                    == PayloadFormat
+                                            .KAFKA_RECORD_BATCH) {
+                                terminal = true;
+                                ObjectSliceReadTarget target =
+                                        (ObjectSliceReadTarget)
+                                                source.readTarget();
+                                byte[] payload =
+                                        new byte[Math.toIntExact(
+                                                source.logicalBytes())];
+                                java.util.Arrays.fill(
+                                        payload,
+                                        (byte) (source
+                                                        .range()
+                                                        .startOffset()
+                                                + 1));
+                                subscriber.onNext(
+                                        new ReadBatch(
+                                                source.range(),
+                                                source.payloadFormat(),
+                                                payload,
+                                                source.schemaRefs(),
+                                                target.entryIndexRef(),
+                                                source.projectionRef(),
+                                                target.objectId(),
+                                                target.objectOffset(),
+                                                target.objectLength()));
+                                active.decrementAndGet();
+                                completedSources.incrementAndGet();
+                                completion.complete(
+                                        new ExactSourceReadSummary(
+                                                source.range(),
+                                                source.recordCount(),
+                                                source.entryCount(),
+                                                source.logicalBytes(),
+                                                MaterializationPlannerTestSupport
+                                                        .sha('a')));
+                                subscriber.onComplete();
                                 return;
                             }
                             long emitted = 0;

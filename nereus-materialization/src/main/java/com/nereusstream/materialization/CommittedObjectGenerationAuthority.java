@@ -418,7 +418,8 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
         };
         long requiredEnd = Math.addExact(target.objectOffset(), target.objectLength());
         if (target.objectType() == ObjectType.STREAM_COMPACTED_OBJECT
-                && !target.physicalFormat().equals(MaterializationPolicy.COMMITTED_FORMAT)) {
+                && !MaterializationPolicy.isLosslessCommittedFormat(
+                        target.physicalFormat())) {
             return false;
         }
         return root.key().equals(keys.physicalRootKey(identity.objectKeyHash()))

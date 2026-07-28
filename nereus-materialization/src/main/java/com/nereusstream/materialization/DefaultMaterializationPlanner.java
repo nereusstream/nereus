@@ -55,12 +55,28 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
     private final OxiaMetadataStore l0Metadata;
     private final GenerationMetadataStore generations;
     private final int scanPageSize;
+    private final MaterializationStreamAuthorityMode authorityMode;
 
     public DefaultMaterializationPlanner(
             String cluster,
             OxiaMetadataStore l0Metadata,
             GenerationMetadataStore generations,
             int scanPageSize) {
+        this(
+                cluster,
+                l0Metadata,
+                generations,
+                scanPageSize,
+                MaterializationStreamAuthorityMode
+                        .PROJECTION_REQUIRED);
+    }
+
+    public DefaultMaterializationPlanner(
+            String cluster,
+            OxiaMetadataStore l0Metadata,
+            GenerationMetadataStore generations,
+            int scanPageSize,
+            MaterializationStreamAuthorityMode authorityMode) {
         this.cluster = requireText(cluster, "cluster");
         this.l0Metadata = Objects.requireNonNull(l0Metadata, "l0Metadata");
         this.generations = Objects.requireNonNull(generations, "generations");
@@ -68,6 +84,8 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             throw new IllegalArgumentException("scanPageSize must be in [1, 1000]");
         }
         this.scanPageSize = scanPageSize;
+        this.authorityMode = Objects.requireNonNull(
+                authorityMode, "authorityMode");
     }
 
     @Override
@@ -189,11 +207,29 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
         } catch (RuntimeException failure) {
             throw invariant("materialization registration contains an unsupported identity", failure);
         }
-        if (registeredProfile != profile || effectiveProjection.isEmpty()) {
+        boolean validAuthority;
+        if (authorityMode
+                == MaterializationStreamAuthorityMode
+                        .PROJECTION_REQUIRED) {
+            validAuthority = effectiveProjection.isPresent();
+        } else {
+            Checksum expected =
+                    DirectMaterializationStreamAuthority
+                            .identitySha256(streamId, profile);
+            validAuthority = effectiveProjection.isEmpty()
+                    && exactRegistration.value().projectionRef()
+                            .equals(
+                                    DirectMaterializationStreamAuthority
+                                            .encodedProjectionRef())
+                    && exactRegistration.value()
+                            .projectionIdentitySha256()
+                            .equals(expected.value());
+        }
+        if (registeredProfile != profile || !validAuthority) {
             throw new NereusException(
                     ErrorCode.METADATA_CONDITION_FAILED,
                     true,
-                    "materialization registration no longer matches the stream profile/projection");
+                    "materialization registration no longer matches the stream profile/authority");
         }
         long start = Math.max(requestedRange.startOffset(), snapshot.trim().trimOffset());
         long end = Math.min(requestedRange.endOffset(), snapshot.committedEnd().committedEndOffset());

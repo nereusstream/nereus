@@ -77,6 +77,32 @@ final class MaterializationPlannerTestSupport {
                 2);
     }
 
+    static DefaultMaterializationPlanner directPlanner(
+            List<VersionedGenerationCandidate> candidates,
+            List<VersionedMaterializationTask> tasks,
+            long trimOffset,
+            long committedEndOffset,
+            StorageProfile profile) {
+        GenerationMetadataStore store =
+                generationStore(
+                        candidates,
+                        tasks,
+                        null,
+                        profile,
+                        MaterializationStreamAuthorityMode
+                                .DIRECT_STREAM);
+        return new DefaultMaterializationPlanner(
+                CLUSTER,
+                l0Store(snapshot(
+                        trimOffset,
+                        committedEndOffset,
+                        profile)),
+                store,
+                2,
+                MaterializationStreamAuthorityMode
+                        .DIRECT_STREAM);
+    }
+
     static GenerationMetadataStore generationStore(
             List<VersionedGenerationCandidate> candidates,
             List<VersionedMaterializationTask> tasks,
@@ -85,7 +111,9 @@ final class MaterializationPlannerTestSupport {
                 candidates,
                 tasks,
                 delegate,
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                MaterializationStreamAuthorityMode
+                        .PROJECTION_REQUIRED);
     }
 
     static GenerationMetadataStore generationStore(
@@ -93,13 +121,29 @@ final class MaterializationPlannerTestSupport {
             List<VersionedMaterializationTask> tasks,
             GenerationMetadataStore delegate,
             StorageProfile profile) {
+        return generationStore(
+                candidates,
+                tasks,
+                delegate,
+                profile,
+                MaterializationStreamAuthorityMode
+                        .PROJECTION_REQUIRED);
+    }
+
+    static GenerationMetadataStore generationStore(
+            List<VersionedGenerationCandidate> candidates,
+            List<VersionedMaterializationTask> tasks,
+            GenerationMetadataStore delegate,
+            StorageProfile profile,
+            MaterializationStreamAuthorityMode authorityMode) {
         List<VersionedGenerationCandidate> orderedCandidates = candidates.stream()
                 .sorted(Comparator.comparing(VersionedGenerationCandidate::key))
                 .toList();
         List<VersionedMaterializationTask> orderedTasks = tasks.stream()
                 .sorted(Comparator.comparing(VersionedMaterializationTask::key))
                 .toList();
-        VersionedMaterializationStreamRegistration registration = registration(profile);
+        VersionedMaterializationStreamRegistration registration =
+                registration(profile, authorityMode);
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -162,6 +206,30 @@ final class MaterializationPlannerTestSupport {
                 target);
     }
 
+    static VersionedGenerationZeroIndex kafkaZero(
+            String key,
+            long start,
+            long end,
+            long cumulativeStart,
+            long logicalBytes,
+            long commitVersion) {
+        ObjectSliceReadTarget target = target(
+                "kafka-l0-" + start + "-" + end,
+                ObjectType.MULTI_STREAM_WAL_OBJECT,
+                "WAL_OBJECT_V1");
+        return zero(
+                key,
+                start,
+                end,
+                cumulativeStart,
+                logicalBytes,
+                commitVersion,
+                target,
+                PayloadFormat.KAFKA_RECORD_BATCH,
+                1,
+                List.of());
+    }
+
     static VersionedGenerationZeroIndex zero(
             String key,
             long start,
@@ -170,6 +238,30 @@ final class MaterializationPlannerTestSupport {
             long logicalBytes,
             long commitVersion,
             ReadTarget target) {
+        return zero(
+                key,
+                start,
+                end,
+                cumulativeStart,
+                logicalBytes,
+                commitVersion,
+                target,
+                PayloadFormat.PULSAR_ENTRY_BATCH,
+                Math.toIntExact(end - start),
+                SCHEMAS);
+    }
+
+    private static VersionedGenerationZeroIndex zero(
+            String key,
+            long start,
+            long end,
+            long cumulativeStart,
+            long logicalBytes,
+            long commitVersion,
+            ReadTarget target,
+            PayloadFormat payloadFormat,
+            int entryCount,
+            List<SchemaRef> schemas) {
         long metadataVersion = 10 + commitVersion;
         OffsetIndexEntry value = new OffsetIndexEntry(
                 STREAM,
@@ -177,11 +269,11 @@ final class MaterializationPlannerTestSupport {
                 0,
                 cumulativeStart + logicalBytes,
                 target,
-                PayloadFormat.PULSAR_ENTRY_BATCH,
+                payloadFormat,
                 Math.toIntExact(end - start),
-                Math.toIntExact(end - start),
+                entryCount,
                 logicalBytes,
-                SCHEMAS,
+                schemas,
                 Optional.empty(),
                 commitVersion,
                 false,
@@ -343,12 +435,35 @@ final class MaterializationPlannerTestSupport {
 
     static VersionedMaterializationStreamRegistration registration(
             StorageProfile profile) {
+        return registration(
+                profile,
+                MaterializationStreamAuthorityMode
+                        .PROJECTION_REQUIRED);
+    }
+
+    static VersionedMaterializationStreamRegistration registration(
+            StorageProfile profile,
+            MaterializationStreamAuthorityMode authorityMode) {
         long metadataVersion = 7;
+        boolean direct =
+                authorityMode
+                        == MaterializationStreamAuthorityMode
+                                .DIRECT_STREAM;
         MaterializationStreamRegistrationRecord record = new MaterializationStreamRegistrationRecord(
                 1,
                 STREAM.value(),
-                MaterializationRecordMapper.projectionIdentity(Optional.of(PROJECTION)),
-                sha('e').value(),
+                direct
+                        ? DirectMaterializationStreamAuthority
+                                .encodedProjectionRef()
+                        : MaterializationRecordMapper.projectionIdentity(
+                                Optional.of(PROJECTION)),
+                direct
+                        ? DirectMaterializationStreamAuthority
+                                .identitySha256(
+                                        STREAM,
+                                        profile.canonical())
+                                .value()
+                        : sha('e').value(),
                 profile.canonical().name(),
                 100,
                 4,

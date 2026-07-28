@@ -431,9 +431,10 @@ public final class DefaultMaterializationCheckpointReconciler
         Objects.requireNonNull(policy, "policy");
         if (policy.view() != ReadView.COMMITTED
                 || policy.taskKind() != TaskKind.LOSSLESS_REWRITE
-                || !policy.targetPhysicalFormat().equals(MaterializationPolicy.COMMITTED_FORMAT)) {
+                || !MaterializationPolicy.isLosslessCommittedFormat(
+                        policy.targetPhysicalFormat())) {
             throw new IllegalArgumentException(
-                    "checkpoint reconciler admits only lossless COMMITTED NCP1 policy");
+                    "checkpoint reconciler admits only lossless COMMITTED NCP1/NCP2 policy");
         }
         return policy;
     }

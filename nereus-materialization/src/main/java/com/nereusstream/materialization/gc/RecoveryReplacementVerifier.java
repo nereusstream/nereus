@@ -289,10 +289,11 @@ final class RecoveryReplacementVerifier {
                     target.objectOffset(), target.objectLength());
             ReadView view = ReadView.fromWireId(index.value().readViewId());
             if (target.objectType() == ObjectType.STREAM_COMPACTED_OBJECT
-                    && !target.physicalFormat().equals(
-                            view == ReadView.COMMITTED
-                                    ? MaterializationPolicy.COMMITTED_FORMAT
-                                    : MaterializationPolicy.TOPIC_COMPACTED_FORMAT)) {
+                    && !(view == ReadView.COMMITTED
+                            ? MaterializationPolicy.isLosslessCommittedFormat(
+                                    target.physicalFormat())
+                            : MaterializationPolicy.isTopicCompactedFormat(
+                                    target.physicalFormat()))) {
                 return Optional.empty();
             }
             PhysicalObjectKind expectedKind = switch (target.objectType()) {

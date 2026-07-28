@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and BookKeeper-WAL-only real release/fresh-JVM gates pass；multi-broker/controller、BookKeeper materialization、remaining M4 internal-topic cuts and inherited final gates remain open
+> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and BookKeeper-WAL-only real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization core is implemented and focused-gated；production runtime/profile wiring、multi-broker/controller、remaining M4 internal-topic cuts and inherited final gates remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -429,6 +429,17 @@ coordinator/transaction/compaction remain M4/M5。
   `OBJECT_WAL_ASYNC_OBJECT` in the real Oxia integration，and `f9ObjectWalAsyncObjectProcessIntegrationTest` proves
   first-JVM append/read plus fresh-JVM recovery/continued append over real Oxia and LocalStack；multi-broker takeover and
   the two BookKeeper materialization profiles remain open；
+- the 2026-07-28 Kafka NCP2 materialization core checkpoint adds the distinct
+  `nereus-kafka-committed-v2` / `NEREUS_COMPACTED_PARQUET_V2` committed policy，without reinterpreting NCP1 durable
+  records。`DefaultMaterializationWorker` now has an NCP2-only ranged writer path that preserves every Kafka
+  `RecordBatch` byte payload and exact `[baseOffset,lastOffset+1)` range，publishes `KAFKA_RECORD_BATCH_V1` row
+  metadata，checks task/output entry and record accounting，and freezes `OUTPUT_READY` only after strict whole-object
+  verification by `RangedMaterializationFormatVerifier`。Planner、registry scanner、required-generation coordinator and
+  generation committer now accept an explicit `DIRECT_STREAM` authority mode while all compatibility constructors remain
+  `PROJECTION_REQUIRED`，so Pulsar NCP1/NTC1 behavior is unchanged。The Kafka activation guard admits
+  `GENERATION_PUBLISH` with the same ACTIVE/readiness proof and revalidation boundary used by direct-stream compaction。
+  Focused materialization、metadata and Kafka activation tests pass；production service lifecycle、append lag admission and
+  the three Object-producing profile mappings are the next checkpoint；
 - `NereusKafkaObjectWalRuntimeFactory` now owns durable checkpoint read pins、reader/verifier/recovery coordinator、
   configured `recoveryChunkRecords/recoveryChunkBytes` paging and `DefaultKafkaPartitionRecoveryLauncher`。
   `DefaultKafkaRecoveryBatchSourceTest` proves exact bounded COMMITTED/EXACT_START pages and fail-closed empty/non-Kafka

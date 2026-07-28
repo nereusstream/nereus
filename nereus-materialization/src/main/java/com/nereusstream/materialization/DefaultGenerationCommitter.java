@@ -139,6 +139,36 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             GenerationMetadataStore generationStore,
             PhysicalObjectMetadataStore physicalStore,
             ObjectProtectionManager protectionManager,
+            MaterializationSourceProtectionRegistry
+                    sourceProtectionAdapters,
+            GenerationProtocolActivationGuard activationGuard,
+            MaterializationOutputVerifier outputVerifier,
+            MaterializationStreamAuthorityMode authorityMode,
+            Duration operationTimeout,
+            ScheduledExecutorService scheduler,
+            Clock clock) {
+        this(
+                cluster,
+                l0Store,
+                generationStore,
+                physicalStore,
+                protectionManager,
+                activationGuard,
+                outputVerifier,
+                new SecurePublicationIdGenerator(),
+                operationTimeout,
+                scheduler,
+                clock,
+                authorityMode,
+                sourceProtectionAdapters);
+    }
+
+    public DefaultGenerationCommitter(
+            String cluster,
+            OxiaMetadataStore l0Store,
+            GenerationMetadataStore generationStore,
+            PhysicalObjectMetadataStore physicalStore,
+            ObjectProtectionManager protectionManager,
             GenerationProtocolActivationGuard activationGuard,
             MaterializationOutputVerifier outputVerifier,
             MaterializationStreamAuthorityMode authorityMode,

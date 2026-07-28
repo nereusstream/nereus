@@ -112,6 +112,24 @@ class MaterializationConfigTest {
         assertInvalid(fixture, "lossless COMMITTED");
     }
 
+    @Test
+    void acceptsKafkaNcp2AtTheLosslessCommittedServiceBoundary()
+            throws Exception {
+        Fixture fixture =
+                new Fixture(privateDirectory("kafka-ncp2-policy"));
+        fixture.policy =
+                MaterializationPolicyFactory.kafkaLosslessCommitted(
+                        2,
+                        16,
+                        10_000,
+                        256L << 20,
+                        1_024,
+                        "ZSTD");
+
+        assertThat(fixture.build().committedPolicy())
+                .isEqualTo(fixture.policy);
+    }
+
     private Path privateDirectory(String name) throws Exception {
         Path path = Files.createDirectory(temporaryDirectory.resolve(name));
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));

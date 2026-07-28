@@ -82,6 +82,27 @@ final class MaterializationCanonical {
         return version == 0 ? 1 : version;
     }
 
+    static long kafkaOperatorPolicyVersion(
+            int minMergeSourceRanges,
+            int maxSourceRanges,
+            long maxRangeRecords,
+            long targetObjectBytes,
+            int targetRowGroupRecords,
+            String compression) {
+        CanonicalWriter writer = new CanonicalWriter();
+        writer.text("nereus-kafka-lossless-committed-operator-policy-v2");
+        writer.text(MaterializationPolicy.KAFKA_COMMITTED_FORMAT);
+        writer.intValue(minMergeSourceRanges);
+        writer.intValue(maxSourceRanges);
+        writer.longValue(maxRangeRecords);
+        writer.longValue(targetObjectBytes);
+        writer.intValue(targetRowGroupRecords);
+        writer.text(compression);
+        byte[] digest = sha256Bytes(writer.bytes());
+        long version = ByteBuffer.wrap(digest, 0, Long.BYTES).getLong() & Long.MAX_VALUE;
+        return version == 0 ? 1 : version;
+    }
+
     static long topicOperatorPolicyVersion(
             TopicCompactionSpec topicCompaction,
             int minMergeSourceRanges,

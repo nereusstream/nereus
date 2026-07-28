@@ -58,7 +58,10 @@ public record MaterializationPolicyRecord(
                 topicKeyCodecId, "topicKeyCodecId", 4096);
         if (taskKindId == 1) {
             if (readViewId != 1
-                    || !targetPhysicalFormat.equals("NEREUS_COMPACTED_PARQUET_V1")
+                    || (!targetPhysicalFormat.equals(
+                                    "NEREUS_COMPACTED_PARQUET_V1")
+                            && !targetPhysicalFormat.equals(
+                                    "NEREUS_COMPACTED_PARQUET_V2"))
                     || !topicStrategyId.isEmpty()
                     || topicStrategyVersion != 0
                     || !topicKeyCodecId.isEmpty()) {

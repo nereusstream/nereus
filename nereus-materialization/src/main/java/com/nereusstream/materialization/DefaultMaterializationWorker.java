@@ -3,14 +3,19 @@ package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
+import com.nereusstream.api.EntryIndexRef;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.ObjectId;
+import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.SchemaRef;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.ObjectProtectionManager;
@@ -36,7 +41,12 @@ import com.nereusstream.objectstore.PutObjectOptions;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriteRequest;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriteResult;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriter;
+import com.nereusstream.objectstore.compacted.CompactedObjectFormatV2;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectWriteRequest;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectWriteResult;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectWriter;
 import com.nereusstream.objectstore.compacted.TopicCompactionFormatSpec;
+import com.nereusstream.objectstore.staging.StagedObjectFile;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -72,7 +82,8 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     private final ObjectProtectionManager protections;
     private final MaterializationSourceProtectionRegistry sourceProtectionAdapters;
     private final ExactSourceRangeReaderFactory sourceReaders;
-    private final CompactedObjectWriter writer;
+    private final Optional<CompactedObjectWriter> writer;
+    private final Optional<RangedCompactedObjectWriter> rangedWriter;
     private final ObjectStore objectStore;
     private final MaterializationOutputVerifier outputVerifier;
     private final Optional<TopicCompactionEngine> topicCompactionEngine;
@@ -90,6 +101,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     private final Executor callbackExecutor;
     private final Clock clock;
     private final F4Keyspace keyspace;
+    private final MaterializationStreamAuthorityMode authorityMode;
     private final ConcurrentMap<String, Operation> activeOperations = new ConcurrentHashMap<>();
 
     public DefaultMaterializationWorker(
@@ -187,6 +199,64 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 clock,
                 TopicSupport.disabled(),
                 sourceProtectionAdapters);
+    }
+
+    /**
+     * NCP2-only lossless worker used by Kafka profiles. NCP1 and NTC1 stay bound to the
+     * {@link CompactedObjectWriter} constructors above.
+     */
+    public DefaultMaterializationWorker(
+            String cluster,
+            String processRunId,
+            MaterializationTaskStore tasks,
+            GenerationMetadataStore generations,
+            PhysicalObjectIdentityResolver identities,
+            ObjectProtectionManager protections,
+            MaterializationSourceProtectionRegistry sourceProtectionAdapters,
+            ExactSourceRangeReaderFactory sourceReaders,
+            RangedCompactedObjectWriter rangedWriter,
+            ObjectStore objectStore,
+            MaterializationOutputVerifier outputVerifier,
+            int sourceReadPageRecords,
+            int sourceReadPageBytes,
+            Duration claimDuration,
+            Duration claimRenewInterval,
+            Duration retryDelay,
+            int maxTaskAttempts,
+            Duration operationTimeout,
+            String writerBuild,
+            ScheduledExecutorService scheduler,
+            Executor callbackExecutor,
+            Clock clock) {
+        this(
+                cluster,
+                processRunId,
+                tasks,
+                generations,
+                identities,
+                protections,
+                sourceReaders,
+                Optional.empty(),
+                Optional.of(Objects.requireNonNull(
+                        rangedWriter, "rangedWriter")),
+                objectStore,
+                outputVerifier,
+                new SecureWorkerClaimIdGenerator(),
+                sourceReadPageRecords,
+                sourceReadPageBytes,
+                claimDuration,
+                claimRenewInterval,
+                retryDelay,
+                maxTaskAttempts,
+                operationTimeout,
+                writerBuild,
+                scheduler,
+                callbackExecutor,
+                clock,
+                TopicSupport.disabled(),
+                sourceProtectionAdapters,
+                MaterializationStreamAuthorityMode
+                        .DIRECT_STREAM);
     }
 
     public DefaultMaterializationWorker(
@@ -417,6 +487,63 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             Clock clock,
             TopicSupport topicSupport,
             MaterializationSourceProtectionRegistry sourceProtectionAdapters) {
+        this(
+                cluster,
+                processRunId,
+                tasks,
+                generations,
+                identities,
+                protections,
+                sourceReaders,
+                Optional.of(Objects.requireNonNull(writer, "writer")),
+                Optional.empty(),
+                objectStore,
+                outputVerifier,
+                claimIds,
+                sourceReadPageRecords,
+                sourceReadPageBytes,
+                claimDuration,
+                claimRenewInterval,
+                retryDelay,
+                maxTaskAttempts,
+                operationTimeout,
+                writerBuild,
+                scheduler,
+                callbackExecutor,
+                clock,
+                topicSupport,
+                sourceProtectionAdapters,
+                MaterializationStreamAuthorityMode
+                        .PROJECTION_REQUIRED);
+    }
+
+    private DefaultMaterializationWorker(
+            String cluster,
+            String processRunId,
+            MaterializationTaskStore tasks,
+            GenerationMetadataStore generations,
+            PhysicalObjectIdentityResolver identities,
+            ObjectProtectionManager protections,
+            ExactSourceRangeReaderFactory sourceReaders,
+            Optional<CompactedObjectWriter> writer,
+            Optional<RangedCompactedObjectWriter> rangedWriter,
+            ObjectStore objectStore,
+            MaterializationOutputVerifier outputVerifier,
+            WorkerClaimIdGenerator claimIds,
+            int sourceReadPageRecords,
+            int sourceReadPageBytes,
+            Duration claimDuration,
+            Duration claimRenewInterval,
+            Duration retryDelay,
+            int maxTaskAttempts,
+            Duration operationTimeout,
+            String writerBuild,
+            ScheduledExecutorService scheduler,
+            Executor callbackExecutor,
+            Clock clock,
+            TopicSupport topicSupport,
+            MaterializationSourceProtectionRegistry sourceProtectionAdapters,
+            MaterializationStreamAuthorityMode authorityMode) {
         this.cluster = requireText(cluster, "cluster");
         this.processRunId = requireBase32(processRunId, "processRunId");
         this.tasks = Objects.requireNonNull(tasks, "tasks");
@@ -427,6 +554,12 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 sourceProtectionAdapters, "sourceProtectionAdapters");
         this.sourceReaders = Objects.requireNonNull(sourceReaders, "sourceReaders");
         this.writer = Objects.requireNonNull(writer, "writer");
+        this.rangedWriter = Objects.requireNonNull(
+                rangedWriter, "rangedWriter");
+        if (this.writer.isPresent() == this.rangedWriter.isPresent()) {
+            throw new IllegalArgumentException(
+                    "exactly one NCP1/NTC1 or NCP2 writer must be installed");
+        }
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
         this.outputVerifier = Objects.requireNonNull(outputVerifier, "outputVerifier");
         TopicSupport exactTopicSupport = Objects.requireNonNull(topicSupport, "topicSupport");
@@ -462,6 +595,8 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.keyspace = new F4Keyspace(cluster);
+        this.authorityMode = Objects.requireNonNull(
+                authorityMode, "authorityMode");
     }
 
     @Override
@@ -500,7 +635,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         private volatile VersionedMaterializationTask claimed;
         private ObjectProtection outputProtection;
         private Runnable rowsCloser;
-        private CompactedObjectWriteResult written;
+        private WrittenObject written;
         private ScheduledFuture<?> heartbeatSchedule;
         private CompletableFuture<Void> heartbeatTail = CompletableFuture.completedFuture(null);
         private boolean heartbeatStopped;
@@ -510,20 +645,26 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         private Operation(MaterializationTask task) {
             this.task = task;
             this.deadline = new MaterializationDeadline(operationTimeout, scheduler);
-            boolean lossless = task.taskKind() == TaskKind.LOSSLESS_REWRITE
+            boolean losslessNcp1 = task.taskKind() == TaskKind.LOSSLESS_REWRITE
                     && task.policy().targetPhysicalFormat()
-                            .equals(MaterializationPolicy.COMMITTED_FORMAT);
+                            .equals(MaterializationPolicy.COMMITTED_FORMAT)
+                    && writer.isPresent();
+            boolean losslessNcp2 = task.taskKind() == TaskKind.LOSSLESS_REWRITE
+                    && task.policy().targetPhysicalFormat()
+                            .equals(MaterializationPolicy.KAFKA_COMMITTED_FORMAT)
+                    && rangedWriter.isPresent();
             boolean topic = task.taskKind() == TaskKind.TOPIC_KEY_COMPACTION
                     && task.policy().targetPhysicalFormat()
                             .equals(MaterializationPolicy.TOPIC_COMPACTED_FORMAT)
                     && task.policy().topicCompaction().isPresent()
-                    && topicCompactionEngine.isPresent();
-            if (!lossless && !topic) {
+                    && topicCompactionEngine.isPresent()
+                    && writer.isPresent();
+            if (!losslessNcp1 && !losslessNcp2 && !topic) {
                 throw execution(
                         TaskFailureClass.UNSUPPORTED_MAPPING,
                         ErrorCode.UNSUPPORTED_FORMAT,
                         false,
-                        "F4-M3 worker has no execution engine for the durable task policy",
+                        "materialization worker has no execution engine for the durable task policy",
                         null);
             }
         }
@@ -624,19 +765,50 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 TaskFacts facts) {
             MaterializationStreamRegistrationRecord value = registration.value();
             Optional<ProjectionRef> projection;
+            StorageProfile profile;
             try {
                 projection = ProjectionIdentity.decode(value.projectionRef());
+                profile = StorageProfile.valueOf(
+                                value.storageProfile())
+                        .canonical();
             } catch (RuntimeException failure) {
-                throw invariant("materialization registration projection is malformed", failure);
+                throw invariant(
+                        "materialization registration authority is malformed",
+                        failure);
             }
             if (!registration.key().equals(keyspace.materializationRegistryKey(task.streamId()))
                     || !value.streamId().equals(task.streamId().value())
-                    || projection.isEmpty()
-                    || !projection.equals(facts.projectionRef())) {
-                throw condition("materialization registration no longer matches the task projection");
+                    || !profile.objectMaterializationEnabled()) {
+                throw condition(
+                        "materialization registration no longer matches the task identity");
             }
-            return new Admission(new Checksum(
-                    ChecksumType.SHA256, value.projectionIdentitySha256()));
+            Checksum identity = new Checksum(
+                    ChecksumType.SHA256,
+                    value.projectionIdentitySha256());
+            if (authorityMode
+                    == MaterializationStreamAuthorityMode
+                            .DIRECT_STREAM) {
+                Checksum expected =
+                        DirectMaterializationStreamAuthority
+                                .identitySha256(
+                                        task.streamId(), profile);
+                if (projection.isPresent()
+                        || facts.projectionRef().isPresent()
+                        || !value.projectionRef()
+                                .equals(
+                                        DirectMaterializationStreamAuthority
+                                                .encodedProjectionRef())
+                        || !identity.equals(expected)) {
+                    throw condition(
+                            "materialization registration no longer matches the task direct-stream authority");
+                }
+            } else if (projection.isEmpty()
+                    || !projection.equals(
+                            facts.projectionRef())) {
+                throw condition(
+                        "materialization registration no longer matches the task projection");
+            }
+            return new Admission(identity);
         }
 
         private CompletableFuture<Void> acquireSources(int index) {
@@ -683,7 +855,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     });
         }
 
-        private CompletableFuture<CompactedObjectWriteResult> write(
+        private CompletableFuture<WrittenObject> write(
                 TaskFacts facts,
                 Admission admission) {
             ExactSourceRangeReader exactReader = Objects.requireNonNull(
@@ -694,6 +866,16 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     ReadIsolation.COMMITTED,
                     deadline.remaining());
             if (task.taskKind() == TaskKind.LOSSLESS_REWRITE) {
+                if (task.policy().targetPhysicalFormat()
+                        .equals(MaterializationPolicy.KAFKA_COMMITTED_FORMAT)) {
+                    RangedLosslessMaterializationRowPublisher lossless =
+                            new RangedLosslessMaterializationRowPublisher(
+                                    task, exactReader, options, callbackExecutor);
+                    rowsCloser = lossless::close;
+                    return writeRangedRows(
+                            rangedWriteRequest(facts),
+                            lossless);
+                }
                 LosslessMaterializationRowPublisher lossless =
                         new LosslessMaterializationRowPublisher(
                                 task, exactReader, options, callbackExecutor);
@@ -722,16 +904,49 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     });
         }
 
-        private CompletableFuture<CompactedObjectWriteResult> writeRows(
+        private CompletableFuture<WrittenObject> writeRows(
                 CompactedObjectWriteRequest request,
                 java.util.concurrent.Flow.Publisher<com.nereusstream.objectstore.compacted.CompactedObjectRow>
                         publisher) {
             return deadline.bound(
-                            () -> writer.write(request, publisher),
+                            () -> writer.orElseThrow().write(request, publisher),
                             "write compacted Parquet output")
                     .thenApply(result -> {
-                        written = result;
-                        return result;
+                        WrittenObject exact = WrittenObject.from(
+                                result,
+                                request.logicalFormat(),
+                                request.entryCount());
+                        written = exact;
+                        return exact;
+                    });
+        }
+
+        private CompletableFuture<WrittenObject> writeRangedRows(
+                RangedCompactedObjectWriteRequest request,
+                java.util.concurrent.Flow.Publisher<
+                                com.nereusstream.objectstore.compacted.RangedCompactedObjectRow>
+                        publisher) {
+            return deadline.bound(
+                            () -> rangedWriter.orElseThrow().write(
+                                    request, publisher),
+                            "write ranged compacted Parquet output")
+                    .thenApply(result -> {
+                        if (result.outputEntryCount()
+                                        != request.entryCount()
+                                || result.outputRecordCount()
+                                        != request.sourceRecordCount()) {
+                            result.close();
+                            throw execution(
+                                    TaskFailureClass.OUTPUT_INVARIANT,
+                                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                                    false,
+                                    "NCP2 writer output accounting differs from the durable task",
+                                    null);
+                        }
+                        WrittenObject exact = WrittenObject.from(
+                                result, request.logicalFormat());
+                        written = exact;
+                        return exact;
                     });
         }
 
@@ -781,7 +996,36 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                                     spec.keyCodecId())));
         }
 
-        private CompletableFuture<HeadObjectResult> upload(CompactedObjectWriteResult result) {
+        private RangedCompactedObjectWriteRequest rangedWriteRequest(
+                TaskFacts facts) {
+            if (facts.payloadFormat()
+                    != PayloadFormat.KAFKA_RECORD_BATCH) {
+                throw execution(
+                        TaskFailureClass.UNSUPPORTED_MAPPING,
+                        ErrorCode.UNSUPPORTED_FORMAT,
+                        false,
+                        "NCP2 lossless materialization requires Kafka record batches",
+                        null);
+            }
+            return new RangedCompactedObjectWriteRequest(
+                    cluster,
+                    task.streamId(),
+                    task.coverage(),
+                    claimed.value().workerClaim().orElseThrow().claimId(),
+                    task.sourceSetSha256(),
+                    task.policyDigestSha256(),
+                    facts.payloadFormat(),
+                    CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT,
+                    task.coverage().recordCount(),
+                    facts.entryCount(),
+                    facts.logicalBytes(),
+                    facts.cumulativeSizeAtEnd(),
+                    task.policy().targetRowGroupRecords(),
+                    task.policy().compression(),
+                    writerBuild);
+        }
+
+        private CompletableFuture<HeadObjectResult> upload(WrittenObject result) {
             PutObjectOptions options = new PutObjectOptions(
                     "application/vnd.apache.parquet",
                     result.storageCrc32c(),
@@ -812,7 +1056,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     .thenCompose(value -> value);
         }
 
-        private CompletableFuture<HeadObjectResult> head(CompactedObjectWriteResult result) {
+        private CompletableFuture<HeadObjectResult> head(WrittenObject result) {
             return deadline.bound(
                             () -> objectStore.headObject(
                                     result.objectKey(),
@@ -835,7 +1079,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
 
         private MaterializationOutput output(
                 TaskFacts facts,
-                CompactedObjectWriteResult result,
+                WrittenObject result,
                 HeadObjectResult head) {
             ObjectSliceReadTarget target = new ObjectSliceReadTarget(
                     1,
@@ -843,7 +1087,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     result.objectKey(),
                     ObjectType.STREAM_COMPACTED_OBJECT,
                     result.physicalFormat(),
-                    facts.payloadFormat().name(),
+                    result.logicalFormat(),
                     task.taskId(),
                     0,
                     result.objectLength(),
@@ -866,13 +1110,13 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     result.contentSha256(),
                     head.etag().orElse(""),
                     result.physicalFormat(),
-                    facts.payloadFormat().name(),
+                    result.logicalFormat(),
                     target,
                     targetIdentity,
                     result.entryIndexRef(),
                     Math.toIntExact(task.coverage().recordCount()),
-                    result.outputRecordCount(),
-                    facts.entryCount(),
+                    Math.toIntExact(result.outputRecordCount()),
+                    result.outputEntryCount(),
                     facts.logicalBytes(),
                     facts.schemaRefs(),
                     facts.cumulativeSizeAtStart(),
@@ -1200,12 +1444,26 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 logicalBytes = Math.addExact(logicalBytes, source.logicalBytes());
                 cumulative = source.cumulativeSizeAtEnd();
             }
-            if (first.projectionRef().isEmpty()) {
+            if (authorityMode
+                            == MaterializationStreamAuthorityMode
+                                    .PROJECTION_REQUIRED
+                    && first.projectionRef().isEmpty()) {
                 throw execution(
                         TaskFailureClass.UNSUPPORTED_MAPPING,
                         ErrorCode.UNSUPPORTED_FORMAT,
                         false,
                         "F4-M3 worker requires a registered projection identity",
+                        null);
+            }
+            if (authorityMode
+                            == MaterializationStreamAuthorityMode
+                                    .DIRECT_STREAM
+                    && first.projectionRef().isPresent()) {
+                throw execution(
+                        TaskFailureClass.UNSUPPORTED_MAPPING,
+                        ErrorCode.UNSUPPORTED_FORMAT,
+                        false,
+                        "direct-stream worker rejects projection-bearing sources",
                         null);
             }
             return new TaskFacts(
@@ -1390,6 +1648,87 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     }
 
     private record Admission(Checksum projectionIdentitySha256) { }
+
+    private record WrittenObject(
+            StagedObjectFile stagingFile,
+            ObjectId objectId,
+            ObjectKey objectKey,
+            ObjectKeyHash objectKeyHash,
+            long objectLength,
+            Checksum storageCrc32c,
+            Checksum contentSha256,
+            String physicalFormat,
+            String logicalFormat,
+            EntryIndexRef entryIndexRef,
+            int outputEntryCount,
+            long outputRecordCount,
+            Runnable closeAction) {
+        private WrittenObject {
+            Objects.requireNonNull(stagingFile, "stagingFile");
+            Objects.requireNonNull(objectId, "objectId");
+            Objects.requireNonNull(objectKey, "objectKey");
+            Objects.requireNonNull(objectKeyHash, "objectKeyHash");
+            Objects.requireNonNull(storageCrc32c, "storageCrc32c");
+            Objects.requireNonNull(contentSha256, "contentSha256");
+            physicalFormat = requireText(
+                    physicalFormat, "physicalFormat");
+            logicalFormat = requireText(
+                    logicalFormat, "logicalFormat");
+            Objects.requireNonNull(entryIndexRef, "entryIndexRef");
+            Objects.requireNonNull(closeAction, "closeAction");
+            if (objectLength <= 0
+                    || outputEntryCount < 0
+                    || outputRecordCount < 0) {
+                throw new IllegalArgumentException(
+                        "written materialization output accounting is invalid");
+            }
+        }
+
+        private static WrittenObject from(
+                CompactedObjectWriteResult result,
+                String logicalFormat,
+                int outputEntryCount) {
+            Objects.requireNonNull(result, "result");
+            return new WrittenObject(
+                    result.stagingFile(),
+                    result.objectId(),
+                    result.objectKey(),
+                    result.objectKeyHash(),
+                    result.objectLength(),
+                    result.storageCrc32c(),
+                    result.contentSha256(),
+                    result.physicalFormat(),
+                    logicalFormat,
+                    result.entryIndexRef(),
+                    outputEntryCount,
+                    result.outputRecordCount(),
+                    result::close);
+        }
+
+        private static WrittenObject from(
+                RangedCompactedObjectWriteResult result,
+                String logicalFormat) {
+            Objects.requireNonNull(result, "result");
+            return new WrittenObject(
+                    result.stagingFile(),
+                    result.objectId(),
+                    result.objectKey(),
+                    result.objectKeyHash(),
+                    result.objectLength(),
+                    result.storageCrc32c(),
+                    result.contentSha256(),
+                    result.physicalFormat(),
+                    logicalFormat,
+                    result.entryIndexRef(),
+                    result.outputEntryCount(),
+                    result.outputRecordCount(),
+                    result::close);
+        }
+
+        private void close() {
+            closeAction.run();
+        }
+    }
 
     private record TaskFacts(
             PayloadFormat payloadFormat,

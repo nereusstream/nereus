@@ -11,9 +11,11 @@ import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.core.capability.GenerationActivationProof;
+import com.nereusstream.core.capability.GenerationActivationSubject;
 import com.nereusstream.core.capability.GenerationOperation;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.capability.LiveProjectionSubject;
+import com.nereusstream.core.capability.LiveStreamSubject;
 import com.nereusstream.materialization.recovery.RecoveryCheckpointPublisher;
 import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.F4ScanToken;
@@ -45,6 +47,7 @@ public final class RegisteredMaterializationStreamScanner {
     private final MaterializationCheckpointReconciler checkpoints;
     private final TerminalWorkflowMetadataRetirer metadataRetirer;
     private final MaterializationPolicy policy;
+    private final MaterializationStreamAuthorityMode authorityMode;
     private final int registryPageSize;
     private final int maxTasksPerPlan;
     private final F4Keyspace keyspace;
@@ -79,7 +82,9 @@ public final class RegisteredMaterializationStreamScanner {
                 metadataRetirer,
                 policy,
                 registryPageSize,
-                maxTasksPerPlan);
+                maxTasksPerPlan,
+                MaterializationStreamAuthorityMode
+                        .PROJECTION_REQUIRED);
     }
 
     public RegisteredMaterializationStreamScanner(
@@ -98,6 +103,43 @@ public final class RegisteredMaterializationStreamScanner {
             MaterializationPolicy policy,
             int registryPageSize,
             int maxTasksPerPlan) {
+        this(
+                cluster,
+                l0Metadata,
+                generations,
+                activationGuard,
+                sourceRepairer,
+                planner,
+                tasks,
+                recovery,
+                recoveryScanner,
+                recoveryCheckpoints,
+                checkpoints,
+                metadataRetirer,
+                policy,
+                registryPageSize,
+                maxTasksPerPlan,
+                MaterializationStreamAuthorityMode
+                        .PROJECTION_REQUIRED);
+    }
+
+    public RegisteredMaterializationStreamScanner(
+            String cluster,
+            OxiaMetadataStore l0Metadata,
+            GenerationMetadataStore generations,
+            GenerationProtocolActivationGuard activationGuard,
+            MaterializationSourceRepairer sourceRepairer,
+            MaterializationPlanner planner,
+            MaterializationTaskStore tasks,
+            MaterializationTaskRecovery recovery,
+            TaskRecoveryScanner recoveryScanner,
+            RecoveryCheckpointPublisher recoveryCheckpoints,
+            MaterializationCheckpointReconciler checkpoints,
+            TerminalWorkflowMetadataRetirer metadataRetirer,
+            MaterializationPolicy policy,
+            int registryPageSize,
+            int maxTasksPerPlan,
+            MaterializationStreamAuthorityMode authorityMode) {
         this.cluster = requireText(cluster, "cluster");
         this.l0Metadata = Objects.requireNonNull(l0Metadata, "l0Metadata");
         this.generations = Objects.requireNonNull(generations, "generations");
@@ -113,6 +155,8 @@ public final class RegisteredMaterializationStreamScanner {
         this.checkpoints = Objects.requireNonNull(checkpoints, "checkpoints");
         this.metadataRetirer = Objects.requireNonNull(metadataRetirer, "metadataRetirer");
         this.policy = Objects.requireNonNull(policy, "policy");
+        this.authorityMode = Objects.requireNonNull(
+                authorityMode, "authorityMode");
         if (registryPageSize <= 0 || registryPageSize > 1_000) {
             throw new IllegalArgumentException("registryPageSize must be in [1, 1000]");
         }
@@ -181,7 +225,9 @@ public final class RegisteredMaterializationStreamScanner {
                     "registered materialization stream key/value identity mismatch", null));
         }
         return l0Metadata.getStreamSnapshot(cluster, streamId).thenCompose(snapshot -> {
-            Optional<LiveProjectionSubject> subject = validateRegistration(value, streamId, snapshot);
+            Optional<GenerationActivationSubject> subject =
+                    validateRegistration(
+                            value, streamId, snapshot);
             if (subject.isEmpty()) {
                 accumulator.registrationsSkipped++;
                 return CompletableFuture.completedFuture(null);
@@ -191,13 +237,16 @@ public final class RegisteredMaterializationStreamScanner {
                                     ? GenerationOperation.TOPIC_COMPACTED_PUBLISH
                                     : GenerationOperation.GENERATION_PUBLISH,
                             subject.orElseThrow(),
-                            true)
+                            authorityMode
+                                    == MaterializationStreamAuthorityMode
+                                            .PROJECTION_REQUIRED)
                     .thenCompose(proof -> processAdmittedStream(
                             streamId, snapshot, proof, accumulator));
         });
     }
 
-    private Optional<LiveProjectionSubject> validateRegistration(
+    private Optional<GenerationActivationSubject>
+            validateRegistration(
             MaterializationStreamRegistrationRecord registration,
             StreamId streamId,
             StreamMetadataSnapshot snapshot) {
@@ -219,14 +268,39 @@ public final class RegisteredMaterializationStreamScanner {
         if ((state != StreamState.ACTIVE && state != StreamState.SEALED)
                 || registeredProfile != actualProfile
                 || !actualProfile.objectMaterializationEnabled()
-                || projection.isEmpty()
                 || registration.lastHintCommitVersion() > snapshot.committedEnd().commitVersion()) {
             return Optional.empty();
         }
-        return Optional.of(new LiveProjectionSubject(
-                streamId,
-                projection.orElseThrow(),
-                new Checksum(ChecksumType.SHA256, registration.projectionIdentitySha256())));
+        Checksum identity = new Checksum(
+                ChecksumType.SHA256,
+                registration.projectionIdentitySha256());
+        if (authorityMode
+                == MaterializationStreamAuthorityMode
+                        .DIRECT_STREAM) {
+            Checksum expected =
+                    DirectMaterializationStreamAuthority
+                            .identitySha256(
+                                    streamId, actualProfile);
+            if (projection.isPresent()
+                    || !registration.projectionRef()
+                            .equals(
+                                    DirectMaterializationStreamAuthority
+                                            .encodedProjectionRef())
+                    || !identity.equals(expected)) {
+                return Optional.empty();
+            }
+            return Optional.of(
+                    new LiveStreamSubject(
+                            streamId, expected));
+        }
+        if (projection.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(
+                new LiveProjectionSubject(
+                        streamId,
+                        projection.orElseThrow(),
+                        identity));
     }
 
     private CompletableFuture<Void> processAdmittedStream(

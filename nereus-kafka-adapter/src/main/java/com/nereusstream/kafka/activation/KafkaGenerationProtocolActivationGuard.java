@@ -203,12 +203,16 @@ public final class KafkaGenerationProtocolActivationGuard
             boolean activateLiveProjectionIfAbsent) {
         GenerationOperation exactOperation = Objects.requireNonNull(operation, "operation");
         GenerationActivationSubject exactSubject = Objects.requireNonNull(subject, "subject");
-        if (exactOperation != GenerationOperation.TOPIC_COMPACTED_PUBLISH
+        if ((exactOperation
+                        != GenerationOperation
+                                .TOPIC_COMPACTED_PUBLISH
+                        && exactOperation
+                                != GenerationOperation
+                                        .GENERATION_PUBLISH)
                 || activateLiveProjectionIfAbsent
                 || !(exactSubject instanceof LiveStreamSubject live)) {
             throw new IllegalArgumentException(
-                    "Kafka generation guard admits only non-activating direct-stream topic"
-                        + " compaction");
+                    "Kafka generation guard admits only non-activating direct-stream generation publication");
         }
         return live;
     }
