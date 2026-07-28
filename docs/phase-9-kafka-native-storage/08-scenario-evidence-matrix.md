@@ -69,8 +69,18 @@ release distribution against shared KRaft/Oxia/LocalStack authority。It commits
 requires `leader=2, replicas=[2], ISR=[2]`、empty ongoing reassignment and both processes alive，then recovers offset 0 and
 commits/reads offset 1 through broker 2。Fresh execution passes 73/73 actionable tasks in 1m04s and is included in
 `phase9M6KafkaProcessCheck`。This adds P-tier partial evidence for KF-META-007 and the post-handoff part of KF-APP-014，
-plus D/K/P evidence for KF-OPS-007。It does not add the C-tier already-dispatched old append cut，and the process topology
-has only one controller；the rows therefore remain `PLANNED`。
+plus D/K/P evidence for KF-OPS-007。
+
+`f9InFlightTakeoverProcessIntegrationTest` adds the named C cut with three real release JVMs：node 3 remains the sole
+controller voter，node 1 owns `[1]` and node 2 is the target。A Toxiproxy downstream timeout holds a retries-disabled offset-1
+Produce；a `jcmd Thread.print -l` sample must prove the node-1 storage worker is blocked in
+`NereusUnifiedLog.appendStable -> CompletableFuture.get` before `SIGSTOP`。Admin then connects through the two live nodes，
+atomically installs `[2]` and proves recovered earliest/latest `0/1`。After `SIGCONT`，the stale future fails with
+`append session changed before guarded object upload`，the old JVM survives，the WAL key set and latest remain unchanged，
+and node 2 alone commits/fetches offset 1 before latest becomes 2。Fresh execution passes 64/64 actionable tasks in 1m01s
+including runtime publication/source lock and is included in `phase9M6KafkaProcessCheck`。This supplies Object-WAL P/C
+evidence for KF-META-007/KF-META-012/KF-APP-014。The manifest row still requires `bookkeeper` service coverage，and the
+topology still has only one controller；therefore these rows remain `PLANNED` until profile and final service matrices run。
 
 Current deterministic M4 fork evidence（local `ec7f0db991` + `032974067c`）：`NereusProducerStateManagerTest`、
 `NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
@@ -318,12 +328,12 @@ hash。Markdown/JSON ID sets must match。
 | KF-META-004 | every create response-loss cut reloads/converges without extra stream | `KafkaBindingRaceIntegrationTest` | R,C | M2 |
 | KF-META-005 | binding profile/mapping/authority attributes are immutable and mismatch becomes CORRUPT | `KafkaBindingTransitionTest` | D,R | M2 |
 | KF-META-006 | lower KRaft leader epoch cannot acquire/renew session | `KafkaLeaderAuthorityPropertyTest` | D,M,R | M2 |
-| KF-META-007 | higher leader epoch immediately preempts live old session before TTL | product `f9MultiBrokerTakeoverProviderIntegrationTest`（real Oxia/two independent Object-WAL runtimes R）+ `f9MultiBrokerTakeoverProcessIntegrationTest`（real release/KRaft singleton handoff P；old in-flight C pending） | R,P,C | M2 |
+| KF-META-007 | higher leader epoch immediately preempts live old session before TTL | product `f9MultiBrokerTakeoverProviderIntegrationTest`（real Oxia/two independent Object-WAL runtimes R）+ `f9MultiBrokerTakeoverProcessIntegrationTest`（release/KRaft singleton handoff P）+ `f9InFlightTakeoverProcessIntegrationTest`（provider-future freeze/pre-upload fencing C；BookKeeper profile pending） | R,P,C | M2 |
 | KF-META-008 | same leader/owner term renews only exact writer/token；different owner is fenced | `KafkaLeaderAuthorityPropertyTest` | D,M | M2 |
 | KF-META-009 | same broker restart with higher broker epoch preempts same leader term | `KafkaLeaderAuthorityIntegrationTest` | R,P | M2 |
 | KF-META-010 | higher broker epoch from different owner at same leader epoch is rejected | `KafkaLeaderAuthorityPropertyTest` | D,M | M2 |
 | KF-META-011 | legacy caller cannot acquire authority-required Kafka stream after lease expiry | `KafkaLeaderAuthorityIntegrationTest` | D,R | M2 |
-| KF-META-012 | old writer primary/protection/head CAS fails after authority preemption | product `f9MultiBrokerTakeoverProviderIntegrationTest` + `DefaultKafkaPartitionStorageTest`（old head-CAS rejection/local recovery fence R/D）；release process proves old owner resign/binding preservation but explicit stale writer P/C cut remains pending | R,P,C | M2 |
+| KF-META-012 | old writer primary/protection/head CAS fails after authority preemption | product `f9MultiBrokerTakeoverProviderIntegrationTest` + `DefaultKafkaPartitionStorageTest`（old head-CAS rejection/local recovery fence R/D）+ `f9InFlightTakeoverProcessIntegrationTest`（release process already-dispatched stale writer fails at guarded-upload session revalidation P/C；BookKeeper profile pending） | R,P,C | M2 |
 | KF-META-013 | StreamHead V1 goldens decode to empty authority；V2 round-trip and old reader rejects | `StreamHeadV2CodecTest` | D | M2 |
 | KF-META-014 | NKC1 all required sections/golden SHA/CRC/EOF round-trip deterministically | `KafkaCheckpointFormatTest` | D | M2 |
 | KF-META-015 | NKC1 length/flag/section/checksum/duplicate/unknown-required corruption fails before unsafe allocation | `KafkaCheckpointCorruptionTest` | D,M | M2 |
@@ -352,7 +362,7 @@ hash。Markdown/JSON ID sets must match。
 | KF-APP-011 | append executor queue/byte rejection occurs before IO and releases owned buffer | fork `NereusProduceBufferTest` | D,M | M3 |
 | KF-APP-012 | client disconnect/cancel after enqueue cannot cancel uncertain append；callback/buffer terminal once | fork `NereusProduceBufferTest` | D,R,C | M3 |
 | KF-APP-013 | different partitions run concurrently，same partition never reorders under saturation | `KafkaAppendExecutorIntegrationTest` | D,R,M | M3 |
-| KF-APP-014 | leader takeover during old in-flight append leaves only current-term publication | product provider gate（post-takeover stale append fenced R）+ release process gate（post-handoff recovery/continuation P）；already-dispatched old append C cut remains pending | P,C | M3 |
+| KF-APP-014 | leader takeover during old in-flight append leaves only current-term publication | product provider gate（post-takeover stale append fenced R）+ `f9MultiBrokerTakeoverProcessIntegrationTest`（post-handoff recovery/continuation P）+ `f9InFlightTakeoverProcessIntegrationTest`（`jcmd` provider-future proof、SIGSTOP takeover、pre-upload fence、no WAL/LEO mutation C）；Object-WAL P/C complete，BookKeeper service/profile pending | P,C | M3 |
 | KF-APP-015 | broker kill before/after each append cut recovers exact LEO/HW/bytes | `KafkaNativeProcessCutIntegrationTest` | P,C | M3/M7 |
 | KF-APP-016 | each claimed Nereus storage profile passes identical Produce correctness contract | `KafkaNativeProfileMatrixIntegrationTest` | R,P | M3/M7 |
 

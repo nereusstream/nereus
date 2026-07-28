@@ -1,7 +1,7 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
 > 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs/full composition and Object-WAL exact-reference durable checkpoint quarantine partial slices implemented
-> 2026-07-28 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；already-dispatched old append、BookKeeper/profile、multi-controller 与 coordinator migration 仍 open
+> 2026-07-28 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 又证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；BookKeeper/profile、multi-controller 与 coordinator migration 仍 open
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -568,7 +568,8 @@ The focused deterministic regression is
 `DefaultKafkaPartitionStorageTest.knownNotCommittedAuthorityOrHeadFailureStillFencesTheOldLeader`。The real gate is wired into
 `phase9M3ProviderCheck` as `:nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest`。This closes an R-tier
 two-runtime Object-provider live-preemption slice for KF-META-007/KF-META-012；it is not yet a two Kafka-process/KRaft
-failover、old in-flight append publication cut、BookKeeper-profile takeover or multi-controller proof。
+failover、BookKeeper-profile takeover or multi-controller proof。The separate section 7.4 process gate now supplies the
+Object-WAL old in-flight publication cut。
 
 ### 7.3 Release-process handoff and binding-preservation boundary（2026-07-28）
 
@@ -605,9 +606,38 @@ while the existing previous-topic-ID and same-name-recreation tests lock the tru
 The matching controller rule is one atomic KRaft record that changes replicas、ISR and leader to the active target
 singleton，with empty adding/removing lists；no transitional RF2 or follower ISR may become visible。This lets the new broker
 acquire a higher stream-head authority only after KRaft ownership changes，while the old broker's metadata callback merely
-resigns its local runtime。Fresh process execution passed 73/73 actionable tasks。It is still not the
-KF-APP-014 already-dispatched append cut：the old broker stays alive，but the test submits the next append only after the
-handoff is observed。
+resigns its local runtime。Fresh process execution passed 73/73 actionable tasks。This first gate supplies post-handoff
+recovery/continuation；section 7.4 supplies the KF-APP-014 already-dispatched append cut。
+
+### 7.4 Already-dispatched append takeover boundary（2026-07-28）
+
+`f9InFlightTakeoverProcessIntegrationTest` keeps control-plane liveness independent from the old data leader：
+
+```text
+node 3 = combined controller/broker, sole controller voter
+node 1 = broker-only, initial RF1 owner
+node 2 = broker-only, takeover target
+all nodes = same cluster ID + Nereus cluster + Oxia + bucket + proxied S3 endpoint
+```
+
+After offset 0 is stable，the harness installs a downstream timeout toxic and starts a single-attempt
+`retries=0, enable.idempotence=false` Produce for offset 1。It does not infer “in flight” from elapsed time：
+`${java.home}/bin/jcmd <pid> Thread.print -l` must capture the broker-1 storage worker inside
+`NereusUnifiedLog.appendStable` and `CompletableFuture.get` while the client future is incomplete。Only then may the
+harness freeze broker 1 with `SIGSTOP`。
+
+The toxic is removed while broker 1 is frozen；Admin connects only to broker 2/node 3 and installs singleton `[2]`。
+Before resuming the old process，broker 2 must recover exact `[0,1)` and report earliest/latest `0/1`。When broker 1 receives
+`SIGCONT`，the guarded object path re-runs `revalidateAppendSession` against the durable head and observes the newer session；
+the old future terminates with `FencedLeaderEpochException` and the exact message
+`append session changed before guarded object upload`。Because rejection occurs before upload，the raw WAL key set must
+remain equal to its pre-fault snapshot。The old JVM must remain alive，durable latest must remain 1，and broker 2 must be the
+only process able to commit `[1,2)`。
+
+This proves two independent safety layers：the process-local storage call already entered the provider future，but durable
+session revalidation still prevents stale physical publication；KRaft handoff recovers only the old stable head and does not
+consume a future/in-memory end offset。The current proof is Object-WAL P/C evidence。The same cut remains required for all
+BookKeeper profiles before KF-APP-014 may leave `PLANNED` in the complete profile/service matrix。
 
 The executable recovery boundary is now split by resource ownership：
 
@@ -993,6 +1023,13 @@ F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kaf
   Oxia/shared provider state，preempts broker A before its session TTL with broker B's higher leader epoch，replays A's exact
   committed batch、fences A's next durable append and lets B continue at the recovered end。The companion partition test locks
   the rule that a known-not-committed authority/head conflict is still a recovery-required fence；
+- `f9InFlightTakeoverProcessIntegrationTest` starts a controller JVM plus two broker JVMs over one real KRaft/Oxia/S3
+  identity，then installs a Toxiproxy downstream timeout before a retries-disabled Produce。A JDK `jcmd Thread.print -l`
+  sample must show the broker-1 storage worker inside `NereusUnifiedLog.appendStable` waiting on
+  `CompletableFuture.get` before the harness may freeze it。After atomic reassignment to broker 2 and exact recovery at
+  stable end 1，resuming broker 1 must surface `append session changed before guarded object upload`；the stale future
+  fails、the process survives、the pre-takeover WAL key set is unchanged and only broker 2 may publish `[1,2)`。This is the
+  concrete process implementation of “old in-flight head CAS/upload must not outlive authority” for Object-WAL；
 - config-free Kafka identity/domain values、the `nereus-kafka-adapter` module skeleton、canonical binding/registry keys、
   all 25 binding-root fields、closed lifecycle/mapping/operation wire IDs and explicit V1 codecs are implemented；
 - frozen Kafka metadata envelope SHA-256 values are binding

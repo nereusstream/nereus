@@ -22,7 +22,15 @@ checkpoint-before-trim barrier，and supplies bounded owned-partition capture to
 The Object-WAL runtime now also persists an immutable exact-reference checkpoint-failure quarantine/redacted first-failure
 audit in Oxia；recovery and retention cannot use an older root until that audit is durable，and quarantine-store failure
 fails closed。
-These are deterministic partial M5 results；real-provider restart/takeover and stock retention-oracle gates remain open。
+On 2026-07-28，the F9 process harness also closed the Object-WAL already-dispatched append takeover cut：three real
+release JVMs share one KRaft/Oxia/LocalStack authority，Toxiproxy holds the old leader inside provider IO，`jcmd` proves
+the storage worker is blocked in `NereusUnifiedLog.appendStable`，and `SIGSTOP` freezes broker 1 before an atomic
+`[1] -> [2]` reassignment。After `SIGCONT`，the stale request fails with
+`append session changed before guarded object upload`，the WAL key set and latest offset remain unchanged，and broker 2
+commits the next batch at the exact old stable end。The dedicated
+`f9InFlightTakeoverProcessIntegrationTest` is part of `phase9M6KafkaProcessCheck`。
+These are still partial F9 results；BookKeeper-profile takeover、multi-controller/coordinator migration、response-loss
+restart and the stock retention oracle remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation

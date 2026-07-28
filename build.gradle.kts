@@ -66,6 +66,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "f9M6KafkaProcessIntegrationTest"
         || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
         || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
+        || task == "f9InFlightTakeoverProcessIntegrationTest"
         || task == "f9BookKeeperWalOnlyProcessIntegrationTest"
         || task == "f9BookKeeperWalAsyncObjectProcessIntegrationTest"
         || task == "f9BookKeeperWalSyncObjectProcessIntegrationTest"
@@ -136,6 +137,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "f9BookKeeperLedgerDeletionProviderIntegrationTest",
         "f9M6KafkaProcessIntegrationTest",
         "f9MultiBrokerTakeoverProcessIntegrationTest",
+        "f9InFlightTakeoverProcessIntegrationTest",
         "f9BookKeeperWalOnlyProcessIntegrationTest",
         "f9BookKeeperWalAsyncObjectProcessIntegrationTest",
         "f9BookKeeperWalSyncObjectProcessIntegrationTest",
@@ -3090,6 +3092,7 @@ tasks.register("phase9M6KafkaProcessCheck") {
         "Run real Oxia + LocalStack + BookKeeper cold-restart and two-process Nereus Kafka takeover acceptance."
     dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9InFlightTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalAsyncObjectProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalSyncObjectProcessIntegrationTest")

@@ -1,7 +1,7 @@
 # 07 — Implementation Plan and Gates
 
 > 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss、release-process physical-deletion/fresh-JVM NCP2 fallback and real-Oxia two-runtime Object-WAL live leader takeover are implemented；release-process response-loss restart、two Kafka-process/multi-controller takeover、remaining M4 internal-topic cuts and inherited final gates remain open
-> 2026-07-28 状态增量：two-release-process Object-WAL/KRaft singleton takeover 已实现并进入 M6 process aggregate；仍 open 的 takeover 边界是 already-dispatched old append、BookKeeper profiles、coordinator/internal topics、multi-controller 与 chaos
+> 2026-07-28 状态增量：two-release-process Object-WAL/KRaft singleton takeover 已实现并进入 M6 process aggregate；新增 `f9InFlightTakeoverProcessIntegrationTest` 已闭合 Object-WAL already-dispatched old append 的 P/C 边界；仍 open 的 takeover 边界是 BookKeeper profiles、coordinator/internal topics、multi-controller 与更广 chaos
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -387,8 +387,16 @@ coordinator/transaction/compaction remain M4/M5。
   recovers offset 0 and commits/reads offset 1。The controller test
   `testNereusStorageFeatureAtomicallyHandsOffSingletonReplica` requires a single change record with no transitional RF2，
   and `testLocalReplicaRemovalResignsWithoutDeletingSharedBinding` requires the departing broker to resign rather than
-  delete the shared binding。Fresh task execution passes 73/73 actionable tasks in 1m04s。Old already-in-flight append、
-  BookKeeper/profile、coordinator/internal-topic、multi-controller and chaos cuts remain open；
+  delete the shared binding。Fresh task execution passes 73/73 actionable tasks in 1m04s；
+- `f9InFlightTakeoverProcessIntegrationTest` now supplies the C-tier half of that process proof without adding a production
+  hook：node 3 keeps the controller alive，node 1 owns RF1 `[1]` and node 2 is the target；all three use one proxied Object
+  endpoint so provider-scope digest remains identical。After a baseline offset-0 commit，a downstream timeout toxic holds a
+  retries-disabled Produce；`jcmd Thread.print -l` must locate the real storage worker in
+  `NereusUnifiedLog.appendStable -> CompletableFuture.get` before `SIGSTOP` is permitted。The live nodes atomically install
+  `[2]` and recover LEO 1。After `SIGCONT`，the old future fails at append-session revalidation before guarded upload，
+  its WAL key set/LEO remain unchanged，and only broker 2 commits offset 1。The exact task passes in 1m01s and is included in
+  `phase9M6KafkaProcessCheck`。BookKeeper/profile、coordinator/internal-topic、multi-controller and broader chaos cuts
+  remain open；
 - fresh `phase9M3ProviderCheck --rerun-tasks` passes 64/64 actionable tasks on this source。The aggregate reruns the
   146/146 scenario manifest、29-blob Nereus source lock、Apache Kafka baseline lock、M1/M2/M3 codec predecessors and all
   three provider gates：Object sync/async round trip、two-bookie BookKeeper WAL-only/profile composition and the new live
@@ -570,7 +578,8 @@ coordinator/transaction/compaction remain M4/M5。
   release-distribution provider-backed KRaft baseline and same-node fresh-JVM user/group/transaction-state cold restart pass；
   stable open-transaction forced-exit/abort recovery and the separate two-bookie `BOOKKEEPER_WAL_ONLY`
   release-distribution cold restart also pass；the in-process two-runtime Object-WAL live takeover and the two-release-process
-  KRaft singleton reassignment both pass，while multi-controller、already-in-flight old append、BookKeeper-profile takeover、
+  KRaft singleton reassignment plus the three-release-process already-in-flight Object-WAL append cut pass，while
+  multi-controller、BookKeeper-profile takeover、
   checkpoint/virtual-segment/coordinator migration and broader kill-cut final gates remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
@@ -902,9 +911,9 @@ The recovery coordinator retries retriable page-read failures at the exact curso
 the original deadline；the deterministic regression requires two reads but exactly one publication。The root build now
 recognizes M6 feature/process and direct
 process-test task names as F9 development gates，so the published coordinate cannot silently remain an older
-`0.1.0-f9-dev` artifact。The provider-level Object-WAL old-token fence and release-process post-handoff recovery/continuation
-are covered；durable already-in-flight append cuts、multi-controller、priority budgets、BookKeeper-profile takeover、
-coordinator migration and checkpoint/virtual-segment cuts remain open。
+`0.1.0-f9-dev` artifact。The provider-level Object-WAL old-token fence、release-process post-handoff
+recovery/continuation and already-dispatched append cut are covered；multi-controller、priority budgets、
+BookKeeper-profile takeover、coordinator migration and checkpoint/virtual-segment cuts remain open。
 
 ### Tasks
 
@@ -917,6 +926,7 @@ phase9M6ActivationMetadataCheck
 phase9M6KafkaFeatureCheck
 phase9M6CheckpointQuarantineCheck
 :nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest
+:nereus-kafka-adapter:f9InFlightTakeoverProcessIntegrationTest
 phase9M6KafkaProcessCheck
 phase9M6KafkaBookKeeperProcessCheck
 Kafka fork: nereusF9ControllerTest

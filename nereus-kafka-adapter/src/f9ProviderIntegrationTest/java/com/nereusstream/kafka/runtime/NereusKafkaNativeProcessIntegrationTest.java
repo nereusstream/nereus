@@ -23,6 +23,7 @@ import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
+import eu.rekawek.toxiproxy.model.ToxicDirection;
 import io.oxia.testcontainers.OxiaContainer;
 import java.io.IOException;
 import java.io.Writer;
@@ -41,6 +42,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -72,6 +74,7 @@ import org.apache.bookkeeper.util.LocalBookKeeper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.testcontainers.containers.ToxiproxyContainer;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -98,6 +101,8 @@ class NereusKafkaNativeProcessIntegrationTest {
             DockerImageName.parse("oxia/oxia:0.16.3");
     private static final DockerImageName LOCALSTACK_IMAGE =
             DockerImageName.parse("localstack/localstack:4.14.0");
+    private static final DockerImageName TOXIPROXY_IMAGE =
+            DockerImageName.parse("ghcr.io/shopify/toxiproxy:2.12.0");
     private static final Duration PROCESS_TIMEOUT = Duration.ofSeconds(90);
     private static final Duration CLIENT_TIMEOUT = Duration.ofSeconds(60);
 
@@ -649,6 +654,387 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     @Test
+    @Timeout(value = 6, unit = TimeUnit.MINUTES)
+    void threeReleaseProcessesFenceAlreadyDispatchedOldLeaderAppend()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-inflight-takeover-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path controllerConfig = root.resolve("inflight-controller.properties");
+        Path brokerOneConfig = root.resolve("inflight-broker-one.properties");
+        Path brokerTwoConfig = root.resolve("inflight-broker-two.properties");
+        Path controllerFormatLog = root.resolve("inflight-controller-format.log");
+        Path brokerOneFormatLog = root.resolve("inflight-broker-one-format.log");
+        Path brokerTwoFormatLog = root.resolve("inflight-broker-two-format.log");
+        Path controllerServerLog = root.resolve("inflight-controller-server.log");
+        Path brokerOneServerLog = root.resolve("inflight-broker-one-server.log");
+        Path brokerTwoServerLog = root.resolve("inflight-broker-two-server.log");
+        String bucket = "nereus-kafka-inflight-" + UUID.randomUUID();
+        String topic = "process-inflight-" + UUID.randomUUID();
+        String nereusCluster = "f9-process-inflight-" + UUID.randomUUID();
+        String kafkaClusterId =
+                org.apache.kafka.common.Uuid.randomUuid().toString();
+        int controllerBrokerPort = freePort();
+        int controllerPort = differentFreePort(controllerBrokerPort);
+        int brokerOnePort =
+                differentFreePort(controllerBrokerPort, controllerPort);
+        int brokerTwoPort =
+                differentFreePort(
+                        controllerBrokerPort,
+                        controllerPort,
+                        brokerOnePort);
+        String controllerBootstrap = "127.0.0.1:" + controllerBrokerPort;
+        String brokerOneBootstrap = "127.0.0.1:" + brokerOnePort;
+        String brokerTwoBootstrap = "127.0.0.1:" + brokerTwoPort;
+        String clusterBootstrap =
+                brokerOneBootstrap + "," + brokerTwoBootstrap + "," + controllerBootstrap;
+        String toxicName = "hold-old-wal-response";
+
+        createBucket(bucket);
+        org.testcontainers.Testcontainers.exposeHostPorts(LOCALSTACK.getMappedPort(4566));
+        try (ToxiproxyContainer toxiproxy =
+                new ToxiproxyContainer(TOXIPROXY_IMAGE)) {
+            toxiproxy.start();
+            ToxiproxyContainer.ContainerProxy objectProxy =
+                    toxiproxy.getProxy(
+                            "host.testcontainers.internal",
+                            LOCALSTACK.getMappedPort(4566));
+            String proxiedObjectEndpoint =
+                    "http://"
+                            + objectProxy.getContainerIpAddress()
+                            + ":"
+                            + objectProxy.getProxyPort();
+
+            writeConfiguration(
+                    controllerConfig,
+                    controllerBrokerPort,
+                    controllerPort,
+                    bucket,
+                    root.resolve("inflight-controller-log"),
+                    root.resolve("inflight-controller-metadata"),
+                    root.resolve("inflight-controller-cache"),
+                    "OBJECT_WAL_SYNC_OBJECT",
+                    null,
+                    3,
+                    true,
+                    3,
+                    nereusCluster,
+                    proxiedObjectEndpoint);
+            writeConfiguration(
+                    brokerOneConfig,
+                    brokerOnePort,
+                    controllerPort,
+                    bucket,
+                    root.resolve("inflight-broker-one-log"),
+                    root.resolve("inflight-broker-one-metadata"),
+                    root.resolve("inflight-broker-one-cache"),
+                    "OBJECT_WAL_SYNC_OBJECT",
+                    null,
+                    1,
+                    false,
+                    3,
+                    nereusCluster,
+                    proxiedObjectEndpoint);
+            writeConfiguration(
+                    brokerTwoConfig,
+                    brokerTwoPort,
+                    controllerPort,
+                    bucket,
+                    root.resolve("inflight-broker-two-log"),
+                    root.resolve("inflight-broker-two-metadata"),
+                    root.resolve("inflight-broker-two-cache"),
+                    "OBJECT_WAL_SYNC_OBJECT",
+                    null,
+                    2,
+                    false,
+                    3,
+                    nereusCluster,
+                    proxiedObjectEndpoint);
+            formatStorage(
+                    formatScript,
+                    kafkaHome,
+                    controllerConfig,
+                    controllerFormatLog,
+                    kafkaClusterId);
+            formatStorage(
+                    formatScript,
+                    kafkaHome,
+                    brokerOneConfig,
+                    brokerOneFormatLog,
+                    kafkaClusterId);
+            formatStorage(
+                    formatScript,
+                    kafkaHome,
+                    brokerTwoConfig,
+                    brokerTwoFormatLog,
+                    kafkaClusterId);
+
+            TopicPartition partition = new TopicPartition(topic, 0);
+            byte[] committedKey =
+                    "inflight-key-0".getBytes(StandardCharsets.UTF_8);
+            byte[] committedValue =
+                    "nereus-inflight-committed".getBytes(StandardCharsets.UTF_8);
+            byte[] staleKey =
+                    "inflight-stale-key".getBytes(StandardCharsets.UTF_8);
+            byte[] staleValue =
+                    "nereus-inflight-old-leader".getBytes(StandardCharsets.UTF_8);
+            byte[] currentKey =
+                    "inflight-current-key".getBytes(StandardCharsets.UTF_8);
+            byte[] currentValue =
+                    "nereus-inflight-current-leader".getBytes(StandardCharsets.UTF_8);
+
+            Process controller = null;
+            Process brokerOne = null;
+            Process brokerTwo = null;
+            PendingProduce staleProduce = null;
+            boolean brokerOnePaused = false;
+            boolean toxicInstalled = false;
+            Throwable failure = null;
+            try {
+                controller =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        controllerConfig.toString()),
+                                kafkaHome,
+                                controllerServerLog);
+                awaitBroker(
+                        controllerBootstrap,
+                        controller,
+                        controllerServerLog);
+                brokerOne =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        brokerOneConfig.toString()),
+                                kafkaHome,
+                                brokerOneServerLog);
+                brokerTwo =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        brokerTwoConfig.toString()),
+                                kafkaHome,
+                                brokerTwoServerLog);
+                awaitBroker(
+                        brokerOneBootstrap,
+                        brokerOne,
+                        brokerOneServerLog);
+                awaitBroker(
+                        brokerTwoBootstrap,
+                        brokerTwo,
+                        brokerTwoServerLog);
+                awaitClusterBrokers(
+                        clusterBootstrap,
+                        List.of(1, 2, 3),
+                        List.of(controller, brokerOne, brokerTwo),
+                        controllerServerLog,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+
+                try (Admin admin =
+                        Admin.create(adminProperties(
+                                brokerTwoBootstrap + "," + controllerBootstrap))) {
+                    admin.createTopics(List.of(
+                                    new NewTopic(
+                                            topic,
+                                            Map.of(0, List.of(1)))))
+                            .all()
+                            .get(
+                                    CLIENT_TIMEOUT.toSeconds(),
+                                    TimeUnit.SECONDS);
+                }
+                RecordMetadata committed =
+                        produce(
+                                brokerOneBootstrap,
+                                topic,
+                                committedKey,
+                                committedValue);
+                assertThat(committed.offset()).isZero();
+                assertThat(fetch(
+                                        brokerOneBootstrap,
+                                        partition,
+                                        0,
+                                        brokerOneServerLog)
+                                .value())
+                        .isEqualTo(committedValue);
+
+                Set<String> baselineWalObjects = walObjectKeys(bucket);
+                objectProxy
+                        .toxics()
+                        .timeout(
+                                toxicName,
+                                ToxicDirection.DOWNSTREAM,
+                                0);
+                toxicInstalled = true;
+                staleProduce =
+                        beginSingleAttemptProduce(
+                                brokerOneBootstrap,
+                                topic,
+                                staleKey,
+                                staleValue);
+                awaitProviderAppendStack(
+                        brokerOne,
+                        staleProduce,
+                        brokerOneServerLog);
+                assertThat(staleProduce.future().isDone())
+                        .as("the old Produce remains inside provider IO while its WAL response is held")
+                        .isFalse();
+
+                signalProcess(
+                        brokerOne,
+                        "STOP",
+                        brokerOneServerLog);
+                brokerOnePaused = true;
+                removeToxic(objectProxy, toxicName);
+                toxicInstalled = false;
+
+                try (Admin admin =
+                        Admin.create(adminProperties(
+                                brokerTwoBootstrap + "," + controllerBootstrap))) {
+                    admin.alterPartitionReassignments(Map.of(
+                                    partition,
+                                    Optional.of(new NewPartitionReassignment(
+                                            List.of(2)))))
+                            .all()
+                            .get(
+                                    CLIENT_TIMEOUT.toSeconds(),
+                                    TimeUnit.SECONDS);
+                    awaitPartitionLeader(
+                            admin,
+                            partition,
+                            2,
+                            brokerOne,
+                            brokerTwo,
+                            brokerOneServerLog,
+                            brokerTwoServerLog);
+                    assertThat(admin.listPartitionReassignments(Set.of(partition))
+                                    .reassignments()
+                                    .get(
+                                            CLIENT_TIMEOUT.toSeconds(),
+                                            TimeUnit.SECONDS))
+                            .isEmpty();
+                    assertOffsets(admin, partition, 0, 1);
+                }
+                ConsumerRecord<byte[], byte[]> recovered =
+                        fetch(
+                                brokerTwoBootstrap,
+                                partition,
+                                0,
+                                brokerTwoServerLog);
+                assertThat(recovered.key()).isEqualTo(committedKey);
+                assertThat(recovered.value()).isEqualTo(committedValue);
+
+                signalProcess(
+                        brokerOne,
+                        "CONT",
+                        brokerOneServerLog);
+                brokerOnePaused = false;
+                Throwable staleFailure = staleProduce.awaitFailure();
+                assertThat(staleFailure)
+                        .as("the already-dispatched old-leader append must fail after authority takeover")
+                        .isNotNull();
+                assertThat(readLog(brokerOneServerLog))
+                        .contains("append session changed before guarded object upload");
+                assertThat(walObjectKeys(bucket))
+                        .as("pre-upload fencing must not leave an orphan WAL object")
+                        .isEqualTo(baselineWalObjects);
+                assertThat(brokerOne.isAlive())
+                        .as("the old process must survive its stale append completion")
+                        .isTrue();
+                try (Admin admin =
+                        Admin.create(adminProperties(clusterBootstrap))) {
+                    assertOffsets(admin, partition, 0, 1);
+                }
+
+                RecordMetadata current =
+                        produce(
+                                clusterBootstrap,
+                                topic,
+                                currentKey,
+                                currentValue);
+                assertThat(current.offset()).isEqualTo(1L);
+                ConsumerRecord<byte[], byte[]> appended =
+                        fetch(
+                                brokerTwoBootstrap,
+                                partition,
+                                1,
+                                brokerTwoServerLog);
+                assertThat(appended.key()).isEqualTo(currentKey);
+                assertThat(appended.value()).isEqualTo(currentValue);
+                try (Admin admin =
+                        Admin.create(adminProperties(clusterBootstrap))) {
+                    assertOffsets(admin, partition, 0, 2);
+                }
+            } catch (Throwable operationFailure) {
+                failure = operationFailure;
+            }
+            if (toxicInstalled) {
+                try {
+                    removeToxic(objectProxy, toxicName);
+                } catch (Throwable cleanupFailure) {
+                    failure = mergeFailure(failure, cleanupFailure);
+                }
+            }
+            if (brokerOnePaused && brokerOne != null && brokerOne.isAlive()) {
+                try {
+                    signalProcess(
+                            brokerOne,
+                            "CONT",
+                            brokerOneServerLog);
+                } catch (Throwable cleanupFailure) {
+                    failure = mergeFailure(failure, cleanupFailure);
+                }
+            }
+            if (staleProduce != null) {
+                staleProduce.close();
+            }
+            if (brokerTwo != null) {
+                try {
+                    stopBroker(brokerTwo, brokerTwoServerLog);
+                } catch (Throwable cleanupFailure) {
+                    failure = mergeFailure(failure, cleanupFailure);
+                }
+            }
+            if (brokerOne != null) {
+                try {
+                    stopBroker(brokerOne, brokerOneServerLog);
+                } catch (Throwable cleanupFailure) {
+                    failure = mergeFailure(failure, cleanupFailure);
+                }
+            }
+            if (controller != null) {
+                try {
+                    stopBroker(controller, controllerServerLog);
+                } catch (Throwable cleanupFailure) {
+                    failure = mergeFailure(failure, cleanupFailure);
+                }
+            }
+            if (failure != null) {
+                try {
+                    preserveInFlightTakeoverFailureEvidence(
+                            controllerConfig,
+                            brokerOneConfig,
+                            brokerTwoConfig,
+                            controllerFormatLog,
+                            brokerOneFormatLog,
+                            brokerTwoFormatLog,
+                            controllerServerLog,
+                            brokerOneServerLog,
+                            brokerTwoServerLog);
+                } catch (AssertionError evidenceFailure) {
+                    failure.addSuppressed(evidenceFailure);
+                }
+                rethrow(failure);
+            }
+        }
+    }
+
+    @Test
     @Timeout(value = 3, unit = TimeUnit.MINUTES)
     void objectWalAsyncObjectProcessRecoversAcrossFreshJvmRestart()
             throws Exception {
@@ -933,6 +1319,41 @@ class NereusKafkaNativeProcessIntegrationTest {
             boolean controllerRole,
             String nereusCluster
     ) throws IOException {
+        return writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                logDirectory,
+                metadataDirectory,
+                cacheDirectory,
+                storageProfile,
+                bookKeeper,
+                nodeId,
+                controllerRole,
+                1,
+                nereusCluster,
+                LOCALSTACK
+                        .getEndpointOverride(LocalStackContainer.Service.S3)
+                        .toString());
+    }
+
+    private String writeConfiguration(
+            Path config,
+            int brokerPort,
+            int controllerPort,
+            String bucket,
+            Path logDirectory,
+            Path metadataDirectory,
+            Path cacheDirectory,
+            String storageProfile,
+            BookKeeperProcessConfiguration bookKeeper,
+            int nodeId,
+            boolean controllerRole,
+            int controllerNodeId,
+            String nereusCluster,
+            String objectEndpoint
+    ) throws IOException {
         boolean bookKeeperProfile = storageProfile.startsWith("BOOKKEEPER_WAL_");
         if (bookKeeperProfile != (bookKeeper != null)) {
             throw new IllegalArgumentException(
@@ -941,8 +1362,14 @@ class NereusKafkaNativeProcessIntegrationTest {
         if (nodeId <= 0) {
             throw new IllegalArgumentException("nodeId must be positive");
         }
+        if (controllerNodeId <= 0) {
+            throw new IllegalArgumentException("controllerNodeId must be positive");
+        }
         if (nereusCluster == null || nereusCluster.isBlank()) {
             throw new IllegalArgumentException("nereusCluster must be non-blank");
+        }
+        if (objectEndpoint == null || objectEndpoint.isBlank()) {
+            throw new IllegalArgumentException("objectEndpoint must be non-blank");
         }
         Files.createDirectories(logDirectory);
         Files.createDirectories(metadataDirectory);
@@ -952,7 +1379,9 @@ class NereusKafkaNativeProcessIntegrationTest {
                 "process.roles",
                 controllerRole ? "broker,controller" : "broker");
         properties.setProperty("node.id", Integer.toString(nodeId));
-        properties.setProperty("controller.quorum.voters", "1@127.0.0.1:" + controllerPort);
+        properties.setProperty(
+                "controller.quorum.voters",
+                controllerNodeId + "@127.0.0.1:" + controllerPort);
         properties.setProperty(
                 "listeners",
                 controllerRole
@@ -997,7 +1426,7 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty("nereus.kafka.storage.object.bucket", bucket);
         properties.setProperty(
                 "nereus.kafka.storage.object.endpoint",
-                LOCALSTACK.getEndpointOverride(LocalStackContainer.Service.S3).toString());
+                objectEndpoint);
         properties.setProperty(
                 "nereus.kafka.storage.object.region",
                 LOCALSTACK.getRegion());
@@ -1827,6 +2256,32 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private static PendingProduce beginSingleAttemptProduce(
+            String bootstrapServers,
+            String topic,
+            byte[] key,
+            byte[] value
+    ) {
+        Properties properties = producerProperties(bootstrapServers);
+        properties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "false");
+        properties.setProperty(ProducerConfig.RETRIES_CONFIG, "0");
+        KafkaProducer<byte[], byte[]> producer =
+                new KafkaProducer<>(properties);
+        try {
+            Future<RecordMetadata> future =
+                    producer.send(
+                            new ProducerRecord<>(
+                                    topic,
+                                    0,
+                                    key,
+                                    value));
+            return new PendingProduce(producer, future);
+        } catch (Throwable failure) {
+            producer.close(Duration.ZERO);
+            throw failure;
+        }
+    }
+
     private static RecordMetadata transactionalProduce(
             String bootstrapServers,
             String transactionalId,
@@ -2121,6 +2576,39 @@ class NereusKafkaNativeProcessIntegrationTest {
         assertThat(output)
                 .as("forced process stop must not reach the normal shutdown completion path")
                 .doesNotContain("shut down completed");
+    }
+
+    private static void signalProcess(
+            Process process,
+            String signal,
+            Path serverLog
+    ) throws Exception {
+        if (!process.isAlive()) {
+            throw new AssertionError(
+                    "cannot send SIG"
+                            + signal
+                            + " to an exited Kafka process:\n"
+                            + readLog(serverLog));
+        }
+        Process command =
+                new ProcessBuilder(
+                                "kill",
+                                "-" + signal,
+                                Long.toString(process.pid()))
+                        .redirectErrorStream(true)
+                        .start();
+        if (!command.waitFor(5, TimeUnit.SECONDS)) {
+            command.destroyForcibly();
+            throw new AssertionError(
+                    "timed out sending SIG" + signal + " to Kafka process " + process.pid());
+        }
+        if (command.exitValue() != 0) {
+            throw new AssertionError(
+                    "failed to send SIG"
+                            + signal
+                            + " to Kafka process "
+                            + process.pid());
+        }
     }
 
     private static void rethrow(Throwable failure) throws Exception {
@@ -2479,6 +2967,58 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private static void preserveInFlightTakeoverFailureEvidence(
+            Path controllerConfig,
+            Path brokerOneConfig,
+            Path brokerTwoConfig,
+            Path controllerFormatLog,
+            Path brokerOneFormatLog,
+            Path brokerTwoFormatLog,
+            Path controllerServerLog,
+            Path brokerOneServerLog,
+            Path brokerTwoServerLog
+    ) {
+        String configured = System.getProperty("nereus.kafka.process.evidence.dir");
+        if (configured == null || configured.isBlank()) {
+            return;
+        }
+        Path target = Path.of(configured).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(target);
+            copyIfPresent(
+                    controllerConfig,
+                    target.resolve("inflight-controller.properties"));
+            copyIfPresent(
+                    brokerOneConfig,
+                    target.resolve("inflight-broker-one.properties"));
+            copyIfPresent(
+                    brokerTwoConfig,
+                    target.resolve("inflight-broker-two.properties"));
+            copyIfPresent(
+                    controllerFormatLog,
+                    target.resolve("inflight-controller-format.log"));
+            copyIfPresent(
+                    brokerOneFormatLog,
+                    target.resolve("inflight-broker-one-format.log"));
+            copyIfPresent(
+                    brokerTwoFormatLog,
+                    target.resolve("inflight-broker-two-format.log"));
+            copyIfPresent(
+                    controllerServerLog,
+                    target.resolve("inflight-controller-server.log"));
+            copyIfPresent(
+                    brokerOneServerLog,
+                    target.resolve("inflight-broker-one-server.log"));
+            copyIfPresent(
+                    brokerTwoServerLog,
+                    target.resolve("inflight-broker-two-server.log"));
+        } catch (IOException failure) {
+            throw new AssertionError(
+                    "failed to preserve in-flight takeover evidence under " + target,
+                    failure);
+        }
+    }
+
     private static void clearFailureEvidence() throws IOException {
         String configured = System.getProperty("nereus.kafka.process.evidence.dir");
         if (configured == null || configured.isBlank()) {
@@ -2501,6 +3041,15 @@ class NereusKafkaNativeProcessIntegrationTest {
         Files.deleteIfExists(target.resolve("multi-broker-two-format.log"));
         Files.deleteIfExists(target.resolve("multi-broker-one-server.log"));
         Files.deleteIfExists(target.resolve("multi-broker-two-server.log"));
+        Files.deleteIfExists(target.resolve("inflight-controller.properties"));
+        Files.deleteIfExists(target.resolve("inflight-broker-one.properties"));
+        Files.deleteIfExists(target.resolve("inflight-broker-two.properties"));
+        Files.deleteIfExists(target.resolve("inflight-controller-format.log"));
+        Files.deleteIfExists(target.resolve("inflight-broker-one-format.log"));
+        Files.deleteIfExists(target.resolve("inflight-broker-two-format.log"));
+        Files.deleteIfExists(target.resolve("inflight-controller-server.log"));
+        Files.deleteIfExists(target.resolve("inflight-broker-one-server.log"));
+        Files.deleteIfExists(target.resolve("inflight-broker-two-server.log"));
     }
 
     private static void copyIfPresent(Path source, Path target) throws IOException {
@@ -2545,6 +3094,109 @@ class NereusKafkaNativeProcessIntegrationTest {
                     .join()
                     .keyCount();
         }
+    }
+
+    private static Set<String> walObjectKeys(String bucket) {
+        try (S3AsyncClient admin = s3Client()) {
+            return admin.listObjectsV2(
+                            ListObjectsV2Request.builder()
+                                    .bucket(bucket)
+                                    .maxKeys(1_000)
+                                    .build())
+                    .join()
+                    .contents()
+                    .stream()
+                    .map(value -> value.key())
+                    .filter(value -> value.contains("/wal/"))
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
+    }
+
+    private static void awaitProviderAppendStack(
+            Process broker,
+            PendingProduce pending,
+            Path serverLog
+    ) throws Exception {
+        long deadline =
+                System.nanoTime() + Duration.ofSeconds(45).toNanos();
+        String latestThreadDump = "<thread dump not yet captured>";
+        while (System.nanoTime() < deadline) {
+            if (pending.future().isDone()) {
+                Throwable failure = pending.awaitFailure();
+                throw new AssertionError(
+                        "old Produce completed before entering provider-backed stable append:\n"
+                                + readLog(serverLog),
+                        failure);
+            }
+            latestThreadDump = threadDump(broker, serverLog);
+            if (latestThreadDump.contains("kafka.log.nereus.NereusUnifiedLog.appendStable")
+                    && latestThreadDump.contains("java.util.concurrent.CompletableFuture.get")) {
+                return;
+            }
+            Thread.sleep(100);
+        }
+        throw new AssertionError(
+                "old Produce did not block inside provider-backed stable append before the deadline:\n"
+                        + readLog(serverLog)
+                        + "\nLast thread dump:\n"
+                        + tail(latestThreadDump, 32_000));
+    }
+
+    private static String threadDump(
+            Process broker,
+            Path serverLog
+    ) throws Exception {
+        if (!broker.isAlive()) {
+            throw new AssertionError(
+                    "cannot inspect an exited Kafka process:\n"
+                            + readLog(serverLog));
+        }
+        Path jcmd =
+                Path.of(System.getProperty("java.home"), "bin", "jcmd");
+        if (!Files.isExecutable(jcmd)) {
+            throw new AssertionError(
+                    "JDK jcmd is unavailable at " + jcmd);
+        }
+        Process command =
+                new ProcessBuilder(
+                                jcmd.toString(),
+                                Long.toString(broker.pid()),
+                                "Thread.print",
+                                "-l")
+                        .redirectErrorStream(true)
+                        .start();
+        String output =
+                new String(
+                        command.getInputStream().readAllBytes(),
+                        StandardCharsets.UTF_8);
+        if (!command.waitFor(10, TimeUnit.SECONDS)) {
+            command.destroyForcibly();
+            throw new AssertionError(
+                    "timed out capturing Kafka thread dump for process "
+                            + broker.pid());
+        }
+        if (command.exitValue() != 0) {
+            throw new AssertionError(
+                    "jcmd failed for Kafka process "
+                            + broker.pid()
+                            + ":\n"
+                            + output);
+        }
+        return output;
+    }
+
+    private static String tail(String value, int maximumLength) {
+        if (value.length() <= maximumLength) {
+            return value;
+        }
+        return value.substring(value.length() - maximumLength);
+    }
+
+    private static void removeToxic(
+            ToxiproxyContainer.ContainerProxy proxy,
+            String name
+    ) throws IOException {
+        proxy.toxics().get(name).remove();
     }
 
     private static S3AsyncClient s3Client() {
@@ -2633,6 +3285,36 @@ class NereusKafkaNativeProcessIntegrationTest {
             long readinessEpoch,
             String readinessSha256,
             int persistentBrokerCount) {
+    }
+
+    private record PendingProduce(
+            KafkaProducer<byte[], byte[]> producer,
+            Future<RecordMetadata> future
+    ) implements AutoCloseable {
+        private Throwable awaitFailure() throws Exception {
+            try {
+                RecordMetadata unexpected =
+                        future.get(
+                                CLIENT_TIMEOUT.toSeconds(),
+                                TimeUnit.SECONDS);
+                throw new AssertionError(
+                        "old-leader Produce unexpectedly completed at offset "
+                                + unexpected.offset());
+            } catch (ExecutionException failure) {
+                return failure.getCause() == null
+                        ? failure
+                        : failure.getCause();
+            } catch (TimeoutException failure) {
+                throw new AssertionError(
+                        "old-leader Produce did not complete after broker resume",
+                        failure);
+            }
+        }
+
+        @Override
+        public void close() {
+            producer.close(Duration.ZERO);
+        }
     }
 
     private record OpenTransaction(

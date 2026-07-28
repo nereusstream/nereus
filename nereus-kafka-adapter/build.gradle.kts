@@ -38,6 +38,7 @@ dependencies {
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.pulsar.metadata)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.localstack)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.toxiproxy)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.junit.jupiter)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.assertj)
     add(f9ProviderIntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
@@ -206,6 +207,35 @@ tasks.register<Test>("f9MultiBrokerTakeoverProcessIntegrationTest") {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
                 "twoReleaseProcessesAtomicallyReassignLiveSharedStorageLeader",
+        )
+    }
+}
+
+tasks.register<Test>("f9InFlightTakeoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Hold an old broker inside real Object-WAL IO while a separate controller reassigns its partition."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9MultiBrokerTakeoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-inflight-takeover-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "threeReleaseProcessesFenceAlreadyDispatchedOldLeaderAppend",
         )
     }
 }

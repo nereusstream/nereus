@@ -617,8 +617,8 @@ separately owned production Object-WAL runtimes over one durable authority/root�
 1。A's next old-token append returns durable `FENCED_APPEND` and the local storage enters
 `WRITE_FENCED_RECOVERY_REQUIRED` even though the rejected append is `KNOWN_NOT_COMMITTED`；B commits offset 1 and Fetches
 both RecordBatches byte-exactly。The companion deterministic regression fixes the same classification seam。This is an
-R-tier two-runtime provider proof；a two Kafka-process/KRaft reassignment、already-in-flight old append and BookKeeper
-profile matrix remain outside this evidence。
+R-tier two-runtime provider proof；the later release gates now add two Kafka-process/KRaft reassignment and a three-process
+already-in-flight Object-WAL append cut，while the BookKeeper profile matrix remains outside this evidence。
 Fresh `phase9M3ProviderCheck --rerun-tasks` passes 64/64 actionable tasks and composes this gate with the existing Object
 and two-bookie BookKeeper provider gates、M1/M2/M3 deterministic predecessors、146/146 scenario synchronization and the
 updated 29-source Nereus lock。
@@ -645,8 +645,13 @@ authority and LocalStack Object root but isolated metadata/log/cache directories
 commits/reads offset 0，starts node 2，Admin-reassigns to `[2]`，requires exact
 `leader=2, replicas=[2], ISR=[2]` and no ongoing reassignment while node 1 remains alive，then commits offset 1 and reads
 both batches from the cluster。Fresh execution passed 73/73 actionable tasks in 1m04s and the task is part of
-`phase9M6KafkaProcessCheck`。This is P-tier Object-WAL post-handoff evidence，not an already-dispatched old-append cut、
-BookKeeper-profile takeover、transaction/internal-topic coordinator migration、multi-controller or chaos proof。
+`phase9M6KafkaProcessCheck`。This first task is P-tier Object-WAL post-handoff evidence。
+`f9InFlightTakeoverProcessIntegrationTest` adds the C cut with an independent controller JVM、a Toxiproxy-held
+single-attempt Produce、`jcmd` proof of `NereusUnifiedLog.appendStable` waiting on the provider future and a broker-1
+`SIGSTOP` before reassignment。After `[2]` is stable，`SIGCONT` makes the old append fail with
+`append session changed before guarded object upload`；the WAL key set/latest offset do not move and broker 2 continues at
+offset 1。BookKeeper-profile takeover、transaction/internal-topic coordinator migration、multi-controller and broader chaos
+proof remain open。
 
 The 2026-07-28 fresh partial aggregate exposed a second-generation BookKeeper materialization planner defect after the first
 source ledger had already completed terminal retirement and physical deletion。The next wider task must select the committed

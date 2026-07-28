@@ -1,7 +1,7 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
 > 状态：Implementation in progress；100-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed five-profile provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh、Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit、Kafka 64+64-shard stream-coverage deletion activation 与 fail-closed BookKeeper ledger-retention service composition are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie BookKeeper WAL-only/async/sync release-distribution initial process + fresh-JVM cold-restart gates pass；an independent `OBJECT_WAL_ASYNC_OBJECT` initial/fresh-JVM cold-restart gate passes over the same real Object provider；real two-bookie ledger deletion、provider-level applied-delete response-loss、fresh-JVM NCP2 fallback after physical deletion and real-Oxia two-runtime Object-WAL live takeover pass；release-process response-loss restart、two Kafka-process/profile takeover、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
-> 2026-07-28 状态增量：two-release-process Object-WAL/KRaft singleton reassignment、旧 owner resignation、committed recovery 与新 leader continuation 已通过；profile takeover、already-dispatched append、multi-controller、coordinator migration 和 chaos 仍为 rollout blocker
+> 2026-07-28 状态增量：two-release-process Object-WAL/KRaft singleton reassignment、旧 owner resignation、committed recovery 与新 leader continuation 已通过；three-release-process Object-WAL already-dispatched append gate 也已通过，并锁定 provider-future stack、process freeze、pre-upload session fencing、no-orphan WAL 和 exact LEO continuation；profile takeover、multi-controller、coordinator migration 和更广 chaos 仍为 rollout blocker
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -573,8 +573,29 @@ same topic ID/partition remains in the new image and calls `resign` instead of d
 and `phase9M6KafkaProcessCheck` now depends on it。This is P-tier Object-WAL evidence with one controller，not
 multi-controller failover or a five-profile matrix。
 
+The companion `f9InFlightTakeoverProcessIntegrationTest` uses a separate node-3 combined controller/broker so controller
+availability is independent of the old data leader。All three configs carry the same Kafka cluster ID、Nereus cluster、
+Oxia endpoints、bucket and proxied S3 endpoint；only metadata/log/cache directories and broker roles differ。Its fixed
+operational sequence is：
+
+1. create RF1 `[1]` and commit/fetch offset 0；
+2. snapshot raw `/wal/` keys，install a downstream timeout toxic and start a retries-disabled/non-idempotent Produce；
+3. require `jcmd Thread.print -l` to show `NereusUnifiedLog.appendStable -> CompletableFuture.get` while the client future
+   remains incomplete；
+4. `SIGSTOP` broker 1，remove the toxic，and use only live broker-2/controller bootstrap addresses for Admin；
+5. atomically reassign `[1] -> [2]`，wait for exact leader/replica/ISR singleton and empty reassignment，then prove
+   earliest/latest remain `0/1` and offset 0 is byte-exact；
+6. `SIGCONT` broker 1；require stale Produce failure plus
+   `append session changed before guarded object upload`，old-process liveness and unchanged WAL keys/latest；
+7. Produce through the current cluster，require returned offset 1、byte-exact Fetch and final earliest/latest `0/2`；
+8. remove any toxic、resume a paused process and preserve nine config/log artifacts on every failure before ordered normal
+   shutdown。
+
+The task requires a full JDK containing `${java.home}/bin/jcmd` and runs with `maxParallelForks=1` because it owns POSIX
+process signals and one fault proxy。It is a process/chaos gate, not a production runtime dependency or test hook。
+
 Multi-controller、checkpoint/virtual-segment cuts、BookKeeper-profile takeover、transaction/internal-topic coordinator
-migration、already-dispatched old append and complete rollout evidence 尚未闭合，所以整个路径
+migration and complete rollout evidence 尚未闭合，所以整个路径
 仍不能用于 production rollout readiness。
 
 The selected shell is not a durability shortcut：`NereusUnifiedLogFactory` uses only
