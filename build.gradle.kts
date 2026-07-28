@@ -3049,3 +3049,13 @@ tasks.register("phase9M6ActivationMetadataCheck") {
     dependsOn(":nereus-kafka-adapter:f9ActivationTest")
     dependsOn(":nereus-metadata-oxia:f9ActivationOxiaIntegrationTest")
 }
+
+tasks.register("phase9M6CheckpointQuarantineCheck") {
+    group = "verification"
+    description =
+        "Verify durable F9 checkpoint quarantine metadata, fallback ordering, restart skip, and runtime composition."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn(":nereus-metadata-oxia:f9MetadataTest")
+    dependsOn(":nereus-metadata-oxia:f9OxiaIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9CheckpointQuarantineTest")
+}

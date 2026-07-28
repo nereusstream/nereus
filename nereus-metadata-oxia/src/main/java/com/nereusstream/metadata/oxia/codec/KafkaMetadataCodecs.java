@@ -2,6 +2,7 @@
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
+import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureRecord;
 import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionRegistryRecord;
@@ -11,15 +12,30 @@ import java.util.List;
 
 /** Closed F9 native-Kafka metadata codec family. */
 public final class KafkaMetadataCodecs {
-    private static final MapMetadataCodecRegistry REGISTRY = new MapMetadataCodecRegistry(List.of(
-            registered(KafkaPartitionBindingRecord.class, new KafkaPartitionBindingRecordCodecV1()),
-            registered(KafkaCompactionPlanRecord.class, new KafkaCompactionPlanRecordCodecV1()),
-            registered(KafkaPartitionRegistryRecord.class, new KafkaPartitionRegistryRecordCodecV1()),
-            registered(
-                    KafkaStorageProtocolActivationRecord.class,
-                    new KafkaStorageProtocolActivationRecordCodecV1()),
-            registered(KafkaBrokerCapabilityRecord.class, new KafkaBrokerCapabilityRecordCodecV1()),
-            registered(KafkaStorageReadinessRecord.class, new KafkaStorageReadinessRecordCodecV1())));
+    private static final MapMetadataCodecRegistry REGISTRY =
+            new MapMetadataCodecRegistry(
+                    List.of(
+                            registered(
+                                    KafkaPartitionBindingRecord.class,
+                                    new KafkaPartitionBindingRecordCodecV1()),
+                            registered(
+                                    KafkaCheckpointFailureRecord.class,
+                                    new KafkaCheckpointFailureRecordCodecV1()),
+                            registered(
+                                    KafkaCompactionPlanRecord.class,
+                                    new KafkaCompactionPlanRecordCodecV1()),
+                            registered(
+                                    KafkaPartitionRegistryRecord.class,
+                                    new KafkaPartitionRegistryRecordCodecV1()),
+                            registered(
+                                    KafkaStorageProtocolActivationRecord.class,
+                                    new KafkaStorageProtocolActivationRecordCodecV1()),
+                            registered(
+                                    KafkaBrokerCapabilityRecord.class,
+                                    new KafkaBrokerCapabilityRecordCodecV1()),
+                            registered(
+                                    KafkaStorageReadinessRecord.class,
+                                    new KafkaStorageReadinessRecordCodecV1())));
 
     private KafkaMetadataCodecs() { }
 

@@ -582,6 +582,12 @@ through pinned
 binding-root reload。Its `CaptureProvider` remains the partition-lock seam that supplies the exact source/canonical image。
 The existing local-file object-store integration test now publishes a canonical seven-section object through these services，
 reloads its authoritative root and verifies the exact reference through a released reader pin。
+`KafkaRetentionCheckpointGate` now queries `KafkaCheckpointFailureQuarantine` before object verification。A rooted reference
+already quarantined for the exact partition incarnation/reference digest is skipped without object I/O；a newly classified
+not-found/checksum/unsupported-format/invariant failure must await immutable Oxia quarantine create or response-loss
+reconciliation before the next older reference is verified。Any quarantine metadata read/write/collision failure fails the
+retention attempt closed and therefore prevents trim。The durable record is a first-failure audit only；it does not remove the
+reference from the binding root or authorize physical deletion。
 `KafkaRetentionDurableTrimListener` publishes monotonic observed logStart through binding CAS before invoking the exact
 local leader updater，recovers applied-but-response-lost CAS by reload and refuses changed leader terms。Product commits
 `3eb6b63` and `57dcf35` now add `DefaultKafkaPartitionMaintenance`、`KafkaPartitionMaintenanceRuntime` and
@@ -589,7 +595,10 @@ local leader updater，recovers applied-but-response-lost CAS by reload and refu
 partitions，captures each snapshot under the stock partition lock，uses the same `NereusUnifiedLog` for local log-start
 publication，and starts a bounded non-overlapping periodic retention pass only after runtime readiness。The complete
 `f9RetentionTest` passes。Real provider trim、fresh-process restart/takeover and multi-broker race evidence remain
-pending，so this is still deterministic partial M5 evidence rather than an end-to-end retention claim。
+pending，so this is still deterministic partial M5 evidence rather than an end-to-end retention claim。The focused
+`phase9M6CheckpointQuarantineCheck --rerun-tasks` composes immutable metadata contracts、real Oxia close/reconnect、
+recovery/retention ordering and production Object-WAL runtime wiring；it does not replace the pending real provider trim and
+fresh-process takeover gates。
 
 ### 9.4 DeleteRecords
 
@@ -1395,6 +1404,7 @@ per-partition serialization described above。
 - time/size/both/disabled policies against stock virtual-segment oracle；
 - group lag does not block trim；
 - checkpoint barrier failure/response loss；
+- exact quarantine restart lookup、redacted first-failure audit、write-before-fallback and quarantine-store fail-closed；
 - DeleteRecords at batch start/middle/end/HW；
 - compact+delete interaction、restart and physical-GC lag。
 

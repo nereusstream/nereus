@@ -23,6 +23,11 @@ public class KafkaPartitionKeyspaceTest {
         String taskId = "mat1-" + "a".repeat(52);
         assertThat(keys.parseCompactionPlanKey(id, keys.compactionPlanKey(id, taskId)))
                 .isEqualTo(taskId);
+        String failureKey = keys.checkpointFailureKey(id, 9, "checkpoint-object");
+        assertThat(keys.parseCheckpointFailureKey(id, failureKey))
+                .isEqualTo(
+                        new KafkaPartitionKeyspace.CheckpointFailureKeyIdentity(
+                                id, 9, "checkpoint-object"));
         assertThat(keys.bindingRootKey(id)).contains("/0000000003/root");
         assertThat(keys.identitySha256(id)).hasSize(64);
         assertThat(keys.activationPartitionKey().value()).isEqualTo(
@@ -50,6 +55,15 @@ public class KafkaPartitionKeyspaceTest {
                 id, keys.compactionPlanKey(id, "mat1-" + "a".repeat(52)) + "/extra"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> keys.compactionPlanKey(id, "not-a-task-id"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(
+                        () ->
+                                keys.parseCheckpointFailureKey(
+                                        id,
+                                        keys.checkpointFailureKey(id, 1, "checkpoint-object")
+                                                + "/extra"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> keys.checkpointFailureKey(id, 0, "checkpoint-object"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new KafkaPartitionId("kraft-a", "AAAAAAAAAAAAAAAAAAAAAA", 0))
                 .isInstanceOf(IllegalArgumentException.class);

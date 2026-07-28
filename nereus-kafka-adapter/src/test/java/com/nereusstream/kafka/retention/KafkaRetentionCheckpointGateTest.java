@@ -25,6 +25,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.kafka.checkpoint.KafkaCheckpointFailureQuarantine;
+import com.nereusstream.metadata.oxia.KafkaPartitionId;
+import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -50,7 +53,7 @@ class KafkaRetentionCheckpointGateTest {
               publications.incrementAndGet();
               return CompletableFuture.completedFuture(verified(CHECKPOINT_40));
             },
-            (reference, failure) -> {});
+            KafkaCheckpointFailureQuarantine.transientObserver((reference, failure) -> {}));
 
     KafkaTrimBarrier.VerifiedCheckpoint result =
         gate.ensureVerified(
@@ -80,7 +83,7 @@ class KafkaRetentionCheckpointGateTest {
               publications.incrementAndGet();
               return CompletableFuture.completedFuture(verified(CHECKPOINT_40));
             },
-            (reference, failure) -> {});
+            KafkaCheckpointFailureQuarantine.transientObserver((reference, failure) -> {}));
 
     KafkaTrimBarrier.VerifiedCheckpoint result =
         gate.ensureVerified(
@@ -106,7 +109,8 @@ class KafkaRetentionCheckpointGateTest {
                     : CompletableFuture.completedFuture(verified(reference)),
             snapshot ->
                 CompletableFuture.failedFuture(new AssertionError("publication must not run")),
-            (reference, failure) -> unusable.set(reference));
+            KafkaCheckpointFailureQuarantine.transientObserver(
+                (reference, failure) -> unusable.set(reference)));
 
     KafkaTrimBarrier.VerifiedCheckpoint result =
         gate.ensureVerified(
@@ -122,6 +126,160 @@ class KafkaRetentionCheckpointGateTest {
   }
 
   @Test
+  void waitsForDurableQuarantineBeforeTryingAnOlderRoot() {
+    CompletableFuture<Void> durableWrite = new CompletableFuture<>();
+    AtomicInteger verifications = new AtomicInteger();
+    KafkaCheckpointFailureQuarantine quarantine =
+        new KafkaCheckpointFailureQuarantine() {
+          @Override
+          public CompletableFuture<Boolean> isQuarantined(
+              KafkaPartitionId identity,
+              long partitionIncarnation,
+              KafkaCheckpointReferenceRecord reference) {
+            return CompletableFuture.completedFuture(false);
+          }
+
+          @Override
+          public CompletableFuture<Void> quarantine(
+              KafkaPartitionId identity,
+              long partitionIncarnation,
+              KafkaCheckpointReferenceRecord reference,
+              KafkaCheckpointFailureSource source,
+              Throwable failure) {
+            return durableWrite;
+          }
+        };
+    KafkaRetentionCheckpointGate gate =
+        new KafkaRetentionCheckpointGate(
+            (snapshot, reference) -> {
+              verifications.incrementAndGet();
+              return reference.equals(CHECKPOINT_40)
+                  ? CompletableFuture.failedFuture(
+                      new NereusException(
+                          ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "corrupt checkpoint"))
+                  : CompletableFuture.completedFuture(verified(reference));
+            },
+            snapshot ->
+                CompletableFuture.failedFuture(new AssertionError("publication must not run")),
+            quarantine);
+
+    CompletableFuture<KafkaTrimBarrier.VerifiedCheckpoint> result =
+        gate.ensureVerified(
+            snapshot(
+                binding(CHECKPOINT_30, CHECKPOINT_40),
+                head(0),
+                retentionSnapshot(250, 2_500, 20, 5_000)),
+            20);
+
+    assertThat(result).isNotDone();
+    assertThat(verifications).hasValue(1);
+    durableWrite.complete(null);
+    assertThat(result.join().reference()).isEqualTo(CHECKPOINT_30);
+    assertThat(verifications).hasValue(2);
+  }
+
+  @Test
+  void failsClosedWhenDurableQuarantineCannotBeWritten() {
+    AtomicInteger verifications = new AtomicInteger();
+    KafkaCheckpointFailureQuarantine quarantine =
+        new KafkaCheckpointFailureQuarantine() {
+          @Override
+          public CompletableFuture<Boolean> isQuarantined(
+              KafkaPartitionId identity,
+              long partitionIncarnation,
+              KafkaCheckpointReferenceRecord reference) {
+            return CompletableFuture.completedFuture(false);
+          }
+
+          @Override
+          public CompletableFuture<Void> quarantine(
+              KafkaPartitionId identity,
+              long partitionIncarnation,
+              KafkaCheckpointReferenceRecord reference,
+              KafkaCheckpointFailureSource source,
+              Throwable failure) {
+            return CompletableFuture.failedFuture(
+                new NereusException(
+                    ErrorCode.METADATA_UNAVAILABLE,
+                    true,
+                    "checkpoint quarantine store unavailable"));
+          }
+        };
+    KafkaRetentionCheckpointGate gate =
+        new KafkaRetentionCheckpointGate(
+            (snapshot, reference) -> {
+              verifications.incrementAndGet();
+              return reference.equals(CHECKPOINT_40)
+                  ? CompletableFuture.failedFuture(
+                      new NereusException(
+                          ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "corrupt checkpoint"))
+                  : CompletableFuture.completedFuture(verified(reference));
+            },
+            snapshot ->
+                CompletableFuture.failedFuture(new AssertionError("publication must not run")),
+            quarantine);
+
+    assertThatThrownBy(
+            () ->
+                gate.ensureVerified(
+                        snapshot(
+                            binding(CHECKPOINT_30, CHECKPOINT_40),
+                            head(0),
+                            retentionSnapshot(250, 2_500, 20, 5_000)),
+                        20)
+                    .join())
+        .hasRootCauseMessage("checkpoint quarantine store unavailable");
+    assertThat(verifications).hasValue(1);
+  }
+
+  @Test
+  void skipsDurablyQuarantinedRootWithoutObjectVerification() {
+    AtomicInteger verifications = new AtomicInteger();
+    KafkaCheckpointFailureQuarantine quarantine =
+        new KafkaCheckpointFailureQuarantine() {
+          @Override
+          public CompletableFuture<Boolean> isQuarantined(
+              KafkaPartitionId identity,
+              long partitionIncarnation,
+              KafkaCheckpointReferenceRecord reference) {
+            return CompletableFuture.completedFuture(reference.equals(CHECKPOINT_40));
+          }
+
+          @Override
+          public CompletableFuture<Void> quarantine(
+              KafkaPartitionId identity,
+              long partitionIncarnation,
+              KafkaCheckpointReferenceRecord reference,
+              KafkaCheckpointFailureSource source,
+              Throwable failure) {
+            return CompletableFuture.failedFuture(
+                new AssertionError("existing quarantine must not be rewritten"));
+          }
+        };
+    KafkaRetentionCheckpointGate gate =
+        new KafkaRetentionCheckpointGate(
+            (snapshot, reference) -> {
+              verifications.incrementAndGet();
+              return CompletableFuture.completedFuture(verified(reference));
+            },
+            snapshot ->
+                CompletableFuture.failedFuture(new AssertionError("publication must not run")),
+            quarantine);
+
+    KafkaTrimBarrier.VerifiedCheckpoint result =
+        gate.ensureVerified(
+                snapshot(
+                    binding(CHECKPOINT_30, CHECKPOINT_40),
+                    head(0),
+                    retentionSnapshot(250, 2_500, 20, 5_000)),
+                20)
+            .join();
+
+    assertThat(result.reference()).isEqualTo(CHECKPOINT_30);
+    assertThat(verifications).hasValue(1);
+  }
+
+  @Test
   void pausesInsteadOfPublishingWhenCheckpointStorageIsTemporarilyUnavailable() {
     AtomicInteger publications = new AtomicInteger();
     KafkaRetentionCheckpointGate gate =
@@ -134,7 +292,7 @@ class KafkaRetentionCheckpointGateTest {
               publications.incrementAndGet();
               return CompletableFuture.completedFuture(verified(CHECKPOINT_40));
             },
-            (reference, failure) -> {});
+            KafkaCheckpointFailureQuarantine.transientObserver((reference, failure) -> {}));
 
     assertThatThrownBy(
             () ->
@@ -155,7 +313,7 @@ class KafkaRetentionCheckpointGateTest {
         new KafkaRetentionCheckpointGate(
             (snapshot, reference) -> CompletableFuture.completedFuture(verified(reference)),
             snapshot -> CompletableFuture.completedFuture(verified(CHECKPOINT_30)),
-            (reference, failure) -> {});
+            KafkaCheckpointFailureQuarantine.transientObserver((reference, failure) -> {}));
 
     assertThatThrownBy(
             () ->
@@ -173,7 +331,7 @@ class KafkaRetentionCheckpointGateTest {
             snapshot ->
                 CompletableFuture.completedFuture(
                     new KafkaTrimBarrier.VerifiedCheckpoint(CHECKPOINT_40, new byte[32])),
-            (reference, failure) -> {});
+            KafkaCheckpointFailureQuarantine.transientObserver((reference, failure) -> {}));
 
     assertThatThrownBy(
             () ->

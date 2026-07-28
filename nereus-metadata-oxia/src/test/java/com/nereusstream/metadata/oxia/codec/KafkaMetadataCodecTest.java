@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.metadata.oxia.KafkaPartitionKeyspaceTest;
+import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureRecord;
+import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
 import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import com.nereusstream.metadata.oxia.records.KafkaCompactionCoverageRecord;
@@ -83,6 +85,51 @@ public class KafkaMetadataCodecTest {
                 10, 20, 30, bytes(9), planBytes, 1_000, 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("SHA");
+    }
+
+    @Test
+    void checkpointFailureAuditRoundTripsWithoutRawFailureText() {
+        KafkaCheckpointFailureRecord failure =
+                new KafkaCheckpointFailureRecord(
+                        1,
+                        "kraft",
+                        KafkaPartitionKeyspaceTest.topicId(7),
+                        2,
+                        4,
+                        "checkpoint-object",
+                        bytes(1),
+                        KafkaCheckpointFailureSource.RECOVERY.wireId(),
+                        "OBJECT_CHECKSUM_MISMATCH",
+                        bytes(2),
+                        3_000,
+                        0);
+
+        byte[] first =
+                KafkaMetadataCodecs.encodeEnvelope(failure, KafkaCheckpointFailureRecord.class);
+        byte[] second =
+                KafkaMetadataCodecs.encodeEnvelope(failure, KafkaCheckpointFailureRecord.class);
+
+        assertThat(second).isEqualTo(first);
+        assertThat(KafkaMetadataCodecs.decodeEnvelope(first, KafkaCheckpointFailureRecord.class))
+                .isEqualTo(failure);
+        assertThat(new String(first, java.nio.charset.StandardCharsets.UTF_8))
+                .doesNotContain("raw failure message");
+        assertThatThrownBy(
+                        () ->
+                                new KafkaCheckpointFailureRecord(
+                                        1,
+                                        "kraft",
+                                        KafkaPartitionKeyspaceTest.topicId(7),
+                                        2,
+                                        4,
+                                        "checkpoint-object",
+                                        bytes(1),
+                                        99,
+                                        "OBJECT_CHECKSUM_MISMATCH",
+                                        bytes(2),
+                                        3_000,
+                                        0))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     public static KafkaPartitionBindingRecord fullBinding() {

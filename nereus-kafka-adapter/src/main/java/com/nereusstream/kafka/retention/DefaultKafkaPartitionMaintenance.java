@@ -25,6 +25,7 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamStorage;
 import com.nereusstream.kafka.checkpoint.KafkaCanonicalCheckpointPublicationFactory;
 import com.nereusstream.kafka.checkpoint.KafkaCanonicalCheckpointState;
+import com.nereusstream.kafka.checkpoint.KafkaCheckpointFailureQuarantine;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointPublicationCoordinator;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceValidator;
@@ -38,11 +39,11 @@ import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
 import com.nereusstream.metadata.oxia.records.KafkaCompactionCoverageRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
-import java.util.HexFormat;
-import java.util.Optional;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.HexFormat;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /** Exact product composition of retention and DeleteRecords for one recovered Kafka leader. */
@@ -67,7 +68,7 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
       KafkaCheckpointRecoveryCoordinator recovery,
       KafkaCanonicalCheckpointPublicationFactory publicationFactory,
       KafkaCheckpointPublicationCoordinator publication,
-      KafkaRetentionCheckpointGate.FailureObserver checkpointFailureObserver,
+      KafkaCheckpointFailureQuarantine checkpointFailureQuarantine,
       Duration verificationTimeout,
       Duration trimTimeout,
       Clock clock) {
@@ -80,16 +81,14 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
     this.sourceValidator = Objects.requireNonNull(sourceValidator, "sourceValidator");
     this.bindings = Objects.requireNonNull(bindings, "bindings");
     this.streams = Objects.requireNonNull(streams, "streams");
-    KafkaCheckpointRecoveryCoordinator exactRecovery =
-        Objects.requireNonNull(recovery, "recovery");
+    KafkaCheckpointRecoveryCoordinator exactRecovery = Objects.requireNonNull(recovery, "recovery");
     KafkaCanonicalCheckpointPublicationFactory exactPublicationFactory =
         Objects.requireNonNull(publicationFactory, "publicationFactory");
     KafkaCheckpointPublicationCoordinator exactPublication =
         Objects.requireNonNull(publication, "publication");
-    KafkaRetentionCheckpointGate.FailureObserver exactFailureObserver =
-        Objects.requireNonNull(checkpointFailureObserver, "checkpointFailureObserver");
-    Duration exactVerificationTimeout =
-        positive(verificationTimeout, "verificationTimeout");
+    KafkaCheckpointFailureQuarantine exactFailureQuarantine =
+        Objects.requireNonNull(checkpointFailureQuarantine, "checkpointFailureQuarantine");
+    Duration exactVerificationTimeout = positive(verificationTimeout, "verificationTimeout");
     this.checkpointGates =
         hooks -> {
           KafkaRetentionCheckpointServices services =
@@ -112,8 +111,7 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
                                                   this.leaderEpoch,
                                                   this.sourceValidator))),
                   exactVerificationTimeout);
-          return new KafkaRetentionCheckpointGate(
-              services, services, exactFailureObserver);
+          return new KafkaRetentionCheckpointGate(services, services, exactFailureQuarantine);
         };
     this.trimTimeout = positive(trimTimeout, "trimTimeout");
     this.clock = Objects.requireNonNull(clock, "clock");
@@ -190,7 +188,9 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
                                                         current.orElseThrow(
                                                             () ->
                                                                 invariant(
-                                                                    "Kafka compaction binding"
+                                                                    "Kafka"
+                                                                        + " compaction"
+                                                                        + " binding"
                                                                         + " disappeared")),
                                                         captured)))));
   }
@@ -204,11 +204,9 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
             checkpointGates.create(exactHooks),
             "Kafka maintenance checkpoint-gate factory returned null");
     KafkaRetentionDurableTrimListener listener =
-        new KafkaRetentionDurableTrimListener(
-            bindings, exactHooks::advanceLogStart, clock);
+        new KafkaRetentionDurableTrimListener(bindings, exactHooks::advanceLogStart, clock);
     KafkaTrimBarrier barrier =
-        new KafkaTrimBarrier(
-            planner, snapshots, checkpointGate, streams, trimTimeout, listener);
+        new KafkaTrimBarrier(planner, snapshots, checkpointGate, streams, trimTimeout, listener);
     return new Operation(planner, snapshots, barrier);
   }
 
@@ -220,8 +218,7 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
       CompactionState captured) {
     requireSameSource(source, head);
     requireCompactionBinding(source, binding, captured);
-    KafkaCompactionPlanner.Snapshot plannerSnapshot =
-        compactionSnapshot(binding, captured);
+    KafkaCompactionPlanner.Snapshot plannerSnapshot = compactionSnapshot(binding, captured);
     KafkaCompactionPlanner.Candidate candidate =
         new KafkaCompactionPlanner().select(plannerSnapshot);
     CompletableFuture<KafkaCompactionPartitionPass.PassOneInputs> passOne;
@@ -250,8 +247,7 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
     try {
       captured =
           Objects.requireNonNull(
-              hooks.capture(source),
-              "Kafka compaction state capture hook returned a null future");
+              hooks.capture(source), "Kafka compaction state capture hook returned a null future");
     } catch (Throwable failure) {
       captured = CompletableFuture.failedFuture(failure);
     }
@@ -301,8 +297,13 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
                                   currentBinding.orElseThrow(
                                       () ->
                                           invariant(
-                                              "Kafka compaction binding disappeared during"
-                                                  + " authority revalidation")));
+                                              "Kafka"
+                                                  + " compaction"
+                                                  + " binding"
+                                                  + " disappeared"
+                                                  + " during"
+                                                  + " authority"
+                                                  + " revalidation")));
                               return null;
                             }));
   }
@@ -402,7 +403,9 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
                                                         binding.orElseThrow(
                                                             () ->
                                                                 invariant(
-                                                                    "Kafka maintenance binding"
+                                                                    "Kafka"
+                                                                        + " maintenance"
+                                                                        + " binding"
                                                                         + " disappeared")),
                                                         captured)))));
   }
@@ -433,8 +436,7 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
     return new KafkaTrimBarrier.Snapshot(identity, binding, head, retention);
   }
 
-  private CompletableFuture<Capture> capture(
-      Hooks hooks, KafkaCheckpointSourceState source) {
+  private CompletableFuture<Capture> capture(Hooks hooks, KafkaCheckpointSourceState source) {
     CompletableFuture<Capture> captured;
     try {
       captured =
@@ -454,8 +456,7 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
         });
   }
 
-  private void requireSameSource(
-      KafkaCheckpointSourceState source, StableStreamHeadSnapshot head) {
+  private void requireSameSource(KafkaCheckpointSourceState source, StableStreamHeadSnapshot head) {
     if (!head.streamId().equals(streamId)
         || head.trimOffset() != source.trimOffset()
         || head.committedEndOffset() != source.endOffset()
@@ -481,15 +482,13 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
   private static Duration positive(Duration value, String field) {
     Duration exact = Objects.requireNonNull(value, field);
     if (exact.isZero() || exact.isNegative() || exact.toMillis() <= 0) {
-      throw new IllegalArgumentException(
-          field + " must be positive and millisecond-representable");
+      throw new IllegalArgumentException(field + " must be positive and millisecond-representable");
     }
     return exact;
   }
 
   private static NereusException invariant(String message) {
-    return new NereusException(
-        ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+    return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
   }
 
   private record Operation(

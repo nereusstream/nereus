@@ -75,6 +75,41 @@ public final class KafkaPartitionKeyspace {
         return partitionPrefix(id) + "/compaction-plans";
     }
 
+    public String checkpointFailurePrefix(KafkaPartitionId id, long partitionIncarnation) {
+        if (partitionIncarnation <= 0) {
+            throw new IllegalArgumentException("partitionIncarnation must be positive");
+        }
+        return partitionPrefix(id)
+                + "/checkpoint-failures/"
+                + KeyComponentCodec.encodeNonNegativeLong(partitionIncarnation);
+    }
+
+    public String checkpointFailureKey(
+            KafkaPartitionId id, long partitionIncarnation, String objectId) {
+        return checkpointFailurePrefix(id, partitionIncarnation)
+                + "/"
+                + KeyComponentCodec.encodeComponent(text(objectId, "objectId"));
+    }
+
+    public CheckpointFailureKeyIdentity parseCheckpointFailureKey(
+            KafkaPartitionId expected, String key) {
+        KafkaPartitionId exact = requireIdentity(expected);
+        String family = partitionPrefix(exact) + "/checkpoint-failures/";
+        String supplied = scoped(key, family, "checkpoint failure");
+        String[] components = supplied.substring(family.length()).split("/", -1);
+        if (components.length != 2) {
+            throw new IllegalArgumentException("checkpoint failure key has an unknown depth");
+        }
+        long incarnation = KeyComponentCodec.decodeNonNegativeLong(components[0]);
+        String objectId = KeyComponentCodec.decodeComponent(components[1]);
+        CheckpointFailureKeyIdentity identity =
+                new CheckpointFailureKeyIdentity(exact, incarnation, objectId);
+        if (!checkpointFailureKey(exact, incarnation, objectId).equals(supplied)) {
+            throw new IllegalArgumentException("checkpoint failure key is not canonical");
+        }
+        return identity;
+    }
+
     public String compactionPlanKey(KafkaPartitionId id, String materializationTaskId) {
         return compactionPlanPrefix(id) + "/"
                 + KeyComponentCodec.encodeComponent(materializationTaskId(materializationTaskId));
@@ -161,6 +196,17 @@ public final class KafkaPartitionKeyspace {
     public String bindingRootKeySha256(KafkaPartitionId id) {
         return HexFormat.of().formatHex(sha256().digest(
                 bindingRootKey(id).getBytes(StandardCharsets.UTF_8)));
+    }
+
+    public record CheckpointFailureKeyIdentity(
+            KafkaPartitionId partition, long partitionIncarnation, String objectId) {
+        public CheckpointFailureKeyIdentity {
+            Objects.requireNonNull(partition, "partition");
+            text(objectId, "objectId");
+            if (partitionIncarnation <= 0) {
+                throw new IllegalArgumentException("partitionIncarnation must be positive");
+            }
+        }
     }
 
     private KafkaPartitionId requireIdentity(KafkaPartitionId id) {

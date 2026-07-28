@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index、transactional request handoff 与 internal-topic ready ordering deterministic slices implemented locally；M5 checkpoint-before-DeleteRecords、周期性 owned-partition retention、virtual segment/config history/derived index、timestamp lookup 与 compaction fork capture deterministic slices implemented locally；stock-source isolation、显式 `NereusKafka`/server-start production-factory launcher 与 controller-leader-only activation scheduling 已实现；真实 internal-topic coordinator recovery、durable checkpoint quarantine、multi-controller failover and real native-storage KRaft process gate remain open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index、transactional request handoff 与 internal-topic ready ordering deterministic slices implemented locally；M5 checkpoint-before-DeleteRecords、周期性 owned-partition retention、virtual segment/config history/derived index、timestamp lookup 与 compaction fork capture deterministic slices implemented locally；stock-source isolation、显式 `NereusKafka`/server-start production-factory launcher、controller-leader-only activation scheduling 与 product-side durable exact-reference checkpoint quarantine 已实现；真实 internal-topic coordinator recovery、multi-controller failover and real native-storage KRaft process gate remain open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -243,8 +243,9 @@ product adapter 已实现 `NereusKafkaRuntimeFactory`，并新增仅支持 `OBJE
 callback executor、durable checkpoint read pins、checkpoint reader/verifier/recovery coordinator、bounded COMMITTED page
 source、concrete recovery launcher 和同一 manager/runtime graph；real Oxia + local-file provider 的 leader
 open/Produce/Fetch gate 已通过。Fork 不再承担 ObjectStore/Oxia/read-pin orchestration，只在 exact ReplicaManager
-可用后为每次 open 创建 fresh state codec 和 exact Partition publisher。尚未实现的是 BookKeeper/async-object
-creator、durable checkpoint-failure quarantine observer、真实 controller failover 和 native-storage
+可用后为每次 open 创建 fresh state codec 和 exact Partition publisher。Product Object-WAL runtime 已在 checkpoint
+reader/retention verifier 外围组装同一个 exact-reference durable quarantine store；它无需新增 Kafka-fork seam。
+尚未实现的是 BookKeeper/async-object creator、真实 controller failover 和 native-storage
 KRaft process test。显式 launcher/KafkaRaftServer broker/controller factory selection 已实现；当前已有可执行的 Object-WAL
 provider/runtime/recovery composition、log-shell selection、直接 `NereusUnifiedLog` correctness I/O bridge，以及
 bounded Produce/Fetch handoff，但还没有真实 provider-backed KRaft Produce/Fetch 进程证据，不能据此宣称

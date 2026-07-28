@@ -12,10 +12,12 @@ import com.nereusstream.core.physical.ObjectReadLease;
 import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
+import com.nereusstream.kafka.checkpoint.KafkaCheckpointFailureQuarantine;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
+import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
@@ -34,11 +36,6 @@ import java.util.concurrent.CompletionException;
 
 /** Newest-first exact-key checkpoint recovery with durable reader pins and bounded fallback. */
 public final class KafkaCheckpointRecoveryCoordinator {
-    @FunctionalInterface
-    public interface FailureObserver {
-        void unusable(KafkaCheckpointReferenceRecord reference, Throwable failure);
-    }
-
     private final String nereusCluster;
     private final KafkaPartitionMetadataStore bindings;
     private final PhysicalObjectMetadataStore physicalStore;
@@ -46,7 +43,7 @@ public final class KafkaCheckpointRecoveryCoordinator {
     private final KafkaCheckpointReader reader;
     private final KafkaCheckpointVerifier verifier;
     private final Clock clock;
-    private final FailureObserver observer;
+    private final KafkaCheckpointFailureQuarantine quarantine;
 
     public KafkaCheckpointRecoveryCoordinator(
             String nereusCluster,
@@ -56,7 +53,7 @@ public final class KafkaCheckpointRecoveryCoordinator {
             KafkaCheckpointReader reader,
             KafkaCheckpointVerifier verifier,
             Clock clock,
-            FailureObserver observer) {
+            KafkaCheckpointFailureQuarantine quarantine) {
         this.nereusCluster = requireText(nereusCluster, "nereusCluster");
         this.bindings = Objects.requireNonNull(bindings, "bindings");
         this.physicalStore = Objects.requireNonNull(physicalStore, "physicalStore");
@@ -64,7 +61,7 @@ public final class KafkaCheckpointRecoveryCoordinator {
         this.reader = Objects.requireNonNull(reader, "reader");
         this.verifier = Objects.requireNonNull(verifier, "verifier");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.observer = Objects.requireNonNull(observer, "observer");
+        this.quarantine = Objects.requireNonNull(quarantine, "quarantine");
     }
 
     public CompletableFuture<KafkaCheckpointRecoveryResult> recover(
@@ -118,7 +115,19 @@ public final class KafkaCheckpointRecoveryCoordinator {
             return CompletableFuture.failedFuture(new IllegalArgumentException(
                     "Kafka checkpoint recovery deadline overflows", failure));
         }
-        return recoverOne(request, reference, deadline);
+        return quarantine
+                .isQuarantined(
+                        request.identity().durableId(),
+                        request.binding().value().incarnation(),
+                        reference)
+                .thenCompose(
+                        quarantined ->
+                                quarantined
+                                        ? CompletableFuture.failedFuture(
+                                                invariant(
+                                                        "requested Kafka checkpoint is durably"
+                                                            + " quarantined"))
+                                        : recoverOne(request, reference, deadline));
     }
 
     private CompletableFuture<Optional<KafkaRecoveredCheckpoint>> tryReference(
@@ -128,16 +137,43 @@ public final class KafkaCheckpointRecoveryCoordinator {
             long deadline) {
         if (index == references.size()) return CompletableFuture.completedFuture(Optional.empty());
         KafkaCheckpointReferenceRecord reference = references.get(index);
-        return recoverOne(request, reference, deadline)
-                .thenApply(Optional::of)
-                .exceptionallyCompose(failure -> {
-                    Throwable exact = unwrap(failure);
-                    if (!canFallback(exact)) {
-                        return CompletableFuture.failedFuture(exact);
-                    }
-                    observer.unusable(reference, exact);
-                    return tryReference(request, references, index + 1, deadline);
-                });
+        return quarantine
+                .isQuarantined(
+                        request.identity().durableId(),
+                        request.binding().value().incarnation(),
+                        reference)
+                .thenCompose(
+                        quarantined -> {
+                            if (quarantined) {
+                                return tryReference(request, references, index + 1, deadline);
+                            }
+                            return recoverOne(request, reference, deadline)
+                                    .thenApply(Optional::of)
+                                    .exceptionallyCompose(
+                                            failure -> {
+                                                Throwable exact = unwrap(failure);
+                                                if (!canFallback(exact)) {
+                                                    return CompletableFuture.failedFuture(exact);
+                                                }
+                                                return quarantine
+                                                        .quarantine(
+                                                                request.identity().durableId(),
+                                                                request.binding()
+                                                                        .value()
+                                                                        .incarnation(),
+                                                                reference,
+                                                                KafkaCheckpointFailureSource
+                                                                        .RECOVERY,
+                                                                exact)
+                                                        .thenCompose(
+                                                                ignored ->
+                                                                        tryReference(
+                                                                                request,
+                                                                                references,
+                                                                                index + 1,
+                                                                                deadline));
+                                            });
+                        });
     }
 
     private CompletableFuture<KafkaRecoveredCheckpoint> recoverOne(

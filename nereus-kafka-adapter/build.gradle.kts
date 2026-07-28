@@ -127,7 +127,22 @@ tasks.register<Test>("f9RetentionTest") {
         includeTestsMatching("com.nereusstream.kafka.retention.DefaultKafkaPartitionMaintenanceTest")
         includeTestsMatching("com.nereusstream.kafka.retention.KafkaPartitionMaintenanceRuntimeTest")
         includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaCheckpointPublicationRecoveryIntegrationTest")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.DurableKafkaCheckpointFailureQuarantineTest")
         includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaMaintenanceConfigurationTest")
+    }
+}
+
+tasks.register<Test>("f9CheckpointQuarantineTest") {
+    group = "verification"
+    description = "Run durable F9 NKC1 quarantine, audit, fallback-order, and restart-skip contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.DurableKafkaCheckpointFailureQuarantineTest")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaCheckpointPublicationRecoveryIntegrationTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaRetentionCheckpointGateTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeFactoryTest")
     }
 }
 

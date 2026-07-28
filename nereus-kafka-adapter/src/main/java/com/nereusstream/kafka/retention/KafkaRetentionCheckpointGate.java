@@ -16,6 +16,8 @@ package com.nereusstream.kafka.retention;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.kafka.checkpoint.KafkaCheckpointFailureQuarantine;
+import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
 import java.util.Arrays;
 import java.util.List;
@@ -29,15 +31,15 @@ import java.util.concurrent.CompletionException;
 public final class KafkaRetentionCheckpointGate implements KafkaTrimBarrier.CheckpointGate {
   private final ExistingCheckpointVerifier verifier;
   private final CheckpointPublisher publisher;
-  private final FailureObserver failureObserver;
+  private final KafkaCheckpointFailureQuarantine quarantine;
 
   public KafkaRetentionCheckpointGate(
       ExistingCheckpointVerifier verifier,
       CheckpointPublisher publisher,
-      FailureObserver failureObserver) {
+      KafkaCheckpointFailureQuarantine quarantine) {
     this.verifier = Objects.requireNonNull(verifier, "verifier");
     this.publisher = Objects.requireNonNull(publisher, "publisher");
-    this.failureObserver = Objects.requireNonNull(failureObserver, "failureObserver");
+    this.quarantine = Objects.requireNonNull(quarantine, "quarantine");
   }
 
   @Override
@@ -49,7 +51,7 @@ public final class KafkaRetentionCheckpointGate implements KafkaTrimBarrier.Chec
         || targetOffset > snapshot.sourceHead().committedEndOffset()) {
       return CompletableFuture.failedFuture(
           new IllegalArgumentException(
-              "Kafka retention checkpoint target is outside the frozen durable window"));
+              "Kafka retention checkpoint target is outside the frozen durable" + " window"));
     }
     List<KafkaCheckpointReferenceRecord> references =
         snapshot.binding().value().checkpointReferences();
@@ -74,6 +76,24 @@ public final class KafkaRetentionCheckpointGate implements KafkaTrimBarrier.Chec
         || reference.logStartOffsetAtCheckpoint() > snapshot.sourceHead().trimOffset()) {
       return tryExisting(snapshot, targetOffset, references, index + 1);
     }
+    return quarantine
+        .isQuarantined(
+            snapshot.binding().value().identity(),
+            snapshot.binding().value().incarnation(),
+            reference)
+        .thenCompose(
+            quarantined ->
+                quarantined
+                    ? tryExisting(snapshot, targetOffset, references, index + 1)
+                    : verifyExisting(snapshot, targetOffset, references, index, reference));
+  }
+
+  private CompletableFuture<KafkaTrimBarrier.VerifiedCheckpoint> verifyExisting(
+      KafkaTrimBarrier.Snapshot snapshot,
+      long targetOffset,
+      List<KafkaCheckpointReferenceRecord> references,
+      int index,
+      KafkaCheckpointReferenceRecord reference) {
     CompletableFuture<KafkaTrimBarrier.VerifiedCheckpoint> verification;
     try {
       verification =
@@ -91,8 +111,15 @@ public final class KafkaRetentionCheckpointGate implements KafkaTrimBarrier.Chec
               if (!canFallback(exact)) {
                 return CompletableFuture.failedFuture(exact);
               }
-              failureObserver.unusable(reference, exact);
-              return tryExisting(snapshot, targetOffset, references, index + 1);
+              return quarantine
+                  .quarantine(
+                      snapshot.binding().value().identity(),
+                      snapshot.binding().value().incarnation(),
+                      reference,
+                      KafkaCheckpointFailureSource.RETENTION,
+                      exact)
+                  .thenCompose(
+                      ignored -> tryExisting(snapshot, targetOffset, references, index + 1));
             });
   }
 
@@ -115,7 +142,8 @@ public final class KafkaRetentionCheckpointGate implements KafkaTrimBarrier.Chec
               || reference.checkpointOffset() < targetOffset
               || reference.logStartOffsetAtCheckpoint() > snapshot.sourceHead().trimOffset()
               || !Arrays.equals(reference.objectSha256(), checkpoint.verifiedObjectSha256())) {
-            throw invariant("published Kafka retention checkpoint does not freeze the stable end");
+            throw invariant(
+                "published Kafka retention checkpoint does not freeze the stable" + " end");
           }
           return checkpoint;
         });
@@ -167,10 +195,5 @@ public final class KafkaRetentionCheckpointGate implements KafkaTrimBarrier.Chec
   public interface CheckpointPublisher {
     CompletableFuture<KafkaTrimBarrier.VerifiedCheckpoint> publish(
         KafkaTrimBarrier.Snapshot snapshot);
-  }
-
-  @FunctionalInterface
-  public interface FailureObserver {
-    void unusable(KafkaCheckpointReferenceRecord reference, Throwable failure);
   }
 }

@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher 与 controller-leader-only activation scheduling are implemented locally；BookKeeper/async providers、durable checkpoint-failure quarantine/audit、feature registration、real multi-controller/KRaft process gate and observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling 与 Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit are implemented locally；BookKeeper/async providers、feature registration、real multi-controller/KRaft process gate and full observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -56,7 +56,8 @@ fork-owned KRaft/local-log snapshot by reading the first key from every one of t
 hint makes `bindingsPresent=true`，and “no bindings” is returned only after all shards prove empty。An already-positive fork fact
 is preserved without scanning。This is intentionally conservative because a stale registry hint must block first activation，
 while ACTIVE admission does not require the cluster to remain empty。The same product factory now constructs and owns durable
-checkpoint read pins plus the checkpoint reader/verifier/recovery coordinator and bounded COMMITTED replay source；only the
+checkpoint read pins plus the checkpoint reader/verifier/recovery coordinator、bounded COMMITTED replay source and a separate
+shared-Oxia `KafkaCheckpointFailureMetadataStore`/`DurableKafkaCheckpointFailureQuarantine`；only the
 fork-provided `KafkaRecoveryStateFactory`、Kafka scheduler and clock are borrowed。Runtime close cancels owned
 heartbeat/poll futures before closing the activation store and provider ledger。
 
@@ -98,7 +99,8 @@ Partition publication are executable。Fork `faaffc8a75` keeps stock maintenance
 Stock `ControllerStorageRuntime` is a `MetadataPublisher` created and started before publisher installation；the product runtime
 then coalesces stock metadata/leadership callbacks into one current-controller-only activation attempt，retries only retriable
 `NereusException` failures，cancels scheduled retry on leadership loss and suppresses repeated non-retriable fault reports
-process-locally within one controller epoch；this is separate from the still-open durable checkpoint quarantine。
+process-locally within one controller epoch；this controller fault suppression is separate from the implemented partition
+checkpoint quarantine。
 The controller creator owns a minimal shared-Oxia partition/activation graph independently of the broker runtime and does not
 block controller startup on ACTIVE。Detailed signatures and event rules are frozen in document 03。Feature registration、
 dedicated-controller enablement、real multi-controller takeover and the provider-backed native-storage process gate remain open。
@@ -110,6 +112,7 @@ dedicated-controller enablement、real multi-controller takeover and the provide
 | `StreamStorage` | Kafka runtime when factory-created | close after all partitions drained |
 | Oxia clients/stores | runtime | close after scanners/checkpoints stopped |
 | ObjectStore provider | runtime | close after checkpoint/materialization/GC drained |
+| checkpoint failure metadata store | Object-WAL Kafka runtime | close with provider ledger after maintenance/recovery drain |
 | BookKeeper client | runtime when selected profiles need it | close after StreamStorage/materialization |
 | append/fetch/lifecycle/recovery executors | runtime | stop admission，drain，then interrupt only at final timeout |
 | compaction/materialization services | runtime | stop planning，drain workers before provider close |
@@ -681,6 +684,10 @@ Stable event IDs：
 
 Fields use stable IDs/hashes and offsets；payload、Kafka key/value、fencing token、secret config never logged。Repeated errors are
 rate-limited but first/last/count preserved。
+
+The durable quarantine record implemented on 2026-07-28 is the data source for future `NKF300` diagnostics，but this milestone
+does not yet claim a rate-limited structured-log emitter or admin export。It persists only stable IDs/code/timestamps and
+domain-separated SHA-256 digests；the raw exception message remains process-local and never enters Oxia durable bytes。
 
 ## 12. Alerts
 

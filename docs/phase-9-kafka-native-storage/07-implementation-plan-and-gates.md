@@ -417,8 +417,11 @@ coordinator/transaction/compaction remain M4/M5。
 - `NereusKafkaObjectWalRuntimeFactory` now owns durable checkpoint read pins、reader/verifier/recovery coordinator、
   configured `recoveryChunkRecords/recoveryChunkBytes` paging and `DefaultKafkaPartitionRecoveryLauncher`。
   `DefaultKafkaRecoveryBatchSourceTest` proves exact bounded COMMITTED/EXACT_START pages and fail-closed empty/non-Kafka
-  results；`KafkaCheckpointPublicationRecoveryIntegrationTest` proves multi-page replay。The installed checkpoint failure
-  observer is currently no-op，so durable quarantine/audit is still open；
+  results；`KafkaCheckpointPublicationRecoveryIntegrationTest` proves multi-page replay。The production Object-WAL graph now
+  owns a separate immutable Oxia checkpoint-failure store and injects the same
+  `DurableKafkaCheckpointFailureQuarantine` into recovery and retention。Exact persisted refs skip object I/O；new eligible
+  permanent failures await durable create/response-loss reconciliation before fallback，and quarantine metadata failure
+  fails closed；
 - fork `NereusKafkaRecoveryStateCodecTest` proves three stock magic-v2 RecordBatch recovery cases covering CRC、single
   entry/batch、compressed/uncompressed dense offsets、timestamp/leader-epoch derivation、trailing/source mismatch and M3
   producer/transaction/NKC1 rejection。`NereusKafkaRecoveryStateFactoryTest` proves two exact live-Partition publication/stale
@@ -753,9 +756,11 @@ main/test compilation；fork `3bd92c7244` adds an executable native-storage laun
 factory through the shared stock `Kafka.run` lifecycle into `KafkaRaftServer`；fork `9773c8f817` adds the parallel
 `ControllerStorageRuntimeFactory` path and a `MetadataPublisher`-driven activation scheduler。Focused tests prove
 current-controller-only execution、one in-flight/coalesced callbacks、retriable-only retry、leadership-loss cancellation、
-one durable fault per controller epoch and owned close。These are deterministic scheduler/lifecycle evidence only：
+one durable fault per controller epoch and owned close。`phase9M6CheckpointQuarantineCheck --rerun-tasks` now additionally
+composes 146/146 manifest validation、immutable store/codec contracts、recovery/retention ordering、production Object-WAL
+resource ownership and real-Oxia close/reconnect lookup。These remain focused partial evidence：
 `nereus.storage.version` feature registration、dedicated-controller enablement、durable in-flight epoch fencing、
-multi-controller takeover、durable checkpoint-failure quarantine/audit、priority budgets and real native-storage
+multi-controller takeover、priority budgets and real native-storage
 shutdown/process cuts remain open。
 
 ### Tasks

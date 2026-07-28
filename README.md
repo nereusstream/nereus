@@ -10,6 +10,9 @@ are in progress；the adapter now also has the process admission/runtime lifecyc
 ledger with reverse-order close。The local Kafka fork now also maintains checkpoint-restorable virtual segments、exact
 KRaft config history、logical/time indexes and real offset metadata，routes stock DeleteRecords through the shared
 checkpoint-before-trim barrier，and supplies bounded owned-partition capture to the product's periodic retention runtime。
+The Object-WAL runtime now also persists an immutable exact-reference checkpoint-failure quarantine/redacted first-failure
+audit in Oxia；recovery and retention cannot use an older root until that audit is durable，and quarantine-store failure
+fails closed。
 These are deterministic partial M5 results；real-provider restart/takeover and stock retention-oracle gates remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
@@ -58,7 +61,7 @@ nereus/
   docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
   docs/phase-3-cursor-subscription/      implemented/final-gated F3 code-level contract
   docs/phase-4-compaction-generation/    F4 code-level contract and implementation gates
-  docs/phase-9-kafka-native-storage/     F9 native Kafka code-level target and in-progress M1-M5 evidence
+  docs/phase-9-kafka-native-storage/     F9 native Kafka code-level target and in-progress M1-M6 evidence
   docs/phase-bk-bookkeeper-primary-wal/  final-gated F1-BK BK-M0–M6 contract and executable evidence
   docs/automq-like-stream-storage/       async materialization profile design
 ```

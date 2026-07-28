@@ -1,6 +1,6 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
-> 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs and full composition partial slice implemented
+> 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs/full composition and Object-WAL exact-reference durable checkpoint quarantine partial slices implemented
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -32,6 +32,7 @@ topic ID 冲突，fail closed；不得按 topic name“修正”为另一个 str
 
 /nereus/clusters/{nereusCluster}/kafka/{kafkaClusterId}/partitions/{topicId}/{partition}/root
 /nereus/clusters/{nereusCluster}/kafka/{kafkaClusterId}/partitions/{topicId}/{partition}/compaction-plans/{materializationTaskId}
+/nereus/clusters/{nereusCluster}/kafka/{kafkaClusterId}/partitions/{topicId}/{partition}/checkpoint-failures/{partitionIncarnation}/{objectId}
 /nereus/clusters/{nereusCluster}/kafka/{kafkaClusterId}/registry/{shard}/{topicId}/{partition}
 ```
 
@@ -42,7 +43,7 @@ binding/registry = sha256(kafkaClusterId || 0x00 || topicId || 0x00 || partition
 activation       = sha256(kafkaClusterId || 0x00 || "activation")
 ```
 
-binding 与其 immutable compaction-plan children 使用同一 deterministic partition key；registry hint 使用其 shard
+binding 与其 immutable compaction-plan/checkpoint-failure children 使用同一 deterministic partition key；registry hint 使用其 shard
 partition key。实现仍不能依赖 multi-key
 transaction。stream head 使用既有 `streamPartitionKey(streamId)`，通常与 binding 不同 shard。
 V1 activation、capability 与 readiness 三类 control-plane key 均使用 `activation` partition key；这是 deterministic
@@ -557,9 +558,12 @@ The executable recovery boundary is now split by resource ownership：
    `LeaderEpochAwareRecoveryState`，so `Partition` preserves exact identity/epoch/frozen validation without an
    artifact-only compile dependency。The one-time bridge fails retriably before binding。
 
-The Object-WAL composition currently installs a no-op checkpoint `FailureObserver`；missing/corrupt referenced objects still
-fail/fallback according to the recovery coordinator, but durable quarantine/audit recording is not yet implemented and must not
-be claimed as complete。Neither the product launcher nor the fork publisher may bypass opener/source revalidation。
+The Object-WAL composition now owns an independent `KafkaCheckpointFailureMetadataStore` and installs
+`DurableKafkaCheckpointFailureQuarantine` into both recovery and retention。It does not rewrite the binding root or make
+quarantine a deletion authority。A new Object-WAL runtime reloads the immutable record before object I/O，and a newly confirmed
+permanent failure must durably create/reconcile that record before fallback。Neither the product launcher nor the fork publisher
+may bypass opener/source revalidation。BookKeeper/async-object production creators must explicitly compose the same contract
+when those profiles are implemented；the transient observer adapter remains test-only。
 
 If no checkpoint：
 
@@ -719,6 +723,65 @@ For each root reference newest-first：
 
 Missing/corrupt newest ref is quarantined/audited and next ref tried。Object LIST cannot resurrect an unreferenced checkpoint。
 
+### 11.1 Exact-reference durable quarantine record（implemented 2026-07-28）
+
+The authoritative Java surfaces are：
+
+```text
+records/KafkaCheckpointFailureRecord.java
+codec/KafkaCheckpointFailureRecordCodecV1.java
+KafkaCheckpointFailureMetadataStore.java
+OxiaJavaKafkaCheckpointFailureMetadataStore.java
+KafkaCheckpointFailureQuarantine.java
+DurableKafkaCheckpointFailureQuarantine.java
+```
+
+The key is scoped by exact Kafka partition identity、positive binding `partitionIncarnation` and canonical encoded
+`objectId`。It uses `KafkaPartitionKeyspace.bindingPartitionKey(identity)`，so the store never infers identity from LIST and
+rejects wrong depth、alternate encoding、wrong cluster or non-positive incarnation。
+
+The closed V1 payload order is：
+
+```text
+formatVersion:i32 = 1
+kafkaClusterId:string
+topicId:string
+partitionId:i32
+partitionIncarnation:i64
+objectId:string
+referenceSha256[32]
+sourceId:i32                 1=RECOVERY, 2=RETENTION
+failureCode:string
+failureSha256[32]
+quarantinedAtMillis:i64
+metadataVersion:i64          0 on create, replaced by Oxia version on read
+```
+
+`referenceSha256` is domain-separated
+`SHA-256("nereus-kafka-checkpoint-reference-v1\0" || canonical length-prefixed reference fields)` over every
+`KafkaCheckpointReferenceRecord` field，not just object ID/key/SHA。`failureSha256` is separately domain-separated over
+exception class、stable `ErrorCode`、retriable flag and length-prefixed message；the raw message is never persisted。
+Eligible codes are the closed set `OBJECT_NOT_FOUND`、`OBJECT_CHECKSUM_MISMATCH`、`UNSUPPORTED_FORMAT` and
+`METADATA_INVARIANT_VIOLATION`。Transient metadata/provider errors are never converted into quarantine。
+
+`putIfAbsent` is immutable first-writer-wins。A concurrent recovery/retention classifier may preserve the first source/code/time
+when both writers identify the same exact `referenceSha256`；the stored record is still the authoritative first-failure audit。
+The same key with a different reference digest is `METADATA_INVARIANT_VIOLATION`。A failed create always reloads the exact key：
+an applied-but-response-lost write reconciles to the stored winner，absence/read failure fails closed。There is no update、
+clear or fallback-on-store-error path in this milestone。
+
+Recovery and retention execute the same ordering：
+
+1. query the exact quarantine key before acquiring an object read；
+2. if an exact record exists，skip object I/O and try the next rooted reference；
+3. otherwise verify the current reference；
+4. on an eligible permanent failure，await immutable quarantine create/reconciliation；
+5. only after that future succeeds may the older rooted reference run；
+6. quarantine read/write/collision failure completes the whole recovery/retention operation exceptionally。
+
+The binding root still owns reference reachability and retention/physical-GC decisions。Quarantine does not remove、reorder or
+mutate `checkpointRefs`，and same-name/new-topic or new partition incarnation cannot inherit the old audit。
+
 ## 12. Topic deletion
 
 KRaft topic ID deletion is the only normal delete authority。State machine：
@@ -811,6 +874,7 @@ in-flight futures。
 
 - every lifecycle/payload mapping/operation wire ID；unknown ID/field/version；
 - full binding and min/max checkpoint refs；canonical key parse round trip；
+- checkpoint-failure key/record/envelope round trip、unknown source/version、reference collision and redacted durable bytes；
 - StreamHead V1 golden remains decodable；V2 authority golden and V1→V2 rewrite；old reader rejection；
 - NKC1 each section/limit/checksum/truncation/duplicate/unknown-required fixture。
 
@@ -819,6 +883,8 @@ in-flight futures。
 - two creator convergence at every response-loss cut；
 - authority lower/equal/higher leader and broker epochs；old in-flight head CAS fenced；
 - open with current/stale/corrupt/missing checkpoints；trimmed stream without checkpoint fails；
+- exact quarantine restart lookup、response-loss reconciliation、no object I/O for a quarantined ref and no fallback before
+  durable audit completion；
 - unknown append exact recovery；
 - delete/create/open races；same-name new topic isolation；
 - scanner pagination/lease takeover/registry hint loss。
@@ -866,13 +932,19 @@ F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kaf
 - `KafkaCheckpointPublicationCoordinator` performs pending protection → immutable PUT/full verify → source revalidation →
   binding CAS → permanent root protection → pending release；idempotent retries converge without an unprotected PUT window；
 - `KafkaCheckpointRecoveryCoordinator` reads referenced keys newest-first under durable reader pins，falls back only for
-  object-local missing/corrupt/invariant failures，and fails closed when trim is non-zero without a usable checkpoint；
+  object-local missing/corrupt/invariant failures，persists/reconciles the exact immutable failure audit before fallback，
+  skips a previously quarantined exact ref without object I/O，and fails closed when trim is non-zero without a usable
+  checkpoint；
 - `KafkaPartitionRecoveryCoordinator` hydrates only a fresh state instance，requires exact contiguous committed batch
   coverage to the frozen stable end across bounded pages，revalidates session/head before and after non-writable state
   installation，and fences instead of enabling writes if the head changes during replay/publication；
 - `DefaultKafkaRecoveryBatchSourceTest` proves the exact COMMITTED/EXACT_START request, configured record/byte bounds,
   source-fact matching and fail-closed empty/non-Kafka pages；`KafkaCheckpointPublicationRecoveryIntegrationTest` proves
-  multi-page replay to the frozen end；
+  multi-page replay to the frozen end and restart-stable quarantine lookup；
+- `KafkaCheckpointFailureMetadataStoreContractTest` covers immutable winner、reference collision and
+  applied-response-loss reconciliation；`DurableKafkaCheckpointFailureQuarantineTest` covers exact-reference hashing、
+  redaction、restart lookup and rejection of transient failure classes；the real-Oxia integration gate writes the audit、
+  closes/reopens the client/runtime and reloads identical durable bytes；
 - fork `NereusKafkaRecoveryStateCodecTest` proves exact magic-v2 single-batch parsing、CRC、compressed and uncompressed dense
   record replay、timestamps/leader-epoch ranges、trailing/source mismatch rejection and M3 fail-closed
   producer/transaction/NKC1 behavior；`NereusKafkaRecoveryStateFactoryTest` proves exact current-Partition publication and
@@ -883,3 +955,6 @@ F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kaf
 - `phase9M2Check --rerun-tasks` passes on current source；`phase9M2FinalCheck --rerun-tasks` reaches the inherited
   `checkPulsarSourceLock` and stops because the local Pulsar checkout is `5ffc2caa0e08dac95bc8c2ea76ed3d32382dfe3e`
   while the repository requires `2f9c1eb93be96e2036fbdc8c5e39545f21fa6200`。
+- `phase9M6CheckpointQuarantineCheck --rerun-tasks` passes 146/146 scenario-manifest validation、metadata contracts、
+  real-Oxia close/reconnect and recovery/retention runtime composition on 2026-07-28。This is a focused partial gate，not
+  F9-M4/M5/M6 or Phase 9 completion。

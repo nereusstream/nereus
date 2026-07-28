@@ -44,6 +44,15 @@ committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、C
 remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing。The Kafka
 fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@9773c8f817`。
 
+Current checkpoint-failure quarantine evidence（product 2026-07-28）：closed V1 record/envelope and canonical key tests
+cover exact partition-incarnation/object identity、immutable first-winner、reference-digest collision、raw-failure
+redaction and applied-but-response-lost reconciliation。Recovery and retention tests prove persisted refs skip object I/O，
+new eligible permanent failures wait for the durable write before older-root fallback，and metadata read/write failure
+fails closed。The real-Oxia integration writes the record，closes/reopens the client/runtime and reloads the same audit；
+`phase9M6CheckpointQuarantineCheck --rerun-tasks` composes those tests with 146/146 manifest validation and production
+Object-WAL wiring。Rows remain `PLANNED` because this focused evidence does not supply the required real provider trim、
+fresh broker process、takeover or aggregate tiers。
+
 Current deterministic compaction fork evidence（product `e18bf36`；fork `58342d9dca`）：typed bounded runtime config、
 one-time product composition、leader-only owned-partition registration、internal/user work classification、partition-lock
 canonical/HW/LSO capture and stock `CleanedTransactionMetadata` marker pre-scan pass focused adapter/fork tests plus

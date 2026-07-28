@@ -109,7 +109,8 @@ tasks.register<Test>("f9MetadataTest") {
 
 tasks.register<Test>("f9OxiaIntegrationTest") {
     group = "verification"
-    description = "Run the F9-M2 Kafka binding CAS and registry scan gate against real Oxia."
+    description =
+        "Run the F9 Kafka binding CAS, registry scan, and checkpoint-quarantine reconnect gate against real Oxia."
     testClassesDirs = oxiaIntegrationTest.output.classesDirs
     classpath = oxiaIntegrationTest.runtimeClasspath
     shouldRunAfter(tasks.test, tasks.named("f9MetadataTest"))

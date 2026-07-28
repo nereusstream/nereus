@@ -4,6 +4,9 @@ package com.nereusstream.metadata.oxia;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureRecord;
+import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
+import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
 import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
@@ -41,10 +44,14 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
         OxiaClientConfiguration configuration = configuration();
         VersionedKafkaPartitionBinding active;
         VersionedKafkaCompactionPlan compactionPlan;
+        VersionedKafkaCheckpointFailure checkpointFailure;
 
         try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, Clock.systemUTC());
                 OxiaJavaKafkaPartitionMetadataStore store =
                         OxiaJavaKafkaPartitionMetadataStore.usingSharedRuntime(
+                                configuration, runtime, nereusCluster, kafkaCluster);
+                KafkaCheckpointFailureMetadataStore failureStore =
+                        KafkaCheckpointFailureMetadataStore.usingSharedRuntime(
                                 configuration, runtime, nereusCluster, kafkaCluster)) {
             KafkaPartitionBindingRecord creating = creating(id);
             VersionedKafkaPartitionBinding created = store.putCreatingIfAbsent(creating).join();
@@ -68,11 +75,18 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
             compactionPlan = store.putCompactionPlanIfAbsent(requestedPlan).join();
             assertThat(store.putCompactionPlanIfAbsent(requestedPlan).join())
                     .isEqualTo(compactionPlan);
+            checkpointFailure =
+                    failureStore
+                            .putIfAbsent(checkpointFailure(id, active.value().incarnation()))
+                            .join();
         }
 
         try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, Clock.systemUTC());
                 OxiaJavaKafkaPartitionMetadataStore store =
                         OxiaJavaKafkaPartitionMetadataStore.usingSharedRuntime(
+                                configuration, runtime, nereusCluster, kafkaCluster);
+                KafkaCheckpointFailureMetadataStore failureStore =
+                        KafkaCheckpointFailureMetadataStore.usingSharedRuntime(
                                 configuration, runtime, nereusCluster, kafkaCluster)) {
             assertThat(store.get(id).join()).contains(active);
             KafkaPartitionKeyspace keys = new KafkaPartitionKeyspace(nereusCluster, kafkaCluster);
@@ -83,6 +97,14 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
                     .contains(compactionPlan);
             assertThat(store.scanCompactionPlans(id, Optional.empty(), 1).join().plans())
                     .containsExactly(compactionPlan);
+            assertThat(
+                            failureStore
+                                    .get(
+                                            id,
+                                            active.value().incarnation(),
+                                            checkpointFailure.value().objectId())
+                                    .join())
+                    .contains(checkpointFailure);
             store.deleteCompactionPlan(compactionPlan).join();
             assertThat(store.getCompactionPlan(
                             id, compactionPlan.value().materializationTaskId()).join())
@@ -106,6 +128,23 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
                 1, id.kafkaClusterId(), id.topicId(), id.partitionId(),
                 "stream-id", "kcp1-" + "a".repeat(52), "mat1-" + "b".repeat(52),
                 0, 10, 12, sha256(bytes), bytes, 1_300, 0);
+    }
+
+    private static KafkaCheckpointFailureRecord checkpointFailure(
+            KafkaPartitionId id, long incarnation) {
+        return new KafkaCheckpointFailureRecord(
+                1,
+                id.kafkaClusterId(),
+                id.topicId(),
+                id.partitionId(),
+                incarnation,
+                "checkpoint-object",
+                sha256("reference".getBytes(StandardCharsets.UTF_8)),
+                KafkaCheckpointFailureSource.RECOVERY.wireId(),
+                "OBJECT_CHECKSUM_MISMATCH",
+                sha256("redacted-failure".getBytes(StandardCharsets.UTF_8)),
+                1_400,
+                0);
     }
 
     private static byte[] sha256(byte[] value) {

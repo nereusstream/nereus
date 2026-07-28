@@ -35,8 +35,11 @@ import com.nereusstream.kafka.retention.KafkaRetentionPlanner;
 import com.nereusstream.kafka.retention.KafkaTrimBarrier;
 import com.nereusstream.kafka.testing.TestStreamStorage;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.KafkaPartitionId;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataTransitions;
 import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
+import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
+import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.testing.FakeKafkaPartitionMetadataStore;
 import com.nereusstream.objectstore.DeleteObjectOptions;
@@ -62,8 +65,10 @@ import java.time.ZoneOffset;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -299,6 +304,12 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
             assertThat(fixture.unusable).containsExactly(newObject.objectId().value());
             assertThat(fixture.readerLeaseCount(newObject)).isZero();
             assertThat(fixture.readerLeaseCount(oldObject)).isZero();
+
+            KafkaCheckpointRecoveryResult restarted =
+                    fixture.recover(fixture.currentBinding(), newSource);
+            assertThat(restarted.checkpoint().orElseThrow().reference().objectId())
+                    .isEqualTo(oldObject.objectId().value());
+            assertThat(fixture.unusable).containsExactly(newObject.objectId().value());
         }
     }
 
@@ -657,6 +668,30 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
         private final KafkaCheckpointVerifier verifier = new KafkaCheckpointVerifier();
         private final MutableValidator validator = new MutableValidator();
         private final List<String> unusable = new ArrayList<>();
+        private final Set<String> quarantined = new HashSet<>();
+        private final KafkaCheckpointFailureQuarantine quarantine =
+                new KafkaCheckpointFailureQuarantine() {
+                    @Override
+                    public CompletableFuture<Boolean> isQuarantined(
+                            KafkaPartitionId identity,
+                            long partitionIncarnation,
+                            KafkaCheckpointReferenceRecord reference) {
+                        return CompletableFuture.completedFuture(
+                                quarantined.contains(reference.objectId()));
+                    }
+
+                    @Override
+                    public CompletableFuture<Void> quarantine(
+                            KafkaPartitionId identity,
+                            long partitionIncarnation,
+                            KafkaCheckpointReferenceRecord reference,
+                            KafkaCheckpointFailureSource source,
+                            Throwable failure) {
+                        quarantined.add(reference.objectId());
+                        unusable.add(reference.objectId());
+                        return CompletableFuture.completedFuture(null);
+                    }
+                };
 
         private Fixture(Path directory) throws Exception {
             Path objectDirectory = Files.createDirectory(directory.resolve("objects"));
@@ -721,8 +756,14 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
 
         private KafkaCheckpointRecoveryCoordinator recovery(Clock clock) {
             return new KafkaCheckpointRecoveryCoordinator(
-                    NEREUS_CLUSTER, bindings, physical, readPins, reader, verifier, clock,
-                    (reference, failure) -> unusable.add(reference.objectId()));
+                    NEREUS_CLUSTER,
+                    bindings,
+                    physical,
+                    readPins,
+                    reader,
+                    verifier,
+                    clock,
+                    quarantine);
         }
 
         private List<ObjectProtectionType> protections(KafkaCheckpointObject object) {

@@ -19,7 +19,9 @@ import com.nereusstream.core.wal.object.ObjectWalReaderAdapter;
 import com.nereusstream.kafka.activation.KafkaStorageActivationRuntime;
 import com.nereusstream.kafka.activation.KafkaStorageActivationVerifier;
 import com.nereusstream.kafka.activation.KafkaStorageBindingAwareClusterSnapshotProvider;
+import com.nereusstream.kafka.checkpoint.DurableKafkaCheckpointFailureQuarantine;
 import com.nereusstream.kafka.checkpoint.KafkaCanonicalCheckpointPublicationFactory;
+import com.nereusstream.kafka.checkpoint.KafkaCheckpointFailureQuarantine;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointPublicationCoordinator;
 import com.nereusstream.kafka.compaction.KafkaActivatedGenerationAuthority;
 import com.nereusstream.kafka.compaction.KafkaActivatedGenerationSetResolver;
@@ -33,7 +35,7 @@ import com.nereusstream.kafka.retention.KafkaPartitionMaintenanceFactory;
 import com.nereusstream.kafka.retention.KafkaPartitionMaintenanceRuntime;
 import com.nereusstream.metadata.oxia.GenerationIndexValidator;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
-import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
+import com.nereusstream.metadata.oxia.KafkaCheckpointFailureMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaGenerationMetadataStore;
@@ -165,9 +167,21 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     exactConfiguration.runtime().nereusCluster(),
                     exactConfiguration.runtime().kafkaClusterId());
             registerOwned(
-                    constructedResources,
-                    "kafka-partition-metadata-store",
-                    partitionMetadataStore);
+                    constructedResources, "kafka-partition-metadata-store", partitionMetadataStore);
+            KafkaCheckpointFailureMetadataStore checkpointFailures =
+                    KafkaCheckpointFailureMetadataStore.usingSharedRuntime(
+                            exactConfiguration.oxia(),
+                            oxiaRuntime,
+                            exactConfiguration.runtime().nereusCluster(),
+                            exactConfiguration.runtime().kafkaClusterId());
+            providerResources.add(
+                    registerOwned(
+                            constructedResources,
+                            "kafka-checkpoint-failure-metadata-store",
+                            checkpointFailures));
+            KafkaCheckpointFailureQuarantine checkpointQuarantine =
+                    new DurableKafkaCheckpointFailureQuarantine(
+                            checkpointFailures, exactContext.clock());
             if (activationContext != null) {
                 KafkaStorageActivationMetadataStore activationStore =
                         KafkaStorageActivationMetadataStore.usingSharedRuntime(
@@ -282,15 +296,16 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                             checkpointReader,
                             checkpointVerifier,
                             exactContext.clock(),
-                            (reference, failure) -> { });
-            recoveryLauncher = new DefaultKafkaPartitionRecoveryLauncher(
-                    checkpoints,
-                    streamStorage,
-                    exactContext.recoveryStateFactory(),
-                    exactConfiguration.runtime().recoveryChunkRecords(),
-                    exactConfiguration.runtime().recoveryChunkBytes(),
-                    callbackExecutor,
-                    exactContext.clock());
+                            checkpointQuarantine);
+            recoveryLauncher =
+                    new DefaultKafkaPartitionRecoveryLauncher(
+                            checkpoints,
+                            streamStorage,
+                            exactContext.recoveryStateFactory(),
+                            exactConfiguration.runtime().recoveryChunkRecords(),
+                            exactConfiguration.runtime().recoveryChunkBytes(),
+                            callbackExecutor,
+                            exactContext.clock());
             if (activationContext != null && activationContext.maintenance().isPresent()) {
                 NereusKafkaMaintenanceContext maintenanceContext =
                         activationContext.maintenance().orElseThrow();
@@ -327,22 +342,23 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                                 maintenance.checkpointObjectTimeout(),
                                 maintenance.pendingProtectionTtl(),
                                 maintenance.writerBuild());
-                maintenanceFactory = Optional.of(
-                        (identity, leaderEpoch, streamId, sourceValidator) ->
-                                new DefaultKafkaPartitionMaintenance(
-                                        identity,
-                                        leaderEpoch,
-                                        streamId,
-                                        sourceValidator,
-                                        partitionMetadataStore,
-                                        streamStorage,
-                                        checkpoints,
-                                        publicationFactory,
-                                        publication,
-                                        (reference, failure) -> { },
-                                        maintenance.checkpointVerificationTimeout(),
-                                        maintenance.trimTimeout(),
-                                        exactContext.clock()));
+                maintenanceFactory =
+                        Optional.of(
+                                (identity, leaderEpoch, streamId, sourceValidator) ->
+                                        new DefaultKafkaPartitionMaintenance(
+                                                identity,
+                                                leaderEpoch,
+                                                streamId,
+                                                sourceValidator,
+                                                partitionMetadataStore,
+                                                streamStorage,
+                                                checkpoints,
+                                                publicationFactory,
+                                                publication,
+                                                checkpointQuarantine,
+                                                maintenance.checkpointVerificationTimeout(),
+                                                maintenance.trimTimeout(),
+                                                exactContext.clock()));
                 backgroundServiceFactories.add(
                         partitions ->
                                 new KafkaPartitionMaintenanceRuntime(
