@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index、transactional request handoff 与 internal-topic ready ordering deterministic slices implemented locally；M5 checkpoint-before-DeleteRecords、周期性 owned-partition retention、virtual segment/config history/derived index、timestamp lookup 与 compaction fork capture deterministic slices implemented locally；stock-source isolation 与显式 `NereusKafka`/server-start production-factory launcher 已实现；真实 internal-topic coordinator recovery、controller scheduling and real native-storage KRaft process gate remain open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index、transactional request handoff 与 internal-topic ready ordering deterministic slices implemented locally；M5 checkpoint-before-DeleteRecords、周期性 owned-partition retention、virtual segment/config history/derived index、timestamp lookup 与 compaction fork capture deterministic slices implemented locally；stock-source isolation、显式 `NereusKafka`/server-start production-factory launcher 与 controller-leader-only activation scheduling 已实现；真实 internal-topic coordinator recovery、durable checkpoint quarantine、multi-controller failover and real native-storage KRaft process gate remain open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -171,12 +171,72 @@ mapper；`c27305a7ad955ebc876de20da0fd045e97beba55` 增加 deferred activation-b
   JDK `Supplier`/`Runnable` closure 并在 `leaderIsrUpdateLock` 内执行；`LogManager`/`ReplicaManager` 只匹配
   stock interface。由此 artifact-free `:core:test --tests kafka.KafkaConfigTest` 可完整编译 stock main/test，
   stock source 不再直接 import `com.nereusstream.*` 或 `kafka.*.nereus`；
-- stock `kafka.Kafka.main` 现在调用 `run(args, BrokerStorageRuntimeFactory.Disabled)`；
+- stock `kafka.Kafka.main` 现在调用
+  `run(args, BrokerStorageRuntimeFactory.Disabled, ControllerStorageRuntimeFactory.Disabled)`；
   package-visible `Kafka.run` 仍完整拥有 signal、shutdown hook、server startup 与 `awaitShutdown`，仅把显式 factory
-  传给 `KafkaRaftServer`。artifact-only `kafka.server.nereus.NereusKafka.main` 每次调用
-  `NereusBrokerStorageRuntimeFactory.production()`，再委托同一 `Kafka.run`；可执行
+  传给 `KafkaRaftServer`。artifact-only `kafka.server.nereus.NereusKafka.main` 每次创建 fresh
+  `NereusBrokerStorageRuntimeFactory.production()` 和 `NereusControllerStorageRuntimeFactory.production()`，
+  再委托同一 `Kafka.run`；可执行
   `bin/nereus-kafka-server-start.sh` 只把 main class 切到该 launcher，不使用 reflection、`ServiceLoader` 或
-  process-global registry。该切片由 `3bd92c7244` 发布并通过 focused launcher test 与 stock compile gate。
+  process-global registry。broker-only launcher 切片由 `3bd92c7244` 发布；dual-factory/controller 切片由
+  `9773c8f817` 发布，并通过 focused launcher/controller runtime tests 与 artifact-free stock compile gate。
+
+#### 3.2.1 `ControllerServer` activation runtime（`9773c8f817`）
+
+stock package 新增三个产品无关 contract，不能 import `com.nereusstream.*` 或 `kafka.server.nereus.*`：
+
+```scala
+trait ControllerStorageRuntime extends MetadataPublisher {
+  def start(): CompletionStage[Void]
+}
+
+final case class ControllerStorageRuntimeContext(
+  config: KafkaConfig,
+  clusterId: String,
+  nodeId: Int,
+  metadataCache: KRaftMetadataCache,
+  time: Time,
+  logDirectories: java.util.List[Path],
+  faultHandler: FaultHandler)
+
+trait ControllerStorageRuntimeFactory {
+  def create(context: ControllerStorageRuntimeContext): ControllerStorageRuntime
+}
+```
+
+`ControllerStorageRuntimeFactory.Disabled` 精确保持 stock default：storage disabled 时返回 completed/no-op publisher；
+enabled 且没有显式 factory 时在 controller resource I/O 前抛 `ConfigException`。`ControllerServer` 保留原三参数
+auxiliary constructor 以兼容 Java/stock callers，四参数 constructor 才接收 factory。startup 在构造完 stock
+metadata publishers 后执行 `factory.create(context)` 和 bounded `start()`，随后把同一 runtime 加入
+`metadataPublishers`，因此 `MetadataLoader.installPublishers` 统一排序 image 与 `onControllerChange` 回调；
+`start()` 不等待 activation terminal。shutdown 在 registration manager 和 publisher removal 前 close runtime，
+撤销 scheduled retry 并释放它独占的 product resources。
+
+artifact-only `NereusControllerStorageRuntimeFactory` 先调用
+`NereusKafkaRuntimeConfigurationMapper.mapController(storageConfig, clusterId)`；mapping 只冻结
+Nereus/Kafka cluster ID、Oxia config、`KafkaStorageActivationPolicy` 和 retry interval，不创建 client、thread 或文件。
+runtime `start()` 才通过 `NereusKafkaControllerActivationCreator` 创建 daemon single-thread scheduler、shared Oxia client、
+`KafkaPartitionMetadataStore`、`KafkaStorageActivationMetadataStore`、binding-aware cluster snapshot 和既有
+`KafkaStorageFirstActivationCoordinator`，并按构造逆序 close。
+
+`NereusControllerStorageRuntime` 的事件规则冻结如下：
+
+- `onControllerChange` 只有 `LeaderAndEpoch.isLeader(nodeId)` 为真才允许新 attempt；失去 leadership 立即清除 pending
+  并取消尚未执行的 scheduled retry；
+- metadata image 与 leadership callback 只设置一个 `pending` bit；scheduled 或 in-flight 已存在时不再提交第二个 task；
+  in-flight 成功后若 pending 再立即执行一次，保证 callback 合并但不丢失最后状态；
+- 只对解包后的 `NereusException` 且 `retriable()==true` 延迟重试；其他 failure 设置该 controller epoch 的
+  `terminalFailure`，只调用一次 `FaultHandler.handleFault(...)`，下一次本节点在新 epoch 重新成为 controller 才清除；
+- leadership loss 不强制取消已经进入 coordinator 的 future。该 attempt 仍由 PREPARED/ACTIVE CAS、幂等恢复和并发 winner
+  reconciliation 约束；本切片没有把 controller epoch 写入 durable activation record，因此不能声称 in-flight activation
+  已被 leadership epoch 硬 fencing；
+- `close()` 幂等取消 scheduled retry、阻止 late completion 继续调度、关闭 activation graph 并 `shutdownNow()` scheduler。
+
+combined broker/controller 进程中 `ControllerServer` 先于 broker capability publication 启动；首次 coordinator attempt
+可因 broker registration/capability 尚未出现返回 retriable，后续 metadata callback/periodic retry 再完成
+PREPARED→ACTIVE，避免 controller startup 同步等待 broker readiness 形成闭环。当前 production validator 仍要求
+enabled node 包含 broker role；dedicated controller 进程启用、`nereus.storage.version` Kafka feature
+registration/create-topic gate、真实 controller takeover/failover 和 provider-backed KRaft process evidence均不在本切片。
 
 product adapter 已实现 `NereusKafkaRuntimeFactory`，并新增仅支持 `OBJECT_WAL_SYNC_OBJECT` 的 concrete
 `NereusKafkaObjectWalRuntimeFactory`：显式组装 Object provider、shared Oxia、L0/physical/binding stores、protection、
@@ -184,8 +244,8 @@ callback executor、durable checkpoint read pins、checkpoint reader/verifier/re
 source、concrete recovery launcher 和同一 manager/runtime graph；real Oxia + local-file provider 的 leader
 open/Produce/Fetch gate 已通过。Fork 不再承担 ObjectStore/Oxia/read-pin orchestration，只在 exact ReplicaManager
 可用后为每次 open 创建 fresh state codec 和 exact Partition publisher。尚未实现的是 BookKeeper/async-object
-creator、controller activation scheduling、durable checkpoint-failure quarantine observer 和 native-storage
-KRaft process test。显式 launcher/KafkaRaftServer factory selection 已实现；当前已有可执行的 Object-WAL
+creator、durable checkpoint-failure quarantine observer、真实 controller failover 和 native-storage
+KRaft process test。显式 launcher/KafkaRaftServer broker/controller factory selection 已实现；当前已有可执行的 Object-WAL
 provider/runtime/recovery composition、log-shell selection、直接 `NereusUnifiedLog` correctness I/O bridge，以及
 bounded Produce/Fetch handoff，但还没有真实 provider-backed KRaft Produce/Fetch 进程证据，不能据此宣称
 production rollout ready。
@@ -756,8 +816,9 @@ canonical source/HW/LSO 与 producer/transaction state。选择 exact decision h
 producer/transaction image。该 branch 已通过 SSH 推送到 `nereusstream/kafka`，工作 clone 为
 `/Users/liusinan/apps/ideaproject/nereusstream/kafka`。第二十六个 `faaffc8a75` 以 stock-only maintenance
 interfaces 恢复 artifact-free stock compilation；第二十七个 `3bd92c7244` 新增显式 native-storage launcher，
-并把 production factory 传进共享 Kafka/KafkaRaftServer lifecycle。Controller activation scheduling、
-real KRaft/provider process gate 与完整 stock cleaner differential
+并把 production broker factory 传进共享 Kafka/KafkaRaftServer lifecycle；第二十八个 `9773c8f817` 新增
+stock-owned controller runtime/publisher seam、artifact-only activation scheduler，并把 production controller factory
+接进同一 launcher lifecycle。真实多 Controller failover、feature registration、real KRaft/provider process gate 与完整 stock cleaner differential
 matrix 尚未实现；bounded Produce/Fetch/M4/M5 deterministic 证据仍不构成真实 KRaft runtime claim。
 
 ## 6. Produce execution and threading
@@ -900,8 +961,8 @@ LSO 继续由 stock ProducerStateManager/first unstable offset 算法计算，re
 
 该 manager 不替代 durable Oxia/head authority CAS；`KafkaPartitionOpener` 必须先完成文档 04 的 session acquisition
 和 fresh recovery。Kafka fork metadata callback、BrokerServer config/runtime factory、manager ownership、ordered
-shutdown wiring 与显式 native-storage CLI selection 已实现；controller activation scheduling 与真实
-native-storage KRaft process gate 尚未实现。
+shutdown wiring、显式 native-storage CLI selection 与 controller-leader-only first-activation scheduling 已实现；
+真实 controller failover 与 native-storage KRaft process gate 尚未实现。
 
 ## 8. Fetch execution
 

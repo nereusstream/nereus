@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation 与 explicit native-storage launcher are implemented locally；Kafka controller scheduling、BookKeeper/async providers、durable checkpoint-failure quarantine/audit、real KRaft process gate and observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher 与 controller-leader-only activation scheduling are implemented locally；BookKeeper/async providers、durable checkpoint-failure quarantine/audit、feature registration、real multi-controller/KRaft process gate and observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -93,9 +93,15 @@ scheduler/clock，captures one KRaft image plus conservative local-log facts，a
 to the exact ReplicaManager。Product-owned checkpoint/read-pin/paged replay and fork-owned fresh state construction/exact
 Partition publication are executable。Fork `faaffc8a75` keeps stock maintenance compilation artifact-free through
 `BrokerStorageManagedLog`/`PartitionLeaderAuthority`；`3bd92c7244` adds `kafka.server.nereus.NereusKafka` and
-`bin/nereus-kafka-server-start.sh`，selecting a fresh production factory before delegating to the same stock
-`Kafka.run`/`KafkaRaftServer` lifecycle。Kafka controller activation scheduling and the real native-storage process gate
-remain open。
+`bin/nereus-kafka-server-start.sh`，selecting a fresh production broker factory before delegating to the same stock
+`Kafka.run`/`KafkaRaftServer` lifecycle；`9773c8f817` extends that explicit path with a fresh production controller factory。
+Stock `ControllerStorageRuntime` is a `MetadataPublisher` created and started before publisher installation；the product runtime
+then coalesces stock metadata/leadership callbacks into one current-controller-only activation attempt，retries only retriable
+`NereusException` failures，cancels scheduled retry on leadership loss and suppresses repeated non-retriable fault reports
+process-locally within one controller epoch；this is separate from the still-open durable checkpoint quarantine。
+The controller creator owns a minimal shared-Oxia partition/activation graph independently of the broker runtime and does not
+block controller startup on ACTIVE。Detailed signatures and event rules are frozen in document 03。Feature registration、
+dedicated-controller enablement、real multi-controller takeover and the provider-backed native-storage process gate remain open。
 
 ### 1.2 Resource ownership
 

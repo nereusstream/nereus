@@ -414,15 +414,16 @@ checkpoint-before-DeleteRecords trim 是 `4c060aec89`，第二十三个 partitio
 `feabf6c686`，第二十四个 virtual log segment state 是 `378e9f8967`，第二十五个 compaction partition
 authority capture 是 `58342d9dca31009bb63b2c6a3be8a7c7ff68f9ec`，第二十六个 stock maintenance
 source-isolation fix 是 `faaffc8a75`，第二十七个 native-storage launcher 是
-`3bd92c7244d84870f48e4819bf2930ca9248c278`。该 head 已通过 SSH 发布到
+`3bd92c7244d84870f48e4819bf2930ca9248c278`，第二十八个 controller storage activation scheduling 是
+`9773c8f817a8f9f81d8beadf072d8d0e1345be99`。该 head 已通过 SSH 发布到
 `origin/nereus/future9-native-kafka-storage`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/twenty-seven-commit
-count/version、组织 fork fetch/push identity、cached organization trunk ancestry、九十二文件 exact change set/blob、
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/twenty-eight-commit
+count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百零二文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
 BrokerServer runtime create/ready/drain/close signature、typed adapter factory/ReplicaManager binding、stock-only
-maintenance interfaces、共享 `Kafka.run` factory 传递、artifact-only launcher 与 executable script，以及 package-wide
+maintenance interfaces、共享 `Kafka.run` dual-factory 传递、artifact-only launcher 与 executable script，以及 package-wide
 no-reflection/no-service-loader/no-stock-product-import 规则；新增 runtime composition 还锁定 executable-profile、explicit-provider、
 broker-capability、activation-backed Object-WAL creator、borrowed scheduler、single-image KRaft snapshot、
 post-registration broker epoch、per-operation admission recheck、one-time recovery-state-factory binding、stock
@@ -433,7 +434,11 @@ post-registration broker epoch、per-operation admission recheck、one-time reco
 owned buffer capture、`RequestLocal.noCaching` worker、per-partition FIFO、公平 reschedule、post-worker action-queue
 completion，以及 stock optional fetch executor、whole-request `readFromLog` routing、initial/event
 `readFromPurgatory` mode、response completion、bounded worker/callback pools、logical operation admission、
-exact partition subscription 和 combined runtime drain signatures。
+exact partition subscription 和 combined runtime drain signatures，以及 stock-owned
+`ControllerStorageRuntime`/context/factory、`ControllerServer` create/start/publisher-install/close 顺序、artifact-only
+controller mapper/factory/creator/runtime、current-controller-only attempt、single in-flight/coalesced metadata callback、
+retriable-only retry、leadership-loss retry cancellation、per-controller-epoch durable fault suppression、minimal
+shared-Oxia resource graph 和 production launcher 的 fresh broker/controller factories。
 M4/M5/F9 compaction 还锁定 canonical producer/transaction replay/freeze、virtual log/config state、DeleteRecords
 authority、typed compaction config/two-pass limits、one-time product composition、leader-only owned-partition registration、
 internal/user work class、partition-read-lock capture 和 stock `CleanedTransactionMetadata` marker oracle。
@@ -547,5 +552,5 @@ KRaft restart、the simultaneous-wakeup regression and all Checkstyle/SpotBugs/S
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`3bd92c7244d84870f48e4819bf2930ca9248c278`。Executable source-lock expectation 已更新到该 reviewed、
+`9773c8f817a8f9f81d8beadf072d8d0e1345be99`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

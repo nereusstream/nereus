@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "27" ]] \
-    || fail "expected twenty-seven reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "28" ]] \
+    || fail "expected twenty-eight reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -71,6 +71,10 @@ core/src/main/java/kafka/log/nereus/NereusTransactionIndex.java
 core/src/main/java/kafka/log/nereus/NereusUnifiedLog.java
 core/src/main/java/kafka/server/builders/LogManagerBuilder.java
 core/src/main/java/kafka/server/builders/ReplicaManagerBuilder.java
+core/src/main/java/kafka/server/nereus/NereusControllerStorageRuntime.java
+core/src/main/java/kafka/server/nereus/NereusKafkaControllerActivation.java
+core/src/main/java/kafka/server/nereus/NereusKafkaControllerActivationCreator.java
+core/src/main/java/kafka/server/nereus/NereusKafkaControllerRuntimeConfiguration.java
 core/src/main/java/kafka/server/nereus/NereusKafkaClock.java
 core/src/main/java/kafka/server/nereus/NereusKafkaDeferredRuntime.java
 core/src/main/java/kafka/server/nereus/NereusKafkaForkRuntimeBridges.java
@@ -90,6 +94,7 @@ core/src/main/scala/kafka/log/nereus/NereusUnifiedLogFactory.scala
 core/src/main/scala/kafka/server/KafkaConfig.scala
 core/src/main/scala/kafka/server/BrokerServer.scala
 core/src/main/scala/kafka/server/ConfigHandler.scala
+core/src/main/scala/kafka/server/ControllerServer.scala
 core/src/main/scala/kafka/server/KafkaRaftServer.scala
 core/src/main/scala/kafka/server/NereusKafkaConfigValidator.scala
 core/src/main/scala/kafka/server/ReplicaManager.scala
@@ -100,6 +105,7 @@ core/src/main/scala/kafka/server/nereus/NereusBrokerStorageAppendExecutor.scala
 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageFetchExecutor.scala
 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageRuntime.scala
 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageRuntimeFactory.scala
+core/src/main/scala/kafka/server/nereus/NereusControllerStorageRuntimeFactory.scala
 core/src/main/scala/kafka/server/nereus/NereusKafka.scala
 core/src/main/scala/kafka/server/nereus/NereusKafkaOwnedPartitionSourceBridge.scala
 core/src/main/scala/kafka/server/storage/BrokerStorageAppendExecutor.scala
@@ -108,6 +114,9 @@ core/src/main/scala/kafka/server/storage/BrokerStorageDrainReason.scala
 core/src/main/scala/kafka/server/storage/BrokerStorageRuntime.scala
 core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeContext.scala
 core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeFactory.scala
+core/src/main/scala/kafka/server/storage/ControllerStorageRuntime.scala
+core/src/main/scala/kafka/server/storage/ControllerStorageRuntimeContext.scala
+core/src/main/scala/kafka/server/storage/ControllerStorageRuntimeFactory.scala
 core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
 core/src/test/java/kafka/log/nereus/NereusCanonicalLogStateTest.java
 core/src/test/java/kafka/log/nereus/NereusKafkaRecoveryStateCodecTest.java
@@ -115,6 +124,7 @@ core/src/test/java/kafka/log/nereus/NereusListOffsetsBridgeTest.java
 core/src/test/java/kafka/log/nereus/NereusProducerStateManagerTest.java
 core/src/test/java/kafka/log/nereus/NereusRecordTimestampInspectorTest.java
 core/src/test/java/kafka/server/nereus/NereusKafkaContextAdaptersTest.java
+core/src/test/java/kafka/server/nereus/NereusControllerStorageRuntimeTest.java
 core/src/test/java/kafka/server/nereus/NereusKafkaDeferredRuntimeTest.java
 core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryBridgeTest.java
 core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryTest.java
@@ -149,7 +159,7 @@ storage/src/test/java/org/apache/kafka/storage/internals/log/ProducerStateManage
 FILES
 )"
 [[ "$actual_changes" == "$expected_changes" ]] \
-    || fail "fork change set differs from the reviewed ninety-two-file log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/launcher slice"
+    || fail "fork change set differs from the reviewed one-hundred-two-file log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher slice"
 
 while read -r expected path; do
     [[ -n "$expected" ]] || continue
@@ -174,6 +184,10 @@ aadcc658a9e74de9798b06d674ecb784947c8762 core/src/main/java/kafka/log/nereus/Ner
 7ea7807874c39b2ce383f9472fca019633602b1d core/src/main/java/kafka/log/nereus/NereusUnifiedLog.java
 df74856a75146e0e35aaf5431b1ecb35531ec054 core/src/main/java/kafka/server/builders/LogManagerBuilder.java
 0984006b925982dea46544d6459a5b5510e2a634 core/src/main/java/kafka/server/builders/ReplicaManagerBuilder.java
+a580ffe40b83ddc62ee0ab5f234dbd413a780e1c core/src/main/java/kafka/server/nereus/NereusControllerStorageRuntime.java
+6521c6972def23a62c1fa1e8cc81a284f3b5c502 core/src/main/java/kafka/server/nereus/NereusKafkaControllerActivation.java
+3c61509e24531a47edeef62800a1ba0eb625240d core/src/main/java/kafka/server/nereus/NereusKafkaControllerActivationCreator.java
+44fe428c0b70ac64e4b8d1a5709ccde3c70d6f69 core/src/main/java/kafka/server/nereus/NereusKafkaControllerRuntimeConfiguration.java
 5e2061bbb1655ab63a2796a3c0f12d34d7346ea7 core/src/main/java/kafka/server/nereus/NereusKafkaClock.java
 2a72f47dd161052374b47e7a1eaee64a4d5f0dde core/src/main/java/kafka/server/nereus/NereusKafkaDeferredRuntime.java
 d522cfe11ff3c4c3745be971c7a4613f1fc1502a core/src/main/java/kafka/server/nereus/NereusKafkaForkRuntimeBridges.java
@@ -181,9 +195,9 @@ d522cfe11ff3c4c3745be971c7a4613f1fc1502a core/src/main/java/kafka/server/nereus/
 af9f5237d973c31eec101b2f3c966d836dc35353 core/src/main/java/kafka/server/nereus/NereusKafkaProductRuntimeCreator.java
 bf0b8ed32d850cda69ba3e05b5ba64fe288bf452 core/src/main/java/kafka/server/nereus/NereusKafkaRecoveryStateFactory.java
 b903540487b6553d4a1944b5f36e9567fc9262ba core/src/main/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryBridge.java
-602852f9e6840db5e51de1e176bc7c427da5d004 core/src/main/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapper.java
+0d9a8133d57b8e3aaeb88865108b48c431e1a735 core/src/main/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapper.java
 1970537a48ac13fd77c6bc32fd2bf1e99fb31670 core/src/main/java/kafka/server/nereus/NereusKafkaStorageClusterSnapshotProvider.java
-9d0e3b28430e77adca486f4c1d104ed6aaff6a1f core/src/main/scala/kafka/Kafka.scala
+ae2387ee9d6b318eaf37f62840d8ca3ac44f4e9b core/src/main/scala/kafka/Kafka.scala
 d477c7485376ae62f82abcb8393c9582be8794df core/src/main/scala/kafka/cluster/Partition.scala
 0e5117ef3fabc87e5bad14ff92e66a73e9136215 core/src/main/scala/kafka/log/LogManager.scala
 80bbb0cac25ac68a37af9e2d18975ed0ecf02c3f core/src/main/scala/kafka/log/UnifiedLogFactory.scala
@@ -192,8 +206,9 @@ d477c7485376ae62f82abcb8393c9582be8794df core/src/main/scala/kafka/cluster/Parti
 f487465399bcde389cc5209e88bc5b946184217d core/src/main/scala/kafka/log/nereus/NereusUnifiedLogFactory.scala
 241bf8dc000e47c8cf8303062b558a4705baa5fa core/src/main/scala/kafka/server/BrokerServer.scala
 e22088276dc750fe4ab5698f58959bb68dbd5cdd core/src/main/scala/kafka/server/ConfigHandler.scala
+0206ed9dcfa8e9d17e99683973a3069c3cf45c33 core/src/main/scala/kafka/server/ControllerServer.scala
 457e08ad6714dd972abdb92d9f7471bb258469b7 core/src/main/scala/kafka/server/KafkaConfig.scala
-1bb02848026399255535c83f667daa1d1777ad59 core/src/main/scala/kafka/server/KafkaRaftServer.scala
+d2a01927593f183e272995bef5177a314b959276 core/src/main/scala/kafka/server/KafkaRaftServer.scala
 1526e85d891d075c173fd50c22dc017219d8aa73 core/src/main/scala/kafka/server/NereusKafkaConfigValidator.scala
 647af758ca065d8944bf4e7e03172028827db98e core/src/main/scala/kafka/server/ReplicaManager.scala
 7a3674d0cb71daa8830ea1ef89273181733ba661 core/src/main/scala/kafka/server/metadata/AsyncTopicDeltaLifecycle.scala
@@ -203,7 +218,8 @@ a6b0ad3e0effee4b673d6f831862d2750e190c0a core/src/main/scala/kafka/server/metada
 b5d51ebc62ffa3e99cccff99030060fb8c59e262 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageFetchExecutor.scala
 e5c3a9fac1939d1c1eb485267cfec959985d38bf core/src/main/scala/kafka/server/nereus/NereusBrokerStorageRuntime.scala
 fb91f4e6f99b70c7c26470ca2115583eb6ee4dd6 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageRuntimeFactory.scala
-74964b2d578f8a787a77b16b8380e50309197bf9 core/src/main/scala/kafka/server/nereus/NereusKafka.scala
+04380389df34bc0facb10aa5e0d8371fbb1005c5 core/src/main/scala/kafka/server/nereus/NereusControllerStorageRuntimeFactory.scala
+f566a6ab54024f37e8d5f4cfaa43be781d92e7e1 core/src/main/scala/kafka/server/nereus/NereusKafka.scala
 431486f57cd3aefd9dc8ed019607ed193e98fb43 core/src/main/scala/kafka/server/nereus/NereusKafkaOwnedPartitionSourceBridge.scala
 315a6959c87bc2f86466148ffb9630ab9eeedbeb core/src/main/scala/kafka/server/storage/BrokerStorageAppendExecutor.scala
 1b2984caa4062c995c10ffcc91710c3b9b4ea42c core/src/main/scala/kafka/server/storage/BrokerStorageFetchExecutor.scala
@@ -211,6 +227,9 @@ fb91f4e6f99b70c7c26470ca2115583eb6ee4dd6 core/src/main/scala/kafka/server/nereus
 f798e41b5dd028eb6880aedad7dd427690ebae64 core/src/main/scala/kafka/server/storage/BrokerStorageRuntime.scala
 b2d6eccbc8169932d4104c6f494d945476becfd1 core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeContext.scala
 ce68275cd8367da3cbb3a8d043ac6234163dd032 core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeFactory.scala
+d73e74019d8769f2ac04175c36eb77430e052cfd core/src/main/scala/kafka/server/storage/ControllerStorageRuntime.scala
+bcc5ec81f637a1a473d33e2f03267cf15ef85c60 core/src/main/scala/kafka/server/storage/ControllerStorageRuntimeContext.scala
+21200a7a039f5bcf495547ad1b94d8976702ce86 core/src/main/scala/kafka/server/storage/ControllerStorageRuntimeFactory.scala
 9685d6627eaaebdf9de5a8e71c5f1b789372375f core/src/test/java/kafka/log/nereus/NereusCanonicalLogStateTest.java
 f81ec4137daa9e9fff7b7262733ded7998c86eba core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
 ab0cd6d890b40a9309d56c55db596b19ad0ebb96 core/src/test/java/kafka/log/nereus/NereusKafkaRecoveryStateCodecTest.java
@@ -218,10 +237,11 @@ c2bd8e03152a23547044a42f439b33698ace4251 core/src/test/java/kafka/log/nereus/Ner
 59293bda207a9617016cab39c94bcd5bfb6f894f core/src/test/java/kafka/log/nereus/NereusProducerStateManagerTest.java
 205989c5d3adf68127d71be28c6ff9f521abcbf1 core/src/test/java/kafka/log/nereus/NereusRecordTimestampInspectorTest.java
 7f36f601ae68ccb353878327bd9bdb0219b90186 core/src/test/java/kafka/server/nereus/NereusKafkaContextAdaptersTest.java
+7b9cfffa9f2f9e1ff4dafda06a05581d6564a7b7 core/src/test/java/kafka/server/nereus/NereusControllerStorageRuntimeTest.java
 d7f0b8cca7dec9cfa4de9a542c8eb1b3c3c9cfe5 core/src/test/java/kafka/server/nereus/NereusKafkaDeferredRuntimeTest.java
 ec32f2b8e23e9548a7a8b4e8bdb717a7949dc788 core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryBridgeTest.java
 0dad9ef15898372476787e354ce96ac2415a8a3c core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryTest.java
-295cb22b65832a55ab6b09ad457da44614ac49ab core/src/test/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapperTest.java
+e4b1bc88c777fa45cd56165fb0a37334c90b4237 core/src/test/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapperTest.java
 e06ff96da5853e2ab0afc1cbc3e4153b981f7b7d core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
 c28a29d488b51c0630cb1197b95b30bc6bf43a68 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 ba0bcb6a45f1715683ac23611873dcb83ce5a474 core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
@@ -234,7 +254,7 @@ ba0bcb6a45f1715683ac23611873dcb83ce5a474 core/src/test/scala/unit/kafka/log/nere
 3c9281f1c48872b3645de485aaa98bcc2ac431ae core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageFetchExecutorTest.scala
 49c96ae84cb30876cfd79afd39e93ad52aa92618 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageRuntimeTest.scala
 d2a9265f60ae82e93bb152832c4dd36f69c46126 core/src/test/scala/unit/kafka/server/nereus/NereusKafkaOwnedPartitionSourceBridgeTest.scala
-f5d7b755399293b050553e420131bf1f63f90f5a core/src/test/scala/unit/kafka/server/nereus/NereusKafkaTest.scala
+e09fa0c9643d3982af69a6679438f1baf8230606 core/src/test/scala/unit/kafka/server/nereus/NereusKafkaTest.scala
 733c4d4815cbec6a7335f9a337053e980e87883d core/src/test/scala/unit/kafka/server/storage/BrokerStorageRuntimeFactoryTest.scala
 1fbf9180a68bca9a5d45e38f9862841ea486f739 server-common/src/main/java/org/apache/kafka/server/util/KafkaScheduler.java
 3036df4e77ad23fabb6533d1dc173458356ea6b3 server/src/main/java/org/apache/kafka/server/config/AbstractKafkaConfig.java
@@ -257,6 +277,7 @@ marker_start="$(grep -h -F -c 'Nereus inject start:' \
     "$kafka_checkout/core/src/main/scala/kafka/cluster/Partition.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/log/LogManager.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/BrokerServer.scala" \
+    "$kafka_checkout/core/src/main/scala/kafka/server/ControllerServer.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/KafkaConfig.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/KafkaRaftServer.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/ReplicaManager.scala" \
@@ -269,6 +290,7 @@ marker_end="$(grep -h -F -c 'Nereus inject end:' \
     "$kafka_checkout/core/src/main/scala/kafka/cluster/Partition.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/log/LogManager.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/BrokerServer.scala" \
+    "$kafka_checkout/core/src/main/scala/kafka/server/ControllerServer.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/KafkaConfig.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/KafkaRaftServer.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/ReplicaManager.scala" \
@@ -577,18 +599,38 @@ grep -F -q 'closeBrokerStorageRuntime()' "$broker_server" \
 kafka_raft_server="$kafka_checkout/core/src/main/scala/kafka/server/KafkaRaftServer.scala"
 grep -F -q 'brokerStorageRuntimeFactory: BrokerStorageRuntimeFactory = BrokerStorageRuntimeFactory.Disabled' "$kafka_raft_server" \
     || fail "KafkaRaftServer lost explicit stock-default runtime injection"
+grep -F -q 'controllerStorageRuntimeFactory: ControllerStorageRuntimeFactory = ControllerStorageRuntimeFactory.Disabled' "$kafka_raft_server" \
+    || fail "KafkaRaftServer lost explicit stock-default controller runtime injection"
+grep -F -q 'controllerStorageRuntimeFactory,' "$kafka_raft_server" \
+    || fail "KafkaRaftServer lost ControllerServer runtime factory injection"
+
+controller_server="$kafka_checkout/core/src/main/scala/kafka/server/ControllerServer.scala"
+grep -F -q 'controllerStorageRuntimeFactory.create(' "$controller_server" \
+    || fail "ControllerServer lost explicit storage runtime creation"
+grep -F -q 'controllerStorageRuntime.start().toCompletableFuture' "$controller_server" \
+    || fail "ControllerServer lost bounded startup resource creation"
+grep -F -q 'metadataPublishers.add(controllerStorageRuntime)' "$controller_server" \
+    || fail "ControllerServer lost metadata/leadership callback registration"
+grep -F -q 'Utils.closeQuietly(controllerStorageRuntime, "controller storage runtime")' "$controller_server" \
+    || fail "ControllerServer lost pre-publisher-removal activation shutdown"
 
 kafka_main="$kafka_checkout/core/src/main/scala/kafka/Kafka.scala"
-grep -F -q 'run(args, BrokerStorageRuntimeFactory.Disabled)' "$kafka_main" \
-    || fail "stock Kafka launcher no longer selects the disabled runtime"
+grep -F -q 'BrokerStorageRuntimeFactory.Disabled,' "$kafka_main" \
+    || fail "stock Kafka launcher no longer selects the disabled broker runtime"
+grep -F -q 'ControllerStorageRuntimeFactory.Disabled)' "$kafka_main" \
+    || fail "stock Kafka launcher no longer selects the disabled controller runtime"
 grep -F -q 'brokerStorageRuntimeFactory,' "$kafka_main" \
-    || fail "shared Kafka lifecycle lost explicit KafkaRaftServer factory injection"
+    || fail "shared Kafka lifecycle lost explicit KafkaRaftServer broker factory injection"
+grep -F -q 'controllerStorageRuntimeFactory)' "$kafka_main" \
+    || fail "shared Kafka lifecycle lost explicit KafkaRaftServer controller factory injection"
 
 nereus_launcher="$kafka_checkout/core/src/main/scala/kafka/server/nereus/NereusKafka.scala"
-grep -F -q 'Kafka.run(args, productionFactory)' "$nereus_launcher" \
+grep -F -q 'productionBrokerFactory,' "$nereus_launcher" \
     || fail "Nereus launcher no longer reuses the stock Kafka lifecycle"
 grep -F -q 'NereusBrokerStorageRuntimeFactory.production()' "$nereus_launcher" \
-    || fail "Nereus launcher lost static production factory selection"
+    || fail "Nereus launcher lost static broker production factory selection"
+grep -F -q 'NereusControllerStorageRuntimeFactory.production()' "$nereus_launcher" \
+    || fail "Nereus launcher lost static controller production factory selection"
 
 nereus_start_script="$kafka_checkout/bin/nereus-kafka-server-start.sh"
 grep -F -q 'kafka.server.nereus.NereusKafka' "$nereus_start_script" \
@@ -598,6 +640,8 @@ for stock_source in \
         "$partition" \
         "$kafka_checkout/core/src/main/scala/kafka/log/LogManager.scala" \
         "$replica_manager" \
+        "$controller_server" \
+        "$kafka_raft_server" \
         "$kafka_main"; do
     if grep -E -q 'com\.nereusstream|kafka\.(log|server)\.nereus' "$stock_source"; then
         fail "stock source directly links an artifact-only Nereus class: $stock_source"
@@ -619,6 +663,48 @@ grep -F -q 'new NereusKafkaCompactionRuntimeConfiguration(' "$runtime_mapper" \
     || fail "runtime mapper lost typed compaction configuration"
 grep -F -q 'new KafkaCompactionTwoPassExecutor.Limits(' "$runtime_mapper" \
     || fail "runtime mapper lost bounded two-pass compaction limits"
+grep -F -q 'public NereusKafkaControllerRuntimeConfiguration mapController(' "$runtime_mapper" \
+    || fail "runtime mapper lost provider-neutral controller configuration"
+grep -F -q 'new KafkaStorageActivationPolicy(' "$runtime_mapper" \
+    || fail "runtime mapper lost exact controller activation policy"
+
+controller_runtime_seam="$kafka_checkout/core/src/main/scala/kafka/server/storage/ControllerStorageRuntime.scala"
+grep -F -q 'trait ControllerStorageRuntime extends MetadataPublisher' "$controller_runtime_seam" \
+    || fail "stock controller runtime lost MetadataLoader callback ownership"
+grep -F -q 'def start(): CompletionStage[Void]' "$controller_runtime_seam" \
+    || fail "stock controller runtime lost explicit resource startup"
+
+controller_factory_seam="$kafka_checkout/core/src/main/scala/kafka/server/storage/ControllerStorageRuntimeFactory.scala"
+grep -F -q 'val Disabled: ControllerStorageRuntimeFactory' "$controller_factory_seam" \
+    || fail "controller storage runtime lost its stock-disabled factory"
+grep -F -q 'requires an explicitly installed ControllerStorageRuntimeFactory' "$controller_factory_seam" \
+    || fail "enabled controller storage no longer fails closed without an explicit runtime factory"
+
+controller_adapter_factory="$kafka_checkout/core/src/main/scala/kafka/server/nereus/NereusControllerStorageRuntimeFactory.scala"
+grep -F -q 'mapper.mapController(' "$controller_adapter_factory" \
+    || fail "adapter controller factory lost pure controller mapping"
+grep -F -q '() => activationCreator.create(mapped, clusterSnapshots, clock)' "$controller_adapter_factory" \
+    || fail "adapter controller factory no longer defers Oxia creation to start"
+
+controller_activation_creator="$kafka_checkout/core/src/main/java/kafka/server/nereus/NereusKafkaControllerActivationCreator.java"
+grep -F -q 'SharedOxiaClientRuntime.connect(exact.oxia(), exactClock)' "$controller_activation_creator" \
+    || fail "controller activation creator lost its owned Oxia runtime"
+grep -F -q 'new KafkaStorageBindingAwareClusterSnapshotProvider(' "$controller_activation_creator" \
+    || fail "controller activation creator lost the durable binding scan"
+grep -F -q 'new KafkaStorageFirstActivationCoordinator(' "$controller_activation_creator" \
+    || fail "controller activation creator lost product coordinator composition"
+
+controller_adapter_runtime="$kafka_checkout/core/src/main/java/kafka/server/nereus/NereusControllerStorageRuntime.java"
+grep -F -q 'localController = exact.isLeader(nodeId);' "$controller_adapter_runtime" \
+    || fail "controller runtime lost current-controller scheduling"
+grep -F -q 'if (inFlight != null || scheduled != null)' "$controller_adapter_runtime" \
+    || fail "controller runtime lost single-attempt coalescing"
+grep -F -q 'nereus.retriable()' "$controller_adapter_runtime" \
+    || fail "controller runtime lost typed retry classification"
+grep -F -q 'terminalFailure = true;' "$controller_adapter_runtime" \
+    || fail "controller runtime lost per-epoch terminal failure suppression"
+grep -F -q 'cancelScheduled();' "$controller_adapter_runtime" \
+    || fail "controller runtime lost leadership-loss/shutdown cancellation"
 
 product_runtime_creator="$kafka_checkout/core/src/main/java/kafka/server/nereus/NereusKafkaProductRuntimeCreator.java"
 grep -F -q 'NereusKafkaObjectWalRuntimeFactory.createActivated(' "$product_runtime_creator" \
@@ -718,4 +804,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; twenty-seven commits, ninety-two log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/launcher blobs and markers match"
+echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; twenty-eight commits, one hundred two log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher blobs and markers match"

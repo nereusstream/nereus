@@ -80,11 +80,13 @@ authority-session renewal and exact bounded ListOffsets scan slices；the isolat
 record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHolder` bridge、optional stock
 `Partition`/`ReplicaManager` request seam、a generic
 `BrokerServer` runtime lifecycle injection boundary、the typed adapter-backed runtime bridge、stock-only maintenance
-interfaces and an explicit native-storage launcher。Its code-level
+interfaces、an explicit native-storage launcher and a stock-owned controller metadata-publisher/runtime seam。Its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The SSH-published fork head is
-`nereus/future9-native-kafka-storage@3bd92c7244`；`bin/nereus-kafka-server-start.sh` selects a fresh production factory
-through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。A real provider-backed KRaft process gate and
+`nereus/future9-native-kafka-storage@9773c8f817`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
+controller factories through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。The controller runtime now coalesces
+metadata/leadership callbacks、runs first activation only while locally current、retries only retriable product failures and
+cancels scheduled retry on leadership loss。A real provider-backed KRaft process gate、multi-controller failover evidence and
 end-to-end native Produce/Fetch/ListOffsets evidence remain future work，so this is not yet a production-rollout claim.
 
 ## Current Phase

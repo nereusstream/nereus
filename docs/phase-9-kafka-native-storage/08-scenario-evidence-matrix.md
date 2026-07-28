@@ -34,7 +34,7 @@ and TV2 marker through the configured storage executor。`BrokerMetadataPublishe
 `NereusTopicDeltaLifecycleTest` cover the deterministic ordering part of KF-TXN-011/012：both elections wait for ready，
 and transaction-state ready waits for exact recovered storage installation。Rows stay `PLANNED` because required
 real-service、process/restart、takeover and aggregate tiers have not run。The fork commits are published in
-`nereusstream/kafka:nereus/future9-native-kafka-storage@3bd92c7244`。
+`nereusstream/kafka:nereus/future9-native-kafka-storage@9773c8f817`。
 
 Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
 `3eb6b63` + `57dcf35`）：stock DeleteRecords normalization/capture invokes the shared checkpoint-before-trim path；
@@ -42,20 +42,27 @@ the fork exposes bounded owned writable partitions and the same `NereusUnifiedLo
 non-overlapping maintenance；and canonical virtual segment/config/time/logical state is rebuilt from checkpoint plus
 committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、Checkstyle and SpotBugs evidence passes。Rows
 remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing。The Kafka
-fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@3bd92c7244`。
+fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@9773c8f817`。
 
 Current deterministic compaction fork evidence（product `e18bf36`；fork `58342d9dca`）：typed bounded runtime config、
 one-time product composition、leader-only owned-partition registration、internal/user work classification、partition-lock
 canonical/HW/LSO capture and stock `CleanedTransactionMetadata` marker pre-scan pass focused adapter/fork tests plus
-Checkstyle、SpotBugs and the executable 27-commit/92-file source lock。Rows remain `PLANNED` until real-provider
+Checkstyle、SpotBugs and the executable 28-commit/102-file source lock。Rows remain `PLANNED` until real-provider
 fresh-process/restart/takeover and full LogCleaner differential evidence exist。
 
-Current deterministic M6 launcher/isolation evidence（fork `faaffc8a75` + `3bd92c7244`）：stock maintenance
+Current deterministic M6 launcher/isolation evidence（fork `faaffc8a75` + `3bd92c7244` + `9773c8f817`）：stock maintenance
 paths compile only against `BrokerStorageManagedLog`/`PartitionLeaderAuthority`；artifact-free stock main/test compilation
 and `PartitionTest` pass without Nereus classes。The artifact-only `NereusKafka` launcher selects a fresh production factory
 and delegates signal/startup/shutdown/await behavior to the shared stock `Kafka.run` path；the executable server-start script
-selects that class。Focused launcher/runtime tests、Checkstyle、SpotBugs and the executable 27-commit/92-file source lock pass。
-Rows remain `PLANNED` until a real provider-backed KRaft process proves startup、Produce/Fetch/ListOffsets and shutdown cuts。
+selects that class。The same launcher now passes fresh broker and controller factories；stock controller sources import only
+`ControllerStorageRuntime`/context/factory seams，and the preserved three-argument `ControllerServer` constructor keeps
+artifact-free Java/stock callers compatible。`NereusControllerStorageRuntimeTest` proves current-controller-only retriable
+retry、leadership-loss scheduled-retry cancellation、metadata callback coalescing behind one in-flight attempt and one
+non-retriable fault report process-locally per controller epoch；mapper and launcher tests prove no-I/O controller mapping and dual-factory
+selection。Focused launcher/runtime tests、complete stock `KafkaConfigTest` compilation、Checkstyle、SpotBugs and the executable
+28-commit/102-file source lock pass。Rows remain `PLANNED` because the evidence does not yet cover dedicated-controller
+enablement、in-flight activation epoch fencing、`nereus.storage.version` feature/create-topic gating、multi-controller
+takeover or a real provider-backed KRaft process proving startup、Produce/Fetch/ListOffsets and shutdown cuts。
 
 ## 2. Machine-readable manifest target
 
@@ -132,9 +139,11 @@ revocation and borrowed-scheduler ownership，adding deterministic partial evide
 non-destructive non-empty rejection、PREPARED crash resume、second-proof cut and post-ACTIVE idempotence。
 `KafkaStorageBindingAwareClusterSnapshotProviderTest` proves all 64 binding-registry shards are examined before an empty result，
 any non-empty shard is projected into the activation snapshot，and an already-positive fork fact avoids a weaker rescan；the
-activation-backed Object-WAL integration test proves this wrapper remains on the public production path。Kafka controller seam/process
-integration and fork provider/context binding、BookKeeper/async-object provider construction、priority budgets and native-storage process cuts
-仍未实现，
+activation-backed Object-WAL integration test proves this wrapper remains on the public production path。Kafka controller
+seam/context binding and deterministic activation scheduling are now implemented at fork `9773c8f817`；the four runtime tests
+cover controller-current retry、leadership loss、in-flight coalescing and per-epoch durable fault suppression。Real
+multi-controller process/takeover、feature setting/create-topic gating、BookKeeper/async-object provider construction、
+priority budgets and native-storage process cuts 仍未实现，
 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及
 BrokerServer stock start/drain/close compatibility；`NereusBrokerStorageRuntimeTest` additionally verifies disabled creator
