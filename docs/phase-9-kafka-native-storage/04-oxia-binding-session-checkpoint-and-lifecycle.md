@@ -1,7 +1,7 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
 > 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs/full composition and Object-WAL exact-reference durable checkpoint quarantine partial slices implemented
-> 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 又证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；新增真实两 Bookie/两 Kafka release-process gate 闭合 BookKeeper 三 profile 的 post-handoff recovery/continuation；BookKeeper in-flight cut、multi-controller 与 coordinator migration 仍 open
+> 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；真实两 Bookie/两 Kafka release-process gate 闭合 BookKeeper 三 profile 的 post-handoff recovery/continuation；test-only agent gate further proves Bookie-acked/metadata-`WRITING` stale append recovery and fencing；multi-controller、checkpoint/virtual-segment 与 coordinator migration 仍 open
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -636,8 +636,9 @@ only process able to commit `[1,2)`。
 
 This proves two independent safety layers：the process-local storage call already entered the provider future，but durable
 session revalidation still prevents stale physical publication；KRaft handoff recovers only the old stable head and does not
-consume a future/in-memory end offset。The current proof is Object-WAL P/C evidence。The same cut remains required for all
-BookKeeper profiles before KF-APP-014 may leave `PLANNED` in the complete profile/service matrix。
+consume a future/in-memory end offset。The current proof is Object-WAL P/C evidence；section 7.6 supplies the BookKeeper
+provider-applied counterpart。`KF-APP-014` remains `PLANNED` until the owning milestone/final aggregate policy advances it，
+not because this provider cut is still absent。
 
 ### 7.5 BookKeeper three-profile post-handoff boundary（2026-07-29）
 
@@ -665,11 +666,60 @@ actionable tasks in 2m17s and is aggregated by `phase9M6KafkaProcessCheck` and
 `phase9M6KafkaBookKeeperProcessCheck`。
 
 This is P-tier post-handoff evidence：it proves all three provider graphs can resign/open/recover/continue without deleting
-shared authority while both JVMs remain live。It does not hold a BookKeeper append after provider dispatch，does not sample
-the old worker stack and does not prove current-term-only publication under a BookKeeper response-loss cut；that C-tier
-boundary remains the next KF-APP-014 requirement。
+shared authority while both JVMs remain live。It does not itself hold a BookKeeper append after provider dispatch；the
+following independent C-tier gate does so on the shared appender boundary before the three profiles diverge into their
+materialization completion policies。
 
-### 7.6 Recovery component ownership
+### 7.6 BookKeeper provider-applied/pre-publication C boundary（2026-07-29）
+
+`f9BookKeeperInFlightTakeoverProcessIntegrationTest` creates an observable cut inside the real BookKeeper write without a
+production hook。The `f9BookKeeperFaultAgent` source set has only Byte Buddy plus JDK dependencies and is packaged as
+`nereus-f9-bookkeeper-fault-agent.jar` with `Premain-Class`。Only broker 1 receives
+`KAFKA_OPTS=-javaagent:<jar>=arm=...,captured=...,applied=...,release=...,installed=...`；the artifact is neither published
+as a Nereus module nor copied into the Kafka release distribution。
+
+The instrumented method is exactly：
+
+```java
+DefaultBookKeeperClientOperations.write(
+        WriteAdvHandle handle,
+        long entryId,
+        ByteBuf entry,
+        BookKeeperOperationDeadline deadline)
+```
+
+The advice preserves the real provider future returned after `handle.writeAsync(entryId, transmitted)` and substitutes a
+second `CompletableFuture<Long>` toward `BookKeeperPrimaryWalAppender`。When the provider future succeeds，the callback writes
+the exact `entryId` to the applied marker and waits on the release marker before completing the substituted future。Thus
+BookKeeper has acknowledged bytes while the production pipeline is still between
+`casReservation(..., WRITING)` and `casReservation(..., DURABLE)`。
+
+The process gate rejects a timing-only observation。Before takeover it requires all of：
+
+1. agent installed/captured/applied markers；
+2. an incomplete retries-disabled Produce and a `jcmd Thread.print -l` stack containing
+   `NereusUnifiedLog.appendStable` plus `CompletableFuture.get`；
+3. `BookKeeperWriterStateRecord.activeReservationId` resolving to the exact
+   `BookKeeperAppendReservationRecord` with `WRITING`、matching stream、ledger、entry and `entryCount=1`；
+4. a separately constructed stock BookKeeper client opening that ledger without recovery and reading the same
+   `(ledgerId, entryId)` via `readUnconfirmed` with positive length；
+5. durable earliest/latest still `0/1`。
+
+Broker 1 is then `SIGSTOP`ped；the controller and broker 2 atomically install
+`leader=2, replicas=[2], ISR=[2]`。Because the BookKeeper writer is lazy，broker 2's offset-1 Produce is the explicit recovery
+trigger。`BookKeeperLedgerRecovery` must abandon the captured `WRITING` reservation and seal its root before allocating the
+new writer ledger；the new Produce returns offset 1 and reads byte-exactly。Only after those metadata facts are observed does
+the test create the release marker and `SIGCONT` broker 1。The stale pipeline may receive its provider success but its
+metadata CAS must fail；the old process stays alive、WAL-only has zero S3 objects and final earliest/latest remains `0/2`。
+
+This single C cut covers all three BookKeeper profiles because `BOOKKEEPER_WAL_ONLY`、
+`BOOKKEEPER_WAL_ASYNC_OBJECT` and `BOOKKEEPER_WAL_SYNC_OBJECT` all execute the same
+`BookKeeperPrimaryWalAppender` through `WRITING -> provider write -> DURABLE`；their NCP2 behavior starts only after the
+captured boundary。Section 7.5 separately proves each profile's post-handoff composition。Fresh task execution passes 66/66
+actionable tasks in 1m30s and belongs to both `phase9M6KafkaProcessCheck` and
+`phase9M6KafkaBookKeeperProcessCheck`。
+
+### 7.7 Recovery component ownership
 
 The executable recovery boundary is now split by resource ownership：
 
@@ -1065,7 +1115,11 @@ F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kaf
 - `f9BookKeeperProfileTakeoverProcessIntegrationTest` uses real stock ZooKeeper metadata、two Bookies and two Kafka release
   JVMs per profile to prove exact `[1] -> [2]` singleton handoff、live old-owner resign、shared committed recovery and
   continuation for WAL-only/async/sync。It also requires zero objects for WAL-only and real NCP2 objects for both Object
-  profiles。This is BookKeeper post-handoff P evidence；already-dispatched BookKeeper append C evidence remains open；
+  profiles。This is BookKeeper post-handoff P evidence；
+- `f9BookKeeperInFlightTakeoverProcessIntegrationTest` instruments only the test process's common BookKeeper client write，
+  proves Bookie-applied bytes plus an Oxia `WRITING` reservation before takeover，then requires new-owner recovery to publish
+  exact `ABANDONED`/`SEALED` metadata and rejects the resumed old completion without moving LEO。This is the shared
+  BookKeeper C evidence and introduces no production hook；
 - config-free Kafka identity/domain values、the `nereus-kafka-adapter` module skeleton、canonical binding/registry keys、
   all 25 binding-root fields、closed lifecycle/mapping/operation wire IDs and explicit V1 codecs are implemented；
 - frozen Kafka metadata envelope SHA-256 values are binding

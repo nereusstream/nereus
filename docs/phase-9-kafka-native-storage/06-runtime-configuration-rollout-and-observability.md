@@ -600,8 +600,18 @@ reassign to exact `[2]` while the old process remains live，recover the old bat
 requires zero S3 objects and async/sync require real NCP2 objects before and after handoff。The task passes 64/64 actionable
 tasks in 2m17s and belongs to both M6 process aggregates。
 
-Multi-controller、checkpoint/virtual-segment cuts、BookKeeper already-in-flight append、transaction/internal-topic coordinator
-migration and complete rollout evidence 尚未闭合，所以整个路径
+`f9BookKeeperInFlightTakeoverProcessIntegrationTest` adds the C-tier companion as a product-test-only runtime：
+`f9BookKeeperFaultAgentJar` is built before the process task and injected only into broker 1's `KAFKA_OPTS`。The broker config
+and release artifact remain unchanged。The gate requires installed/captured/applied/release markers、a real
+`NereusUnifiedLog.appendStable` blocked stack、the exact Oxia `WRITING` reservation、independent physical BookKeeper entry
+read、new-owner `ABANDONED`/old-root `SEALED` reconciliation、stale-future failure、old-process liveness、zero WAL-only
+objects and final earliest/latest `0/2`。Both `phase9M6KafkaProcessCheck` and
+`phase9M6KafkaBookKeeperProcessCheck` depend on it；the root development-version detector and Docker serialization service
+also name the direct task，so it cannot run against stale `0.1.0-f9-dev` artifacts or collide with another container gate。
+Fresh execution passes 66/66 actionable tasks in 1m30s with configuration-cache reuse。
+
+Multi-controller、checkpoint/virtual-segment cuts、transaction/internal-topic coordinator migration and complete rollout
+evidence 尚未闭合，所以整个路径
 仍不能用于 production rollout readiness。
 
 The selected shell is not a durability shortcut：`NereusUnifiedLogFactory` uses only

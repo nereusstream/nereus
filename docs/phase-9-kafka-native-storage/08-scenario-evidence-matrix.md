@@ -42,8 +42,8 @@ offset 0 in the first JVM and recovered offset 0 plus offset 1 in a fresh JVM，
 Oxia/LocalStack。The BookKeeper async process gate appends four batches、waits for the real NCP2 S3 object、normally
 stops and recovers/appends in a fresh JVM；the sync gate appends one batch only after required NCP2
 COMMITTED/readable completion and then performs the same cold recovery。All profile-matrix rows remain `PLANNED` because
-the new live-takeover matrix supplies only post-handoff P-tier coverage；BookKeeper already-in-flight failure cuts and final
-aggregate tiers are still absent。
+manifest status advances only with the owning milestone/final aggregate；the live-takeover matrix plus the common
+provider-applied C gate now supply the BookKeeper P/C boundary，while final aggregate tiers are still absent。
 
 Current live authority evidence（product 2026-07-28）：
 `f9MultiBrokerTakeoverProviderIntegrationTest` starts two independently owned activated Object-WAL runtime graphs against the
@@ -80,8 +80,9 @@ atomically installs `[2]` and proves recovered earliest/latest `0/1`。After `SI
 `append session changed before guarded object upload`，the old JVM survives，the WAL key set and latest remain unchanged，
 and node 2 alone commits/fetches offset 1 before latest becomes 2。Fresh execution passes 64/64 actionable tasks in 1m01s
 including runtime publication/source lock and is included in `phase9M6KafkaProcessCheck`。This supplies Object-WAL P/C
-evidence for KF-META-007/KF-META-012/KF-APP-014。The manifest row still requires `bookkeeper` service coverage，and the
-topology still has only one controller；therefore these rows remain `PLANNED` until profile and final service matrices run。
+evidence for KF-META-007/KF-META-012/KF-APP-014。At this point the manifest still required `bookkeeper` service coverage；
+the following P/C gates now supply it。The topology still has only one controller and final aggregates remain open，so these
+rows retain `PLANNED` under the milestone status policy。
 
 `f9BookKeeperProfileTakeoverProcessIntegrationTest` now supplies the matching post-handoff BookKeeper P-tier matrix over one
 real stock ZooKeeper long-hierarchical metadata service and two Bookies。For each of
@@ -95,7 +96,19 @@ NCP2 object before handoff and after continuation。The operator-seeded activati
 the async broker configuration，so any profile/config identity drift fails before storage I/O。Fresh execution passes 64/64
 actionable tasks in 2m17s；the task is included in both `phase9M6KafkaProcessCheck` and
 `phase9M6KafkaBookKeeperProcessCheck`。This closes BookKeeper profile post-handoff P evidence，not the already-dispatched
-BookKeeper append C cut required by KF-APP-014；the row therefore remains `PLANNED`。
+BookKeeper append C cut by itself。
+
+`f9BookKeeperInFlightTakeoverProcessIntegrationTest` now supplies that C cut at the common appender boundary。A dedicated
+test-only Java agent waits for the real BookKeeper provider future to succeed but withholds the future observed by
+`BookKeeperPrimaryWalAppender`。The gate requires an installed/captured/applied marker sequence、a `jcmd` stack in
+`NereusUnifiedLog.appendStable -> CompletableFuture.get`、the exact Oxia reservation in `WRITING` and a separately readable
+physical `(ledgerId, entryId)` before broker 1 may be `SIGSTOP`ped。After atomic `[1] -> [2]`，broker 2's offset-1 append must
+drive the old reservation to `ABANDONED` and old root to `SEALED`，then return/fetch offset 1。Releasing and resuming broker 1
+must fail its stale completion while the process lives、WAL-only remains object-free and final earliest/latest remains
+`0/2`。Fresh execution passes 66/66 actionable tasks in 1m30s and the task belongs to both M6 process aggregates。Because the
+cut is before `WRITING -> DURABLE` and profile-specific NCP2 behavior，it combines with the three-profile P matrix as the
+BookKeeper service/profile P/C evidence for KF-META-007/KF-META-012/KF-APP-014。The rows remain `PLANNED` under the manifest's
+milestone/final-aggregate status policy；the remaining reason is no longer a missing BookKeeper in-flight cut。
 
 Current deterministic M4 fork evidence（local `ec7f0db991` + `032974067c`）：`NereusProducerStateManagerTest`、
 `NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
@@ -343,12 +356,12 @@ hash。Markdown/JSON ID sets must match。
 | KF-META-004 | every create response-loss cut reloads/converges without extra stream | `KafkaBindingRaceIntegrationTest` | R,C | M2 |
 | KF-META-005 | binding profile/mapping/authority attributes are immutable and mismatch becomes CORRUPT | `KafkaBindingTransitionTest` | D,R | M2 |
 | KF-META-006 | lower KRaft leader epoch cannot acquire/renew session | `KafkaLeaderAuthorityPropertyTest` | D,M,R | M2 |
-| KF-META-007 | higher leader epoch immediately preempts live old session before TTL | product `f9MultiBrokerTakeoverProviderIntegrationTest`（real Oxia/two independent Object-WAL runtimes R）+ `f9MultiBrokerTakeoverProcessIntegrationTest`（release/KRaft singleton handoff P）+ `f9InFlightTakeoverProcessIntegrationTest`（provider-future freeze/pre-upload fencing C）+ `f9BookKeeperProfileTakeoverProcessIntegrationTest`（three-profile post-handoff P；BookKeeper C pending） | R,P,C | M2 |
+| KF-META-007 | higher leader epoch immediately preempts live old session before TTL | product `f9MultiBrokerTakeoverProviderIntegrationTest`（real Oxia/two independent Object-WAL runtimes R）+ `f9MultiBrokerTakeoverProcessIntegrationTest`（release/KRaft singleton handoff P）+ `f9InFlightTakeoverProcessIntegrationTest`（Object provider-future freeze/pre-upload fencing C）+ `f9BookKeeperProfileTakeoverProcessIntegrationTest`（three-profile post-handoff P）+ `f9BookKeeperInFlightTakeoverProcessIntegrationTest`（Bookie-acked `WRITING` recovery/fencing C） | R,P,C | M2 |
 | KF-META-008 | same leader/owner term renews only exact writer/token；different owner is fenced | `KafkaLeaderAuthorityPropertyTest` | D,M | M2 |
 | KF-META-009 | same broker restart with higher broker epoch preempts same leader term | `KafkaLeaderAuthorityIntegrationTest` | R,P | M2 |
 | KF-META-010 | higher broker epoch from different owner at same leader epoch is rejected | `KafkaLeaderAuthorityPropertyTest` | D,M | M2 |
 | KF-META-011 | legacy caller cannot acquire authority-required Kafka stream after lease expiry | `KafkaLeaderAuthorityIntegrationTest` | D,R | M2 |
-| KF-META-012 | old writer primary/protection/head CAS fails after authority preemption | product `f9MultiBrokerTakeoverProviderIntegrationTest` + `DefaultKafkaPartitionStorageTest`（old head-CAS rejection/local recovery fence R/D）+ `f9InFlightTakeoverProcessIntegrationTest`（release process already-dispatched stale writer fails at guarded-upload session revalidation P/C）+ `f9BookKeeperProfileTakeoverProcessIntegrationTest`（BookKeeper post-handoff P；BookKeeper stale-writer C pending） | R,P,C | M2 |
+| KF-META-012 | old writer primary/protection/head CAS fails after authority preemption | product `f9MultiBrokerTakeoverProviderIntegrationTest` + `DefaultKafkaPartitionStorageTest`（old head-CAS rejection/local recovery fence R/D）+ `f9InFlightTakeoverProcessIntegrationTest`（release process already-dispatched Object writer fails at guarded-upload session revalidation P/C）+ `f9BookKeeperProfileTakeoverProcessIntegrationTest`（BookKeeper post-handoff P）+ `f9BookKeeperInFlightTakeoverProcessIntegrationTest`（old `WRITING` reservation abandoned/ledger sealed；resumed completion fenced C） | R,P,C | M2 |
 | KF-META-013 | StreamHead V1 goldens decode to empty authority；V2 round-trip and old reader rejects | `StreamHeadV2CodecTest` | D | M2 |
 | KF-META-014 | NKC1 all required sections/golden SHA/CRC/EOF round-trip deterministically | `KafkaCheckpointFormatTest` | D | M2 |
 | KF-META-015 | NKC1 length/flag/section/checksum/duplicate/unknown-required corruption fails before unsafe allocation | `KafkaCheckpointCorruptionTest` | D,M | M2 |
@@ -377,7 +390,7 @@ hash。Markdown/JSON ID sets must match。
 | KF-APP-011 | append executor queue/byte rejection occurs before IO and releases owned buffer | fork `NereusProduceBufferTest` | D,M | M3 |
 | KF-APP-012 | client disconnect/cancel after enqueue cannot cancel uncertain append；callback/buffer terminal once | fork `NereusProduceBufferTest` | D,R,C | M3 |
 | KF-APP-013 | different partitions run concurrently，same partition never reorders under saturation | `KafkaAppendExecutorIntegrationTest` | D,R,M | M3 |
-| KF-APP-014 | leader takeover during old in-flight append leaves only current-term publication | product provider gate（post-takeover stale append fenced R）+ `f9MultiBrokerTakeoverProcessIntegrationTest`（Object post-handoff P）+ `f9InFlightTakeoverProcessIntegrationTest`（Object `jcmd` provider-future proof、SIGSTOP takeover、pre-upload fence、no WAL/LEO mutation C）+ `f9BookKeeperProfileTakeoverProcessIntegrationTest`（three-profile post-handoff P）；BookKeeper already-dispatched C pending | P,C | M3 |
+| KF-APP-014 | leader takeover during old in-flight append leaves only current-term publication | product provider gate（post-takeover stale append fenced R）+ `f9MultiBrokerTakeoverProcessIntegrationTest`（Object post-handoff P）+ `f9InFlightTakeoverProcessIntegrationTest`（Object `jcmd` provider-future proof、SIGSTOP takeover、pre-upload fence、no WAL/LEO mutation C）+ `f9BookKeeperProfileTakeoverProcessIntegrationTest`（three-profile post-handoff P）+ `f9BookKeeperInFlightTakeoverProcessIntegrationTest`（common BookKeeper Bookie-acked/`WRITING`/physical-entry proof、new-owner `ABANDONED`/`SEALED`、stale completion fence C） | P,C | M3 |
 | KF-APP-015 | broker kill before/after each append cut recovers exact LEO/HW/bytes | `KafkaNativeProcessCutIntegrationTest` | P,C | M3/M7 |
 | KF-APP-016 | each claimed Nereus storage profile passes identical Produce correctness contract | `KafkaNativeProfileMatrixIntegrationTest` | R,P | M3/M7 |
 

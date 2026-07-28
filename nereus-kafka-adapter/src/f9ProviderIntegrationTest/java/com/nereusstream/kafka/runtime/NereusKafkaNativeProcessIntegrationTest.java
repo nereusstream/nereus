@@ -21,6 +21,8 @@ import com.nereusstream.metadata.oxia.OxiaJavaBookKeeperMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaKafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
+import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
+import com.nereusstream.metadata.oxia.records.BookKeeperAppendReservationRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
 import eu.rekawek.toxiproxy.model.ToxicDirection;
@@ -66,6 +68,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
+import org.apache.bookkeeper.client.LedgerHandle;
 import org.apache.bookkeeper.common.allocator.PoolingPolicy;
 import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.conf.ServerConfiguration;
@@ -1377,6 +1380,561 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     @Test
+    @Timeout(value = 8, unit = TimeUnit.MINUTES)
+    void threeReleaseProcessesFenceAppliedBookKeeperWriteBeforePublication()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome =
+                extractReleaseDistribution(
+                        kafkaCheckout,
+                        root.resolve(
+                                "kafka-bookkeeper-inflight-distribution"));
+        Path formatScript =
+                executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript =
+                executable(
+                        kafkaHome.resolve(
+                                "bin/nereus-kafka-server-start.sh"));
+        Path faultAgent = requiredBookKeeperFaultAgent();
+        Path controllerConfig =
+                root.resolve("bookkeeper-inflight-controller.properties");
+        Path brokerOneConfig =
+                root.resolve("bookkeeper-inflight-broker-one.properties");
+        Path brokerTwoConfig =
+                root.resolve("bookkeeper-inflight-broker-two.properties");
+        Path controllerFormatLog =
+                root.resolve("bookkeeper-inflight-controller-format.log");
+        Path brokerOneFormatLog =
+                root.resolve("bookkeeper-inflight-broker-one-format.log");
+        Path brokerTwoFormatLog =
+                root.resolve("bookkeeper-inflight-broker-two-format.log");
+        Path controllerServerLog =
+                root.resolve("bookkeeper-inflight-controller-server.log");
+        Path brokerOneServerLog =
+                root.resolve("bookkeeper-inflight-broker-one-server.log");
+        Path brokerTwoServerLog =
+                root.resolve("bookkeeper-inflight-broker-two-server.log");
+        Path passwordFile =
+                root.resolve("bookkeeper-inflight-password.bin");
+        Path agentArm = root.resolve("bookkeeper-inflight-agent-arm");
+        Path agentCaptured =
+                root.resolve("bookkeeper-inflight-agent-captured");
+        Path agentApplied =
+                root.resolve("bookkeeper-inflight-agent-applied");
+        Path agentRelease =
+                root.resolve("bookkeeper-inflight-agent-release");
+        Path agentInstalled =
+                root.resolve("bookkeeper-inflight-agent-installed");
+        Files.write(
+                passwordFile,
+                "f9-bookkeeper-inflight-process-password"
+                        .getBytes(StandardCharsets.UTF_8));
+
+        String bucket =
+                "nereus-kafka-bk-inflight-" + UUID.randomUUID();
+        String topic =
+                "bookkeeper-inflight-process-" + UUID.randomUUID();
+        String nereusCluster =
+                "f9-bookkeeper-inflight-" + UUID.randomUUID();
+        String kafkaClusterId =
+                org.apache.kafka.common.Uuid.randomUuid().toString();
+        int controllerBrokerPort = freePort();
+        int controllerPort =
+                differentFreePort(controllerBrokerPort);
+        int brokerOnePort =
+                differentFreePort(
+                        controllerBrokerPort,
+                        controllerPort);
+        int brokerTwoPort =
+                differentFreePort(
+                        controllerBrokerPort,
+                        controllerPort,
+                        brokerOnePort);
+        int zooKeeperPort =
+                differentFreePort(
+                        controllerBrokerPort,
+                        controllerPort,
+                        brokerOnePort,
+                        brokerTwoPort);
+        String controllerBootstrap =
+                "127.0.0.1:" + controllerBrokerPort;
+        String brokerOneBootstrap =
+                "127.0.0.1:" + brokerOnePort;
+        String brokerTwoBootstrap =
+                "127.0.0.1:" + brokerTwoPort;
+        String clusterBootstrap =
+                brokerOneBootstrap
+                        + ","
+                        + brokerTwoBootstrap
+                        + ","
+                        + controllerBootstrap;
+        String metadataServiceUri =
+                "zk+longhierarchical://127.0.0.1:"
+                        + zooKeeperPort
+                        + "/ledgers";
+        BookKeeperProcessConfiguration bookKeeper =
+                bookKeeperProcessConfiguration(
+                        metadataServiceUri,
+                        "bookkeeper-inflight",
+                        passwordFile,
+                        7,
+                        3);
+        BookKeeperWalConfiguration bookKeeperWal =
+                bookKeeperWalConfiguration(bookKeeper, false);
+        seedBookKeeperAuthority(
+                oxiaConfiguration(),
+                bookKeeperWal,
+                bookKeeper,
+                Clock.systemUTC());
+        createBucket(bucket);
+        writeConfiguration(
+                controllerConfig,
+                controllerBrokerPort,
+                controllerPort,
+                bucket,
+                root.resolve("bookkeeper-inflight-controller-log"),
+                root.resolve(
+                        "bookkeeper-inflight-controller-metadata"),
+                root.resolve(
+                        "bookkeeper-inflight-controller-cache"),
+                "BOOKKEEPER_WAL_ONLY",
+                bookKeeper,
+                3,
+                true,
+                3,
+                nereusCluster,
+                LOCALSTACK
+                        .getEndpointOverride(
+                                LocalStackContainer.Service.S3)
+                        .toString());
+        writeConfiguration(
+                brokerOneConfig,
+                brokerOnePort,
+                controllerPort,
+                bucket,
+                root.resolve("bookkeeper-inflight-broker-one-log"),
+                root.resolve(
+                        "bookkeeper-inflight-broker-one-metadata"),
+                root.resolve(
+                        "bookkeeper-inflight-broker-one-cache"),
+                "BOOKKEEPER_WAL_ONLY",
+                bookKeeper,
+                1,
+                false,
+                3,
+                nereusCluster,
+                LOCALSTACK
+                        .getEndpointOverride(
+                                LocalStackContainer.Service.S3)
+                        .toString());
+        writeConfiguration(
+                brokerTwoConfig,
+                brokerTwoPort,
+                controllerPort,
+                bucket,
+                root.resolve("bookkeeper-inflight-broker-two-log"),
+                root.resolve(
+                        "bookkeeper-inflight-broker-two-metadata"),
+                root.resolve(
+                        "bookkeeper-inflight-broker-two-cache"),
+                "BOOKKEEPER_WAL_ONLY",
+                bookKeeper,
+                2,
+                false,
+                3,
+                nereusCluster,
+                LOCALSTACK
+                        .getEndpointOverride(
+                                LocalStackContainer.Service.S3)
+                        .toString());
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                controllerConfig,
+                controllerFormatLog,
+                kafkaClusterId);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerOneConfig,
+                brokerOneFormatLog,
+                kafkaClusterId);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerTwoConfig,
+                brokerTwoFormatLog,
+                kafkaClusterId);
+
+        String agentOptions =
+                bookKeeperFaultAgentOptions(
+                        faultAgent,
+                        agentArm,
+                        agentCaptured,
+                        agentApplied,
+                        agentRelease,
+                        agentInstalled);
+        TopicPartition partition = new TopicPartition(topic, 0);
+        byte[] committedKey =
+                "bookkeeper-inflight-key-0"
+                        .getBytes(StandardCharsets.UTF_8);
+        byte[] committedValue =
+                "bookkeeper-inflight-committed"
+                        .getBytes(StandardCharsets.UTF_8);
+        byte[] staleKey =
+                "bookkeeper-inflight-stale-key"
+                        .getBytes(StandardCharsets.UTF_8);
+        byte[] staleValue =
+                "bookkeeper-inflight-stale-value"
+                        .getBytes(StandardCharsets.UTF_8);
+        byte[] currentKey =
+                "bookkeeper-inflight-current-key"
+                        .getBytes(StandardCharsets.UTF_8);
+        byte[] currentValue =
+                "bookkeeper-inflight-current-value"
+                        .getBytes(StandardCharsets.UTF_8);
+
+        try (LocalBookKeeper ignored =
+                        startBookKeeper(zooKeeperPort);
+                BookKeeper inspector =
+                        bookKeeperClient(metadataServiceUri)) {
+            Process controller = null;
+            Process brokerOne = null;
+            Process brokerTwo = null;
+            PendingProduce staleProduce = null;
+            boolean brokerOnePaused = false;
+            boolean releasePublished = false;
+            Throwable failure = null;
+            try {
+                controller =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        controllerConfig.toString()),
+                                kafkaHome,
+                                controllerServerLog);
+                awaitBroker(
+                        controllerBootstrap,
+                        controller,
+                        controllerServerLog);
+                brokerOne =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        brokerOneConfig.toString()),
+                                kafkaHome,
+                                brokerOneServerLog,
+                                Map.of("KAFKA_OPTS", agentOptions));
+                brokerTwo =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        brokerTwoConfig.toString()),
+                                kafkaHome,
+                                brokerTwoServerLog);
+                awaitBroker(
+                        brokerOneBootstrap,
+                        brokerOne,
+                        brokerOneServerLog);
+                awaitBroker(
+                        brokerTwoBootstrap,
+                        brokerTwo,
+                        brokerTwoServerLog);
+                awaitMarker(
+                        agentInstalled,
+                        brokerOne,
+                        brokerOneServerLog,
+                        Duration.ofSeconds(30));
+                awaitClusterBrokers(
+                        clusterBootstrap,
+                        List.of(1, 2, 3),
+                        List.of(controller, brokerOne, brokerTwo),
+                        controllerServerLog,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+                try (Admin admin =
+                        Admin.create(
+                                adminProperties(
+                                        brokerTwoBootstrap
+                                                + ","
+                                                + controllerBootstrap))) {
+                    admin.createTopics(
+                                    List.of(
+                                            new NewTopic(
+                                                    topic,
+                                                    Map.of(
+                                                            0,
+                                                            List.of(
+                                                                    1)))))
+                            .all()
+                            .get(
+                                    CLIENT_TIMEOUT.toSeconds(),
+                                    TimeUnit.SECONDS);
+                }
+                RecordMetadata committed =
+                        produce(
+                                brokerOneBootstrap,
+                                topic,
+                                committedKey,
+                                committedValue);
+                assertThat(committed.offset()).isZero();
+                assertThat(
+                                fetch(
+                                                brokerOneBootstrap,
+                                                partition,
+                                                0,
+                                                brokerOneServerLog)
+                                        .value())
+                        .isEqualTo(committedValue);
+                KafkaPartitionId partitionId =
+                        kafkaPartitionId(
+                                clusterBootstrap,
+                                partition,
+                                topic);
+                Files.createFile(agentArm);
+                staleProduce =
+                        beginSingleAttemptProduce(
+                                brokerOneBootstrap,
+                                topic,
+                                staleKey,
+                                staleValue);
+                String appliedMarker =
+                        awaitAppliedMarker(
+                                agentApplied,
+                                brokerOne,
+                                staleProduce,
+                                brokerOneServerLog,
+                                Duration.ofSeconds(45));
+                assertThat(Files.exists(agentCaptured)).isTrue();
+                long appliedEntryId =
+                        Long.parseLong(appliedMarker.strip());
+                awaitProviderAppendStack(
+                        brokerOne,
+                        staleProduce,
+                        brokerOneServerLog);
+                BookKeeperInFlightEvidence inFlight =
+                        awaitBookKeeperWritingReservation(
+                                nereusCluster,
+                                partitionId,
+                                bookKeeperWal,
+                                appliedEntryId,
+                                brokerOneServerLog,
+                                Duration.ofSeconds(30));
+                assertPhysicalBookKeeperEntry(
+                        inspector,
+                        inFlight.ledgerId(),
+                        inFlight.entryId(),
+                        Files.readAllBytes(passwordFile));
+                assertThat(staleProduce.future().isDone())
+                        .as(
+                                "the old Produce remains pending after the Bookie ack")
+                        .isFalse();
+                try (Admin admin =
+                        Admin.create(
+                                adminProperties(clusterBootstrap))) {
+                    assertOffsets(admin, partition, 0, 1);
+                }
+
+                signalProcess(
+                        brokerOne,
+                        "STOP",
+                        brokerOneServerLog);
+                brokerOnePaused = true;
+                try (Admin admin =
+                        Admin.create(
+                                adminProperties(
+                                        brokerTwoBootstrap
+                                                + ","
+                                                + controllerBootstrap))) {
+                    admin.alterPartitionReassignments(
+                                    Map.of(
+                                            partition,
+                                            Optional.of(
+                                                    new NewPartitionReassignment(
+                                                            List.of(
+                                                                    2)))))
+                            .all()
+                            .get(
+                                    CLIENT_TIMEOUT.toSeconds(),
+                                    TimeUnit.SECONDS);
+                    awaitPartitionLeader(
+                            admin,
+                            partition,
+                            2,
+                            brokerOne,
+                            brokerTwo,
+                            brokerOneServerLog,
+                            brokerTwoServerLog);
+                    assertThat(
+                                    admin.listPartitionReassignments(
+                                                    Set.of(
+                                                            partition))
+                                            .reassignments()
+                                            .get(
+                                                    CLIENT_TIMEOUT
+                                                            .toSeconds(),
+                                                    TimeUnit.SECONDS))
+                            .isEmpty();
+                    assertOffsets(admin, partition, 0, 1);
+                }
+                ConsumerRecord<byte[], byte[]> recovered =
+                        fetch(
+                                brokerTwoBootstrap,
+                                partition,
+                                0,
+                                brokerTwoServerLog);
+                assertThat(recovered.key()).isEqualTo(committedKey);
+                assertThat(recovered.value())
+                        .isEqualTo(committedValue);
+                RecordMetadata current =
+                        produce(
+                                brokerTwoBootstrap,
+                                topic,
+                                currentKey,
+                                currentValue);
+                assertThat(current.offset()).isEqualTo(1L);
+                ConsumerRecord<byte[], byte[]> appended =
+                        fetch(
+                                brokerTwoBootstrap,
+                                partition,
+                                1,
+                                brokerTwoServerLog);
+                assertThat(appended.key()).isEqualTo(currentKey);
+                assertThat(appended.value())
+                        .isEqualTo(currentValue);
+                awaitBookKeeperTakeoverReconciliation(
+                        nereusCluster,
+                        bookKeeperWal,
+                        inFlight,
+                        brokerTwoServerLog,
+                        Duration.ofSeconds(30));
+                assertThat(controller.isAlive()).isTrue();
+
+                Files.createFile(agentRelease);
+                releasePublished = true;
+                signalProcess(
+                        brokerOne,
+                        "CONT",
+                        brokerOneServerLog);
+                brokerOnePaused = false;
+                Throwable staleFailure =
+                        staleProduce.awaitFailure();
+                assertThat(staleFailure)
+                        .as(
+                                "the provider-applied old BookKeeper append must fail after takeover")
+                        .isNotNull();
+                assertThat(brokerOne.isAlive())
+                        .as(
+                                "the old process survives stale BookKeeper completion")
+                        .isTrue();
+                try (Admin admin =
+                        Admin.create(
+                                adminProperties(clusterBootstrap))) {
+                    assertOffsets(admin, partition, 0, 2);
+                }
+                assertThat(objectCount(bucket))
+                        .as(
+                                "BookKeeper WAL-only takeover must not publish Object bytes")
+                        .isZero();
+                awaitBookKeeperTakeoverReconciliation(
+                        nereusCluster,
+                        bookKeeperWal,
+                        inFlight,
+                        brokerTwoServerLog,
+                        Duration.ofSeconds(30));
+            } catch (Throwable operationFailure) {
+                failure = operationFailure;
+            }
+            if (!releasePublished) {
+                try {
+                    Files.writeString(agentRelease, "release");
+                } catch (Throwable cleanupFailure) {
+                    failure =
+                            mergeFailure(
+                                    failure,
+                                    cleanupFailure);
+                }
+            }
+            if (brokerOnePaused
+                    && brokerOne != null
+                    && brokerOne.isAlive()) {
+                try {
+                    signalProcess(
+                            brokerOne,
+                            "CONT",
+                            brokerOneServerLog);
+                } catch (Throwable cleanupFailure) {
+                    failure =
+                            mergeFailure(
+                                    failure,
+                                    cleanupFailure);
+                }
+            }
+            if (staleProduce != null) {
+                staleProduce.close();
+            }
+            if (brokerTwo != null) {
+                try {
+                    stopBroker(
+                            brokerTwo,
+                            brokerTwoServerLog);
+                } catch (Throwable cleanupFailure) {
+                    failure =
+                            mergeFailure(
+                                    failure,
+                                    cleanupFailure);
+                }
+            }
+            if (brokerOne != null) {
+                try {
+                    stopBroker(
+                            brokerOne,
+                            brokerOneServerLog);
+                } catch (Throwable cleanupFailure) {
+                    failure =
+                            mergeFailure(
+                                    failure,
+                                    cleanupFailure);
+                }
+            }
+            if (controller != null) {
+                try {
+                    stopBroker(
+                            controller,
+                            controllerServerLog);
+                } catch (Throwable cleanupFailure) {
+                    failure =
+                            mergeFailure(
+                                    failure,
+                                    cleanupFailure);
+                }
+            }
+            if (failure != null) {
+                try {
+                    preserveBookKeeperInFlightFailureEvidence(
+                            controllerConfig,
+                            brokerOneConfig,
+                            brokerTwoConfig,
+                            controllerFormatLog,
+                            brokerOneFormatLog,
+                            brokerTwoFormatLog,
+                            controllerServerLog,
+                            brokerOneServerLog,
+                            brokerTwoServerLog,
+                            agentInstalled,
+                            agentCaptured,
+                            agentApplied,
+                            agentRelease);
+                } catch (AssertionError evidenceFailure) {
+                    failure.addSuppressed(evidenceFailure);
+                }
+                rethrow(failure);
+            }
+        }
+    }
+
+    @Test
     @Timeout(value = 3, unit = TimeUnit.MINUTES)
     void objectWalAsyncObjectProcessRecoversAcrossFreshJvmRestart()
             throws Exception {
@@ -2246,6 +2804,184 @@ class NereusKafkaNativeProcessIntegrationTest {
                         + readLog(serverLog));
     }
 
+    private static BookKeeperInFlightEvidence
+            awaitBookKeeperWritingReservation(
+                    String nereusCluster,
+                    KafkaPartitionId partitionId,
+                    BookKeeperWalConfiguration bookKeeperWal,
+                    long appliedEntryId,
+                    Path serverLog,
+                    Duration timeout) {
+        OxiaClientConfiguration oxia = oxiaConfiguration();
+        Clock clock = Clock.systemUTC();
+        BookKeeperMetadataStoreConfig metadataConfiguration =
+                new BookKeeperMetadataStoreConfig(
+                        bookKeeperWal.maxAppendRangesPerLedger(),
+                        bookKeeperWal.protectionSlotsPerRange(),
+                        bookKeeperWal.maxReaderLeasesPerLedger(),
+                        bookKeeperWal.maxUncertainAllocations());
+        try (SharedOxiaClientRuntime shared =
+                        SharedOxiaClientRuntime.connect(oxia, clock);
+                OxiaJavaKafkaPartitionMetadataStore partitions =
+                        OxiaJavaKafkaPartitionMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        shared,
+                                        nereusCluster,
+                                        partitionId.kafkaClusterId());
+                OxiaJavaBookKeeperMetadataStore metadata =
+                        OxiaJavaBookKeeperMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        shared,
+                                        clock,
+                                        metadataConfiguration)) {
+            StreamId streamId =
+                    awaitPartitionStreamId(
+                            partitions,
+                            partitionId,
+                            serverLog,
+                            timeout);
+            long deadline = System.nanoTime() + timeout.toNanos();
+            BookKeeperAppendReservationRecord last = null;
+            while (System.nanoTime() < deadline) {
+                var writer =
+                        metadata.getWriter(nereusCluster, streamId)
+                                .join();
+                if (writer.isPresent()
+                        && !writer.orElseThrow()
+                                .value()
+                                .activeReservationId()
+                                .isEmpty()) {
+                    String reservationId =
+                            writer.orElseThrow()
+                                    .value()
+                                    .activeReservationId();
+                    var reservation =
+                            metadata.getReservation(
+                                            nereusCluster,
+                                            streamId,
+                                            reservationId)
+                                    .join();
+                    if (reservation.isPresent()) {
+                        last = reservation.orElseThrow().value();
+                        if (last.lifecycle()
+                                == AppendReservationLifecycle.WRITING) {
+                            assertThat(last.streamId())
+                                    .isEqualTo(streamId.value());
+                            assertThat(last.firstEntryId())
+                                    .isEqualTo(appliedEntryId);
+                            assertThat(last.entryCount()).isEqualTo(1);
+                            return new BookKeeperInFlightEvidence(
+                                    streamId,
+                                    reservationId,
+                                    last.ledgerId(),
+                                    appliedEntryId);
+                        }
+                    }
+                }
+                pauseForProviderState(
+                        "BookKeeper WRITING reservation");
+            }
+            throw new AssertionError(
+                    "provider-applied BookKeeper append did not remain WRITING before the deadline; last="
+                            + last
+                            + ":\n"
+                            + readLog(serverLog));
+        }
+    }
+
+    private static void awaitBookKeeperTakeoverReconciliation(
+            String nereusCluster,
+            BookKeeperWalConfiguration bookKeeperWal,
+            BookKeeperInFlightEvidence inFlight,
+            Path serverLog,
+            Duration timeout
+    ) {
+        OxiaClientConfiguration oxia = oxiaConfiguration();
+        Clock clock = Clock.systemUTC();
+        BookKeeperMetadataStoreConfig metadataConfiguration =
+                new BookKeeperMetadataStoreConfig(
+                        bookKeeperWal.maxAppendRangesPerLedger(),
+                        bookKeeperWal.protectionSlotsPerRange(),
+                        bookKeeperWal.maxReaderLeasesPerLedger(),
+                        bookKeeperWal.maxUncertainAllocations());
+        try (SharedOxiaClientRuntime shared =
+                        SharedOxiaClientRuntime.connect(oxia, clock);
+                OxiaJavaBookKeeperMetadataStore metadata =
+                        OxiaJavaBookKeeperMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        shared,
+                                        clock,
+                                        metadataConfiguration)) {
+            long deadline = System.nanoTime() + timeout.toNanos();
+            BookKeeperAppendReservationRecord lastReservation = null;
+            BookKeeperLedgerRootRecord lastRoot = null;
+            while (System.nanoTime() < deadline) {
+                var reservation =
+                        metadata.getReservation(
+                                        nereusCluster,
+                                        inFlight.streamId(),
+                                        inFlight.reservationId())
+                                .join();
+                var root =
+                        metadata.getRoot(
+                                        nereusCluster,
+                                        bookKeeperWal
+                                                .providerScopeSha256(),
+                                        inFlight.ledgerId())
+                                .join();
+                if (reservation.isPresent()) {
+                    lastReservation =
+                            reservation.orElseThrow().value();
+                }
+                if (root.isPresent()) {
+                    lastRoot = root.orElseThrow().value();
+                }
+                if (lastReservation != null
+                        && lastRoot != null
+                        && lastReservation.lifecycle()
+                                == AppendReservationLifecycle.ABANDONED
+                        && lastRoot.lifecycle()
+                                == BookKeeperLedgerLifecycle.SEALED) {
+                    assertThat(lastReservation.reservationId())
+                            .isEqualTo(inFlight.reservationId());
+                    assertThat(lastReservation.streamId())
+                            .isEqualTo(inFlight.streamId().value());
+                    assertThat(lastReservation.ledgerId())
+                            .isEqualTo(inFlight.ledgerId());
+                    assertThat(lastReservation.firstEntryId())
+                            .isEqualTo(inFlight.entryId());
+                    assertThat(lastReservation.stateReason())
+                            .isNotBlank();
+                    assertThat(lastRoot.streamId())
+                            .isEqualTo(inFlight.streamId().value());
+                    assertThat(lastRoot.providerScopeSha256())
+                            .isEqualTo(
+                                    bookKeeperWal
+                                            .providerScopeSha256());
+                    assertThat(lastRoot.ledgerId())
+                            .isEqualTo(inFlight.ledgerId());
+                    assertThat(lastRoot.sealedLastEntryId())
+                            .isGreaterThanOrEqualTo(
+                                    inFlight.entryId());
+                    return;
+                }
+                pauseForProviderState(
+                        "BookKeeper takeover reconciliation");
+            }
+            throw new AssertionError(
+                    "BookKeeper takeover did not abandon the provider-applied WRITING reservation and seal its ledger; "
+                            + "lastReservation="
+                            + lastReservation
+                            + ", lastRoot="
+                            + lastRoot
+                            + ":\n"
+                            + readLog(serverLog));
+        }
+    }
+
     private static BookKeeperVersionedValue<BookKeeperLedgerRootRecord>
             awaitProcessRetiredLedger(
                     OxiaJavaBookKeeperMetadataStore metadata,
@@ -2388,6 +3124,42 @@ class NereusKafkaNativeProcessIntegrationTest {
                                     .NoSuchLedgerExistsException,
                             BKException.Code
                                     .NoSuchLedgerExistsOnMetadataServerException);
+        }
+    }
+
+    private static void assertPhysicalBookKeeperEntry(
+            BookKeeper inspector,
+            long ledgerId,
+            long entryId,
+            byte[] password
+    ) throws Exception {
+        LedgerHandle handle = null;
+        try {
+            handle =
+                    inspector.openLedgerNoRecovery(
+                            ledgerId,
+                            BookKeeper.DigestType.CRC32C,
+                            password);
+            try (var entries =
+                    handle.readUnconfirmed(entryId, entryId)) {
+                var iterator = entries.iterator();
+                assertThat(iterator.hasNext())
+                        .as(
+                                "provider-applied BookKeeper entry "
+                                        + ledgerId
+                                        + ":"
+                                        + entryId)
+                        .isTrue();
+                var entry = iterator.next();
+                assertThat(entry.getEntryId()).isEqualTo(entryId);
+                assertThat(entry.getLength()).isPositive();
+                assertThat(iterator.hasNext()).isFalse();
+            }
+        } finally {
+            java.util.Arrays.fill(password, (byte) 0);
+            if (handle != null) {
+                handle.close();
+            }
         }
     }
 
@@ -3015,6 +3787,68 @@ class NereusKafkaNativeProcessIntegrationTest {
                 lastFailure);
     }
 
+    private static String awaitMarker(
+            Path marker,
+            Process broker,
+            Path serverLog,
+            Duration timeout
+    ) throws Exception {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (Files.exists(marker)) {
+                return Files.readString(marker, StandardCharsets.UTF_8);
+            }
+            if (!broker.isAlive()) {
+                throw new AssertionError(
+                        "Kafka process exited before publishing marker "
+                                + marker.getFileName()
+                                + ":\n"
+                                + readLog(serverLog));
+            }
+            Thread.sleep(100);
+        }
+        throw new AssertionError(
+                "Kafka process did not publish marker "
+                        + marker.getFileName()
+                        + " before the deadline:\n"
+                        + readLog(serverLog));
+    }
+
+    private static String awaitAppliedMarker(
+            Path marker,
+            Process broker,
+            PendingProduce pending,
+            Path serverLog,
+            Duration timeout
+    ) throws Exception {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (Files.exists(marker)) {
+                return Files.readString(marker, StandardCharsets.UTF_8);
+            }
+            if (pending.future().isDone()) {
+                Throwable failure = pending.awaitFailure();
+                throw new AssertionError(
+                        "BookKeeper write completed before the provider-applied marker:\n"
+                                + readLog(serverLog),
+                        failure);
+            }
+            if (!broker.isAlive()) {
+                throw new AssertionError(
+                        "Kafka process exited before publishing marker "
+                                + marker.getFileName()
+                                + ":\n"
+                                + readLog(serverLog));
+            }
+            Thread.sleep(100);
+        }
+        throw new AssertionError(
+                "Kafka process did not publish marker "
+                        + marker.getFileName()
+                        + " before the deadline:\n"
+                        + readLog(serverLog));
+    }
+
     private static void awaitClusterBrokers(
             String bootstrapServers,
             List<Integer> expectedBrokerIds,
@@ -3158,6 +3992,15 @@ class NereusKafkaNativeProcessIntegrationTest {
             Path workingDirectory,
             Path output
     ) throws IOException {
+        return start(command, workingDirectory, output, Map.of());
+    }
+
+    private static Process start(
+            List<String> command,
+            Path workingDirectory,
+            Path output,
+            Map<String, String> environmentOverrides
+    ) throws IOException {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(workingDirectory.toFile());
         builder.redirectErrorStream(true);
@@ -3170,6 +4013,7 @@ class NereusKafkaNativeProcessIntegrationTest {
         environment.put("AWS_EC2_METADATA_DISABLED", "true");
         environment.put("KAFKA_HEAP_OPTS", "-Xms256m -Xmx512m");
         environment.put("EXTRA_ARGS", "");
+        environment.putAll(environmentOverrides);
         return builder.start();
     }
 
@@ -3197,6 +4041,61 @@ class NereusKafkaNativeProcessIntegrationTest {
                 .as("configured Kafka fork checkout")
                 .exists();
         return checkout;
+    }
+
+    private static Path requiredBookKeeperFaultAgent() {
+        String configured =
+                System.getProperty(
+                        "nereus.kafka.bookkeeper.fault.agent");
+        assertThat(configured)
+                .as("nereus.kafka.bookkeeper.fault.agent")
+                .isNotBlank();
+        Path agent = Path.of(configured).toAbsolutePath().normalize();
+        assertThat(agent)
+                .as("configured BookKeeper fault-agent JAR")
+                .exists()
+                .isRegularFile();
+        return agent;
+    }
+
+    private static String bookKeeperFaultAgentOptions(
+            Path agent,
+            Path arm,
+            Path captured,
+            Path applied,
+            Path release,
+            Path installed
+    ) {
+        Map<String, Path> markers =
+                Map.of(
+                        "arm", arm,
+                        "captured", captured,
+                        "applied", applied,
+                        "release", release,
+                        "installed", installed);
+        markers.forEach(
+                (name, path) ->
+                        assertThat(path.toString())
+                                .as(
+                                        "BookKeeper fault-agent "
+                                                + name
+                                                + " marker path")
+                                .doesNotContain(",", "="));
+        assertThat(agent.toString())
+                .as("BookKeeper fault-agent JAR path")
+                .doesNotContain(" ");
+        return "-javaagent:"
+                + agent
+                + "=arm="
+                + arm
+                + ",captured="
+                + captured
+                + ",applied="
+                + applied
+                + ",release="
+                + release
+                + ",installed="
+                + installed;
     }
 
     private static Path extractReleaseDistribution(
@@ -3375,6 +4274,90 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private static void preserveBookKeeperInFlightFailureEvidence(
+            Path controllerConfig,
+            Path brokerOneConfig,
+            Path brokerTwoConfig,
+            Path controllerFormatLog,
+            Path brokerOneFormatLog,
+            Path brokerTwoFormatLog,
+            Path controllerServerLog,
+            Path brokerOneServerLog,
+            Path brokerTwoServerLog,
+            Path agentInstalled,
+            Path agentCaptured,
+            Path agentApplied,
+            Path agentRelease
+    ) {
+        String configured =
+                System.getProperty(
+                        "nereus.kafka.process.evidence.dir");
+        if (configured == null || configured.isBlank()) {
+            return;
+        }
+        Path target = Path.of(configured).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(target);
+            copyIfPresent(
+                    controllerConfig,
+                    target.resolve(
+                            "bookkeeper-inflight-controller.properties"));
+            copyIfPresent(
+                    brokerOneConfig,
+                    target.resolve(
+                            "bookkeeper-inflight-broker-one.properties"));
+            copyIfPresent(
+                    brokerTwoConfig,
+                    target.resolve(
+                            "bookkeeper-inflight-broker-two.properties"));
+            copyIfPresent(
+                    controllerFormatLog,
+                    target.resolve(
+                            "bookkeeper-inflight-controller-format.log"));
+            copyIfPresent(
+                    brokerOneFormatLog,
+                    target.resolve(
+                            "bookkeeper-inflight-broker-one-format.log"));
+            copyIfPresent(
+                    brokerTwoFormatLog,
+                    target.resolve(
+                            "bookkeeper-inflight-broker-two-format.log"));
+            copyIfPresent(
+                    controllerServerLog,
+                    target.resolve(
+                            "bookkeeper-inflight-controller-server.log"));
+            copyIfPresent(
+                    brokerOneServerLog,
+                    target.resolve(
+                            "bookkeeper-inflight-broker-one-server.log"));
+            copyIfPresent(
+                    brokerTwoServerLog,
+                    target.resolve(
+                            "bookkeeper-inflight-broker-two-server.log"));
+            copyIfPresent(
+                    agentInstalled,
+                    target.resolve(
+                            "bookkeeper-inflight-agent-installed"));
+            copyIfPresent(
+                    agentCaptured,
+                    target.resolve(
+                            "bookkeeper-inflight-agent-captured"));
+            copyIfPresent(
+                    agentApplied,
+                    target.resolve(
+                            "bookkeeper-inflight-agent-applied"));
+            copyIfPresent(
+                    agentRelease,
+                    target.resolve(
+                            "bookkeeper-inflight-agent-release"));
+        } catch (IOException failure) {
+            throw new AssertionError(
+                    "failed to preserve BookKeeper in-flight takeover evidence under "
+                            + target,
+                    failure);
+        }
+    }
+
     private static void preserveBookKeeperTakeoverFailureEvidence(
             String profile,
             Path brokerOneConfig,
@@ -3451,6 +4434,23 @@ class NereusKafkaNativeProcessIntegrationTest {
         Files.deleteIfExists(target.resolve("inflight-controller-server.log"));
         Files.deleteIfExists(target.resolve("inflight-broker-one-server.log"));
         Files.deleteIfExists(target.resolve("inflight-broker-two-server.log"));
+        for (String file :
+                List.of(
+                        "bookkeeper-inflight-controller.properties",
+                        "bookkeeper-inflight-broker-one.properties",
+                        "bookkeeper-inflight-broker-two.properties",
+                        "bookkeeper-inflight-controller-format.log",
+                        "bookkeeper-inflight-broker-one-format.log",
+                        "bookkeeper-inflight-broker-two-format.log",
+                        "bookkeeper-inflight-controller-server.log",
+                        "bookkeeper-inflight-broker-one-server.log",
+                        "bookkeeper-inflight-broker-two-server.log",
+                        "bookkeeper-inflight-agent-installed",
+                        "bookkeeper-inflight-agent-captured",
+                        "bookkeeper-inflight-agent-applied",
+                        "bookkeeper-inflight-agent-release")) {
+            Files.deleteIfExists(target.resolve(file));
+        }
         for (String profile :
                 List.of(
                         "wal-only",
@@ -3711,6 +4711,13 @@ class NereusKafkaNativeProcessIntegrationTest {
             String fixtureToken,
             int authoritySeed,
             boolean requireMaterializedObject) {
+    }
+
+    private record BookKeeperInFlightEvidence(
+            StreamId streamId,
+            String reservationId,
+            long ledgerId,
+            long entryId) {
     }
 
     private record PendingProduce(

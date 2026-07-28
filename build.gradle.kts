@@ -68,6 +68,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
         || task == "f9InFlightTakeoverProcessIntegrationTest"
         || task == "f9BookKeeperProfileTakeoverProcessIntegrationTest"
+        || task == "f9BookKeeperInFlightTakeoverProcessIntegrationTest"
         || task == "f9BookKeeperWalOnlyProcessIntegrationTest"
         || task == "f9BookKeeperWalAsyncObjectProcessIntegrationTest"
         || task == "f9BookKeeperWalSyncObjectProcessIntegrationTest"
@@ -139,6 +140,8 @@ val dockerBackedSubprojectTasks = mapOf(
         "f9M6KafkaProcessIntegrationTest",
         "f9MultiBrokerTakeoverProcessIntegrationTest",
         "f9InFlightTakeoverProcessIntegrationTest",
+        "f9BookKeeperProfileTakeoverProcessIntegrationTest",
+        "f9BookKeeperInFlightTakeoverProcessIntegrationTest",
         "f9BookKeeperWalOnlyProcessIntegrationTest",
         "f9BookKeeperWalAsyncObjectProcessIntegrationTest",
         "f9BookKeeperWalSyncObjectProcessIntegrationTest",
@@ -3090,11 +3093,12 @@ tasks.register("phase9M6KafkaFeatureCheck") {
 tasks.register("phase9M6KafkaProcessCheck") {
     group = "verification"
     description =
-        "Run real Oxia + LocalStack + BookKeeper cold-restart and two-process Nereus Kafka takeover acceptance."
+        "Run real Oxia + LocalStack + BookKeeper cold-restart, live takeover, and in-flight fencing acceptance."
     dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9InFlightTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperProfileTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperInFlightTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalAsyncObjectProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalSyncObjectProcessIntegrationTest")
@@ -3104,8 +3108,9 @@ tasks.register("phase9M6KafkaProcessCheck") {
 tasks.register("phase9M6KafkaBookKeeperProcessCheck") {
     group = "verification"
     description =
-        "Run the focused real BookKeeper three-profile cold-restart, deletion, and live-takeover process gates."
+        "Run focused real BookKeeper three-profile cold-restart, deletion, live-takeover, and in-flight fencing gates."
     dependsOn(":nereus-kafka-adapter:f9BookKeeperProfileTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperInFlightTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalAsyncObjectProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalSyncObjectProcessIntegrationTest")

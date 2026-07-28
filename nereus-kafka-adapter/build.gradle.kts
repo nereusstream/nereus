@@ -22,6 +22,8 @@ val f9ProviderIntegrationTest by sourceSets.creating {
     runtimeClasspath += output + compileClasspath
 }
 
+val f9BookKeeperFaultAgent by sourceSets.creating
+
 configurations[f9ProviderIntegrationTest.implementationConfigurationName].extendsFrom(
     configurations.testImplementation.get(),
 )
@@ -42,7 +44,29 @@ dependencies {
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.junit.jupiter)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.assertj)
     add(f9ProviderIntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+    add(f9BookKeeperFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
 }
+
+val f9BookKeeperFaultAgentJar =
+    tasks.register<Jar>("f9BookKeeperFaultAgentJar") {
+        group = "build"
+        description =
+            "Build the test-only Java agent that gates one applied BookKeeper write completion."
+        archiveFileName.set("nereus-f9-bookkeeper-fault-agent.jar")
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        manifest {
+            attributes[
+                "Premain-Class"
+            ] = "com.nereusstream.kafka.testing.agent.BookKeeperWriteCompletionGateAgent"
+        }
+        from(f9BookKeeperFaultAgent.output)
+        from({
+            configurations[f9BookKeeperFaultAgent.runtimeClasspathConfigurationName]
+                .map { dependency ->
+                    if (dependency.isDirectory) dependency else zipTree(dependency)
+                }
+        })
+    }
 
 tasks.register<Test>("f9M2Test") {
     group = "verification"
@@ -266,6 +290,41 @@ tasks.register<Test>("f9BookKeeperProfileTakeoverProcessIntegrationTest") {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
                 "threeBookKeeperProfilesAtomicallyReassignLiveSharedStorageLeader",
+        )
+    }
+}
+
+tasks.register<Test>("f9BookKeeperInFlightTakeoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Hold an applied BookKeeper write before durable publication while a live release broker takes over."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9BookKeeperFaultAgentJar)
+    shouldRunAfter(tasks.named("f9BookKeeperProfileTakeoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.bookkeeper.fault.agent",
+        layout.buildDirectory.file("libs/nereus-f9-bookkeeper-fault-agent.jar").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-bookkeeper-inflight-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "threeReleaseProcessesFenceAppliedBookKeeperWriteBeforePublication",
         )
     }
 }

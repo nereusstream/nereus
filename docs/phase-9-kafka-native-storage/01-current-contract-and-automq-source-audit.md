@@ -656,7 +656,15 @@ ZooKeeper metadata、two Bookies and two Kafka release processes for WAL-only、
 commits offset 0 on `[1]`，requires exact `[2]` leader/replicas/ISR and empty reassignment while node 1 remains alive，then
 recovers offset 0 and commits/fetches offset 1 on node 2。WAL-only proves its bucket remains empty；both Object profiles prove
 real NCP2 objects exist across the handoff。Fresh execution passes 64/64 actionable tasks in 2m17s。This closes BookKeeper
-post-handoff P coverage；BookKeeper already-dispatched append C cuts、transaction/internal-topic coordinator migration、
+post-handoff P coverage。`f9BookKeeperInFlightTakeoverProcessIntegrationTest` supplies the matching shared-appender C cut
+without changing production code：a test-only Java agent allows the real Bookie future to succeed、captures exact
+`ledgerId/entryId` evidence while the Oxia reservation remains `WRITING`，then withholds completion from
+`BookKeeperPrimaryWalAppender`。After broker 1 is frozen and KRaft installs `[2]`，broker 2's first append invokes
+`BookKeeperLedgerRecovery`，which must transition that exact reservation to `ABANDONED` and the old root to `SEALED` before
+committing offset 1。Resuming broker 1 releases the delayed future but its stale metadata CAS cannot publish；LEO remains 2
+and WAL-only publishes no Object bytes。Fresh execution passes 66/66 actionable tasks in 1m30s。Because this cut precedes
+`DURABLE` and the profile-specific materialization branch，the same production boundary is shared by WAL-only、async and
+sync；the prior three-profile P matrix supplies the profile-specific half。Transaction/internal-topic coordinator migration、
 multi-controller and broader chaos proof remain open。
 
 The 2026-07-28 fresh partial aggregate exposed a second-generation BookKeeper materialization planner defect after the first
