@@ -1,10 +1,10 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + activation-backed Object-WAL provider/checkpoint/read-pin/paged-replay runtime + local Kafka-fork stock-RecordBatch recovery-state/metadata-lifecycle/deferred-provider/log-factory slices implemented；F9-M4 NKC1 全七 section canonical state/strict V1 codecs/full composition、idempotent/transaction/control exact append encoding，以及 Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transaction guard/marker-version async executor handoff 和 recovered-storage-before-coordinator-election deterministic slices implemented；F9-M5 stock-compatible retention planner + checkpoint-before-trim/response-loss barrier + stock DeleteRecords fork invocation + checkpoint-restorable virtual segment/config/index state + periodic owned-partition retention runtime + ranged Kafka compaction decode/rewrite/exact-source/sorted-spill/KCRS-to-NTC2 preparation + object upload/Generation publication/coverage-CAS linearization + exact activated-generation discovery/generation-constrained runtime reads + binding-rooted compacted-prefix/committed-tail no-resurrection routing + recoverable single-partition pass + terminal dual-root retirement + bounded orphan scan/non-overlapping scheduler-owner + projection-free direct-stream registration/Generation authority fence + activated Object-WAL production composition + fork-owned compaction registration/partition-lock authority/stock transaction-marker pre-scan deterministic slices implemented；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation metadata/coordinator + broker publisher/verifier/runtime startup fence + generic BrokerServer lifecycle + stock-source isolation + explicit native-storage launcher + controller-leader-only activation scheduling slices implemented；checkpoint recovery/retention 的 exact-reference durable quarantine/redacted first-failure audit 已接入 Object-WAL runtime，并通过 deterministic 与 real-Oxia reconnect gate；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；M4 checkpoint publication/process-restart/takeover 与 internal-topic real-process gates、M5 real-provider retention/restart/takeover、完整 stock `LogCleaner` differential oracle、真实多 Controller failover 与 native-storage KRaft gate 仍未实现
+> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + activation-backed Object-WAL provider/checkpoint/read-pin/paged-replay runtime + local Kafka-fork stock-RecordBatch recovery-state/metadata-lifecycle/deferred-provider/log-factory slices implemented；F9-M4 NKC1 全七 section canonical state/strict V1 codecs/full composition、idempotent/transaction/control exact append encoding，以及 Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transaction guard/marker-version async executor handoff 和 recovered-storage-before-coordinator-election deterministic slices implemented；F9-M5 stock-compatible retention planner + checkpoint-before-trim/response-loss barrier + stock DeleteRecords fork invocation + checkpoint-restorable virtual segment/config/index state + periodic owned-partition retention runtime + ranged Kafka compaction decode/rewrite/exact-source/sorted-spill/KCRS-to-NTC2 preparation + object upload/Generation publication/coverage-CAS linearization + exact activated-generation discovery/generation-constrained runtime reads + binding-rooted compacted-prefix/committed-tail no-resurrection routing + recoverable single-partition pass + terminal dual-root retirement + bounded orphan scan/non-overlapping scheduler-owner + projection-free direct-stream registration/Generation authority fence + activated Object-WAL production composition + fork-owned compaction registration/partition-lock authority/stock transaction-marker pre-scan deterministic slices implemented；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation metadata/coordinator + broker publisher/verifier/runtime startup fence + generic BrokerServer lifecycle + stock-source isolation + explicit native-storage launcher + controller-leader-only activation scheduling + durable feature/format + dedicated-controller admission + controller single-copy enforcement slices implemented；checkpoint recovery/retention 的 exact-reference durable quarantine/redacted first-failure audit 已接入 Object-WAL runtime，并通过 deterministic 与 real-Oxia reconnect gate；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；M4 checkpoint publication/process-restart/takeover 与 internal-topic real-process gates、M5 real-provider retention/restart/takeover、完整 stock `LogCleaner` differential oracle、真实多 Controller failover 与 native-storage KRaft gate 仍未实现
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Kafka fork development head：`nereusstream/kafka:nereus/future9-native-kafka-storage@9773c8f817a8f9f81d8beadf072d8d0e1345be99`（28 commits from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；M3 19 + M4 2 + M5 4 + M6/stock-isolation/controller 3）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；HTTPS credential is invalid/read-only but SSH push is configured and the remote head is verified
+> Kafka fork development head：`nereusstream/kafka:nereus/future9-native-kafka-storage@5ebf31cde8a5ef58597f9a2e0f05d9c37e5ceb41`（30 commits / 118 files from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；M3 19 + M4 2 + M5 4 + M6/stock-isolation/controller 3 + durable feature/control 1 + aggregate Spotless alignment 1）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；HTTPS credential is invalid/read-only but SSH push is configured and the remote head is verified
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
@@ -76,8 +76,11 @@ controller-epoch fencing；它继续依赖 coordinator 的 idempotent CAS/winner
 检查约束。Object-WAL runtime 现另外拥有 `KafkaCheckpointFailureMetadataStore` 和
 `DurableKafkaCheckpointFailureQuarantine`：recovery/retention 在读取对象前按 exact reference 查询，确认永久失败后必须先
 完成 immutable first-failure audit 的 create/reconcile 才能尝试旧 root；raw failure message 不进入 durable bytes，
-metadata read/write failure 直接 fail closed。BookKeeper/async-object creator、checkpoint time-index candidate、五档
-real-service profile matrix、`nereus.storage.version` feature registration/gating、真实多 Controller failover与
+metadata read/write failure 直接 fail closed。fork `d23dc5c787` 已注册 opt-in
+`nereus.storage.version`、仅在 enabled broker/controller 广播 0..1 range、支持 dedicated controller 配置与显式
+`kafka-storage.sh format --feature nereus.storage.version=1`，并在 finalized level 1 后才调度 activation；
+controller create/config/ISR/reassignment/directory mutation 同时执行 single-copy policy。BookKeeper/async-object
+creator、checkpoint time-index candidate、五档 real-service profile matrix、真实多 Controller failover与
 KRaft Produce/Fetch/ListOffsets 尚未实现。`NereusUnifiedLog` 已有首条同步
 correctness bridge：stock validation/offset assignment 后把 exact bytes 交给 adapter stable append，成功后才推进 shell
 LEO；Fetch 把 bounded adapter assembly 转回 `MemoryRecords`，synthetic segment size 保持 `0`。fork-owned
@@ -252,8 +255,9 @@ wiring 已落地并通过 stock KRaft restart；provider-backed runtime composit
 fork `faaffc8a75` 又以 stock `BrokerStorageManagedLog`/`PartitionLeaderAuthority` 接口隔离所有 maintenance hook，
 保证未携带 Nereus artifact 的 stock main/test compilation 不链接产品类型；`3bd92c7244` 把显式 production broker factory
 从 `bin/nereus-kafka-server-start.sh` 注入共享 `Kafka.run`/`KafkaRaftServer` 生命周期；`9773c8f817` 再把 production
-controller factory 沿同一路径传入 `ControllerServer`，以 stock-owned runtime/publisher seam 驱动 activation。当前仍未
-闭合的是真实多 Controller failover、feature gate 与 native-storage KRaft process gate。
+controller factory 沿同一路径传入 `ControllerServer`，以 stock-owned runtime/publisher seam 驱动 activation；同一
+head 还完成 durable feature 注册、enabled-only advertisement/format、dedicated-controller validation 和
+single-copy controller policy。当前仍未闭合的是真实多 Controller failover 与 native-storage KRaft process gate。
 fork `617451957c` 已把该 generic seam 接到 adapter contract：显式 typed creators 交付 runtime 与 ListOffsets limits，
 同一 product manager 只绑定一个 exact `ReplicaManager`，构造 `NereusListOffsetsLifecycle`/`NereusTopicDeltaLifecycle`，
 并在 runtime drain 时同步撤销 lookup admission；disabled build 排除全部 adapter-backed sources。
@@ -281,8 +285,9 @@ state update failure都会 resign/fence；M3 idempotent/transaction/control batc
 worker 内的 `NereusUnifiedLog` stock state-machine boundary，不再占用 request handler。`bba3ef0121` 同样把
 whole-request Fetch read wave 迁到 runtime-owned bounded worker；逻辑 operation permit 覆盖等待期，独立 callback
 executor 负责最终响应，request handler 与 purgatory thread 都不再执行 Nereus storage wait。Controller
-first-activation 的 deterministic scheduling 已由 `9773c8f817` 组装；Object-WAL checkpoint durable quarantine 已在
-product runtime 组装，BookKeeper/async provider、真实 controller failover 和 native-storage KRaft process gate
+first-activation 的 deterministic scheduling 与 durable feature gate 已由 `d23dc5c787` 组装；Object-WAL checkpoint
+durable quarantine 已在 product runtime 组装，BookKeeper/async provider、真实 controller failover 和
+native-storage KRaft process gate
 仍未组装。
 若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。

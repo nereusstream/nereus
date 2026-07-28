@@ -39,6 +39,6 @@ status_count="$(rg -c '^[[:space:]]+"status": "(PLANNED|IMPLEMENTED_NOT_RUN|PASS
 [[ "$status_count" -eq 146 ]] || fail "manifest contains an invalid status"
 
 method_count="$(rg -o '"testMethod": "scenarioKf[A-Za-z0-9]+"' "$manifest" | sort -u | wc -l | tr -d ' ')"
-[[ "$method_count" -eq 146 ]] || fail "planned test methods must be unique and canonical"
+[[ "$method_count" -eq 146 ]] || fail "scenario test methods must be unique and canonical"
 
-echo "F9 scenario manifest: 146/146 planned scenarios synchronized"
+echo "F9 scenario manifest: 146/146 status-bearing scenarios synchronized"

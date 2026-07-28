@@ -460,10 +460,10 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@9773c8f817` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@5ebf31cde8` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
-  compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit and one
-  controller activation scheduling commit。The
+  compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
+  controller activation scheduling commit、one durable feature/control commit and one aggregate Spotless alignment commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
@@ -474,9 +474,9 @@ coordinator/transaction/compaction remain M4/M5。
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the
-  fork branch/local+remote head/base ancestry/twenty-eight-commit count/organization remote/one-hundred-two log-IO/bridge/recovery/
+  fork branch/local+remote head/base ancestry/thirty-commit count/organization remote/one-hundred-eighteen log-IO/bridge/recovery/
   metadata-lifecycle/configuration/runtime-composition/retention/compaction
-  plus stock-isolation/launcher/controller-runtime blobs and markers；`phase9M3KafkaForkCheck` publishes exact
+  plus stock-isolation/launcher/controller-runtime/feature-control blobs and markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
   seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、five stock Partition seam tests、two
   focused ReplicaManager tests、all seven BrokerMetadataPublisher tests、six typed-config tests、four config-validator tests、
@@ -556,7 +556,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@9773c8f817` branch。
+`nereus/future9-native-kafka-storage@5ebf31cde8` branch。
 The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、fresh
 process restart/takeover index recovery、real internal-topic coordinator replay/restart/failover、upstream focused suites
 and real two-broker evidence are still required before M4 completion。
@@ -756,11 +756,14 @@ main/test compilation；fork `3bd92c7244` adds an executable native-storage laun
 factory through the shared stock `Kafka.run` lifecycle into `KafkaRaftServer`；fork `9773c8f817` adds the parallel
 `ControllerStorageRuntimeFactory` path and a `MetadataPublisher`-driven activation scheduler。Focused tests prove
 current-controller-only execution、one in-flight/coalesced callbacks、retriable-only retry、leadership-loss cancellation、
-one durable fault per controller epoch and owned close。`phase9M6CheckpointQuarantineCheck --rerun-tasks` now additionally
+one durable fault per controller epoch and owned close。The same `d23dc5c787` head registers explicit-only
+`nereus.storage.version`、advertises it only from enabled broker/controller processes、supports dedicated controllers、
+requires explicit enabled formatting、waits for finalized level 1 before activation and enforces single-copy controller
+mutations。`phase9M6KafkaFeatureCheck --rerun-tasks` locks that head and runs the isolated server-common、server、metadata and
+artifact-enabled core feature suites。`phase9M6CheckpointQuarantineCheck --rerun-tasks` additionally
 composes 146/146 manifest validation、immutable store/codec contracts、recovery/retention ordering、production Object-WAL
 resource ownership and real-Oxia close/reconnect lookup。These remain focused partial evidence：
-`nereus.storage.version` feature registration、dedicated-controller enablement、durable in-flight epoch fencing、
-multi-controller takeover、priority budgets and real native-storage
+durable in-flight epoch fencing、multi-controller takeover、priority budgets and real native-storage
 shutdown/process cuts remain open。
 
 ### Tasks
@@ -771,6 +774,8 @@ shutdown/process cuts remain open。
 :nereus-kafka-adapter:f9ActivationOxiaIntegrationTest
 :nereus-metadata-oxia:f9ActivationOxiaIntegrationTest
 phase9M6ActivationMetadataCheck
+phase9M6KafkaFeatureCheck
+phase9M6CheckpointQuarantineCheck
 Kafka fork: nereusF9ControllerTest
 Kafka fork: nereusF9BrokerLifecycleTest
 Kafka fork: nereusF9MetadataPublisherTest

@@ -415,11 +415,13 @@ checkpoint-before-DeleteRecords trim 是 `4c060aec89`，第二十三个 partitio
 authority capture 是 `58342d9dca31009bb63b2c6a3be8a7c7ff68f9ec`，第二十六个 stock maintenance
 source-isolation fix 是 `faaffc8a75`，第二十七个 native-storage launcher 是
 `3bd92c7244d84870f48e4819bf2930ca9248c278`，第二十八个 controller storage activation scheduling 是
-`9773c8f817a8f9f81d8beadf072d8d0e1345be99`。该 head 已通过 SSH 发布到
+`9773c8f817a8f9f81d8beadf072d8d0e1345be99`，第二十九个 durable storage feature/control commit 是
+`d23dc5c7877eac89366e3552b56cae4a87bdad4a`，第三十个 aggregate Spotless import alignment 是
+`5ebf31cde8a5ef58597f9a2e0f05d9c37e5ceb41`。该 head 已通过 SSH 发布到
 `origin/nereus/future9-native-kafka-storage`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/twenty-eight-commit
-count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百零二文件 exact change set/blob、
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/thirty-commit
+count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百一十八文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
 BrokerServer runtime create/ready/drain/close signature、typed adapter factory/ReplicaManager binding、stock-only
@@ -552,5 +554,5 @@ KRaft restart、the simultaneous-wakeup regression and all Checkstyle/SpotBugs/S
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`9773c8f817a8f9f81d8beadf072d8d0e1345be99`。Executable source-lock expectation 已更新到该 reviewed、
+`5ebf31cde8a5ef58597f9a2e0f05d9c37e5ceb41`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

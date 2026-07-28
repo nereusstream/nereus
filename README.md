@@ -31,8 +31,10 @@ broad stock-`LogCleaner` differential gate remain pending。The Kafka fork now h
 local stock-`MemoryRecords` timestamp inspection/recovery-state rebuild、Kafka
 sentinel/request mapping、
 leader-epoch-fenced `Partition` lookup installation、`ReplicaManager` delayed-operation wakeup、async completion/cancellation
-plus provisional exact-`Partition` state publication/rollback and exhaustive Nereus-to-Kafka error mapping against the locked 4.3 baseline，
-but no native Kafka broker capability is available yet. Nereus is built around an Oxia
+plus provisional exact-`Partition` state publication/rollback and exhaustive Nereus-to-Kafka error mapping against the locked 4.3 baseline。
+The fork now also owns an explicit durable `nereus.storage.version` feature、dedicated-controller admission and feature-gated
+RF/minISR/ISR/reassignment/directory enforcement；this is deterministic control-plane evidence, not yet a native Kafka
+production capability. Nereus is built around an Oxia
 metadata/coordination plane, selectable primary-WAL/object-materialization profiles,
 a shared object data plane, broker-locality without durable broker ownership, and a
 single logical `streamId + offset` coordinate.
@@ -86,10 +88,13 @@ record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHol
 interfaces、an explicit native-storage launcher and a stock-owned controller metadata-publisher/runtime seam。Its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The SSH-published fork head is
-`nereus/future9-native-kafka-storage@9773c8f817`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
+`nereus/future9-native-kafka-storage@5ebf31cde8`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
 controller factories through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。The controller runtime now coalesces
 metadata/leadership callbacks、runs first activation only while locally current、retries only retriable product failures and
-cancels scheduled retry on leadership loss。A real provider-backed KRaft process gate、multi-controller failover evidence and
+cancels scheduled retry on leadership loss；activation scheduling additionally waits for finalized
+`nereus.storage.version >= 1`。The same fork head advertises this opt-in feature only from enabled broker/controller processes、
+allows dedicated enabled controllers and enforces single-copy controller mutations。A real provider-backed KRaft process gate、
+multi-controller failover evidence and
 end-to-end native Produce/Fetch/ListOffsets evidence remain future work，so this is not yet a production-rollout claim.
 
 ## Current Phase

@@ -144,7 +144,7 @@ calling the scalar-mutating add path，so a later marker-updated `lastTimestamp`
 into a fresh manager and immediately re-exported for exact canonical equality；ordinary local snapshot IO remains disabled。
 Deterministic tests cover sequence wrap、five-batch retention、marker timestamp preservation、checkpoint encode/decode and
 replay equality。该 commit 现已作为 published F9 branch 的第二十个 commit 包含在
-`nereusstream/kafka:nereus/future9-native-kafka-storage@9773c8f817`。
+`nereusstream/kafka:nereus/future9-native-kafka-storage@5ebf31cde8`。
 
 ## 4. Transaction state and indexes
 

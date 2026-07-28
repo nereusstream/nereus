@@ -34,7 +34,7 @@ and TV2 marker through the configured storage executor。`BrokerMetadataPublishe
 `NereusTopicDeltaLifecycleTest` cover the deterministic ordering part of KF-TXN-011/012：both elections wait for ready，
 and transaction-state ready waits for exact recovered storage installation。Rows stay `PLANNED` because required
 real-service、process/restart、takeover and aggregate tiers have not run。The fork commits are published in
-`nereusstream/kafka:nereus/future9-native-kafka-storage@9773c8f817`。
+`nereusstream/kafka:nereus/future9-native-kafka-storage@5ebf31cde8`。
 
 Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
 `3eb6b63` + `57dcf35`）：stock DeleteRecords normalization/capture invokes the shared checkpoint-before-trim path；
@@ -42,7 +42,7 @@ the fork exposes bounded owned writable partitions and the same `NereusUnifiedLo
 non-overlapping maintenance；and canonical virtual segment/config/time/logical state is rebuilt from checkpoint plus
 committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、Checkstyle and SpotBugs evidence passes。Rows
 remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing。The Kafka
-fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@9773c8f817`。
+fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@5ebf31cde8`。
 
 Current checkpoint-failure quarantine evidence（product 2026-07-28）：closed V1 record/envelope and canonical key tests
 cover exact partition-incarnation/object identity、immutable first-winner、reference-digest collision、raw-failure
@@ -56,10 +56,10 @@ fresh broker process、takeover or aggregate tiers。
 Current deterministic compaction fork evidence（product `e18bf36`；fork `58342d9dca`）：typed bounded runtime config、
 one-time product composition、leader-only owned-partition registration、internal/user work classification、partition-lock
 canonical/HW/LSO capture and stock `CleanedTransactionMetadata` marker pre-scan pass focused adapter/fork tests plus
-Checkstyle、SpotBugs and the executable 28-commit/102-file source lock。Rows remain `PLANNED` until real-provider
+Checkstyle、SpotBugs and the executable 30-commit/118-file source lock。Rows remain `PLANNED` until real-provider
 fresh-process/restart/takeover and full LogCleaner differential evidence exist。
 
-Current deterministic M6 launcher/isolation evidence（fork `faaffc8a75` + `3bd92c7244` + `9773c8f817`）：stock maintenance
+Current deterministic M6 launcher/isolation evidence（fork `faaffc8a75` + `3bd92c7244` + `9773c8f817` + `d23dc5c787` + `5ebf31cde8`）：stock maintenance
 paths compile only against `BrokerStorageManagedLog`/`PartitionLeaderAuthority`；artifact-free stock main/test compilation
 and `PartitionTest` pass without Nereus classes。The artifact-only `NereusKafka` launcher selects a fresh production factory
 and delegates signal/startup/shutdown/await behavior to the shared stock `Kafka.run` path；the executable server-start script
@@ -68,15 +68,18 @@ selects that class。The same launcher now passes fresh broker and controller fa
 artifact-free Java/stock callers compatible。`NereusControllerStorageRuntimeTest` proves current-controller-only retriable
 retry、leadership-loss scheduled-retry cancellation、metadata callback coalescing behind one in-flight attempt and one
 non-retriable fault report process-locally per controller epoch；mapper and launcher tests prove no-I/O controller mapping and dual-factory
-selection。Focused launcher/runtime tests、complete stock `KafkaConfigTest` compilation、Checkstyle、SpotBugs and the executable
-28-commit/102-file source lock pass。Rows remain `PLANNED` because the evidence does not yet cover dedicated-controller
-enablement、in-flight activation epoch fencing、`nereus.storage.version` feature/create-topic gating、multi-controller
-takeover or a real provider-backed KRaft process proving startup、Produce/Fetch/ListOffsets and shutdown cuts。
+selection。Fork `d23dc5c787` additionally proves explicit-only `nereus.storage.version` definition、
+enabled broker/controller advertisement、dedicated-controller validation、explicit enabled formatting、finalized-feature
+activation wait and controller-side RF/minISR/ISR/reassignment/directory rejection。Focused launcher/runtime/feature suites、
+complete stock `KafkaConfigTest` compilation、Checkstyle、SpotBugs and the executable 30-commit/118-file source lock pass。
+KF-OPS-006/007 are `PASSED_CURRENT_SOURCE` deterministic evidence；the other runtime rows remain `PLANNED` because the
+evidence does not yet cover in-flight activation epoch fencing、multi-controller takeover or a real provider-backed KRaft
+process proving startup、Produce/Fetch/ListOffsets and shutdown cuts。
 
 ## 2. Machine-readable manifest target
 
 F9-M1 implementation start 已创建 `docs/phase-9-kafka-native-storage/f9-scenarios.json`，每个 Markdown row 对应
-一个 object；`checkPhase9ScenarioManifest` 当前验证 146/146 ID、required fields、status vocabulary 和 planned
+一个 object；`checkPhase9ScenarioManifest` 当前验证 146/146 ID、required fields、status vocabulary 和 canonical
 method uniqueness：
 
 ```json
@@ -149,11 +152,12 @@ non-destructive non-empty rejection、PREPARED crash resume、second-proof cut a
 `KafkaStorageBindingAwareClusterSnapshotProviderTest` proves all 64 binding-registry shards are examined before an empty result，
 any non-empty shard is projected into the activation snapshot，and an already-positive fork fact avoids a weaker rescan；the
 activation-backed Object-WAL integration test proves this wrapper remains on the public production path。Kafka controller
-seam/context binding and deterministic activation scheduling are now implemented at fork `9773c8f817`；the four runtime tests
-cover controller-current retry、leadership loss、in-flight coalescing and per-epoch durable fault suppression。Real
-multi-controller process/takeover、feature setting/create-topic gating、BookKeeper/async-object provider construction、
+seam/context binding and deterministic activation scheduling are now implemented at fork `d23dc5c787`；the feature/control tests
+cover controller-current retry、leadership loss、in-flight coalescing、per-epoch process-local fault suppression、explicit feature
+format/advertisement and single-copy controller mutation。Real multi-controller process/takeover、
+BookKeeper/async-object provider construction、
 priority budgets and native-storage process cuts 仍未实现，
-rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
+除 KF-OPS-006/007 外 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及
 BrokerServer stock start/drain/close compatibility；`NereusBrokerStorageRuntimeTest` additionally verifies disabled creator
 isolation、typed adapter assembly、post-runtime failure rollback、drain mapping and idempotent close，但不替代 provider/
@@ -427,8 +431,8 @@ composition/restart evidence only；the real-provider fresh-process restart tier
 | KF-OPS-003 | empty cluster first activation PREPARED→ACTIVE succeeds with exact brokers/digests | `KafkaActivationIntegrationTest` | R,P,C | M6 |
 | KF-OPS-004 | any topic/internal topic/local authoritative log/binding makes first activation fail non-destructively | `KafkaActivationIntegrationTest` | R,P | M6 |
 | KF-OPS-005 | controller failover at every activation cut preserves one-way state | `KafkaActivationControllerFailoverTest` | P,C,K | M6 |
-| KF-OPS-006 | controller enforces RF=1/minISR=1 for create/create-partitions/manual assignment | fork `NereusReplicationControlManagerTest` | D,K | M6 |
-| KF-OPS-007 | ISR/reassignment/directory APIs cannot create follower/local-placement semantics | fork `NereusReplicationControlManagerTest` | D,K | M6 |
+| KF-OPS-006 | controller enforces RF=1/minISR=1 for create/create-partitions/manual assignment | fork `ReplicationControlManagerTest.testNereusStorageFeatureGatesTopicCreationAndPartitionGrowth` | D,K | M6 |
+| KF-OPS-007 | ISR/reassignment/directory APIs cannot create follower/local-placement semantics | fork `ReplicationControlManagerTest.testNereusStorageFeatureGatesIsrReassignmentAndDirectories` | D,K | M6 |
 | KF-OPS-008 | missing/mismatched/expired broker capability excludes leader ownership | `KafkaCapabilityReadinessIntegrationTest` | R,P,C | M6 |
 | KF-OPS-009 | compatible rolling restart/new broker epoch reacquires readiness/leadership | `KafkaRollingRestartIntegrationTest` | P,K | M6 |
 | KF-OPS-010 | unsupported binary rollback or locally disabled broker remains fenced | `KafkaRollingRestartIntegrationTest` | P,C | M6 |

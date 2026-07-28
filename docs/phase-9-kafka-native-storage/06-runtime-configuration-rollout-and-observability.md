@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling 与 Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit are implemented locally；BookKeeper/async providers、feature registration、real multi-controller/KRaft process gate and full observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement 与 Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit are implemented locally；BookKeeper/async providers、real multi-controller/KRaft process gate and full observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -102,8 +102,11 @@ then coalesces stock metadata/leadership callbacks into one current-controller-o
 process-locally within one controller epoch；this controller fault suppression is separate from the implemented partition
 checkpoint quarantine。
 The controller creator owns a minimal shared-Oxia partition/activation graph independently of the broker runtime and does not
-block controller startup on ACTIVE。Detailed signatures and event rules are frozen in document 03。Feature registration、
-dedicated-controller enablement、real multi-controller takeover and the provider-backed native-storage process gate remain open。
+block controller startup on ACTIVE。Detailed signatures and event rules are frozen in document 03。Fork `d23dc5c787`
+registers `nereus.storage.version` as explicit-only、advertises range 0..1 only on enabled processes、permits a
+controller-only enabled role、requires explicit enabled-mode formatting and prevents activation scheduling until the metadata
+image finalizes level 1。It also enforces RF/minISR/ISR/reassignment/directory rules in the controller。Real
+multi-controller takeover and the provider-backed native-storage process gate remain open。
 
 ### 1.2 Resource ownership
 
@@ -392,7 +395,10 @@ When enabled，startup rejects before any partition IO unless：
 - selected profile dependencies/configs pass existing typed provider validation；
 - activation Kafka cluster ID exactly matches current KRaft cluster ID。
 
-Controller validates RF/assignment independently from broker config using the KRaft `nereus.storage.version` feature。
+Controller validates RF/assignment independently from broker config using the finalized KRaft
+`nereus.storage.version` feature。Level 1 requires RF=1、singleton manual assignments、effective
+`min.insync.replicas=1`、leader-only ISR and singleton reassignment targets；replica-directory assignment returns per-partition
+`UNSUPPORTED_VERSION` without records after stock broker epoch validation。Level 0/absent keeps stock behavior。
 
 ## 4. Activation records
 

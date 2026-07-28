@@ -2826,7 +2826,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "9773c8f817a8f9f81d8beadf072d8d0e1345be99",
+        "5ebf31cde8a5ef58597f9a2e0f05d9c37e5ceb41",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -2945,6 +2945,84 @@ tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
         "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
         "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
     )
+}
+
+tasks.register<Exec>("phase9M6KafkaFeatureServerCommonCheck") {
+    group = "verification"
+    description = "Verify the opt-in nereus.storage.version definition and stock feature-set isolation."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":server-common:test",
+        "--tests",
+        "org.apache.kafka.server.common.FeatureTest",
+    )
+}
+
+tasks.register<Exec>("phase9M6KafkaFeatureServerCheck") {
+    group = "verification"
+    description = "Verify broker feature advertisement is enabled only for Nereus storage processes."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":server:test",
+        "--tests",
+        "org.apache.kafka.server.BrokerFeaturesTest",
+    )
+}
+
+tasks.register<Exec>("phase9M6KafkaFeatureMetadataCheck") {
+    group = "verification"
+    description = "Verify controller feature finalization and RF/minISR/ISR/reassignment/directory enforcement."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":metadata:test",
+        "--tests",
+        "org.apache.kafka.controller.FeatureControlManagerTest",
+        "--tests",
+        "org.apache.kafka.controller.QuorumFeaturesTest",
+        "--tests",
+        "org.apache.kafka.controller.ConfigurationControlManagerTest",
+        "--tests",
+        "org.apache.kafka.controller.ReplicationControlManagerTest",
+    )
+}
+
+tasks.register<Exec>("phase9M6KafkaFeatureCoreCheck") {
+    group = "verification"
+    description = "Verify dedicated-controller admission, explicit storage formatting, and feature-gated activation scheduling."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    dependsOn("publishPhase9DevelopmentArtifacts")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":core:test",
+        "--tests",
+        "kafka.server.NereusKafkaConfigValidatorTest",
+        "--tests",
+        "kafka.tools.StorageToolTest",
+        "--tests",
+        "kafka.server.nereus.NereusControllerStorageRuntimeTest",
+        "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
+        "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
+    )
+}
+
+tasks.register("phase9M6KafkaFeatureCheck") {
+    group = "verification"
+    description = "Run the deterministic F9 Kafka durable feature and controller policy gate."
+    dependsOn("phase9M6KafkaFeatureServerCommonCheck")
+    dependsOn("phase9M6KafkaFeatureServerCheck")
+    dependsOn("phase9M6KafkaFeatureMetadataCheck")
+    dependsOn("phase9M6KafkaFeatureCoreCheck")
 }
 
 tasks.register("phase9M3KafkaForkCheck") {
