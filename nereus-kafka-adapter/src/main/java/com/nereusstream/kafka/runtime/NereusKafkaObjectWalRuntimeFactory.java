@@ -269,23 +269,24 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                         constructedResources,
                         "bookkeeper-client",
                         bookKeeperContext.client()));
-                bookKeeperRuntime = BookKeeperPrimaryWalRuntime.create(
-                        bookKeeperConfiguration.deploymentId(),
-                        exactConfiguration.runtime().nereusCluster(),
-                        exactConfiguration.streamStorage().processRunId(),
-                        bookKeeperConfiguration.wal(),
-                        exactConfiguration.oxia(),
-                        oxiaRuntime,
-                        bookKeeperContext.client(),
-                        new OxiaBookKeeperLedgerIdNamespaceReservationStore(
+                bookKeeperRuntime = BookKeeperPrimaryWalRuntime
+                        .createWithOperations(
+                                bookKeeperConfiguration.deploymentId(),
+                                exactConfiguration.runtime().nereusCluster(),
+                                exactConfiguration.streamStorage().processRunId(),
+                                bookKeeperConfiguration.wal(),
                                 exactConfiguration.oxia(),
-                                oxiaRuntime),
-                        new OxiaBookKeeperProtocolActivationStore(
-                                exactConfiguration.oxia(),
-                                oxiaRuntime),
-                        bookKeeperContext.brokerReadiness(),
-                        bookKeeperContext.passwords(),
-                        exactContext.clock());
+                                oxiaRuntime,
+                                bookKeeperContext.operations(),
+                                new OxiaBookKeeperLedgerIdNamespaceReservationStore(
+                                        exactConfiguration.oxia(),
+                                        oxiaRuntime),
+                                new OxiaBookKeeperProtocolActivationStore(
+                                        exactConfiguration.oxia(),
+                                        oxiaRuntime),
+                                bookKeeperContext.brokerReadiness(),
+                                bookKeeperContext.passwords(),
+                                exactContext.clock());
                 providerResources.add(registerOwned(
                         constructedResources,
                         "bookkeeper-primary-wal-runtime",

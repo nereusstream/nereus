@@ -947,11 +947,17 @@ hint/root、L0、registration、namespace、readiness 或 activation version 漂
 `f9BookKeeperLedgerDeletionProviderIntegrationTest` 已在 real Oxia + two bookies 上覆盖 adapter-level
 物理删除：BookKeeper async append/rollover、NCP2 COMMITTED、terminal materialization-source protection
 retirement、activation-guarded retention、provider ledger absence 和删除后的 NCP2 byte-exact read 全部通过。
+该 gate 现在还从 `NereusKafkaBookKeeperWalRuntimeContext` 注入一个只在 runtime start 后 armed 的 narrow
+`BookKeeperClientOperations` decorator；它要求目标 Kafka WAL ledger 的 provider delete 已成功后才返回失败，
+并断言被注入 ledger ID 与最终退休 ledger 完全相等。Retention 随即重读 provider metadata、记录 first absence、
+等待 late-create audit grace，再重验 namespace/activation 与 second absence 后发布 `DELETED`。默认三参数
+context 仍创建 `DefaultBookKeeperClientOperations`，fork mapper 和正常 provider gate 不需要改变。
 它还锁定 Kafka logical format `KAFKA_RECORD_BATCH_V1` 必须 canonicalize 为 generation index payload format
 `KAFKA_RECORD_BATCH`，否则 terminal task 会永久保护旧 ledger。
 `f9BookKeeperWalAsyncObjectProcessIntegrationTest` 又用真实 release tarball 强制单 entry rollover，等待 ledger
 root `DELETED` 并以独立 client 证明 `NoSuchLedger`；首 JVM 正常停机后，fresh JVM 从 NCP2 读取 offset 0
-并继续 append/fetch/ListOffsets。delete-response-loss 和 multi-broker takeover 仍需后续 process gate，
+并继续 append/fetch/ListOffsets。Provider-level applied-delete response loss 已覆盖；release-process
+response-loss restart 和 multi-broker takeover 仍需后续 process gate，
 当前不能把这条 R-tier evidence 等同于完整 KF-RET-009。
 真实 combined-node
 KRaft/Oxia/S3 process baseline 已通过；

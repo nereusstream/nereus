@@ -84,12 +84,14 @@ mapping that previously vetoed terminal retirement。`f9BookKeeperWalAsyncObject
 release-distribution P-tier evidence：one-entry rollover、metadata `DELETED`、independent-client `NoSuchLedger`、normal
 first-JVM shutdown and fresh-JVM offset-0 NCP2 recovery followed by continued append/fetch/ListOffsets。This is
 deterministic plus adapter/provider/process partial evidence for KF-RET-009 and KF-OPS-012/018 only。Those rows remain
-`PLANNED` because delete-response-loss/multi-broker takeover cuts and aggregate evidence have not run。
+`PLANNED`。The provider gate now also injects applied-delete response loss on the exact retired Kafka WAL ledger and proves
+first/second absence convergence；release-process response-loss restart、multi-broker takeover and final aggregate tiers
+have not run。
 The same date's fresh current-slice aggregate also proves repeated materialization can replace a physically deleted
 BookKeeper prefix with a committed NCP2 higher generation and combine it with a readable BookKeeper tail。The deterministic
 planner reproducer and real provider deletion gate pass inside a 109/109 outer-task run；nested Kafka stock/artifact-enabled
 builds pass 92/92 and 95/95 actionable tasks。This does not change any row to `PASSED_CURRENT_SOURCE`：the manifest's
-required delete-response-loss、multi-broker takeover and final aggregate tiers are still absent。
+required release-process response-loss restart、multi-broker takeover and final aggregate tiers are still absent。
 
 Current checkpoint-failure quarantine evidence（product 2026-07-28）：closed V1 record/envelope and canonical key tests
 cover exact partition-incarnation/object identity、immutable first-winner、reference-digest collision、raw-failure
@@ -383,7 +385,7 @@ full replay；no request-path or recovery claim is inferred from codec-only evid
 | KF-RET-006 | DeleteRecords at batch start/middle/end/HW maps durable logStart/low watermark correctly | product `KafkaDeleteRecordsCoordinatorTest` + fork `PartitionTest`/`NereusUnifiedLogFactoryTest`（exact target/HW/local publication D/K partial）；`KafkaNativeDeleteRecordsIntegrationTest`（real-provider matrix pending） | R,K | M5 |
 | KF-RET-007 | retention/config/new-append races revalidate and never over-trim | `KafkaRetentionRacePropertyTest` | M,R,C | M5 |
 | KF-RET-008 | compact+delete preserves compacted visibility until logical trim passes range | `KafkaCompactionRetentionIntegrationTest` | R,K | M5 |
-| KF-RET-009 | logical trim success is independent of delayed protected physical GC | product `KafkaBookKeeperStreamCoverageProofProducerTest` + `BookKeeperDeletionActivationCoordinatorTest`（activation D partial）+ `f9BookKeeperLedgerDeletionProviderIntegrationTest`（real Oxia/two-bookie physical delete + post-delete NCP2 read R partial）+ `TerminalWorkflowMetadataRetirementTest`（Kafka payload-format retirement regression）+ `f9BookKeeperWalAsyncObjectProcessIntegrationTest`（release-process physical delete + fresh-JVM NCP2 recovery P partial）；`KafkaRetentionPhysicalGcIntegrationTest`（delete-response-loss/multi-broker takeover pending） | R,P,C | M5 |
+| KF-RET-009 | logical trim success is independent of delayed protected physical GC | product `KafkaBookKeeperStreamCoverageProofProducerTest` + `BookKeeperDeletionActivationCoordinatorTest`（activation D partial）+ `f9BookKeeperLedgerDeletionProviderIntegrationTest`（real Oxia/two-bookie physical delete + exact-ledger applied-delete response-loss + post-delete NCP2 read R/C partial）+ `TerminalWorkflowMetadataRetirementTest`（Kafka payload-format retirement regression）+ `f9BookKeeperWalAsyncObjectProcessIntegrationTest`（release-process physical delete + fresh-JVM NCP2 recovery P partial）；`KafkaRetentionPhysicalGcIntegrationTest`（release-process response-loss restart/multi-broker takeover pending） | R,P,C | M5 |
 | KF-RET-010 | all storage profiles obey same checkpoint barrier and trim semantics | `KafkaRetentionProfileMatrixTest` | R | M5/M7 |
 
 Implementation note（2026-07-27）：product `KafkaDerivedIndexStateCodecV1Test` provides canonical-format partial evidence

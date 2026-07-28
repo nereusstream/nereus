@@ -60,6 +60,44 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
             BookKeeperBrokerReadinessProvider brokerReadiness,
             BookKeeperPasswordProvider passwords,
             Clock clock) {
+        return createWithOperations(
+                deploymentId,
+                cluster,
+                processRunId,
+                configuration,
+                oxia,
+                sharedOxia,
+                new DefaultBookKeeperClientOperations(
+                        Objects.requireNonNull(
+                                borrowedClient,
+                                "borrowedClient")),
+                namespaceReservations,
+                activationStore,
+                brokerReadiness,
+                passwords,
+                clock);
+    }
+
+    /**
+     * Creates the production runtime over an explicit narrow BookKeeper operations boundary.
+     *
+     * <p>The operations object is borrowed and must delegate to a client whose lifetime covers this
+     * runtime. This overload preserves the same provider ownership contract while allowing
+     * embeddings to apply observability or deterministic failure-cut decorators.
+     */
+    public static BookKeeperPrimaryWalRuntime createWithOperations(
+            String deploymentId,
+            String cluster,
+            String processRunId,
+            BookKeeperWalConfiguration configuration,
+            OxiaClientConfiguration oxia,
+            SharedOxiaClientRuntime sharedOxia,
+            BookKeeperClientOperations borrowedOperations,
+            BookKeeperLedgerIdNamespaceReservationAdminStore namespaceReservations,
+            BookKeeperProtocolActivationStore activationStore,
+            BookKeeperBrokerReadinessProvider brokerReadiness,
+            BookKeeperPasswordProvider passwords,
+            Clock clock) {
         String exactDeploymentId = text(deploymentId, "deploymentId");
         String exactCluster = text(cluster, "cluster");
         String exactProcessRunId = text(processRunId, "processRunId");
@@ -102,8 +140,10 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
             DefaultBookKeeperProtocolActivationVerifier activationVerifier =
                     new DefaultBookKeeperProtocolActivationVerifier(
                             exactActivationStore, wal, namespace, exactReadiness);
-            BookKeeperClientOperations operations = new DefaultBookKeeperClientOperations(
-                    Objects.requireNonNull(borrowedClient, "borrowedClient"));
+            BookKeeperClientOperations operations =
+                    Objects.requireNonNull(
+                            borrowedOperations,
+                            "borrowedOperations");
             BookKeeperWriterStateMachine writer = new BookKeeperWriterStateMachine(
                     exactCluster,
                     wal,

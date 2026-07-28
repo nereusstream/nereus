@@ -192,6 +192,9 @@ API/core/primary-reader/NCP2/NTC2/materialization rows 是当前已实现事实�
 | `nereus-materialization/.../LosslessMaterializationRowPublisher.java` | `ec71fad507a57178ee848426028a3d7c1adf125e` | NCP1 explicitly requires one record per offset |
 | `nereus-materialization/.../RangedLosslessMaterializationRowPublisher.java` | `f4e35b83ffeb0fb630a9b45893f2f9630608dc3e` | one exact Kafka source batch maps to one dense NCP2 row |
 | `nereus-materialization/.../DefaultMaterializationPlanner.java` | `d1715b79b3080483e6ffe8389922840e89eda42d` | normalizes only the exact Kafka V1 Object mapping into the Kafka-batch compatibility domain, so a higher NCP2 prefix supersedes a retired BookKeeper gen0 prefix while a readable BK tail remains selectable |
+| `nereus-bookkeeper/.../BookKeeperPrimaryWalRuntime.java` | `32ef63f4979fb1af4b4e00acd69e56e58a4eddc9` | default client construction delegates to one explicit borrowed operations boundary used consistently by append/read/recovery/activation/retention |
+| `nereus-kafka-adapter/.../NereusKafkaBookKeeperWalRuntimeContext.java` | `988fe111e021d7d9d660abe301fe9d8ff54b0872` | three-argument production compatibility constructor supplies the standard adapter；explicit operations decorators remain borrowed |
+| `nereus-kafka-adapter/.../NereusKafkaObjectWalRuntimeFactory.java` | `831eefecbac96998d4619d507d4a6addcf9110ec` | passes the exact operations identity into the provider-neutral BookKeeper graph without changing client ownership |
 | `nereus-materialization/.../DefaultTopicCompactionEngine.java` | `c4849680050a2be4b0059161509564b36daa350d` | NTC1 collector assumes one logical row per batch |
 | `nereus-metadata-oxia/.../OxiaJavaClientMetadataStore.java` | `3c7d29d7a2b7f4f87e240c65503f46f05c03e464` | live other-writer session rejected until expiry |
 

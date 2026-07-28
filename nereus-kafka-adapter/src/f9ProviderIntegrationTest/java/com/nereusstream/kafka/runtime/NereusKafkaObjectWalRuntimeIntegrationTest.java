@@ -8,13 +8,16 @@ import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadiness;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadinessProvider;
+import com.nereusstream.bookkeeper.BookKeeperClientOperations;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
 import com.nereusstream.bookkeeper.BookKeeperLedgerGcConfiguration;
 import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceProvisioningCoordinator;
+import com.nereusstream.bookkeeper.BookKeeperOperationDeadline;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationCoordinator;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationUpdate;
 import com.nereusstream.bookkeeper.BookKeeperSecretRef;
 import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
+import com.nereusstream.bookkeeper.DefaultBookKeeperClientOperations;
 import com.nereusstream.bookkeeper.OxiaBookKeeperLedgerIdNamespaceReservationStore;
 import com.nereusstream.bookkeeper.OxiaBookKeeperProtocolActivationStore;
 import com.nereusstream.core.StreamStorageConfig;
@@ -59,6 +62,7 @@ import com.nereusstream.objectstore.ObjectStoreConfiguration;
 import com.nereusstream.objectstore.ObjectStoreProvider;
 import com.nereusstream.objectstore.ObjectStoreSecretResolver;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
+import io.netty.buffer.ByteBuf;
 import io.oxia.testcontainers.OxiaContainer;
 import java.net.URI;
 import java.io.ByteArrayOutputStream;
@@ -75,8 +79,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
+import org.apache.bookkeeper.client.api.LedgerEntries;
+import org.apache.bookkeeper.client.api.LedgerMetadata;
+import org.apache.bookkeeper.client.api.ReadHandle;
+import org.apache.bookkeeper.client.api.WriteAdvHandle;
 import org.apache.bookkeeper.common.allocator.PoolingPolicy;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.kafka.common.compress.Compression;
@@ -695,6 +704,10 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                 startBookKeeper(metadataServiceUri)) {
             BookKeeper client = bookKeeperCluster.newClient();
             try {
+                AppliedDeleteResponseLossOperations deletionOperations =
+                        new AppliedDeleteResponseLossOperations(
+                                new DefaultBookKeeperClientOperations(
+                                        client));
                 Set<StorageProfile> profiles =
                         Set.of(
                                 StorageProfile.OBJECT_WAL_SYNC_OBJECT,
@@ -802,7 +815,8 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                                                                                 .getBytes(
                                                                                         java.nio.charset
                                                                                                 .StandardCharsets
-                                                                                                .UTF_8)))),
+                                                                                                .UTF_8),
+                                                                deletionOperations))),
                                         new NereusKafkaObjectWalActivationContext(
                                                 capability,
                                                 () ->
@@ -812,6 +826,7 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                                                 Duration.ofSeconds(10),
                                                 Duration.ofMillis(100)));
                 runtime.start().toCompletableFuture().join();
+                deletionOperations.arm();
 
                 KafkaPartitionIdentity identity =
                         new KafkaPartitionIdentity(
@@ -903,6 +918,10 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                 assertPhysicalLedgerAbsent(
                         client,
                         deletedLedgerId);
+                assertThat(deletionOperations.responseLossInjected())
+                        .isTrue();
+                assertThat(deletionOperations.injectedLedgerId())
+                        .isEqualTo(deletedLedgerId);
                 assertThat(
                                 storage.read(
                                                 new KafkaStorageReadRequest(
@@ -1708,6 +1727,115 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                 com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState frozenSource) {
             if (frozenSource.endOffset() != 0) {
                 throw new AssertionError("empty recovery expected");
+            }
+        }
+    }
+
+    private static final class AppliedDeleteResponseLossOperations
+            implements BookKeeperClientOperations {
+        private final BookKeeperClientOperations delegate;
+        private final AtomicBoolean inject = new AtomicBoolean();
+        private final AtomicBoolean injected = new AtomicBoolean();
+        private final AtomicLong injectedLedgerId =
+                new AtomicLong(Long.MIN_VALUE);
+
+        private AppliedDeleteResponseLossOperations(
+                BookKeeperClientOperations delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public CompletableFuture<WriteAdvHandle> createAdvanced(
+                long ledgerId,
+                BookKeeperWalConfiguration configuration,
+                byte[] password,
+                Map<String, byte[]> customMetadata,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.createAdvanced(
+                    ledgerId,
+                    configuration,
+                    password,
+                    customMetadata,
+                    deadline);
+        }
+
+        @Override
+        public CompletableFuture<ReadHandle> open(
+                long ledgerId,
+                BookKeeperDigestType digestType,
+                byte[] password,
+                boolean recovery,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.open(
+                    ledgerId,
+                    digestType,
+                    password,
+                    recovery,
+                    deadline);
+        }
+
+        @Override
+        public CompletableFuture<Long> write(
+                WriteAdvHandle handle,
+                long entryId,
+                ByteBuf entry,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.write(
+                    handle,
+                    entryId,
+                    entry,
+                    deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerEntries> readUnconfirmed(
+                ReadHandle handle,
+                long firstEntryId,
+                long lastEntryIdInclusive,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.readUnconfirmed(
+                    handle,
+                    firstEntryId,
+                    lastEntryIdInclusive,
+                    deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerMetadata> metadata(
+                long ledgerId,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.metadata(ledgerId, deadline);
+        }
+
+        @Override
+        public CompletableFuture<Void> delete(
+                long ledgerId,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.delete(ledgerId, deadline)
+                    .thenCompose(ignored -> {
+                        if (inject.compareAndSet(true, false)) {
+                            injected.set(true);
+                            injectedLedgerId.set(ledgerId);
+                            return CompletableFuture.failedFuture(
+                                    new IllegalStateException(
+                                            "injected applied BookKeeper delete response loss"));
+                        }
+                        return CompletableFuture.completedFuture(null);
+                    });
+        }
+
+        private boolean responseLossInjected() {
+            return injected.get();
+        }
+
+        private long injectedLedgerId() {
+            return injectedLedgerId.get();
+        }
+
+        private void arm() {
+            if (!inject.compareAndSet(false, true)) {
+                throw new IllegalStateException(
+                        "delete response loss already armed");
             }
         }
     }

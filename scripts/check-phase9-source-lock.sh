@@ -52,6 +52,9 @@ a6e9a0ffe576c88bebd67765864509df5d6680d5 nereus-object-store/src/main/java/com/n
 dd6233c9a084b4473ba9bc9b1c77fbbf85511c75 nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperRangedEntryCodecV1.java
 f4e35b83ffeb0fb630a9b45893f2f9630608dc3e nereus-materialization/src/main/java/com/nereusstream/materialization/RangedLosslessMaterializationRowPublisher.java
 d1715b79b3080483e6ffe8389922840e89eda42d nereus-materialization/src/main/java/com/nereusstream/materialization/DefaultMaterializationPlanner.java
+32ef63f4979fb1af4b4e00acd69e56e58a4eddc9 nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperPrimaryWalRuntime.java
+988fe111e021d7d9d660abe301fe9d8ff54b0872 nereus-kafka-adapter/src/main/java/com/nereusstream/kafka/runtime/NereusKafkaBookKeeperWalRuntimeContext.java
+831eefecbac96998d4619d507d4a6addcf9110ec nereus-kafka-adapter/src/main/java/com/nereusstream/kafka/runtime/NereusKafkaObjectWalRuntimeFactory.java
 LOCKS
 
-echo "F9 source lock: AutoMQ and 25 Nereus ranged/head/session/planner-foundation sources match"
+echo "F9 source lock: AutoMQ and 28 Nereus ranged/head/session/planner/provider-composition sources match"

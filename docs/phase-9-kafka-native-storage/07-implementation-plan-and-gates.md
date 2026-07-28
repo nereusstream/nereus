@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates and release-process physical-deletion/fresh-JVM NCP2 fallback are implemented；delete-response-loss、multi-broker/controller、remaining M4 internal-topic cuts and inherited final gates remain open
+> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss and release-process physical-deletion/fresh-JVM NCP2 fallback are implemented；release-process response-loss restart、multi-broker/controller、remaining M4 internal-topic cuts and inherited final gates remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -234,7 +234,7 @@ shared gate service。
 
 ### 5.1 Current implementation evidence（2026-07-23）
 
-- `phase9SourceLockCheck` locks AutoMQ `1c648d...` / `3.9.0-SNAPSHOT` and 25 current Nereus ranged/head/session/planner-foundation source blobs；
+- `phase9SourceLockCheck` locks AutoMQ `1c648d...` / `3.9.0-SNAPSHOT` and 28 current Nereus ranged/head/session/planner/provider-composition source blobs；
 - `phase9M1Check --rerun-tasks` passes API、conditional append/result、semantic read、Object WAL、BookKeeper、
   exact reader registry/capability and materialization tests；
 - `:nereus-object-store:rangedFormatS3IntegrationTest --rerun-tasks` passes NCP2 and NTC2 upload/read/full verification
@@ -448,11 +448,14 @@ coordinator/transaction/compaction remain M4/M5。
   `SEALED -> MARKED -> DELETING -> DELETED` chain，proves the provider ledger is absent and reads the same Kafka bytes from
   NCP2。`TerminalWorkflowMetadataRetirementTest` separately locks the Kafka-specific
   `KAFKA_RECORD_BATCH_V1 -> KAFKA_RECORD_BATCH` logical/payload mapping used by terminal proof。The task is wired into
-  `phase9M5RetentionCheck` as `f9BookKeeperLedgerDeletionProviderIntegrationTest`。
+  `phase9M5RetentionCheck` as `f9BookKeeperLedgerDeletionProviderIntegrationTest`。The same real provider gate now
+  decorates the exact borrowed operations instance after runtime start，injects failure only after the target Kafka WAL
+  ledger delete has applied，asserts that exact ledger ID，and proves metadata-absence convergence to `DELETED` plus NCP2
+  readability。The compatibility context constructor still supplies the standard client adapter；
   `f9BookKeeperWalAsyncObjectProcessIntegrationTest` additionally uses the release distribution with one-entry rollover，
   waits for metadata `DELETED` and independent-client `NoSuchLedger`，normally stops the first JVM，then proves a fresh
-  JVM can recover offset 0 from NCP2 and continue append/fetch/ListOffsets。Delete-response-loss cuts and multi-broker
-  takeover remain open；
+  JVM can recover offset 0 from NCP2 and continue append/fetch/ListOffsets。Release-process response-loss restart and
+  multi-broker takeover remain open；
 - the fresh 2026-07-28 aggregate additionally locks the planner path required by repeated physical deletion cycles：after
   an NCP2 higher generation replaces a retired/deleted BookKeeper prefix，a wider task selects that NCP2 prefix together
   with the still-readable BookKeeper tail。Only the exact
