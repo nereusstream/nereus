@@ -409,13 +409,19 @@ coordinator/transaction/compaction remain M4/M5。
   KRaft baseline now pass through `phase9M6KafkaProcessCheck`，including single-node graceful restart of committed
   `__consumer_offsets` and `__transaction_state` truth；
 - `NereusKafkaObjectWalRuntimeConfigurationTest` freezes the first concrete provider graph to exactly
-  `OBJECT_WAL_SYNC_OBJECT`、matched cluster/writer/session/scan limits and disabled legacy auto-session；
+  `OBJECT_WAL_SYNC_OBJECT` without BookKeeper，or exactly
+  `OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY` when the provider-neutral BookKeeper configuration/context is present；
+  both graphs retain matched cluster/writer/session/scan limits and disabled legacy auto-session；
   `NereusKafkaObjectWalRuntimeFactoryTest` proves activation scope is rejected before provider IO，and a checked
   provider-construction failure is propagated with every resource registered before that cut closed；
   `f9M3ProviderIntegrationTest` passes against real Oxia plus the filesystem ObjectStore provider and covers deterministic
   ACTIVE/readiness seeding、runtime capability resume/verification、binding、authority acquire/recovery、leader open、one byte-exact
   stable Produce、committed Fetch and owned provider shutdown。
-  This is provider-backed adapter evidence，not yet a Kafka BrokerServer/KRaft or production S3 gate；
+  `f9BookKeeperWalOnlyProviderIntegrationTest` separately provisions the exact F1-BK ledger-ID namespace/publication
+  activation，borrows a real two-bookie client，then proves Kafka leader open、strict append、physical-reference publication
+  and cold generation-zero Fetch against the shared Oxia graph。The BookKeeper client remains borrowed and the provider-neutral
+  runtime/stores/readers are closed through the product ledger。This is adapter evidence；Kafka-fork BookKeeper config/client
+  ownership and process-level profile evidence remain open；
 - `NereusKafkaObjectWalRuntimeFactory` now owns durable checkpoint read pins、reader/verifier/recovery coordinator、
   configured `recoveryChunkRecords/recoveryChunkBytes` paging and `DefaultKafkaPartitionRecoveryLauncher`。
   `DefaultKafkaRecoveryBatchSourceTest` proves exact bounded COMMITTED/EXACT_START pages and fail-closed empty/non-Kafka
@@ -735,7 +741,10 @@ aggregation executable。`NereusKafkaRuntimeConfiguration`、`NereusKafkaRuntime
 `NereusKafkaRuntimeFactory` now make the post-provider product graph executable：one binding keyspace/lifecycle、one
 authority/recovery opener、one partition manager、one codec pair and one process runtime，with fixed/extra provider resources
 entered into the exact close ledger；the Object-WAL creator now additionally owns checkpoint read pins and concrete
-checkpoint/COMMITTED replay composition，while Kafka scheduler/clock and the fork recovery-state factory remain borrowed。The local Kafka fork also
+checkpoint/COMMITTED replay composition。Its optional BookKeeper slice borrows the client、requires exact F1-BK ACTIVE
+publication/readiness、installs the BookKeeper appender/reader/physical-reference/profile resolver in the same graph and skips
+Object materialization registration for `BOOKKEEPER_WAL_ONLY`。Kafka scheduler/clock、BookKeeper client and the fork
+recovery-state factory remain borrowed。The local Kafka fork also
 has an explicitly injected generic `BrokerStorageRuntimeFactory` with
 stock restart coverage and exact BrokerServer start/ready/metadata/drain/close ordering。`NereusBrokerStorageRuntimeFactory`
 and `NereusBrokerStorageRuntime` now add typed runtime/scan-limit creators、failure rollback、one exact ReplicaManager binding、

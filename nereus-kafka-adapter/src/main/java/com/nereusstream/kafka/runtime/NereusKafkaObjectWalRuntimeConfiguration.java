@@ -7,6 +7,7 @@ import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.objectstore.ObjectStoreConfiguration;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /** Complete provider configuration for the first strict synchronous Object-WAL Kafka runtime. */
@@ -18,9 +19,35 @@ public record NereusKafkaObjectWalRuntimeConfiguration(
         Duration pendingProtectionDuration,
         Duration maximumClockSkew,
         Duration orphanGrace,
-        int callbackThreads) {
-    private static final Set<StorageProfile> EXECUTABLE_PROFILES =
+        int callbackThreads,
+        Optional<NereusKafkaBookKeeperWalRuntimeConfiguration> bookKeeper) {
+    private static final Set<StorageProfile> OBJECT_ONLY_PROFILES =
             Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+    private static final Set<StorageProfile> BOOKKEEPER_WAL_ONLY_PROFILES =
+            Set.of(
+                    StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                    StorageProfile.BOOKKEEPER_WAL_ONLY);
+
+    public NereusKafkaObjectWalRuntimeConfiguration(
+            NereusKafkaRuntimeConfiguration runtime,
+            StreamStorageConfig streamStorage,
+            OxiaClientConfiguration oxia,
+            ObjectStoreConfiguration objectStore,
+            Duration pendingProtectionDuration,
+            Duration maximumClockSkew,
+            Duration orphanGrace,
+            int callbackThreads) {
+        this(
+                runtime,
+                streamStorage,
+                oxia,
+                objectStore,
+                pendingProtectionDuration,
+                maximumClockSkew,
+                orphanGrace,
+                callbackThreads,
+                Optional.empty());
+    }
 
     public NereusKafkaObjectWalRuntimeConfiguration {
         Objects.requireNonNull(runtime, "runtime");
@@ -31,12 +58,17 @@ public record NereusKafkaObjectWalRuntimeConfiguration(
                 pendingProtectionDuration, "pendingProtectionDuration");
         maximumClockSkew = nonnegative(maximumClockSkew, "maximumClockSkew");
         orphanGrace = positive(orphanGrace, "orphanGrace");
+        bookKeeper = Objects.requireNonNull(bookKeeper, "bookKeeper");
         if (callbackThreads <= 0 || callbackThreads > 256) {
             throw new IllegalArgumentException("callbackThreads must be in [1,256]");
         }
-        if (!runtime.executableProfiles().equals(EXECUTABLE_PROFILES)) {
+        Set<StorageProfile> expectedProfiles =
+                bookKeeper.isPresent()
+                        ? BOOKKEEPER_WAL_ONLY_PROFILES
+                        : OBJECT_ONLY_PROFILES;
+        if (!runtime.executableProfiles().equals(expectedProfiles)) {
             throw new IllegalArgumentException(
-                    "synchronous Object-WAL runtime must expose exactly OBJECT_WAL_SYNC_OBJECT");
+                    "runtime executable profiles do not match its installed primary-WAL providers");
         }
         if (!streamStorage.cluster().equals(runtime.nereusCluster())
                 || !streamStorage.writerId().equals(runtime.writerId())

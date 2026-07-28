@@ -1,16 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
-package com.nereusstream.pulsar;
+package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.nereusstream.bookkeeper.BookKeeperDigestType;
-import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservation;
-import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationValue;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivationLifecycle;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivationValue;
-import com.nereusstream.bookkeeper.BookKeeperSecretRef;
-import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.metadata.oxia.CapabilityMetadataClient;
 import com.nereusstream.metadata.oxia.CapabilityMetadataValue;
 import java.time.Duration;

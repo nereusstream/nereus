@@ -2,6 +2,9 @@
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.StorageProfile;
+import com.nereusstream.bookkeeper.BookKeeperDigestType;
+import com.nereusstream.bookkeeper.BookKeeperSecretRef;
+import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.objectstore.ObjectPutRetryPolicy;
@@ -41,6 +44,24 @@ class NereusKafkaObjectWalRuntimeConfigurationTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("automatic append-session");
         assertThatThrownBy(() -> new NereusKafkaObjectWalRuntimeConfiguration(
+                runtime(Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)),
+                streams(false),
+                oxia(),
+                objects(),
+                Duration.ofMinutes(10),
+                Duration.ofSeconds(5),
+                Duration.ofHours(24),
+                2,
+                Optional.of(new NereusKafkaBookKeeperWalRuntimeConfiguration(
+                        "deployment-a",
+                        bookKeeper()))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("installed primary-WAL providers");
+    }
+
+    @Test
+    void acceptsExactObjectAndBookKeeperWalOnlyComposition() {
+        new NereusKafkaObjectWalRuntimeConfiguration(
                 runtime(Set.of(
                         StorageProfile.OBJECT_WAL_SYNC_OBJECT,
                         StorageProfile.BOOKKEEPER_WAL_ONLY)),
@@ -50,9 +71,10 @@ class NereusKafkaObjectWalRuntimeConfigurationTest {
                 Duration.ofMinutes(10),
                 Duration.ofSeconds(5),
                 Duration.ofHours(24),
-                2))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("exactly OBJECT_WAL_SYNC_OBJECT");
+                2,
+                Optional.of(new NereusKafkaBookKeeperWalRuntimeConfiguration(
+                        "deployment-a",
+                        bookKeeper())));
     }
 
     private static NereusKafkaRuntimeConfiguration runtime(Set<StorageProfile> profiles) {
@@ -114,5 +136,39 @@ class NereusKafkaObjectWalRuntimeConfigurationTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty());
+    }
+
+    private static BookKeeperWalConfiguration bookKeeper() {
+        return new BookKeeperWalConfiguration(
+                "primary",
+                "11".repeat(32),
+                12,
+                0x801,
+                "reservation-1",
+                3,
+                3,
+                2,
+                BookKeeperDigestType.CRC32C,
+                new BookKeeperSecretRef(
+                        "secret://bookkeeper/password",
+                        "v1"),
+                100_000,
+                256L * 1024 * 1024,
+                1_000,
+                8,
+                64,
+                32,
+                Duration.ofHours(1),
+                1,
+                8,
+                64L * 1024 * 1024,
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(20),
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(2),
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(1),
+                256);
     }
 }

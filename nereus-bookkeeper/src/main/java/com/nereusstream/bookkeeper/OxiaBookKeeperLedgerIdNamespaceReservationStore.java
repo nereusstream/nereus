@@ -1,14 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
-package com.nereusstream.pulsar;
+package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
-import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservation;
-import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationAdminStore;
-import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationCodecV1;
-import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationKeys;
-import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationValue;
-import com.nereusstream.bookkeeper.BookKeeperOperationDeadline;
 import com.nereusstream.metadata.oxia.CapabilityMetadataClient;
 import com.nereusstream.metadata.oxia.CapabilityMetadataValue;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
@@ -23,18 +17,18 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 /** Shared Oxia adapter; brokers consume its read view while explicit administration owns mutations. */
-final class OxiaBookKeeperLedgerIdNamespaceReservationStore
+public final class OxiaBookKeeperLedgerIdNamespaceReservationStore
         implements BookKeeperLedgerIdNamespaceReservationAdminStore {
     private final CapabilityMetadataClient client;
 
-    OxiaBookKeeperLedgerIdNamespaceReservationStore(
+    public OxiaBookKeeperLedgerIdNamespaceReservationStore(
             OxiaClientConfiguration configuration,
             SharedOxiaClientRuntime runtime) {
         this(Objects.requireNonNull(runtime, "runtime")
                 .capabilityMetadataClient(Objects.requireNonNull(configuration, "configuration")));
     }
 
-    OxiaBookKeeperLedgerIdNamespaceReservationStore(CapabilityMetadataClient client) {
+    public OxiaBookKeeperLedgerIdNamespaceReservationStore(CapabilityMetadataClient client) {
         this.client = Objects.requireNonNull(client, "client");
     }
 

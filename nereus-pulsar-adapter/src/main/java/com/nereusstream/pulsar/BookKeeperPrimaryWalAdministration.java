@@ -10,6 +10,8 @@ import com.nereusstream.bookkeeper.BookKeeperProtocolActivationCoordinator;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationStore;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationUpdate;
 import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
+import com.nereusstream.bookkeeper.OxiaBookKeeperLedgerIdNamespaceReservationStore;
+import com.nereusstream.bookkeeper.OxiaBookKeeperProtocolActivationStore;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import java.time.Clock;

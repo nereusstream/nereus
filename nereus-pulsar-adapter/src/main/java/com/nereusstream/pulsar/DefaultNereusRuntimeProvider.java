@@ -6,6 +6,7 @@ import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.bookkeeper.BookKeeperLedgerRetentionService;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryPhysicalReferenceAdapter;
+import com.nereusstream.bookkeeper.OxiaBookKeeperLedgerIdNamespaceReservationStore;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.append.AppendCoordinator;

@@ -1,16 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
-package com.nereusstream.pulsar;
+package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
-import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservation;
-import com.nereusstream.bookkeeper.BookKeeperOperationDeadline;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivation;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivationCodecV1;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivationKeys;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivationStore;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivationValue;
-import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.metadata.oxia.CapabilityMetadataClient;
 import com.nereusstream.metadata.oxia.CapabilityMetadataValue;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
@@ -26,18 +18,18 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 /** Production exact-key/CAS adapter for the BookKeeper rollout activation authority. */
-final class OxiaBookKeeperProtocolActivationStore
+public final class OxiaBookKeeperProtocolActivationStore
         implements BookKeeperProtocolActivationStore {
     private final CapabilityMetadataClient client;
 
-    OxiaBookKeeperProtocolActivationStore(
+    public OxiaBookKeeperProtocolActivationStore(
             OxiaClientConfiguration configuration,
             SharedOxiaClientRuntime runtime) {
         this(Objects.requireNonNull(runtime, "runtime")
                 .capabilityMetadataClient(Objects.requireNonNull(configuration, "configuration")));
     }
 
-    OxiaBookKeeperProtocolActivationStore(CapabilityMetadataClient client) {
+    public OxiaBookKeeperProtocolActivationStore(CapabilityMetadataClient client) {
         this.client = Objects.requireNonNull(client, "client");
     }
 

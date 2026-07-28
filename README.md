@@ -7,7 +7,10 @@ Fetch-operation、binding-first leader manager、exact stable-head/commit-reacha
 checkpoint-pinned paged COMMITTED replay and
 storage-profile policy、authority-session periodic renewal/fail-closed fencing and exact bounded ListOffsets scan slices
 are in progress；the adapter now also has the process admission/runtime lifecycle and an explicit owned/borrowed resource
-ledger with reverse-order close。The local Kafka fork now also maintains checkpoint-restorable virtual segments、exact
+ledger with reverse-order close。The product runtime can now optionally install the provider-neutral BookKeeper runtime
+beside Object WAL and admits exactly `OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY` only after the exact F1-BK namespace、
+publication activation and broker readiness are present；a real Oxia + two-bookie gate proves strict BookKeeper append and
+cold generation-zero Fetch。The local Kafka fork now also maintains checkpoint-restorable virtual segments、exact
 KRaft config history、logical/time indexes and real offset metadata，routes stock DeleteRecords through the shared
 checkpoint-before-trim barrier，and supplies bounded owned-partition capture to the product's periodic retention runtime。
 The Object-WAL runtime now also persists an immutable exact-reference checkpoint-failure quarantine/redacted first-failure
@@ -105,9 +108,10 @@ transient page-read backpressure with bounded 10–250 ms exponential delay unde
 publishes a partial state，while ordinary Fetch continues to reject resource exhaustion immediately。A third JVM then
 stably appends open-transaction data at offset 5 and is forcibly killed；a fourth JVM reuses that transactional ID，recovers
 the coordinator state、writes ABORT marker 6、commits data/marker 7/8，proves `read_committed` skips the aborted record and
-advances the group to offset 8 with latest=9。This is still single-node/Object-WAL evidence：multi-controller and
-multi-broker live takeover、checkpoint/virtual-segment cuts、BookKeeper/async profiles and wider chaos evidence remain future
-work，so this is not yet a production-rollout claim.
+advances the group to offset 8 with latest=9。The native Kafka process evidence is still single-node/Object-WAL。The product
+adapter's focused real-service gate now covers `BOOKKEEPER_WAL_ONLY`，but the Kafka fork does not yet map BookKeeper
+configuration or own a BookKeeper client；multi-controller and multi-broker live takeover、checkpoint/virtual-segment cuts、
+async/sync materialization profiles and wider chaos evidence remain future work，so this is not yet a production-rollout claim.
 
 ## Current Phase
 

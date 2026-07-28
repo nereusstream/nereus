@@ -6,6 +6,7 @@ dependencies {
     implementation(project(":nereus-metadata-oxia"))
     implementation(project(":nereus-object-store"))
     implementation(project(":nereus-materialization"))
+    implementation(project(":nereus-bookkeeper"))
     compileOnly(libs.kafka.clients)
 
     testImplementation(testFixtures(project(":nereus-metadata-oxia")))
@@ -34,6 +35,7 @@ dependencies {
     add(f9ProviderIntegrationTest.implementationConfigurationName, platform(libs.aws.sdk.v2.bom))
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.aws.sdk.v2.s3)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.oxia.testcontainers)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.pulsar.metadata)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.localstack)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.junit.jupiter)
@@ -90,11 +92,32 @@ tasks.register<Test>("f9M3CodecTest") {
 
 tasks.register<Test>("f9M3ProviderIntegrationTest") {
     group = "verification"
-    description = "Run the F9-M3 provider-backed leader open/Produce/Fetch gate against real Oxia."
+    description = "Run the F9-M3 Object-WAL leader open/Produce/Fetch gate against real Oxia."
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
     classpath = f9ProviderIntegrationTest.runtimeClasspath
     shouldRunAfter(tasks.test, tasks.named("f9M3CodecTest"))
     useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
+                "activatesThenRoundTripsStableKafkaBatchThroughRealOxiaProviderGraph",
+        )
+    }
+}
+
+tasks.register<Test>("f9BookKeeperWalOnlyProviderIntegrationTest") {
+    group = "verification"
+    description = "Run the F9 BookKeeper-WAL-only leader open/Produce/Fetch gate against real Oxia and BookKeeper."
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("f9M3ProviderIntegrationTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
+                "activatesThenRoundTripsKafkaBatchThroughRealBookKeeperWalOnlyGraph",
+        )
+    }
 }
 
 tasks.register<Test>("f9M6KafkaProcessIntegrationTest") {

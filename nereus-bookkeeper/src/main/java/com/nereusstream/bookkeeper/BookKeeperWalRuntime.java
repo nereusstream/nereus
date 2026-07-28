@@ -48,6 +48,12 @@ public final class BookKeeperWalRuntime implements AutoCloseable {
         return registry;
     }
 
+    /** Returns the owned exact BookKeeper read-target reader for provider-level registry composition. */
+    public BookKeeperPrimaryWalReader primaryWalReader() {
+        ensureOpen();
+        return reader;
+    }
+
     public BookKeeperStorageProfileResolver profileResolver() {
         ensureOpen();
         return profileResolver;

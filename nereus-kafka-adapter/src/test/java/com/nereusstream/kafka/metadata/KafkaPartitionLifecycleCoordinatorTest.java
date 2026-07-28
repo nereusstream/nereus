@@ -135,6 +135,48 @@ class KafkaPartitionLifecycleCoordinatorTest {
         }
     }
 
+    @Test
+    void bookKeeperWalOnlyBindingDoesNotCreateObjectMaterializationAuthority() {
+        FakeKafkaPartitionMetadataStore metadata =
+                new FakeKafkaPartitionMetadataStore("nereus", "kraft");
+        TestStreamStorage streams = new TestStreamStorage();
+        GenerationMetadataStore generations =
+                GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        try {
+            KafkaPartitionLifecycleCoordinator coordinator =
+                    new KafkaPartitionLifecycleCoordinator(
+                            metadata,
+                            streams,
+                            metadata.keyspace(),
+                            CLOCK,
+                            new KafkaMaterializationStreamRegistration(
+                                    "nereus",
+                                    generations,
+                                    CLOCK));
+            KafkaBindingRequest request = new KafkaBindingRequest(
+                    identity(5, 1, "bookkeeper-only"),
+                    StorageProfile.BOOKKEEPER_WAL_ONLY,
+                    43,
+                    "broker-run",
+                    1,
+                    Duration.ofSeconds(30));
+
+            KafkaPartitionBinding binding =
+                    coordinator.ensureBinding(request).join();
+
+            assertThat(generations
+                            .getStreamRegistration(
+                                    "nereus",
+                                    binding.streamId())
+                            .join())
+                    .isEmpty();
+            assertThat(binding.durableRoot().value().lifecycle())
+                    .isEqualTo(KafkaPartitionLifecycle.ACTIVE);
+        } finally {
+            generations.close();
+        }
+    }
+
     static KafkaPartitionLifecycleCoordinator coordinator(
             FakeKafkaPartitionMetadataStore metadata, TestStreamStorage streams) {
         return new KafkaPartitionLifecycleCoordinator(

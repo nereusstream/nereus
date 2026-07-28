@@ -6,6 +6,7 @@ import com.nereusstream.objectstore.ObjectStoreProvider;
 import com.nereusstream.objectstore.ObjectStoreSecretResolver;
 import java.time.Clock;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
@@ -17,7 +18,25 @@ public record NereusKafkaObjectWalRuntimeContext(
         ScheduledExecutorService renewalScheduler,
         KafkaRecoveryStateFactory recoveryStateFactory,
         Clock clock,
-        Supplier<? extends CompletionStage<Void>> startupAction) {
+        Supplier<? extends CompletionStage<Void>> startupAction,
+        Optional<NereusKafkaBookKeeperWalRuntimeContext> bookKeeper) {
+    public NereusKafkaObjectWalRuntimeContext(
+            ObjectStoreProvider objectStoreProvider,
+            ObjectStoreSecretResolver secretResolver,
+            ScheduledExecutorService renewalScheduler,
+            KafkaRecoveryStateFactory recoveryStateFactory,
+            Clock clock,
+            Supplier<? extends CompletionStage<Void>> startupAction) {
+        this(
+                objectStoreProvider,
+                secretResolver,
+                renewalScheduler,
+                recoveryStateFactory,
+                clock,
+                startupAction,
+                Optional.empty());
+    }
+
     public NereusKafkaObjectWalRuntimeContext {
         Objects.requireNonNull(objectStoreProvider, "objectStoreProvider");
         Objects.requireNonNull(secretResolver, "secretResolver");
@@ -25,5 +44,6 @@ public record NereusKafkaObjectWalRuntimeContext(
         Objects.requireNonNull(recoveryStateFactory, "recoveryStateFactory");
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(startupAction, "startupAction");
+        bookKeeper = Objects.requireNonNull(bookKeeper, "bookKeeper");
     }
 }

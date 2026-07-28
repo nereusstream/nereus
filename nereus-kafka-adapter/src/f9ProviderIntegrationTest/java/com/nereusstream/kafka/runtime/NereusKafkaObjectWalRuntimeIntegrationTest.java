@@ -2,6 +2,18 @@
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.StorageProfile;
+import com.nereusstream.api.Checksum;
+import com.nereusstream.api.ChecksumType;
+import com.nereusstream.bookkeeper.BookKeeperBrokerReadiness;
+import com.nereusstream.bookkeeper.BookKeeperBrokerReadinessProvider;
+import com.nereusstream.bookkeeper.BookKeeperDigestType;
+import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceProvisioningCoordinator;
+import com.nereusstream.bookkeeper.BookKeeperProtocolActivationCoordinator;
+import com.nereusstream.bookkeeper.BookKeeperProtocolActivationUpdate;
+import com.nereusstream.bookkeeper.BookKeeperSecretRef;
+import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
+import com.nereusstream.bookkeeper.OxiaBookKeeperLedgerIdNamespaceReservationStore;
+import com.nereusstream.bookkeeper.OxiaBookKeeperProtocolActivationStore;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.kafka.activation.KafkaBrokerCapabilitySpecification;
 import com.nereusstream.kafka.activation.KafkaStorageCapabilityDigests;
@@ -45,12 +57,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.bookkeeper.client.BookKeeper;
+import org.apache.bookkeeper.common.allocator.PoolingPolicy;
+import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.kafka.common.compress.Compression;
 import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.SimpleRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.apache.pulsar.metadata.bookkeeper.BKCluster;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -205,6 +221,202 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
         assertThat(provider.closed()).isTrue();
     }
 
+    @Test
+    void activatesThenRoundTripsKafkaBatchThroughRealBookKeeperWalOnlyGraph()
+            throws Exception {
+        String nereusCluster =
+                "f9-bookkeeper-provider-" + java.util.UUID.randomUUID();
+        String kafkaCluster = "kraft-bookkeeper-cluster";
+        String writer = "kafka-broker-1-epoch-11";
+        String deployment = "kafka-deployment-a";
+        Clock clock = Clock.systemUTC();
+        OxiaClientConfiguration oxia = new OxiaClientConfiguration(
+                OXIA.getServiceAddress(),
+                "default",
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(30),
+                10_000,
+                1_024);
+        BookKeeperWalConfiguration bookKeeperConfiguration =
+                bookKeeperConfiguration();
+        String readinessSha256 = "55".repeat(32);
+        seedBookKeeperAuthority(
+                oxia,
+                bookKeeperConfiguration,
+                deployment,
+                readinessSha256,
+                clock);
+
+        LocalObjectStoreProvider provider =
+                new LocalObjectStoreProvider(root.resolve("bookkeeper-objects"));
+        ScheduledExecutorService scheduler =
+                Executors.newSingleThreadScheduledExecutor();
+        NereusKafkaRuntime runtime = null;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        try (BKCluster bookKeeperCluster =
+                startBookKeeper(metadataServiceUri)) {
+            BookKeeper client = bookKeeperCluster.newClient();
+            try {
+            Set<StorageProfile> profiles = Set.of(
+                    StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                    StorageProfile.BOOKKEEPER_WAL_ONLY);
+            NereusKafkaRuntimeConfiguration runtimeConfiguration =
+                    new NereusKafkaRuntimeConfiguration(
+                            nereusCluster,
+                            kafkaCluster,
+                            writer,
+                            Duration.ofSeconds(30),
+                            Duration.ofSeconds(5),
+                            writer,
+                            11,
+                            Duration.ofSeconds(30),
+                            100_000,
+                            256 * 1024 * 1024,
+                            profiles);
+            NereusKafkaObjectWalRuntimeConfiguration configuration =
+                    new NereusKafkaObjectWalRuntimeConfiguration(
+                            runtimeConfiguration,
+                            streamConfiguration(nereusCluster, writer),
+                            oxia,
+                            objectConfiguration(provider),
+                            Duration.ofMinutes(10),
+                            Duration.ofSeconds(5),
+                            Duration.ofHours(24),
+                            2,
+                            Optional.of(
+                                    new NereusKafkaBookKeeperWalRuntimeConfiguration(
+                                            deployment,
+                                            bookKeeperConfiguration)));
+            KafkaBrokerIdentity broker = new KafkaBrokerIdentity(1, 11);
+            KafkaBrokerCapabilitySpecification capability =
+                    new KafkaBrokerCapabilitySpecification(
+                            kafkaCluster,
+                            broker,
+                            writer,
+                            "4.3.0",
+                            "f9-bookkeeper-provider-test",
+                            System.getProperty("java.version"),
+                            profiles,
+                            StorageProfile.BOOKKEEPER_WAL_ONLY,
+                            bytes(11),
+                            bytes(12),
+                            bytes(13),
+                            Duration.ofSeconds(1),
+                            Duration.ofSeconds(30));
+            KafkaStorageClusterSnapshot clusterSnapshot =
+                    new KafkaStorageClusterSnapshot(
+                            kafkaCluster,
+                            111,
+                            KafkaStorageProtocolActivationRecord
+                                    .KAFKA_FEATURE_LEVEL,
+                            List.of(broker),
+                            false,
+                            false,
+                            false);
+            seedActiveAuthority(
+                    oxia,
+                    nereusCluster,
+                    capability,
+                    clusterSnapshot,
+                    clock);
+            runtime = NereusKafkaObjectWalRuntimeFactory.createActivated(
+                    configuration,
+                    new NereusKafkaObjectWalRuntimeContext(
+                            provider,
+                            reference -> Optional.empty(),
+                            scheduler,
+                            request -> new KafkaRecoveryState<>(
+                                    new EmptyRecoveryStateCodec(),
+                                    recovered -> CompletableFuture.completedFuture(null)),
+                            clock,
+                            () -> CompletableFuture.completedFuture(null),
+                            Optional.of(
+                                    new NereusKafkaBookKeeperWalRuntimeContext(
+                                            client,
+                                            readinessProvider(
+                                                    readinessSha256),
+                                            ignored ->
+                                                    "f9-bookkeeper-password"
+                                                            .getBytes(
+                                                                    java.nio.charset
+                                                                            .StandardCharsets
+                                                                            .UTF_8)))),
+                    new NereusKafkaObjectWalActivationContext(
+                            capability,
+                            () -> CompletableFuture.completedFuture(
+                                    clusterSnapshot),
+                            Duration.ofSeconds(10),
+                            Duration.ofMillis(100)));
+            runtime.start().toCompletableFuture().join();
+
+            KafkaPartitionStorage storage =
+                    runtime.partitionStorageManager().openLeader(
+                            new KafkaPartitionLeaderOpenRequest(
+                                    new KafkaPartitionIdentity(
+                                            kafkaCluster,
+                                            "AAAAAAAAAAAAAAAAAAAAAg",
+                                            0,
+                                            "bookkeeper-orders"),
+                                    1,
+                                    1,
+                                    11,
+                                    StorageProfile.BOOKKEEPER_WAL_ONLY,
+                                    1,
+                                    Duration.ofSeconds(10)))
+                            .join();
+            assertThat(storage.state())
+                    .isEqualTo(KafkaPartitionState.LEADER_WRITABLE);
+
+            ByteBuffer records = MemoryRecords.withRecords(
+                            0,
+                            Compression.of(CompressionType.NONE).build(),
+                            new SimpleRecord(
+                                    2_000,
+                                    "bookkeeper-value".getBytes()))
+                    .buffer()
+                    .duplicate();
+            KafkaStableAppendResult appendResult = storage.append(
+                            records,
+                            new KafkaAppendContext(
+                                    0,
+                                    1,
+                                    (short) -1,
+                                    Duration.ofSeconds(10),
+                                    Map.of()))
+                    .join();
+            assertThat(
+                            appendResult
+                                    .stableSnapshot()
+                                    .stableEndOffset())
+                    .isEqualTo(1);
+            storage.publishDerivedOffsets(1, 1, 1);
+            assertThat(storage.read(new KafkaStorageReadRequest(
+                                    0,
+                                    1,
+                                    10,
+                                    1024 * 1024,
+                                    1024 * 1024,
+                                    true,
+                                    0,
+                                    0,
+                                    Duration.ofSeconds(10)))
+                            .join()
+                            .fetchAssembly()
+                            .nextLogicalOffset())
+                    .isEqualTo(1);
+            } finally {
+                if (runtime != null) {
+                    runtime.close();
+                    runtime = null;
+                }
+                client.close();
+            }
+        } finally {
+            scheduler.shutdownNow();
+        }
+        assertThat(provider.closed()).isTrue();
+    }
+
     private static void seedActiveAuthority(
             OxiaClientConfiguration oxia,
             String nereusCluster,
@@ -263,6 +475,157 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
         byte[] value = new byte[32];
         for (int index = 0; index < value.length; index++) value[index] = (byte) (seed + index);
         return value;
+    }
+
+    private static void seedBookKeeperAuthority(
+            OxiaClientConfiguration oxia,
+            BookKeeperWalConfiguration configuration,
+            String deployment,
+            String readinessSha256,
+            Clock clock) {
+        try (SharedOxiaClientRuntime shared =
+                SharedOxiaClientRuntime.connect(oxia, clock)) {
+            OxiaBookKeeperLedgerIdNamespaceReservationStore namespaces =
+                    new OxiaBookKeeperLedgerIdNamespaceReservationStore(
+                            oxia,
+                            shared);
+            var reservation =
+                    new BookKeeperLedgerIdNamespaceProvisioningCoordinator(
+                                    namespaces,
+                                    clock)
+                            .provision(
+                                    configuration,
+                                    deployment,
+                                    "44".repeat(32),
+                                    Duration.ofSeconds(30))
+                            .join();
+            OxiaBookKeeperProtocolActivationStore activations =
+                    new OxiaBookKeeperProtocolActivationStore(oxia, shared);
+            BookKeeperProtocolActivationCoordinator coordinator =
+                    new BookKeeperProtocolActivationCoordinator(
+                            activations,
+                            clock);
+            var prepared = coordinator.prepare(
+                            configuration,
+                            reservation,
+                            1,
+                            readinessSha256,
+                            Duration.ofSeconds(30))
+                    .join();
+            coordinator.activate(
+                            configuration,
+                            reservation,
+                            BookKeeperProtocolActivationUpdate.publications(
+                                    1,
+                                    readinessSha256,
+                                    true,
+                                    true,
+                                    prepared.metadataVersion()),
+                            Duration.ofSeconds(30))
+                    .join();
+        }
+    }
+
+    private static BookKeeperBrokerReadinessProvider readinessProvider(
+            String readinessSha256) {
+        BookKeeperBrokerReadiness readiness =
+                new BookKeeperBrokerReadiness(
+                        1,
+                        new Checksum(
+                                ChecksumType.SHA256,
+                                readinessSha256),
+                        1);
+        return new BookKeeperBrokerReadinessProvider() {
+            @Override
+            public CompletableFuture<BookKeeperBrokerReadiness>
+                    requireBookKeeperPrimaryWalReadiness() {
+                return CompletableFuture.completedFuture(readiness);
+            }
+
+            @Override
+            public Optional<BookKeeperBrokerReadiness>
+                    currentBookKeeperPrimaryWalReadiness() {
+                return Optional.of(readiness);
+            }
+        };
+    }
+
+    private static BookKeeperWalConfiguration bookKeeperConfiguration() {
+        return new BookKeeperWalConfiguration(
+                "primary",
+                "11".repeat(32),
+                12,
+                0x801,
+                "reservation-1",
+                2,
+                2,
+                2,
+                BookKeeperDigestType.CRC32C,
+                new BookKeeperSecretRef(
+                        "secret://bookkeeper/password",
+                        "v1"),
+                100_000,
+                256L * 1024 * 1024,
+                1_000,
+                8,
+                64,
+                32,
+                Duration.ofHours(1),
+                8,
+                8,
+                64L * 1024 * 1024,
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(20),
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(2),
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(1),
+                256);
+    }
+
+    private static BKCluster startBookKeeper(
+            String metadataServiceUri) throws Exception {
+        ServerConfiguration configuration = new ServerConfiguration();
+        configuration.setProperty(
+                "dbStorage_writeCacheMaxSizeMb",
+                32);
+        configuration.setProperty(
+                "dbStorage_readAheadCacheMaxSizeMb",
+                4);
+        configuration.setProperty(
+                "dbStorage_rocksDB_writeBufferSizeMB",
+                4);
+        configuration.setProperty(
+                "dbStorage_rocksDB_blockCacheSize",
+                4 * 1024 * 1024);
+        configuration.setJournalSyncData(false);
+        configuration.setJournalWriteData(false);
+        configuration.setProperty("journalMaxGroupWaitMSec", 0L);
+        configuration.setProperty("journalPreAllocSizeMB", 1);
+        configuration.setFlushInterval(60_000);
+        configuration.setGcWaitTime(60_000);
+        configuration.setAllowLoopback(true);
+        configuration.setAdvertisedAddress("127.0.0.1");
+        configuration.setAllowEphemeralPorts(true);
+        configuration.setNumAddWorkerThreads(0);
+        configuration.setNumReadWorkerThreads(0);
+        configuration.setNumHighPriorityWorkerThreads(0);
+        configuration.setNumJournalCallbackThreads(0);
+        configuration.setServerNumIOThreads(1);
+        configuration.setNumLongPollWorkerThreads(1);
+        configuration.setAllocatorPoolingPolicy(
+                PoolingPolicy.UnpooledHeap);
+        configuration.setLedgerStorageClass(
+                "org.apache.bookkeeper.bookie.storage.ldb.DbLedgerStorage");
+        configuration.setDiskUsageThreshold(0.999F);
+        configuration.setDiskUsageWarnThreshold(0.99F);
+        return BKCluster.builder()
+                .baseServerConfiguration(configuration)
+                .metadataServiceUri(metadataServiceUri)
+                .numBookies(2)
+                .clearOldData(true)
+                .build();
     }
 
     private static StreamStorageConfig streamConfiguration(String cluster, String writer) {

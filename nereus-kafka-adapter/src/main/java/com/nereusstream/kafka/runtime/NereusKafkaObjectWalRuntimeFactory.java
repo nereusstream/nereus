@@ -2,8 +2,15 @@
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.keys.DeterministicIds;
+import com.nereusstream.bookkeeper.BookKeeperPrimaryPhysicalReferenceAdapter;
+import com.nereusstream.bookkeeper.BookKeeperPrimaryWalRuntime;
+import com.nereusstream.bookkeeper.OxiaBookKeeperLedgerIdNamespaceReservationStore;
+import com.nereusstream.bookkeeper.OxiaBookKeeperProtocolActivationStore;
 import com.nereusstream.core.DefaultStreamStorage;
+import com.nereusstream.core.append.AppendAdmissionGuard;
+import com.nereusstream.core.append.AppendCoordinator;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.physical.DefaultObjectReadPinManager;
@@ -15,7 +22,13 @@ import com.nereusstream.core.read.MetadataGenerationReadFailureHandler;
 import com.nereusstream.core.read.MetadataPhysicalObjectIdentityResolver;
 import com.nereusstream.core.read.ParquetV2CompactedTargetReader;
 import com.nereusstream.core.read.Phase4ReadComponents;
+import com.nereusstream.core.read.ReadTargetReader;
 import com.nereusstream.core.read.ReadTargetReaderRegistry;
+import com.nereusstream.core.profile.Phase4StorageProfileResolver;
+import com.nereusstream.core.profile.StorageProfileResolver;
+import com.nereusstream.core.profile.StorageProfileResolverRegistry;
+import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
+import com.nereusstream.core.wal.PrimaryWalRegistry;
 import com.nereusstream.core.wal.object.ObjectWalReaderAdapter;
 import com.nereusstream.kafka.activation.KafkaStorageActivationRuntime;
 import com.nereusstream.kafka.activation.KafkaStorageActivationVerifier;
@@ -57,6 +70,7 @@ import com.nereusstream.objectstore.staging.StagingFileManager;
 import com.nereusstream.objectstore.wal.DefaultWalObjectReader;
 import com.nereusstream.objectstore.wal.DefaultWalObjectWriter;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -107,6 +121,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     "ObjectStore provider instance does not match configured providerClassName");
         }
         validateActivationContext(exactConfiguration, activationContext);
+        validateProviderContexts(exactConfiguration, exactContext);
 
         List<KafkaRuntimeResources.Resource> constructedResources = new ArrayList<>();
         List<KafkaRuntimeResources.Resource> providerResources = new ArrayList<>();
@@ -131,8 +146,19 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     exactConfiguration.oxia(), exactContext.clock());
             providerResources.add(registerOwned(
                     constructedResources, "shared-oxia-runtime", oxiaRuntime));
-            OxiaMetadataStore l0MetadataStore = OxiaJavaClientMetadataStore.usingSharedRuntime(
-                    exactConfiguration.oxia(), oxiaRuntime, exactContext.clock());
+            OxiaMetadataStore l0MetadataStore =
+                    exactConfiguration.bookKeeper().isPresent()
+                            ? OxiaJavaClientMetadataStore.usingSharedRuntime(
+                                    exactConfiguration.oxia(),
+                                    oxiaRuntime,
+                                    exactContext.clock(),
+                                    exactConfiguration.bookKeeper()
+                                            .orElseThrow()
+                                            .metadataStore())
+                            : OxiaJavaClientMetadataStore.usingSharedRuntime(
+                                    exactConfiguration.oxia(),
+                                    oxiaRuntime,
+                                    exactContext.clock());
             providerResources.add(registerOwned(
                     constructedResources, "l0-metadata-store", l0MetadataStore));
             GenerationMetadataStore generationMetadataStore =
@@ -221,12 +247,53 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                         generationMetadataStore,
                         exactContext.clock());
             }
+            BookKeeperPrimaryWalRuntime bookKeeperRuntime = null;
+            List<BookKeeperPrimaryPhysicalReferenceAdapter> additionalPhysicalReferences =
+                    List.of();
+            if (exactConfiguration.bookKeeper().isPresent()) {
+                NereusKafkaBookKeeperWalRuntimeConfiguration bookKeeperConfiguration =
+                        exactConfiguration.bookKeeper().orElseThrow();
+                NereusKafkaBookKeeperWalRuntimeContext bookKeeperContext =
+                        exactContext.bookKeeper().orElseThrow();
+                providerResources.add(registerBorrowed(
+                        constructedResources,
+                        "bookkeeper-client",
+                        bookKeeperContext.client()));
+                bookKeeperRuntime = BookKeeperPrimaryWalRuntime.create(
+                        bookKeeperConfiguration.deploymentId(),
+                        exactConfiguration.runtime().nereusCluster(),
+                        exactConfiguration.streamStorage().processRunId(),
+                        bookKeeperConfiguration.wal(),
+                        exactConfiguration.oxia(),
+                        oxiaRuntime,
+                        bookKeeperContext.client(),
+                        new OxiaBookKeeperLedgerIdNamespaceReservationStore(
+                                exactConfiguration.oxia(),
+                                oxiaRuntime),
+                        new OxiaBookKeeperProtocolActivationStore(
+                                exactConfiguration.oxia(),
+                                oxiaRuntime),
+                        bookKeeperContext.brokerReadiness(),
+                        bookKeeperContext.passwords(),
+                        exactContext.clock());
+                providerResources.add(registerOwned(
+                        constructedResources,
+                        "bookkeeper-primary-wal-runtime",
+                        bookKeeperRuntime));
+                if (bookKeeperRuntime.capabilityBinding().isEmpty()) {
+                    throw new IllegalStateException(
+                            "BookKeeper WAL-only runtime requires an ACTIVE exact publication activation");
+                }
+                additionalPhysicalReferences =
+                        List.of(bookKeeperRuntime.physicalReferences());
+            }
             GenerationZeroPhysicalReferencePublisher physicalReferences =
                     new DefaultGenerationZeroPhysicalReferencePublisher(
                             exactConfiguration.runtime().nereusCluster(),
                             l0MetadataStore,
                             physicalMetadataStore,
-                            protections);
+                            protections,
+                            additionalPhysicalReferences);
             ObjectReadPinManager readPins = new DefaultObjectReadPinManager(
                     exactConfiguration.runtime().nereusCluster(),
                     durableProcessRunId(exactConfiguration.streamStorage().processRunId()),
@@ -238,13 +305,17 @@ public final class NereusKafkaObjectWalRuntimeFactory {
             providerResources.add(registerOwned(
                     constructedResources, "kafka-checkpoint-read-pins", readPins));
             DefaultWalObjectReader walObjectReader = new DefaultWalObjectReader(objectStore);
-            ReadTargetReaderRegistry readers = new ReadTargetReaderRegistry(List.of(
-                    new ObjectWalReaderAdapter(walObjectReader),
-                    new ParquetV2CompactedTargetReader(
-                            new ParquetRangedCompactedObjectReader(
-                                    objectStore, callbackExecutor),
-                            new ParquetKafkaTopicCompactedReader(
-                                    objectStore, callbackExecutor))));
+            List<ReadTargetReader> installedReaders = new ArrayList<>();
+            installedReaders.add(new ObjectWalReaderAdapter(walObjectReader));
+            if (bookKeeperRuntime != null) {
+                installedReaders.add(bookKeeperRuntime.walRuntime().primaryWalReader());
+            }
+            installedReaders.add(new ParquetV2CompactedTargetReader(
+                    new ParquetRangedCompactedObjectReader(
+                            objectStore, callbackExecutor),
+                    new ParquetKafkaTopicCompactedReader(
+                            objectStore, callbackExecutor)));
+            ReadTargetReaderRegistry readers = new ReadTargetReaderRegistry(installedReaders);
             MetadataPhysicalObjectIdentityResolver identities =
                     new MetadataPhysicalObjectIdentityResolver(
                             exactConfiguration.runtime().nereusCluster(),
@@ -271,15 +342,48 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                             generationMetadataStore,
                             physicalMetadataStore,
                             exactContext.clock()));
+            PrimaryWalRegistry objectWalRegistry =
+                    AppendCoordinator.productionObjectWalRegistry(
+                            exactConfiguration.streamStorage(),
+                            l0MetadataStore,
+                            new DefaultWalObjectWriter(
+                                    objectStore,
+                                    WRITER_VERSION,
+                                    exactContext.clock()),
+                            walObjectReader,
+                            physicalReferences,
+                            exactContext.clock());
+            List<PrimaryWalRegistry> primaryWalRegistries =
+                    new ArrayList<>(List.of(objectWalRegistry));
+            EnumMap<StorageProfile, StorageProfileResolver> profileResolvers =
+                    new EnumMap<>(StorageProfile.class);
+            Phase4StorageProfileResolver objectProfiles =
+                    new Phase4StorageProfileResolver();
+            profileResolvers.put(
+                    StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                    objectProfiles);
+            if (bookKeeperRuntime != null) {
+                primaryWalRegistries.add(
+                        bookKeeperRuntime.walRuntime().primaryWalRegistry());
+                profileResolvers.put(
+                        StorageProfile.BOOKKEEPER_WAL_ONLY,
+                        bookKeeperRuntime.walRuntime().profileResolver());
+            }
             streamStorage = new DefaultStreamStorage(
                     exactConfiguration.streamStorage(),
                     l0MetadataStore,
-                    new DefaultWalObjectWriter(objectStore, WRITER_VERSION, exactContext.clock()),
-                    walObjectReader,
+                    PrimaryWalRegistry.combine(primaryWalRegistries),
                     physicalReferences,
+                    new MetadataAppendRecoverySearcher(
+                            exactConfiguration.runtime().nereusCluster(),
+                            l0MetadataStore),
+                    new StorageProfileResolverRegistry(profileResolvers),
+                    AppendAdmissionGuard.noOp(),
                     readComponents,
                     exactContext.clock(),
-                    callbackExecutor);
+                    callbackExecutor,
+                    com.nereusstream.core.read.ReadMetricsObserver.noop(),
+                    com.nereusstream.core.trim.TrimMetricsObserver.noop());
             registerOwned(constructedResources, "stream-storage", streamStorage);
             activatedGenerations = new KafkaActivatedGenerationSetResolver(
                     exactConfiguration.runtime().nereusCluster(),
@@ -467,6 +571,16 @@ public final class NereusKafkaObjectWalRuntimeFactory {
         }
     }
 
+    private static void validateProviderContexts(
+            NereusKafkaObjectWalRuntimeConfiguration configuration,
+            NereusKafkaObjectWalRuntimeContext context) {
+        if (configuration.bookKeeper().isPresent()
+                != context.bookKeeper().isPresent()) {
+            throw new IllegalArgumentException(
+                    "BookKeeper runtime configuration and context must be installed together");
+        }
+    }
+
     private static KafkaRuntimeResources.Resource registerOwned(
             List<KafkaRuntimeResources.Resource> resources,
             String name,
@@ -476,6 +590,23 @@ public final class NereusKafkaObjectWalRuntimeFactory {
             if (registered.value() == value) {
                 throw new IllegalArgumentException(
                         "Kafka runtime resource " + name + " duplicates " + registered.name());
+            }
+        }
+        resources.add(resource);
+        return resource;
+    }
+
+    private static KafkaRuntimeResources.Resource registerBorrowed(
+            List<KafkaRuntimeResources.Resource> resources,
+            String name,
+            AutoCloseable value) {
+        KafkaRuntimeResources.Resource resource =
+                KafkaRuntimeResources.Resource.borrowed(name, value);
+        for (KafkaRuntimeResources.Resource registered : resources) {
+            if (registered.value() == value) {
+                throw new IllegalArgumentException(
+                        "Kafka runtime resource " + name
+                                + " duplicates " + registered.name());
             }
         }
         resources.add(resource);

@@ -566,8 +566,10 @@ The Object-WAL composition now owns an independent `KafkaCheckpointFailureMetada
 `DurableKafkaCheckpointFailureQuarantine` into both recovery and retention。It does not rewrite the binding root or make
 quarantine a deletion authority。A new Object-WAL runtime reloads the immutable record before object I/O，and a newly confirmed
 permanent failure must durably create/reconcile that record before fallback。Neither the product launcher nor the fork publisher
-may bypass opener/source revalidation。BookKeeper/async-object production creators must explicitly compose the same contract
-when those profiles are implemented；the transient observer adapter remains test-only。
+may bypass opener/source revalidation。The optional `BOOKKEEPER_WAL_ONLY` composition uses the same checkpoint reader、
+quarantine、source revalidation and recovery coordinator while replacing generation-zero append/read/physical-reference/profile
+resolution with the provider-neutral BookKeeper runtime。Async/sync Object materialization profiles must explicitly compose
+the same contract when implemented；the transient observer adapter remains test-only。
 
 If no checkpoint：
 

@@ -7,7 +7,7 @@ dependencies {
     api(project(":nereus-core"))
     implementation(project(":nereus-materialization"))
     implementation(project(":nereus-metadata-oxia"))
-    implementation(libs.bookkeeper.server)
+    api(libs.bookkeeper.server)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)

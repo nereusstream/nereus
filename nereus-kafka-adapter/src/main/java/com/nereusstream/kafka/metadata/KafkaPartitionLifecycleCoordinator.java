@@ -222,7 +222,8 @@ public final class KafkaPartitionLifecycleCoordinator implements KafkaPartitionB
 
     private CompletableFuture<Void> ensureMaterialization(
             StreamId streamId, StorageProfile profile) {
-        if (materializations.isEmpty()) {
+        if (materializations.isEmpty()
+                || !profile.objectMaterializationEnabled()) {
             return CompletableFuture.completedFuture(null);
         }
         return materializations.orElseThrow().ensure(streamId, profile).thenApply(ignored -> null);

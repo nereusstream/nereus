@@ -270,14 +270,20 @@ feature activation 是 operator-visible durable action，不是 launcher 副作�
 `FeatureLevelRecord` finalization 持久化 level，`FeaturesImage.isNereusStorageEnabled()` 是 broker/controller image
 consumer 的统一判断。
 
-product adapter 已实现 `NereusKafkaRuntimeFactory`，并新增仅支持 `OBJECT_WAL_SYNC_OBJECT` 的 concrete
-`NereusKafkaObjectWalRuntimeFactory`：显式组装 Object provider、shared Oxia、L0/physical/binding stores、protection、
+product adapter 已实现 `NereusKafkaRuntimeFactory`，并让 concrete
+`NereusKafkaObjectWalRuntimeFactory` 支持纯 Object 模式，或显式安装
+`OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY`：它组装 Object provider、shared Oxia、L0/physical/binding stores、protection、
 callback executor、durable checkpoint read pins、checkpoint reader/verifier/recovery coordinator、bounded COMMITTED page
 source、concrete recovery launcher 和同一 manager/runtime graph；real Oxia + local-file provider 的 leader
 open/Produce/Fetch gate 已通过。Fork 不再承担 ObjectStore/Oxia/read-pin orchestration，只在 exact ReplicaManager
 可用后为每次 open 创建 fresh state codec 和 exact Partition publisher。Product Object-WAL runtime 已在 checkpoint
 reader/retention verifier 外围组装同一个 exact-reference durable quarantine store；它无需新增 Kafka-fork seam。
-尚未实现的是 BookKeeper/async-object creator、真实 controller failover、live takeover 和 kill-cut process tests。显式
+BookKeeper 模式复用 provider-neutral `BookKeeperPrimaryWalRuntime`、Oxia namespace/activation stores、generation-zero
+physical-reference publisher、profile resolver 和 exact reader registry；只有 F1-BK namespace 与 ACTIVE publication
+已由 operator provision、broker readiness exact 匹配时才允许启动。`f9BookKeeperWalOnlyProviderIntegrationTest`
+用真实四分片 Oxia + 两个 bookie 证明 leader open、strict append 和 cold generation-zero Fetch。尚未实现的是 Kafka
+fork BookKeeper 配置映射/客户端所有权、async/sync Object materialization、真实 controller failover、live takeover 和
+更广 kill-cut process tests。显式
 launcher/KafkaRaftServer broker/controller factory selection 已实现；`phase9M6KafkaProcessCheck` 现使用真实 release
 distribution、四分片 Oxia 和 pinned LocalStack S3 覆盖显式 feature format、broker/controller registration、
 activation、Admin create、Produce/Fetch/ListOffsets、S3 object existence 和 SIGTERM shutdown，并以同一 KRaft

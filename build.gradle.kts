@@ -3141,9 +3141,10 @@ tasks.register("phase9M3CodecCheck") {
 
 tasks.register("phase9M3ProviderCheck") {
     group = "verification"
-    description = "Run the partial F9-M3 provider-backed Object-WAL gate against real Oxia."
+    description = "Run the partial F9-M3 provider-backed Object-WAL and BookKeeper-WAL-only gates."
     dependsOn("phase9M3CodecCheck")
     dependsOn(":nereus-kafka-adapter:f9M3ProviderIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProviderIntegrationTest")
 }
 
 tasks.register("phase9M4ProducerStateCheck") {

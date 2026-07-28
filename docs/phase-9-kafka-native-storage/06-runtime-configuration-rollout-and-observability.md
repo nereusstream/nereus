@@ -335,6 +335,16 @@ NereusBrokerStorageRuntimeFactory.production(recoveryStateFactoryCreator)
   -> validate ordered result and invoke original fetch response completion exactly once
 ```
 
+At the product boundary，`NereusKafkaObjectWalRuntimeConfiguration` may now carry an optional
+`NereusKafkaBookKeeperWalRuntimeConfiguration` and the context may carry the matching borrowed BookKeeper client/readiness/
+password providers。Presence must match before provider I/O。When present，the runtime installs exactly
+`OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY`，uses the shared Oxia client for the F1-BK namespace/activation/ledger metadata
+views，requires an exact ACTIVE publication before admission，and registers the BookKeeper appender、reader、generation-zero
+physical-reference publisher and profile resolver in the same storage graph。`BOOKKEEPER_WAL_ONLY` deliberately skips Object
+materialization registration。The adapter closes its owned BookKeeper runtime before the embedding owner closes the borrowed
+client。The Kafka-fork call path above still constructs only the Object configuration/provider；BookKeeper configuration mapping
+and client ownership are the next process-level seam，not implied by the adapter gate。
+
 The broker-epoch wait deadline is the typed rollout readiness timeout。The exact epoch is captured once and passed unchanged into
 the capability；the mapper derives only the separate checked operation epoch。`KafkaScheduler.scheduledExecutorService()` exposes
 the already-started executor as `BORROWED`；neither the fork creator nor product runtime may shut it down。

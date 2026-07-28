@@ -24,6 +24,14 @@ Current deterministic M5 read-side evidence（2026-07-27）：`KafkaCompactedFet
 mandatory source never produces a COMMITTED retry。The manifest rows remain `PLANNED` because their required real-service、
 restart/Kafka-fork and process/chaos tiers are not yet satisfied。
 
+Current provider-profile evidence（2026-07-28）：the product adapter can install exactly
+`OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY` over one shared Oxia runtime after validating an operator-provisioned F1-BK
+ledger-ID namespace、ACTIVE publication and exact broker readiness。`f9BookKeeperWalOnlyProviderIntegrationTest` starts real
+two-bookie BookKeeper、opens a Kafka leader with `BOOKKEEPER_WAL_ONLY`、strictly appends a magic-v2 batch、publishes the exact
+BookKeeper generation-zero target and Fetches it through the shared generation resolver。The client is borrowed and the
+provider graph closes before it。All profile-matrix rows remain `PLANNED` because the Kafka fork still lacks BookKeeper
+configuration/client ownership、process startup/restart/takeover and async/sync Object materialization evidence。
+
 Current deterministic M4 fork evidence（local `ec7f0db991` + `032974067c`）：`NereusProducerStateManagerTest`、
 `NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
 KF-TXN-002/003/005/006/007 and KF-FET-006/007：five-batch/sequence-wrap checkpoint equality、full seven-section hydration
