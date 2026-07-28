@@ -99,7 +99,7 @@ tasks.register<Test>("f9M3ProviderIntegrationTest") {
 
 tasks.register<Test>("f9M6KafkaProcessIntegrationTest") {
     group = "verification"
-    description = "Run the F9 provider-backed Nereus Kafka process Produce/Fetch/ListOffsets/shutdown gate."
+    description = "Run the F9 provider-backed Nereus Kafka cold-restart Produce/Fetch/ListOffsets gate."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
     classpath = f9ProviderIntegrationTest.runtimeClasspath

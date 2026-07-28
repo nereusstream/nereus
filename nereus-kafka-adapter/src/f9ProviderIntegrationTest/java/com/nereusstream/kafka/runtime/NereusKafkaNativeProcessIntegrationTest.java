@@ -55,7 +55,8 @@ import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
  *
  * <p>This is intentionally not a Kafka test-kit fixture: formatting, feature activation, broker registration,
  * controller policy enforcement, provider creation, Produce, Fetch, ListOffsets and shutdown all cross the same
- * launcher and scripts that an operator uses.
+ * launcher and scripts that an operator uses. A fresh second JVM must reacquire readiness at a higher broker epoch
+ * and recover the first process's remote bytes before appending again.
  */
 @Testcontainers
 class NereusKafkaNativeProcessIntegrationTest {
@@ -80,7 +81,7 @@ class NereusKafkaNativeProcessIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.MINUTES)
-    void productProcessRoundTripsProduceFetchAndListOffsetsThenShutsDownCleanly()
+    void productProcessRecoversProduceFetchAndListOffsetsAcrossColdRestart()
             throws Exception {
         clearFailureEvidence();
         Path kafkaCheckout = requiredKafkaCheckout();
@@ -91,7 +92,8 @@ class NereusKafkaNativeProcessIntegrationTest {
         Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
         Path config = root.resolve("server.properties");
         Path formatLog = root.resolve("format.log");
-        Path serverLog = root.resolve("server.log");
+        Path firstServerLog = root.resolve("server-first.log");
+        Path restartServerLog = root.resolve("server-restart.log");
         String bucket = "nereus-kafka-" + UUID.randomUUID();
         String topic = "process-gate-" + UUID.randomUUID();
         int brokerPort = freePort();
@@ -127,86 +129,97 @@ class NereusKafkaNativeProcessIntegrationTest {
                     .isZero();
         } catch (Exception | AssertionError failure) {
             try {
-                preserveFailureEvidence(config, formatLog, serverLog);
+                preserveFailureEvidence(config, formatLog, firstServerLog, restartServerLog);
             } catch (AssertionError evidenceFailure) {
                 failure.addSuppressed(evidenceFailure);
             }
             throw failure;
         }
 
-        Process broker = start(
-                List.of(startScript.toString(), config.toString()),
+        TopicPartition partition = new TopicPartition(topic, 0);
+        byte[] firstKey = "key-0".getBytes(StandardCharsets.UTF_8);
+        byte[] firstValue = "nereus-native-process-first".getBytes(StandardCharsets.UTF_8);
+        runBroker(
+                startScript,
                 kafkaHome,
-                serverLog);
-        Throwable primaryFailure = null;
-        try {
-            awaitBroker(bootstrapServers, broker, serverLog);
-            TopicPartition partition = new TopicPartition(topic, 0);
-            byte[] key = "key-0".getBytes(StandardCharsets.UTF_8);
-            byte[] value = "nereus-native-process".getBytes(StandardCharsets.UTF_8);
-
-            try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
-                admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1)))
-                        .all()
-                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
-
-                RecordMetadata produced = produce(bootstrapServers, topic, key, value);
-                assertThat(produced.partition()).isZero();
-                assertThat(produced.offset()).isZero();
-
-                ConsumerRecord<byte[], byte[]> fetched =
-                        fetch(bootstrapServers, partition, serverLog);
-                assertThat(fetched.offset()).isZero();
-                assertThat(fetched.key()).isEqualTo(key);
-                assertThat(fetched.value()).isEqualTo(value);
-
-                Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliest =
-                        admin.listOffsets(Map.of(partition, OffsetSpec.earliest()))
+                config,
+                formatLog,
+                firstServerLog,
+                bootstrapServers,
+                () -> {
+                    try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
+                        admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1)))
                                 .all()
                                 .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
-                Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latest =
-                        admin.listOffsets(Map.of(partition, OffsetSpec.latest()))
-                                .all()
-                                .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
-                assertThat(earliest.get(partition).offset()).isZero();
-                assertThat(latest.get(partition).offset()).isEqualTo(1L);
-            }
 
-            assertThat(objectCount(bucket))
-                    .as("stable Produce must persist at least one S3-compatible object")
-                    .isPositive();
-        } catch (Exception | AssertionError failure) {
-            primaryFailure = failure;
-            try {
-                preserveFailureEvidence(config, formatLog, serverLog);
-            } catch (AssertionError evidenceFailure) {
-                failure.addSuppressed(evidenceFailure);
-            }
-            throw failure;
-        } finally {
-            try {
-                if (broker.isAlive()) {
-                    broker.destroy();
-                }
-                int exit = await(broker, PROCESS_TIMEOUT, "Nereus Kafka shutdown", serverLog);
-                String output = readLog(serverLog);
-                if (exit != 0 && exit != 143) {
-                    throw new AssertionError(
-                            "unexpected process exit " + exit + ":\n" + output);
-                }
-                if (primaryFailure == null) {
-                    assertThat(output)
-                            .as("Kafka process must reach its normal shutdown completion path")
-                            .contains("shut down completed");
-                }
-            } catch (Exception | AssertionError shutdownFailure) {
-                if (primaryFailure != null) {
-                    primaryFailure.addSuppressed(shutdownFailure);
-                } else {
-                    throw shutdownFailure;
-                }
-            }
-        }
+                        RecordMetadata produced =
+                                produce(bootstrapServers, topic, firstKey, firstValue);
+                        assertThat(produced.partition()).isZero();
+                        assertThat(produced.offset()).isZero();
+
+                        ConsumerRecord<byte[], byte[]> fetched =
+                                fetch(bootstrapServers, partition, 0L, firstServerLog);
+                        assertThat(fetched.offset()).isZero();
+                        assertThat(fetched.key()).isEqualTo(firstKey);
+                        assertThat(fetched.value()).isEqualTo(firstValue);
+
+                        Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliest =
+                                admin.listOffsets(Map.of(partition, OffsetSpec.earliest()))
+                                        .all()
+                                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                        Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latest =
+                                admin.listOffsets(Map.of(partition, OffsetSpec.latest()))
+                                        .all()
+                                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                        assertThat(earliest.get(partition).offset()).isZero();
+                        assertThat(latest.get(partition).offset()).isEqualTo(1L);
+                    }
+                });
+
+        byte[] secondKey = "key-1".getBytes(StandardCharsets.UTF_8);
+        byte[] secondValue = "nereus-native-process-restart".getBytes(StandardCharsets.UTF_8);
+        runBroker(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                restartServerLog,
+                bootstrapServers,
+                () -> {
+                    try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
+                        ConsumerRecord<byte[], byte[]> recovered =
+                                fetch(bootstrapServers, partition, 0L, restartServerLog);
+                        assertThat(recovered.offset()).isZero();
+                        assertThat(recovered.key()).isEqualTo(firstKey);
+                        assertThat(recovered.value()).isEqualTo(firstValue);
+
+                        RecordMetadata produced =
+                                produce(bootstrapServers, topic, secondKey, secondValue);
+                        assertThat(produced.partition()).isZero();
+                        assertThat(produced.offset()).isEqualTo(1L);
+
+                        ConsumerRecord<byte[], byte[]> fetched =
+                                fetch(bootstrapServers, partition, 1L, restartServerLog);
+                        assertThat(fetched.offset()).isEqualTo(1L);
+                        assertThat(fetched.key()).isEqualTo(secondKey);
+                        assertThat(fetched.value()).isEqualTo(secondValue);
+
+                        Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliest =
+                                admin.listOffsets(Map.of(partition, OffsetSpec.earliest()))
+                                        .all()
+                                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                        Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latest =
+                                admin.listOffsets(Map.of(partition, OffsetSpec.latest()))
+                                        .all()
+                                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                        assertThat(earliest.get(partition).offset()).isZero();
+                        assertThat(latest.get(partition).offset()).isEqualTo(2L);
+                    }
+                });
+
+        assertThat(objectCount(bucket))
+                .as("stable Produce before and after restart must persist S3-compatible objects")
+                .isPositive();
     }
 
     private void writeConfiguration(
@@ -309,6 +322,7 @@ class NereusKafkaNativeProcessIntegrationTest {
     private static ConsumerRecord<byte[], byte[]> fetch(
             String bootstrapServers,
             TopicPartition partition,
+            long offset,
             Path serverLog
     ) throws Exception {
         Properties properties = new Properties();
@@ -324,7 +338,7 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, "f9-process-" + UUID.randomUUID());
         try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
             consumer.assign(List.of(partition));
-            consumer.seek(partition, 0L);
+            consumer.seek(partition, offset);
             long deadline = System.nanoTime() + CLIENT_TIMEOUT.toNanos();
             while (System.nanoTime() < deadline) {
                 ConsumerRecords<byte[], byte[]> records =
@@ -335,6 +349,70 @@ class NereusKafkaNativeProcessIntegrationTest {
             }
         }
         throw new AssertionError("Fetch timed out:\n" + readLog(serverLog));
+    }
+
+    private static void runBroker(
+            Path startScript,
+            Path kafkaHome,
+            Path config,
+            Path formatLog,
+            Path serverLog,
+            String bootstrapServers,
+            BrokerAssertions assertions
+    ) throws Exception {
+        Process broker = start(
+                List.of(startScript.toString(), config.toString()),
+                kafkaHome,
+                serverLog);
+        Throwable failure = null;
+        try {
+            awaitBroker(bootstrapServers, broker, serverLog);
+            assertions.verify();
+        } catch (Exception | AssertionError operationFailure) {
+            failure = operationFailure;
+        }
+        try {
+            stopBroker(broker, serverLog);
+        } catch (Exception | AssertionError shutdownFailure) {
+            if (failure == null) {
+                failure = shutdownFailure;
+            } else {
+                failure.addSuppressed(shutdownFailure);
+            }
+        }
+        if (failure != null) {
+            try {
+                preserveFailureEvidence(config, formatLog, serverLog);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    private static void stopBroker(Process broker, Path serverLog) throws Exception {
+        if (broker.isAlive()) {
+            broker.destroy();
+        }
+        int exit = await(broker, PROCESS_TIMEOUT, "Nereus Kafka shutdown", serverLog);
+        String output = readLog(serverLog);
+        if (exit != 0 && exit != 143) {
+            throw new AssertionError(
+                    "unexpected process exit " + exit + ":\n" + output);
+        }
+        assertThat(output)
+                .as("Kafka process must reach its normal shutdown completion path")
+                .contains("shut down completed");
+    }
+
+    private static void rethrow(Throwable failure) throws Exception {
+        if (failure instanceof Exception exact) {
+            throw exact;
+        }
+        if (failure instanceof AssertionError exact) {
+            throw exact;
+        }
+        throw new AssertionError("unexpected Kafka process failure", failure);
     }
 
     private static void awaitBroker(
@@ -486,7 +564,7 @@ class NereusKafkaNativeProcessIntegrationTest {
     private static void preserveFailureEvidence(
             Path config,
             Path formatLog,
-            Path serverLog
+            Path... serverLogs
     ) {
         String configured = System.getProperty("nereus.kafka.process.evidence.dir");
         if (configured == null || configured.isBlank()) {
@@ -497,7 +575,9 @@ class NereusKafkaNativeProcessIntegrationTest {
             Files.createDirectories(target);
             copyIfPresent(config, target.resolve("server.properties"));
             copyIfPresent(formatLog, target.resolve("format.log"));
-            copyIfPresent(serverLog, target.resolve("server.log"));
+            for (Path serverLog : serverLogs) {
+                copyIfPresent(serverLog, target.resolve(serverLog.getFileName()));
+            }
         } catch (IOException failure) {
             throw new AssertionError(
                     "failed to preserve Kafka process evidence under " + target,
@@ -513,7 +593,8 @@ class NereusKafkaNativeProcessIntegrationTest {
         Path target = Path.of(configured).toAbsolutePath().normalize();
         Files.deleteIfExists(target.resolve("server.properties"));
         Files.deleteIfExists(target.resolve("format.log"));
-        Files.deleteIfExists(target.resolve("server.log"));
+        Files.deleteIfExists(target.resolve("server-first.log"));
+        Files.deleteIfExists(target.resolve("server-restart.log"));
     }
 
     private static void copyIfPresent(Path source, Path target) throws IOException {
@@ -584,5 +665,10 @@ class NereusKafkaNativeProcessIntegrationTest {
         } catch (IOException failure) {
             return "<failed to read " + log + ": " + failure + ">";
         }
+    }
+
+    @FunctionalInterface
+    private interface BrokerAssertions {
+        void verify() throws Exception;
     }
 }

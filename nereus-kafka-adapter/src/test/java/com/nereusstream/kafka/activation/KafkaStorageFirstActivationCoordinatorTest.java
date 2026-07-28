@@ -4,6 +4,7 @@ package com.nereusstream.kafka.activation;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StorageProfile;
+import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
 import com.nereusstream.metadata.oxia.VersionedKafkaStorageProtocolActivation;
 import com.nereusstream.metadata.oxia.records.KafkaStorageActivationLifecycle;
 import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
@@ -127,6 +128,40 @@ class KafkaStorageFirstActivationCoordinatorTest {
                 store, new SequenceSnapshots(populated)).activate().toCompletableFuture().join();
 
         assertThat(retried).isEqualTo(first);
+    }
+
+    @Test
+    void activeRetryRefreshesReadinessForRestartedBrokerEpoch() {
+        InMemoryKafkaStorageActivationStore store = capableStore();
+        VersionedKafkaStorageProtocolActivation first = coordinator(
+                store, new SequenceSnapshots(empty(100), empty(101)))
+                .activate().toCompletableFuture().join();
+        var previousReadiness = store.getReadiness().join().orElseThrow();
+        KafkaBrokerIdentity restartedIdentity = new KafkaBrokerIdentity(1, 12);
+        store.createCapability(KafkaActivationTestSupport
+                        .specification(restartedIdentity, "runtime-2", 3)
+                        .initialRecord(NOW))
+                .join();
+        KafkaStorageClusterSnapshot restarted = new KafkaStorageClusterSnapshot(
+                KafkaActivationTestSupport.CLUSTER,
+                150,
+                KafkaStorageProtocolActivationRecord.KAFKA_FEATURE_LEVEL,
+                List.of(restartedIdentity),
+                true,
+                true,
+                true);
+
+        VersionedKafkaStorageProtocolActivation retried = coordinator(
+                store, new SequenceSnapshots(restarted)).activate().toCompletableFuture().join();
+
+        var refreshedReadiness = store.getReadiness().join().orElseThrow();
+        assertThat(retried).isEqualTo(first);
+        assertThat(refreshedReadiness.value().brokers()).containsExactly(restartedIdentity);
+        assertThat(refreshedReadiness.value().kraftMetadataOffset()).isEqualTo(150);
+        assertThat(refreshedReadiness.value().readinessEpoch())
+                .isEqualTo(previousReadiness.value().readinessEpoch() + 1);
+        assertThat(refreshedReadiness.value().readinessEpoch())
+                .isGreaterThan(first.value().activationEpoch());
     }
 
     private static InMemoryKafkaStorageActivationStore capableStore() {

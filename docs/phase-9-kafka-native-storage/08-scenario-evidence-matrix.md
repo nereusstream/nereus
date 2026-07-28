@@ -77,10 +77,14 @@ the authoritative cache root's KRaft V1 identity before directory registration�
 complete stock `KafkaConfigTest` compilation、Checkstyle、SpotBugs and the executable 31-commit/118-file source lock pass。
 `phase9M6KafkaProcessCheck` additionally builds the real release tarball and passes one combined broker/controller process
 against four-shard Oxia and pinned LocalStack S3：explicit feature format、registration/activation、Admin create、acks=all
-Produce、byte-exact Fetch、earliest/latest ListOffsets、S3 object existence and SIGTERM shutdown。KF-OPS-006/007 are
-`PASSED_CURRENT_SOURCE` deterministic evidence；the baseline adds real-process partial evidence to KF-OPS-003/013 and the
-ordinary append/fetch/ListOffsets rows，but they remain `PLANNED` until their required restart/takeover/failure/aggregate
-cuts run。In-flight activation epoch fencing and multi-controller takeover also remain open。
+Produce、byte-exact Fetch、earliest/latest ListOffsets、S3 object existence and SIGTERM shutdown。It then starts a fresh
+second JVM with the same KRaft identity，observes a higher broker epoch，CAS-refreshes ACTIVE readiness，recovers offset 0
+from remote state，appends offset 1 and verifies earliest=0/latest=2 before another normal shutdown。A regression also locks
+that M6 task selection republishes the current `0.1.0-f9-dev` artifact rather than reusing stale bytes。KF-OPS-006/007 are
+`PASSED_CURRENT_SOURCE` deterministic evidence；the process gate adds real cold-restart partial evidence to
+KF-META-009、KF-APP-005/006、KF-FET-001/009 and KF-OPS-003/009/013，but those rows remain `PLANNED` where live preemption、
+timestamp/leader-epoch、failure-cut、multi-broker or aggregate requirements are still absent。In-flight activation epoch
+fencing and multi-controller takeover also remain open。
 
 ## 2. Machine-readable manifest target
 
@@ -127,8 +131,9 @@ stale-resign isolation 的 deterministic partial evidence，但不替代 durable
 timestamp/max-timestamp、跨页硬预算、inspector invariant 与 mid-scan leadership fencing 的 deterministic partial
 evidence；local fork `NereusRecordTimestampInspectorTest` 进一步提供 stock 4.3 compressed `MemoryRecords` exact-record
 iterator、minimum-offset、buffer preservation 与 max-timestamp tie-break 证据；该测试现已包含在远端 F9 branch，
-但仍不替代 fork handler/
-time-index recovery/restart evidence；local fork `NereusTopicDeltaLifecycleTest`、`ReplicaManagerTest` 与
+真实 process gate 又验证 earliest/latest 在一次 remote cold recovery 后从 0/1 连续推进为 0/2，但仍不替代
+timestamp/max-timestamp time-index restart 与 leader-epoch lookup evidence；local fork
+`NereusTopicDeltaLifecycleTest`、`ReplicaManagerTest` 与
 `BrokerMetadataPublisherTest` 已为 KF-OPS-017 提供 stock-state-first recovery preparation、coordinator callback-after-open
 和 `firstPublishFuture` non-readiness 的 deterministic Kafka-fork partial evidence；provider-backed BrokerServer
 activation and one successful KRaft process path now pass，but per-partition failure/offline policy、internal-topic restart
@@ -276,7 +281,7 @@ hash。Markdown/JSON ID sets must match。
 | KF-FET-006 | READ_UNCOMMITTED upper bound HW and READ_COMMITTED upper bound LSO | fork `NereusUnifiedLogFactoryTest`（D/K partial）；`KafkaNativeIsolationIntegrationTest`（R pending） | R,K | M4 |
 | KF-FET-007 | aborted transaction list/filter matches Kafka baseline | fork `NereusUnifiedLogFactoryTest` bounded two-abort page（D/K partial）；`KafkaNativeIsolationIntegrationTest`（R pending） | R,K | M4 |
 | KF-FET-008 | request below durable logStart is out-of-range；mid-batch trim hides prefix | product `KafkaDeleteRecordsCoordinatorTest` + fork `PartitionTest`/`NereusUnifiedLogFactoryTest`（D/K partial）；`KafkaNativeDeleteRecordsIntegrationTest`（R pending） | R,K | M5 |
-| KF-FET-009 | ListOffsets earliest/latest/max timestamp/timestamp lookup match baseline | product `KafkaDerivedIndexStateCodecV1Test` + fork `NereusCanonicalLogStateTest`/`NereusUnifiedLogFactoryTest`（derived index/real position/bounded payload lookup D/K partial）；`KafkaNativeListOffsetsIntegrationTest`（restart/R pending） | R,K | M3/M4 |
+| KF-FET-009 | ListOffsets earliest/latest/max timestamp/timestamp lookup match baseline | product `KafkaDerivedIndexStateCodecV1Test` + fork `NereusCanonicalLogStateTest`/`NereusUnifiedLogFactoryTest`（derived index/real position/bounded payload lookup D/K partial）；`NereusKafkaNativeProcessIntegrationTest`（earliest/latest before/after cold restart R/P partial）；`KafkaNativeListOffsetsIntegrationTest`（timestamp/max-timestamp restart pending） | R,K | M3/M4 |
 | KF-FET-010 | leader-epoch end-offset lookup survives checkpoint/restart/takeover | product `KafkaLeaderEpochStateCodecV1Test`（canonical bytes partial）；`KafkaNativeLeaderEpochIntegrationTest`（restart/takeover pending） | R,P,K | M4 |
 | KF-FET-011 | compacted sparse holes advance by source coverage without loop/phantom row | `KafkaCompactedFetchIntegrationTest` | D,R | M5 |
 | KF-FET-012 | mandatory compacted prefix switches exactly once to committed tail at coverage end | `KafkaCompactedFetchIntegrationTest` | D,R,K | M5 |

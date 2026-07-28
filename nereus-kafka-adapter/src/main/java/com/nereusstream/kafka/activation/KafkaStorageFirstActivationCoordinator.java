@@ -47,12 +47,25 @@ public final class KafkaStorageFirstActivationCoordinator {
             if (existing.isPresent()
                     && existing.orElseThrow().value().lifecycle()
                             == KafkaStorageActivationLifecycle.ACTIVE) {
-                return currentSnapshot().thenApply(snapshot -> {
-                    requireActive(existing.orElseThrow(), snapshot);
-                    return existing.orElseThrow();
-                });
+                return currentSnapshot().thenCompose(
+                        snapshot -> refreshActiveReadiness(existing.orElseThrow(), snapshot));
             }
             return currentSnapshot().thenCompose(snapshot -> beginOrResume(existing, snapshot));
+        });
+    }
+
+    private CompletionStage<VersionedKafkaStorageProtocolActivation> refreshActiveReadiness(
+            VersionedKafkaStorageProtocolActivation active,
+            KafkaStorageClusterSnapshot snapshot) {
+        requireActive(active, snapshot);
+        return loadCapabilities(snapshot).thenCompose(proof -> {
+            require(Arrays.equals(
+                            active.value().requiredCapabilitySha256(), proof.capabilitySha256()),
+                    "ACTIVE capability digest differs from current brokers", false);
+            return upsertReadiness(snapshot, proof).thenApply(readiness -> {
+                requireReadiness(readiness, snapshot, proof);
+                return active;
+            });
         });
     }
 

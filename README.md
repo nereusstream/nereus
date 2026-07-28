@@ -96,8 +96,10 @@ cancels scheduled retry on leadership loss；activation scheduling additionally 
 allows dedicated enabled controllers and enforces single-copy controller mutations。A real release-distribution combined-node
 KRaft process gate now passes against four-shard Oxia and pinned LocalStack S3，including explicit feature formatting、
 broker/controller registration、activation、Admin topic creation、acks=all Produce、consumer Fetch、earliest/latest
-ListOffsets、object persistence and SIGTERM shutdown。Multi-controller failover、restart/takeover and wider profile/chaos
-evidence remain future work，so this is not yet a production-rollout claim.
+ListOffsets、object persistence and SIGTERM shutdown。The same gate now starts a fresh second JVM under the higher KRaft
+broker epoch，CAS-refreshes ACTIVE readiness、recovers the first remote record、appends the next exact offset and verifies
+earliest=0/latest=2 before a second normal shutdown。Multi-controller failover、live takeover、kill cuts and wider
+profile/chaos evidence remain future work，so this is not yet a production-rollout claim.
 
 ## Current Phase
 

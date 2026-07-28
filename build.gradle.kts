@@ -14,12 +14,33 @@
 
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
+import org.gradle.api.DefaultTask
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.TaskAction
 
 abstract class DockerIntegrationGateService : BuildService<BuildServiceParameters.None>
 
 abstract class PulsarCheckoutGateService : BuildService<BuildServiceParameters.None>
 
 abstract class KafkaCheckoutGateService : BuildService<BuildServiceParameters.None>
+
+abstract class DevelopmentCoordinateVerificationTask : DefaultTask() {
+    @get:Input
+    abstract val actualVersion: Property<String>
+
+    @get:Input
+    abstract val expectedVersion: Property<String>
+
+    @TaskAction
+    fun verifyCoordinate() {
+        check(actualVersion.get() == expectedVersion.get()) {
+            "Refusing to publish Kafka F9 development artifacts as ${actualVersion.get()}; " +
+                "expected ${expectedVersion.get()}. Add the calling gate to " +
+                "kafkaDevelopmentGateRequested."
+        }
+    }
+}
 
 plugins {
     `base`
@@ -39,8 +60,12 @@ val pulsarDevelopmentGateRequested = gradle.startParameter.taskNames.any { reque
         || requested.substringAfterLast(':') == "publishPhase2DevelopmentArtifacts"
 }
 val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { requested ->
-    requested.substringAfterLast(':').startsWith("phase9M3")
-        || requested.substringAfterLast(':') == "publishPhase9DevelopmentArtifacts"
+    val task = requested.substringAfterLast(':')
+    task.startsWith("phase9M3")
+        || task.startsWith("phase9M6KafkaFeature")
+        || task.startsWith("phase9M6KafkaProcess")
+        || task == "f9M6KafkaProcessIntegrationTest"
+        || task == "publishPhase9DevelopmentArtifacts"
 }
 check(!(pulsarDevelopmentGateRequested && kafkaDevelopmentGateRequested)) {
     "Pulsar F2 and Kafka F9 development artifact gates require separate Gradle invocations"
@@ -2843,10 +2868,12 @@ val phase9PublishedModules = listOf(
     ":nereus-kafka-adapter",
 )
 
-tasks.register("publishPhase9DevelopmentArtifacts") {
+tasks.register<DevelopmentCoordinateVerificationTask>("publishPhase9DevelopmentArtifacts") {
     group = "verification"
     description = "Publish the exact Nereus F9 development coordinate for the Kafka fork gate."
     dependsOn(phase9PublishedModules.map { "$it:publishAllPublicationsToDevelopmentRepository" })
+    actualVersion.set(version.toString())
+    expectedVersion.set(phase9DevelopmentVersion)
 }
 
 val phase9DevelopmentRepository = layout.buildDirectory.dir("development-repository")
@@ -3042,7 +3069,7 @@ tasks.register("phase9M6KafkaFeatureCheck") {
 
 tasks.register("phase9M6KafkaProcessCheck") {
     group = "verification"
-    description = "Run real Oxia + LocalStack + Nereus Kafka process Produce/Fetch/ListOffsets/shutdown acceptance."
+    description = "Run real Oxia + LocalStack + Nereus Kafka cold-restart Produce/Fetch/ListOffsets acceptance."
     dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
 }
 

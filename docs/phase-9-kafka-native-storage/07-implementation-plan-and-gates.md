@@ -471,7 +471,8 @@ coordinator/transaction/compaction remain M4/M5。
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
   `bin/nereus-kafka-server-start.sh`；stock `ControllerServer` now owns a product-neutral metadata-publisher/runtime seam，
   and the artifact runtime deterministically schedules first activation only while locally current。The real single-node
-  release-distribution provider-backed KRaft baseline passes；multi-controller/restart/takeover final gates remain open；
+  release-distribution provider-backed KRaft baseline and same-node fresh-JVM cold restart pass；multi-controller/live
+  takeover/kill-cut final gates remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
@@ -745,8 +746,10 @@ close/reconnect gate pass。`KafkaBrokerCapabilitySpecification`/`Publisher`、t
 `KafkaStorageActivationVerifier` now cover broker-epoch publication/renewal and exact KRaft↔ACTIVE↔readiness↔all-capability
 admission；heartbeat owns only its scheduled future and a failed CAS permanently invokes the fencing callback。
 `KafkaStorageFirstActivationCoordinator` now executes empty-image proof → capability aggregation → readiness → PREPARED → second
-empty-image/capability proof → ACTIVE，resumes PREPARED without mutation，recovers a compatible concurrent winner and treats ACTIVE
-as idempotent without reapplying the first-activation emptiness rule。The Object-WAL production creator now wraps every fork
+empty-image/capability proof → ACTIVE，resumes PREPARED without mutation and recovers a compatible concurrent winner。ACTIVE
+re-entry does not reapply the first-activation emptiness rule；it reloads capabilities for the current KRaft broker epoch set、
+requires the compatibility digest to remain equal and CAS-refreshes readiness while leaving the one-way ACTIVE record unchanged。
+The Object-WAL production creator now wraps every fork
 snapshot with a 64-shard exact binding-registry existence scan，so first activation cannot accept a KRaft-empty cluster that
 already has durable Nereus Kafka binding history。The fork now maps its typed config plus exact broker epoch into provider-neutral
 Object-WAL/Oxia/StreamStorage/capability/ListOffsets configurations with deterministic compatibility/provider/code digests and
@@ -771,8 +774,12 @@ resource ownership and real-Oxia close/reconnect lookup。`phase9M6KafkaProcessC
 `bin/nereus-kafka-server-start.sh` combined-node process against four-shard Oxia and pinned LocalStack S3。It requires
 explicit `nereus.storage.version=1` format、broker/controller registration and activation、Admin single-copy topic creation、
 acks=all Produce offset 0、byte-exact consumer Fetch、earliest=0/latest=1 ListOffsets、at least one S3 object and normal
-SIGTERM shutdown completion。Durable in-flight epoch fencing、multi-controller takeover、restart/takeover、priority budgets
-and kill-during-inflight cuts remain open。
+SIGTERM shutdown completion；then a fresh JVM reuses the exact KRaft identity/directories，publishes a higher broker epoch，
+forces the ACTIVE controller path to CAS-refresh readiness，recovers the old remote bytes，appends offset 1，verifies
+earliest=0/latest=2 and completes a second normal shutdown。The root build now recognizes M6 feature/process and direct
+process-test task names as F9 development gates，so the published coordinate cannot silently remain an older
+`0.1.0-f9-dev` artifact。Durable in-flight epoch fencing、multi-controller/live takeover、priority budgets and
+kill-during-inflight cuts remain open。
 
 ### Tasks
 
