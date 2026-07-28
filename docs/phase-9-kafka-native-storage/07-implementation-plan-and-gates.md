@@ -406,7 +406,8 @@ coordinator/transaction/compaction remain M4/M5。
   `BrokerMetadataPublisherTest` prove stock-state-first preparation、old/new image identity selection、delete-before-recreate、
   callback-after-success、coordinator-election-after-recovery and `firstPublishFuture` non-readiness semantics。Time-index
   checkpoint candidate remains open；provider-backed BrokerServer activation and the real combined-node native-storage
-  KRaft baseline now pass through `phase9M6KafkaProcessCheck`；
+  KRaft baseline now pass through `phase9M6KafkaProcessCheck`，including single-node graceful restart of committed
+  `__consumer_offsets` and `__transaction_state` truth；
 - `NereusKafkaObjectWalRuntimeConfigurationTest` freezes the first concrete provider graph to exactly
   `OBJECT_WAL_SYNC_OBJECT`、matched cluster/writer/session/scan limits and disabled legacy auto-session；
   `NereusKafkaObjectWalRuntimeFactoryTest` proves activation scope is rejected before provider IO，and a checked
@@ -471,8 +472,8 @@ coordinator/transaction/compaction remain M4/M5。
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
   `bin/nereus-kafka-server-start.sh`；stock `ControllerServer` now owns a product-neutral metadata-publisher/runtime seam，
   and the artifact runtime deterministically schedules first activation only while locally current。The real single-node
-  release-distribution provider-backed KRaft baseline and same-node fresh-JVM cold restart pass；multi-controller/live
-  takeover/kill-cut final gates remain open；
+  release-distribution provider-backed KRaft baseline and same-node fresh-JVM user/group/transaction-state cold restart pass；
+  multi-controller/live takeover、ongoing/aborted transaction failover and kill-cut final gates remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
@@ -773,13 +774,18 @@ resource ownership and real-Oxia close/reconnect lookup。`phase9M6KafkaProcessC
 `0.1.0-f9-dev` artifacts、builds `:core:releaseTarGz` from the source-locked fork and runs the actual
 `bin/nereus-kafka-server-start.sh` combined-node process against four-shard Oxia and pinned LocalStack S3。It requires
 explicit `nereus.storage.version=1` format、broker/controller registration and activation、Admin single-copy topic creation、
-acks=all Produce offset 0、byte-exact consumer Fetch、earliest=0/latest=1 ListOffsets、at least one S3 object and normal
-SIGTERM shutdown completion；then a fresh JVM reuses the exact KRaft identity/directories，publishes a higher broker epoch，
-forces the ACTIVE controller path to CAS-refresh readiness，recovers the old remote bytes，appends offset 1，verifies
-earliest=0/latest=2 and completes a second normal shutdown。The root build now recognizes M6 feature/process and direct
+acks=all Produce offset 0、one committed transaction at data/marker offsets 1/2、byte-exact read-committed consumer Fetch、
+one real group rebalance plus committed offset 2、earliest=0/latest=3 ListOffsets、at least one S3 object and normal SIGTERM
+shutdown completion；then a fresh JVM reuses the exact KRaft identity/directories，publishes a higher broker epoch，forces
+the ACTIVE controller path to CAS-refresh readiness and concurrently recovers the user partition、`__consumer_offsets` and
+`__transaction_state`。The second process must load group offset 2，reuse the same transactional ID for data/marker offsets
+3/4，resume the group at visible offset 3、commit offset 4，verify earliest=0/latest=5 and complete a second normal shutdown。
+The recovery coordinator retries retriable page-read failures at the exact cursor with 10–250 ms exponential backoff under
+the original deadline；the deterministic regression requires two reads but exactly one publication。The root build now
+recognizes M6 feature/process and direct
 process-test task names as F9 development gates，so the published coordinate cannot silently remain an older
 `0.1.0-f9-dev` artifact。Durable in-flight epoch fencing、multi-controller/live takeover、priority budgets and
-kill-during-inflight cuts remain open。
+ongoing/aborted transaction failover/kill-during-inflight cuts remain open。
 
 ### Tasks
 

@@ -12,11 +12,14 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /** One-shot deterministic leader-open recovery from a verified checkpoint plus exact committed batch replay. */
 public final class KafkaPartitionRecoveryCoordinator<S> {
     private static final String AUTHORITY_TYPE = "kafka-partition-leader-v1";
+    private static final Duration MIN_READ_RETRY_BACKOFF = Duration.ofMillis(10);
+    private static final Duration MAX_READ_RETRY_BACKOFF = Duration.ofMillis(250);
 
     private final KafkaCheckpointRecoveryCoordinator checkpoints;
     private final KafkaRecoveryBatchSource batches;
@@ -136,8 +139,11 @@ public final class KafkaPartitionRecoveryCoordinator<S> {
         if (startOffset == endOffset) {
             return CompletableFuture.completedFuture(replayedBatchCount);
         }
-        Duration remaining = remaining(deadline);
-        return batches.readCommittedPage(startOffset, endOffset, remaining)
+        return readCommittedPageWithRetry(
+                        startOffset,
+                        endOffset,
+                        deadline,
+                        MIN_READ_RETRY_BACKOFF)
                 .thenComposeAsync(page -> {
                     Objects.requireNonNull(page, "Kafka recovery batch page");
                     if (page.requestedOffset() != startOffset
@@ -165,6 +171,63 @@ public final class KafkaPartitionRecoveryCoordinator<S> {
                     }
                     return replayPages(fresh, cursor, endOffset, count, deadline);
                 }, recoveryExecutor);
+    }
+
+    private CompletableFuture<KafkaRecoveryBatchPage> readCommittedPageWithRetry(
+            long startOffset,
+            long endOffset,
+            long deadline,
+            Duration retryBackoff) {
+        Duration remaining;
+        try {
+            remaining = remaining(deadline);
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        CompletableFuture<KafkaRecoveryBatchPage> attempt;
+        try {
+            attempt = Objects.requireNonNull(
+                    batches.readCommittedPage(startOffset, endOffset, remaining),
+                    "Kafka recovery batch source returned null");
+        } catch (Throwable failure) {
+            attempt = CompletableFuture.failedFuture(failure);
+        }
+        return attempt.handle((page, failure) -> {
+            if (failure == null) {
+                return CompletableFuture.completedFuture(page);
+            }
+            Throwable cause = unwrap(failure);
+            if (!(cause instanceof NereusException nereus) || !nereus.retriable()) {
+                return CompletableFuture.<KafkaRecoveryBatchPage>failedFuture(cause);
+            }
+            Duration delay;
+            try {
+                delay = min(retryBackoff, remaining(deadline));
+            } catch (Throwable timeout) {
+                return CompletableFuture.<KafkaRecoveryBatchPage>failedFuture(timeout);
+            }
+            Executor delayed = CompletableFuture.delayedExecutor(
+                    delay.toMillis(), TimeUnit.MILLISECONDS, recoveryExecutor);
+            Duration nextBackoff = doubledBackoff(retryBackoff);
+            return CompletableFuture.runAsync(() -> {}, delayed)
+                    .thenCompose(ignored -> readCommittedPageWithRetry(
+                            startOffset, endOffset, deadline, nextBackoff));
+        }).thenCompose(value -> value);
+    }
+
+    private static Duration doubledBackoff(Duration current) {
+        if (current.compareTo(MAX_READ_RETRY_BACKOFF) >= 0) {
+            return MAX_READ_RETRY_BACKOFF;
+        }
+        try {
+            return min(current.multipliedBy(2), MAX_READ_RETRY_BACKOFF);
+        } catch (ArithmeticException failure) {
+            return MAX_READ_RETRY_BACKOFF;
+        }
+    }
+
+    private static Duration min(Duration left, Duration right) {
+        return left.compareTo(right) <= 0 ? left : right;
     }
 
     private CompletableFuture<KafkaRecoveredPartition<S>> validateAndPublish(

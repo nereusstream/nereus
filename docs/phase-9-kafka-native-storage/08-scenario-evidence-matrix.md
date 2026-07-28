@@ -32,9 +32,11 @@ actual-page aborted filtering。The stock `ProducerStateManagerTest` also locks 
 `ReplicaManagerTest` now covers the deterministic/Kafka-fork part of KF-TXN-010 by deferring the stock transactional append
 and TV2 marker through the configured storage executor。`BrokerMetadataPublisherTest` and
 `NereusTopicDeltaLifecycleTest` cover the deterministic ordering part of KF-TXN-011/012：both elections wait for ready，
-and transaction-state ready waits for exact recovered storage installation。Rows stay `PLANNED` because required
-real-service、restart、takeover and aggregate tiers have not fully run；the new baseline process gate does not exercise
-transactional/internal-topic restart semantics。The fork commits are published in
+and transaction-state ready waits for exact recovered storage installation。The real process gate now provides partial
+R/P evidence for KF-TXN-011/012/013/014：both internal topics recover before elections、a real group resumes its committed
+offset after restart，and the same transactional ID commits a new transaction after the transaction coordinator reloads。
+Rows stay `PLANNED` because ongoing/aborted transaction resolution、multi-broker takeover、mandatory NTC2 failure cuts and
+aggregate tiers have not run。The fork commits are published in
 `nereusstream/kafka:nereus/future9-native-kafka-storage@ecde6964c5`。
 
 Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
@@ -77,14 +79,18 @@ the authoritative cache root's KRaft V1 identity before directory registration�
 complete stock `KafkaConfigTest` compilation、Checkstyle、SpotBugs and the executable 31-commit/118-file source lock pass。
 `phase9M6KafkaProcessCheck` additionally builds the real release tarball and passes one combined broker/controller process
 against four-shard Oxia and pinned LocalStack S3：explicit feature format、registration/activation、Admin create、acks=all
-Produce、byte-exact Fetch、earliest/latest ListOffsets、S3 object existence and SIGTERM shutdown。It then starts a fresh
-second JVM with the same KRaft identity，observes a higher broker epoch，CAS-refreshes ACTIVE readiness，recovers offset 0
-from remote state，appends offset 1 and verifies earliest=0/latest=2 before another normal shutdown。A regression also locks
+Produce、byte-exact Fetch、one committed transaction、one real group rebalance/offset commit、earliest=0/latest=3
+ListOffsets、S3 object existence and SIGTERM shutdown。It then starts a fresh second JVM with the same KRaft identity，
+observes a higher broker epoch，CAS-refreshes ACTIVE readiness，concurrently recovers the user partition and both coordinator
+internal topics，reloads group offset 2、commits through the same transactional ID、resumes the group at visible offset 3 and
+verifies earliest=0/latest=5 before another normal shutdown。A deterministic regression locks retriable read-budget
+backpressure to same-cursor 10–250 ms deadline-bounded retry with one complete state publication。A regression also locks
 that M6 task selection republishes the current `0.1.0-f9-dev` artifact rather than reusing stale bytes。KF-OPS-006/007 are
 `PASSED_CURRENT_SOURCE` deterministic evidence；the process gate adds real cold-restart partial evidence to
-KF-META-009、KF-APP-005/006、KF-FET-001/009 and KF-OPS-003/009/013，but those rows remain `PLANNED` where live preemption、
-timestamp/leader-epoch、failure-cut、multi-broker or aggregate requirements are still absent。In-flight activation epoch
-fencing and multi-controller takeover also remain open。
+KF-META-009、KF-APP-005/006、KF-FET-001/006/009、KF-TXN-011/012/013/014 and KF-OPS-003/009/013/017，but those rows
+remain `PLANNED` where live preemption、timestamp/leader-epoch、ongoing/aborted transaction failure-cut、mandatory NTC2、
+multi-broker or aggregate requirements are still absent。In-flight activation epoch fencing and multi-controller takeover
+also remain open。
 
 ## 2. Machine-readable manifest target
 
@@ -304,10 +310,10 @@ hash。Markdown/JSON ID sets must match。
 | KF-TXN-008 | crash after transactional data/marker commit before derived update replays correctly | `KafkaTransactionProcessCutIntegrationTest` | P,C | M4 |
 | KF-TXN-009 | transaction spanning virtual segments/checkpoint/takeover remains atomic to consumers | `KafkaTransactionProcessCutIntegrationTest` | P,K | M4 |
 | KF-TXN-010 | transaction verification guard survives async executor handoff without request-thread local use | fork `ReplicaManagerTest.testStorageAppendExecutorPreservesTransactionGuardAndMarkerVersion`（D/K partial；R pending） | D,R,K | M4 |
-| KF-TXN-011 | `__consumer_offsets` opens/replays before group coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady`（D partial）；`KafkaInternalTopicOrderingIntegrationTest`（P/C pending） | P,C | M4 |
-| KF-TXN-012 | `__transaction_state` opens/replays before transaction coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady` + `NereusTopicDeltaLifecycleTest.testLeaderCallbackWaitsForExactRecoveredStorageInstallation`（D partial）；`KafkaInternalTopicOrderingIntegrationTest`（P/C pending） | P,C | M4 |
-| KF-TXN-013 | group commit/rebalance/restart/takeover works with native internal topic | `KafkaGroupCoordinatorIntegrationTest` | P,K | M4 |
-| KF-TXN-014 | ongoing transaction coordinator failover resolves from internal topic | `KafkaTransactionCoordinatorIntegrationTest` | P,K | M4 |
+| KF-TXN-011 | `__consumer_offsets` opens/replays before group coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady`（D partial）+ product `NereusKafkaNativeProcessIntegrationTest`（single-node graceful restart R/P partial；kill/failure cut pending） | P,C | M4 |
+| KF-TXN-012 | `__transaction_state` opens/replays before transaction coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady` + `NereusTopicDeltaLifecycleTest.testLeaderCallbackWaitsForExactRecoveredStorageInstallation`（D partial）+ product `NereusKafkaNativeProcessIntegrationTest`（single-node graceful restart R/P partial；kill/failure cut pending） | P,C | M4 |
+| KF-TXN-013 | group commit/rebalance/restart/takeover works with native internal topic | product `NereusKafkaNativeProcessIntegrationTest`（group commit/rebalance/fresh-JVM resume P/K partial；broker takeover pending）；`KafkaGroupCoordinatorIntegrationTest` | P,K | M4 |
+| KF-TXN-014 | ongoing transaction coordinator failover resolves from internal topic | product `NereusKafkaNativeProcessIntegrationTest`（committed transaction state restart/next commit P/K partial；ongoing transaction failover pending）；`KafkaTransactionCoordinatorIntegrationTest` | P,K | M4 |
 | KF-TXN-015 | group offset lag does not protect user-topic retention；client observes normal reset/out-of-range | `KafkaGroupRetentionIndependenceTest` | R,P,K | M5 |
 | KF-TXN-016 | mandatory internal-topic NTC2 unavailable blocks coordinator election，no full-source fallback | `KafkaInternalTopicNoResurrectionTest` | P,C,K | M5 |
 

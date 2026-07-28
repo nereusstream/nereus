@@ -552,7 +552,11 @@ The executable recovery boundary is now split by resource ownership：
    `PayloadFormat.KAFKA_RECORD_BATCH`，never advances on an empty page and never returns a batch past the frozen end；
 3. `KafkaPartitionRecoveryCoordinator` runs page-by-page on the owned callback executor under one wall deadline，hydrates only
    a fresh state，checks exact progress/contiguity，revalidates the current source after replay，publishes through a short
-   critical-section callback，then revalidates again before returning writable state；
+   critical-section callback，then revalidates again before returning writable state。A page-read failure is retried only
+   when the unwrapped failure is a retriable `NereusException`；retry delay starts at 10 ms、doubles with saturation at
+   250 ms and is capped by the remaining original deadline。The exact same start/end offsets are retried，so no failed page is
+   applied，no partial state is published and no coordinator-ready callback occurs before the complete frozen range succeeds。
+   Non-retriable failures and deadline expiry still fail closed；ordinary Fetch keeps its existing fail-fast backpressure contract；
 4. the Kafka fork supplies only `KafkaRecoveryStateFactory`，which creates a fresh stock-RecordBatch-derived codec and an exact
    `Partition` publisher after ReplicaManager exists。The published state implements stock
    `LeaderEpochAwareRecoveryState`，so `Partition` preserves exact identity/epoch/frozen validation without an
@@ -936,11 +940,13 @@ F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kaf
   skips a previously quarantined exact ref without object I/O，and fails closed when trim is non-zero without a usable
   checkpoint；
 - `KafkaPartitionRecoveryCoordinator` hydrates only a fresh state instance，requires exact contiguous committed batch
-  coverage to the frozen stable end across bounded pages，revalidates session/head before and after non-writable state
+  coverage to the frozen stable end across bounded pages，retries retriable page-read failures at the same cursor with bounded
+  10–250 ms exponential backoff under the original deadline，revalidates session/head before and after non-writable state
   installation，and fences instead of enabling writes if the head changes during replay/publication；
 - `DefaultKafkaRecoveryBatchSourceTest` proves the exact COMMITTED/EXACT_START request, configured record/byte bounds,
   source-fact matching and fail-closed empty/non-Kafka pages；`KafkaCheckpointPublicationRecoveryIntegrationTest` proves
-  multi-page replay to the frozen end and restart-stable quarantine lookup；
+  multi-page replay to the frozen end、transient read-budget rejection followed by exactly one complete publication and
+  restart-stable quarantine lookup；
 - `KafkaCheckpointFailureMetadataStoreContractTest` covers immutable winner、reference collision and
   applied-response-loss reconciliation；`DurableKafkaCheckpointFailureQuarantineTest` covers exact-reference hashing、
   redaction、restart lookup and rejection of transient failure classes；the real-Oxia integration gate writes the audit、

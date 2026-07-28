@@ -554,13 +554,19 @@ KRaft restart、the simultaneous-wakeup regression and all Checkstyle/SpotBugs/S
 
 At the published fork head，the product-side process gate now builds the real release distribution and launches the explicit
 native-storage entrypoint twice over the same formatted KRaft directories、four-shard Oxia and pinned LocalStack S3。The first
-process creates one topic、appends/fetches offset 0、verifies earliest=0/latest=1 and exits through SIGTERM。The fresh second
+process creates one topic、appends/fetches offset 0、commits transactional data at offset 1 plus marker at offset 2、joins a
+real consumer group and commits group offset 2，then verifies earliest=0/latest=3 and exits through SIGTERM。The fresh second
 JVM registers a higher broker epoch；the ACTIVE coordinator reloads that exact capability and CAS-refreshes the readiness broker
-set/epoch without reapplying the first-activation empty-cluster rule，after which the broker recovers offset 0 from remote state、
-appends offset 1 and verifies earliest=0/latest=2 before another normal shutdown。The same work corrected the root Gradle task
+set/epoch without reapplying the first-activation empty-cluster rule，after which the broker concurrently recovers the user
+partition、`__consumer_offsets` and `__transaction_state` from remote state。It reloads group offset 2、reinitializes the same
+transactional ID、commits data offset 3 plus marker offset 4、resumes the group at visible offset 3 and commits offset 4，then
+verifies earliest=0/latest=5 before another normal shutdown。The process gate first exposed concurrent recovery read-budget
+backpressure as a terminal metadata publication fault；the product recovery coordinator now retries only retriable page-read
+failures with 10–250 ms exponential backoff under the original frozen-head deadline and publishes no partial state。The same
+work corrected the root Gradle task
 selection so M6 feature/process gates publish current `0.1.0-f9-dev` bytes；the regression was initially exposed because the
 release tarball had consumed an older same-coordinate adapter artifact。This is same-node graceful cold-restart evidence，not
-live old-process preemption、multi-controller failover or kill-cut evidence。
+live old-process preemption、ongoing/aborted transaction failover、multi-controller failover or kill-cut evidence。
 
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端

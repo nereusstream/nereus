@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +29,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -54,9 +56,9 @@ import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
  * Starts the product launcher in a separate OS process over real Oxia and an S3-compatible provider.
  *
  * <p>This is intentionally not a Kafka test-kit fixture: formatting, feature activation, broker registration,
- * controller policy enforcement, provider creation, Produce, Fetch, ListOffsets and shutdown all cross the same
- * launcher and scripts that an operator uses. A fresh second JVM must reacquire readiness at a higher broker epoch
- * and recover the first process's remote bytes before appending again.
+ * controller policy enforcement, provider creation, Produce, Fetch, ListOffsets, group/transaction coordination and
+ * shutdown all cross the same launcher and scripts that an operator uses. A fresh second JVM must reacquire readiness
+ * at a higher broker epoch, recover the first process's remote bytes and internal-topic state, then append again.
  */
 @Testcontainers
 class NereusKafkaNativeProcessIntegrationTest {
@@ -96,6 +98,8 @@ class NereusKafkaNativeProcessIntegrationTest {
         Path restartServerLog = root.resolve("server-restart.log");
         String bucket = "nereus-kafka-" + UUID.randomUUID();
         String topic = "process-gate-" + UUID.randomUUID();
+        String groupId = "process-group-" + UUID.randomUUID();
+        String transactionalId = "process-transaction-" + UUID.randomUUID();
         int brokerPort = freePort();
         int controllerPort = differentFreePort(brokerPort);
         String bootstrapServers = "127.0.0.1:" + brokerPort;
@@ -139,6 +143,9 @@ class NereusKafkaNativeProcessIntegrationTest {
         TopicPartition partition = new TopicPartition(topic, 0);
         byte[] firstKey = "key-0".getBytes(StandardCharsets.UTF_8);
         byte[] firstValue = "nereus-native-process-first".getBytes(StandardCharsets.UTF_8);
+        byte[] firstTransactionalKey = "key-tx-0".getBytes(StandardCharsets.UTF_8);
+        byte[] firstTransactionalValue =
+                "nereus-native-process-transaction-first".getBytes(StandardCharsets.UTF_8);
         runBroker(
                 startScript,
                 kafkaHome,
@@ -157,11 +164,40 @@ class NereusKafkaNativeProcessIntegrationTest {
                         assertThat(produced.partition()).isZero();
                         assertThat(produced.offset()).isZero();
 
+                        RecordMetadata transactional = transactionalProduce(
+                                bootstrapServers,
+                                transactionalId,
+                                topic,
+                                firstTransactionalKey,
+                                firstTransactionalValue);
+                        assertThat(transactional.partition()).isZero();
+                        assertThat(transactional.offset()).isEqualTo(1L);
+
                         ConsumerRecord<byte[], byte[]> fetched =
                                 fetch(bootstrapServers, partition, 0L, firstServerLog);
                         assertThat(fetched.offset()).isZero();
                         assertThat(fetched.key()).isEqualTo(firstKey);
                         assertThat(fetched.value()).isEqualTo(firstValue);
+
+                        ConsumerRecord<byte[], byte[]> fetchedTransaction =
+                                fetch(bootstrapServers, partition, 1L, firstServerLog);
+                        assertThat(fetchedTransaction.offset()).isEqualTo(1L);
+                        assertThat(fetchedTransaction.key()).isEqualTo(firstTransactionalKey);
+                        assertThat(fetchedTransaction.value())
+                                .isEqualTo(firstTransactionalValue);
+
+                        ConsumerRecord<byte[], byte[]> grouped = consumeGroupThroughOffset(
+                                bootstrapServers,
+                                groupId,
+                                topic,
+                                partition,
+                                0L,
+                                1L,
+                                firstServerLog);
+                        assertThat(grouped.offset()).isEqualTo(1L);
+                        assertThat(committedGroupOffset(
+                                bootstrapServers, groupId, partition))
+                                .isEqualTo(2L);
 
                         Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliest =
                                 admin.listOffsets(Map.of(partition, OffsetSpec.earliest()))
@@ -172,12 +208,15 @@ class NereusKafkaNativeProcessIntegrationTest {
                                         .all()
                                         .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
                         assertThat(earliest.get(partition).offset()).isZero();
-                        assertThat(latest.get(partition).offset()).isEqualTo(1L);
+                        assertThat(latest.get(partition).offset())
+                                .as("the committed transaction adds a control-marker offset")
+                                .isEqualTo(3L);
                     }
                 });
 
-        byte[] secondKey = "key-1".getBytes(StandardCharsets.UTF_8);
-        byte[] secondValue = "nereus-native-process-restart".getBytes(StandardCharsets.UTF_8);
+        byte[] secondTransactionalKey = "key-tx-1".getBytes(StandardCharsets.UTF_8);
+        byte[] secondTransactionalValue =
+                "nereus-native-process-transaction-restart".getBytes(StandardCharsets.UTF_8);
         runBroker(
                 startScript,
                 kafkaHome,
@@ -193,16 +232,47 @@ class NereusKafkaNativeProcessIntegrationTest {
                         assertThat(recovered.key()).isEqualTo(firstKey);
                         assertThat(recovered.value()).isEqualTo(firstValue);
 
-                        RecordMetadata produced =
-                                produce(bootstrapServers, topic, secondKey, secondValue);
+                        ConsumerRecord<byte[], byte[]> recoveredTransaction =
+                                fetch(bootstrapServers, partition, 1L, restartServerLog);
+                        assertThat(recoveredTransaction.offset()).isEqualTo(1L);
+                        assertThat(recoveredTransaction.key()).isEqualTo(firstTransactionalKey);
+                        assertThat(recoveredTransaction.value())
+                                .isEqualTo(firstTransactionalValue);
+
+                        assertThat(committedGroupOffset(
+                                bootstrapServers, groupId, partition))
+                                .as("the recovered group coordinator must retain the committed offset")
+                                .isEqualTo(2L);
+
+                        RecordMetadata produced = transactionalProduce(
+                                bootstrapServers,
+                                transactionalId,
+                                topic,
+                                secondTransactionalKey,
+                                secondTransactionalValue);
                         assertThat(produced.partition()).isZero();
-                        assertThat(produced.offset()).isEqualTo(1L);
+                        assertThat(produced.offset())
+                                .as("the recovered log must retain the first transaction marker")
+                                .isEqualTo(3L);
 
                         ConsumerRecord<byte[], byte[]> fetched =
-                                fetch(bootstrapServers, partition, 1L, restartServerLog);
-                        assertThat(fetched.offset()).isEqualTo(1L);
-                        assertThat(fetched.key()).isEqualTo(secondKey);
-                        assertThat(fetched.value()).isEqualTo(secondValue);
+                                fetch(bootstrapServers, partition, 3L, restartServerLog);
+                        assertThat(fetched.offset()).isEqualTo(3L);
+                        assertThat(fetched.key()).isEqualTo(secondTransactionalKey);
+                        assertThat(fetched.value()).isEqualTo(secondTransactionalValue);
+
+                        ConsumerRecord<byte[], byte[]> grouped = consumeGroupThroughOffset(
+                                bootstrapServers,
+                                groupId,
+                                topic,
+                                partition,
+                                3L,
+                                3L,
+                                restartServerLog);
+                        assertThat(grouped.offset()).isEqualTo(3L);
+                        assertThat(committedGroupOffset(
+                                bootstrapServers, groupId, partition))
+                                .isEqualTo(4L);
 
                         Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliest =
                                 admin.listOffsets(Map.of(partition, OffsetSpec.earliest()))
@@ -213,12 +283,14 @@ class NereusKafkaNativeProcessIntegrationTest {
                                         .all()
                                         .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
                         assertThat(earliest.get(partition).offset()).isZero();
-                        assertThat(latest.get(partition).offset()).isEqualTo(2L);
+                        assertThat(latest.get(partition).offset())
+                                .as("both committed transactions retain their control markers")
+                                .isEqualTo(5L);
                     }
                 });
 
         assertThat(objectCount(bucket))
-                .as("stable Produce before and after restart must persist S3-compatible objects")
+                .as("user and internal-topic commits must persist S3-compatible objects")
                 .isPositive();
     }
 
@@ -255,7 +327,10 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty("num.partitions", "1");
         properties.setProperty("default.replication.factor", "1");
         properties.setProperty("min.insync.replicas", "1");
+        properties.setProperty("offsets.topic.num.partitions", "1");
         properties.setProperty("offsets.topic.replication.factor", "1");
+        properties.setProperty("group.initial.rebalance.delay.ms", "0");
+        properties.setProperty("transaction.state.log.num.partitions", "1");
         properties.setProperty("transaction.state.log.replication.factor", "1");
         properties.setProperty("transaction.state.log.min.isr", "1");
         properties.setProperty("share.coordinator.state.topic.replication.factor", "1");
@@ -302,6 +377,44 @@ class NereusKafkaNativeProcessIntegrationTest {
             byte[] key,
             byte[] value
     ) throws InterruptedException, ExecutionException, TimeoutException {
+        try (KafkaProducer<byte[], byte[]> producer =
+                new KafkaProducer<>(producerProperties(bootstrapServers))) {
+            return producer.send(new ProducerRecord<>(topic, 0, key, value))
+                    .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        }
+    }
+
+    private static RecordMetadata transactionalProduce(
+            String bootstrapServers,
+            String transactionalId,
+            String topic,
+            byte[] key,
+            byte[] value
+    ) throws Exception {
+        Properties properties = producerProperties(bootstrapServers);
+        properties.setProperty(ProducerConfig.TRANSACTIONAL_ID_CONFIG, transactionalId);
+        properties.setProperty(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG, "30000");
+        try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(properties)) {
+            producer.initTransactions();
+            producer.beginTransaction();
+            try {
+                RecordMetadata metadata =
+                        producer.send(new ProducerRecord<>(topic, 0, key, value))
+                                .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                producer.commitTransaction();
+                return metadata;
+            } catch (Exception | AssertionError failure) {
+                try {
+                    producer.abortTransaction();
+                } catch (RuntimeException abortFailure) {
+                    failure.addSuppressed(abortFailure);
+                }
+                throw failure;
+            }
+        }
+    }
+
+    private static Properties producerProperties(String bootstrapServers) {
         Properties properties = new Properties();
         properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         properties.setProperty(
@@ -313,10 +426,82 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
         properties.setProperty(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, "60000");
         properties.setProperty(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, "30000");
-        try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(properties)) {
-            return producer.send(new ProducerRecord<>(topic, 0, key, value))
-                    .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        properties.setProperty(ProducerConfig.MAX_BLOCK_MS_CONFIG, "60000");
+        return properties;
+    }
+
+    private static ConsumerRecord<byte[], byte[]> consumeGroupThroughOffset(
+            String bootstrapServers,
+            String groupId,
+            String topic,
+            TopicPartition partition,
+            long expectedFirstOffset,
+            long targetOffset,
+            Path serverLog
+    ) {
+        Properties properties = consumerProperties(bootstrapServers, groupId);
+        try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
+            consumer.subscribe(List.of(topic));
+            long deadline = System.nanoTime() + CLIENT_TIMEOUT.toNanos();
+            Long firstOffset = null;
+            while (System.nanoTime() < deadline) {
+                ConsumerRecords<byte[], byte[]> records =
+                        consumer.poll(Duration.ofMillis(500));
+                for (ConsumerRecord<byte[], byte[]> record : records.records(partition)) {
+                    if (firstOffset == null) {
+                        firstOffset = record.offset();
+                    }
+                    if (record.offset() == targetOffset) {
+                        assertThat(firstOffset).isEqualTo(expectedFirstOffset);
+                        consumer.commitSync(
+                                Map.of(
+                                        partition,
+                                        new OffsetAndMetadata(targetOffset + 1)),
+                                CLIENT_TIMEOUT);
+                        return record;
+                    }
+                }
+            }
         }
+        throw new AssertionError(
+                "consumer group did not reach offset " + targetOffset + ":\n"
+                        + readLog(serverLog));
+    }
+
+    private static long committedGroupOffset(
+            String bootstrapServers,
+            String groupId,
+            TopicPartition partition
+    ) {
+        try (KafkaConsumer<byte[], byte[]> consumer =
+                new KafkaConsumer<>(consumerProperties(bootstrapServers, groupId))) {
+            OffsetAndMetadata committed =
+                    consumer.committed(Set.of(partition), CLIENT_TIMEOUT).get(partition);
+            assertThat(committed)
+                    .as("consumer group must have a committed offset for " + partition)
+                    .isNotNull();
+            return committed.offset();
+        }
+    }
+
+    private static Properties consumerProperties(
+            String bootstrapServers,
+            String groupId
+    ) {
+        Properties properties = new Properties();
+        properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        properties.setProperty(
+                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                ByteArrayDeserializer.class.getName());
+        properties.setProperty(
+                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                ByteArrayDeserializer.class.getName());
+        properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+        properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        properties.setProperty(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
+        properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        properties.setProperty(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "60000");
+        return properties;
     }
 
     private static ConsumerRecord<byte[], byte[]> fetch(

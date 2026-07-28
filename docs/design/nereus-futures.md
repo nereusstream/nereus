@@ -342,10 +342,13 @@ Detailed design: `nereus-future9-kafka-native-storage.md`
 Code-level target contract: `../phase-9-kafka-native-storage/README.md`
 
 F9-M0 source/design review completed on 2026-07-23；the dated evidence is
-`../phase-9-kafka-native-storage/09-f9-m0-design-review-2026-07-23.md`. F9-M1/M2 and partial M3/M6 are now
-implemented；the local Kafka fork has exact-record/async ListOffsets bridges、metadata lifecycle、typed configuration and
-deferred activation-backed Object-WAL context composition，while concrete recovery、CLI/log selection、remote fork publication
-and native Kafka end-to-end capability remain open.
+`../phase-9-kafka-native-storage/09-f9-m0-design-review-2026-07-23.md`. F9-M1/M2 and substantial M3–M6 slices are now
+implemented；the published Kafka fork has exact-record/async ListOffsets bridges、metadata lifecycle、typed configuration、
+explicit native-storage CLI/log selection and deferred activation-backed Object-WAL context composition。The product process
+gate now proves a real combined-node KRaft/Oxia/S3 start plus same-node fresh-JVM recovery of user data、
+`__consumer_offsets` and `__transaction_state`，including committed group offset resume and same-transactional-ID continuation。
+M4 live takeover/ongoing-or-aborted transaction failover、M5 provider retention/compaction completion、multi-controller and
+kill/chaos aggregate evidence remain open，so F9 remains in progress rather than production-ready.
 
 F9 is deliberately separate from F5. F5 projects the Kafka protocol through KoP on the Pulsar facade；F9 integrates
 a KRaft Kafka broker fork directly with Nereus as the partition log. The two tracks share logical storage primitives

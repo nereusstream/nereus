@@ -46,7 +46,6 @@ public final class KafkaRecordBatchCodec {
     private static final int RECORDS_COUNT_OFFSET = 57;
     private static final int MIN_BATCH_LENGTH = RECORD_BATCH_OVERHEAD - LOG_OVERHEAD;
     private static final long NO_PRODUCER_ID = -1;
-    private static final short NO_PRODUCER_EPOCH = -1;
     private static final int NO_SEQUENCE = -1;
     private static final int MAX_COMPRESSION_TYPE_ID = 4;
 
@@ -175,9 +174,6 @@ public final class KafkaRecordBatchCodec {
             throw invalid("Kafka producer id must be -1 or non-negative");
         }
         if (producerId == NO_PRODUCER_ID) {
-            if (producerEpoch != NO_PRODUCER_EPOCH || baseSequence != NO_SEQUENCE) {
-                throw invalid("Kafka batch without producer id must use producer epoch and sequence -1");
-            }
             if (transactional || control) {
                 throw invalid("transactional/control Kafka batch requires a producer id");
             }

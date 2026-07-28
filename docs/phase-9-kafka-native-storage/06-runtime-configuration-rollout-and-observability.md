@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh 与 Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM cold-restart gate passes；BookKeeper/async providers、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh 与 Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；BookKeeper/async providers、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -376,9 +376,11 @@ callback executor；subscription、deadline、logical permit 均由 operation te
 drained future 做 caller-local `allOf + orTimeout`，不取消底层已接纳 Produce/Fetch。production factory selection
 已由显式 launcher 闭合；`phase9M6KafkaProcessCheck` 也已用真实 release distribution、four-shard Oxia 和 pinned
 LocalStack S3 闭合 single-node format/startup/Produce/Fetch/ListOffsets/object/SIGTERM baseline，并用第二个 JVM
-验证 higher-broker-epoch readiness refresh、remote recovery、连续 append/ListOffsets 和再次 shutdown。Multi-controller、
-live takeover、kill-during-inflight 和完整 rollout evidence 尚未闭合，所以整个路径仍不能用于 production rollout
-readiness。
+验证 higher-broker-epoch readiness refresh、用户与两个 coordinator internal topics 并发 remote recovery、consumer
+group committed-offset resume、同 transactional ID 的 committed transaction continuation、连续 ListOffsets 和再次
+shutdown。恢复页 transient backpressure 由 product coordinator 在原 deadline 内 10–250 ms 退避重试，不改变请求
+路径的 fail-fast admission。Multi-controller、live takeover、ongoing/aborted transaction failover、
+kill-during-inflight 和完整 rollout evidence 尚未闭合，所以整个路径仍不能用于 production rollout readiness。
 
 The selected shell is not a durability shortcut：`NereusUnifiedLogFactory` uses only
 `${cacheDir}/{brokerId}/partition-logs`，sets `loadExistingLogs=false` and `scheduleLocalMaintenance=false`，and rejects local

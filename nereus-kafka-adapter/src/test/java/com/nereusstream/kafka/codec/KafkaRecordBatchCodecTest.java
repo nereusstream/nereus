@@ -9,8 +9,10 @@ import java.util.List;
 import org.apache.kafka.common.compress.Compression;
 import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.MemoryRecords;
+import org.apache.kafka.common.record.MemoryRecordsBuilder;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.SimpleRecord;
+import org.apache.kafka.common.record.TimestampType;
 import org.junit.jupiter.api.Test;
 
 class KafkaRecordBatchCodecTest {
@@ -63,6 +65,32 @@ class KafkaRecordBatchCodecTest {
     }
 
     @Test
+    void acceptsStockCoordinatorBatchSequenceWithoutProducerIdentity() {
+        MemoryRecordsBuilder builder = MemoryRecords.builder(
+                ByteBuffer.allocate(1024),
+                RecordBatch.CURRENT_MAGIC_VALUE,
+                Compression.of(CompressionType.NONE).build(),
+                TimestampType.CREATE_TIME,
+                0,
+                5_000,
+                RecordBatch.NO_PRODUCER_ID,
+                RecordBatch.NO_PRODUCER_EPOCH,
+                0,
+                false,
+                RecordBatch.NO_PARTITION_LEADER_EPOCH);
+        builder.append(new SimpleRecord(5_000, "group".getBytes(), "metadata".getBytes()));
+
+        KafkaRecordBatch batch =
+                codec.decode(KafkaRecordBatchTestSupport.bytes(builder.build()));
+
+        assertThat(batch.producerId()).isEqualTo(RecordBatch.NO_PRODUCER_ID);
+        assertThat(batch.producerEpoch()).isEqualTo(RecordBatch.NO_PRODUCER_EPOCH);
+        assertThat(batch.baseSequence()).isZero();
+        assertThat(batch.transactional()).isFalse();
+        assertThat(batch.controlBatch()).isFalse();
+    }
+
+    @Test
     void failsClosedForCrcLengthMagicCompressionAndProducerCorruption() {
         byte[] valid = KafkaRecordBatchTestSupport.batch(1, CompressionType.NONE, 1_000, "v");
 
@@ -84,9 +112,17 @@ class KafkaRecordBatchCodecTest {
         assertThatThrownBy(() -> codec.decode(badCompression)).hasMessageContaining("compression type id 7");
 
         byte[] badProducer = valid.clone();
-        ByteBuffer.wrap(badProducer).putShort(51, (short) 2);
+        ByteBuffer.wrap(badProducer).putLong(43, -2);
         KafkaRecordBatchTestSupport.recomputeCrc(badProducer);
-        assertThatThrownBy(() -> codec.decode(badProducer)).hasMessageContaining("producer epoch and sequence -1");
+        assertThatThrownBy(() -> codec.decode(badProducer))
+                .hasMessageContaining("producer id must be -1 or non-negative");
+
+        byte[] missingTransactionalProducer = valid.clone();
+        ByteBuffer attributes = ByteBuffer.wrap(missingTransactionalProducer);
+        attributes.putShort(21, (short) (attributes.getShort(21) | 0x10));
+        KafkaRecordBatchTestSupport.recomputeCrc(missingTransactionalProducer);
+        assertThatThrownBy(() -> codec.decode(missingTransactionalProducer))
+                .hasMessageContaining("transactional/control Kafka batch requires a producer id");
     }
 
     @Test

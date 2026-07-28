@@ -281,8 +281,11 @@ reader/retention verifier 外围组装同一个 exact-reference durable quaranti
 launcher/KafkaRaftServer broker/controller factory selection 已实现；`phase9M6KafkaProcessCheck` 现使用真实 release
 distribution、四分片 Oxia 和 pinned LocalStack S3 覆盖显式 feature format、broker/controller registration、
 activation、Admin create、Produce/Fetch/ListOffsets、S3 object existence 和 SIGTERM shutdown，并以同一 KRaft
-identity 启动第二个 JVM，验证 higher broker epoch readiness refresh、旧 record remote recovery、连续 offset append、
-earliest=0/latest=2 和第二次正常 shutdown。该同节点冷重启 slice 仍不足以宣称 production rollout ready。
+identity 启动第二个 JVM。第一 JVM 除普通 offset 0 外，还提交 transactional data/COMMIT marker、执行真实 group
+subscribe/rebalance 并提交 offset；第二 JVM 验证 higher broker epoch readiness refresh、用户分区与两个 coordinator
+internal topics 的并发 remote recovery、原 group committed offset reload、同一 transactional ID 的下一次 commit、
+group 从下一可见 offset 恢复，以及最终 earliest=0/latest=5。该同节点优雅冷重启 slice 不包含 live takeover、
+ongoing/abort transaction failover 或 kill cut，仍不足以宣称 production rollout ready。
 
 ### 3.3 `core/.../kafka/log/LogManager.scala`
 

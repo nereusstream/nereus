@@ -27,6 +27,7 @@ import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryRequest;
 import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryResult;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryCoordinator;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryRequest;
+import com.nereusstream.kafka.recovery.KafkaRecoveredPartition;
 import com.nereusstream.kafka.recovery.KafkaRecoveryBatchPage;
 import com.nereusstream.kafka.recovery.KafkaRecoveryStateCodec;
 import com.nereusstream.kafka.recovery.KafkaReplayBatch;
@@ -397,6 +398,54 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
             assertThat(recovered.state().hydrated).isTrue();
             assertThat(recovered.state().nextOffset).isEqualTo(5);
             assertThat(recovered.state().producerSequence).isEqualTo(5);
+        }
+    }
+
+    @Test
+    void retriesTransientReplayReadBackpressureWithoutPublishingPartialState() throws Exception {
+        try (Fixture fixture = fixture()) {
+            KafkaCheckpointSourceState frozen = source(fixture.identity, 0, 3, 12, 'a');
+            fixture.validator.current.set(frozen);
+            AtomicInteger reads = new AtomicInteger();
+            AtomicInteger publications = new AtomicInteger();
+            KafkaPartitionRecoveryCoordinator<SyntheticKafkaState> coordinator =
+                    new KafkaPartitionRecoveryCoordinator<>(
+                            fixture.recovery(CLOCK),
+                            (start, end, timeout) -> {
+                                if (reads.incrementAndGet() == 1) {
+                                    return CompletableFuture.failedFuture(new NereusException(
+                                            ErrorCode.BACKPRESSURE_REJECTED,
+                                            true,
+                                            "read object permit or buffer budget is full"));
+                                }
+                                return CompletableFuture.completedFuture(
+                                        new KafkaRecoveryBatchPage(start, end, List.of(
+                                                batch(0, 1, 0, 2),
+                                                batch(2, 2, 2, 1))));
+                            },
+                            new SyntheticStateCodec(),
+                            recovered -> {
+                                publications.incrementAndGet();
+                                return CompletableFuture.completedFuture(null);
+                            },
+                            CLOCK);
+            KafkaCheckpointRecoveryRequest checkpointRequest = new KafkaCheckpointRecoveryRequest(
+                    fixture.identity,
+                    fixture.activeBinding(),
+                    frozen,
+                    fixture.validator,
+                    Duration.ofSeconds(5));
+
+            KafkaRecoveredPartition<SyntheticKafkaState> recovered = coordinator
+                    .recover(new KafkaPartitionRecoveryRequest(
+                            checkpointRequest, Duration.ofSeconds(5)))
+                    .join();
+
+            assertThat(reads).hasValue(2);
+            assertThat(publications).hasValue(1);
+            assertThat(recovered.replayedBatchCount()).isEqualTo(2);
+            assertThat(recovered.state().nextOffset).isEqualTo(3);
+            assertThat(coordinator.state()).isEqualTo(KafkaPartitionState.LEADER_WRITABLE);
         }
     }
 

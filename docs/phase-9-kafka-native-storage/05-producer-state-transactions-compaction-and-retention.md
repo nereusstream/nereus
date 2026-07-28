@@ -256,7 +256,11 @@ resurrect compacted state。
 Local fork commit `032974067c` adds deterministic ordering evidence at the stock seams：both group and transaction
 coordinator elections remain absent until `AsyncTopicDeltaLifecycle` reports the exact leader ready，and the
 `__transaction_state` ready callback itself waits for installation of the exact recovered storage instance。This closes
-the request/lifecycle unit-test gap only；real internal-topic replay、coordinator restart/failover and mandatory NTC2
+the request/lifecycle unit-test gap。The product `NereusKafkaNativeProcessIntegrationTest` now adds a real single-node
+graceful restart slice：the first JVM commits transactional data plus its COMMIT marker、joins/rebalances a real consumer
+group and commits offset 2；the second JVM concurrently recovers both internal topics，loads that committed offset，
+reinitializes the same transactional ID、commits the next transaction and resumes the group at the next visible data offset。
+This is partial evidence only；ongoing/aborted transaction failover、multi-broker coordinator takeover and mandatory NTC2
 unavailability remain process gates。
 
 ## 6. Leader epoch section

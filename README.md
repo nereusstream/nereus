@@ -97,9 +97,14 @@ allows dedicated enabled controllers and enforces single-copy controller mutatio
 KRaft process gate now passes against four-shard Oxia and pinned LocalStack S3，including explicit feature formatting、
 broker/controller registration、activation、Admin topic creation、acks=all Produce、consumer Fetch、earliest/latest
 ListOffsets、object persistence and SIGTERM shutdown。The same gate now starts a fresh second JVM under the higher KRaft
-broker epoch，CAS-refreshes ACTIVE readiness、recovers the first remote record、appends the next exact offset and verifies
-earliest=0/latest=2 before a second normal shutdown。Multi-controller failover、live takeover、kill cuts and wider
-profile/chaos evidence remain future work，so this is not yet a production-rollout claim.
+broker epoch，CAS-refreshes ACTIVE readiness and concurrently recovers the user partition、`__consumer_offsets` and
+`__transaction_state`。The first JVM commits one transactional record and a real consumer-group offset；the second reloads
+that group offset、reinitializes the same transactional ID、commits the next transaction、resumes the group at the exact
+visible offset and verifies earliest=0/latest=5 before a second normal shutdown。The recovery coordinator now retries
+transient page-read backpressure with bounded 10–250 ms exponential delay under the unchanged recovery deadline；it never
+publishes a partial state，while ordinary Fetch continues to reject resource exhaustion immediately。This is single-node
+graceful cold-restart evidence only：multi-controller failover、live takeover、ongoing/aborted transaction failover、kill cuts
+and wider profile/chaos evidence remain future work，so this is not yet a production-rollout claim.
 
 ## Current Phase
 
