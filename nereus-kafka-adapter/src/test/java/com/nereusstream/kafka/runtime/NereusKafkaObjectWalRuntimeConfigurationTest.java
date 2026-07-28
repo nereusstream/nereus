@@ -93,6 +93,36 @@ class NereusKafkaObjectWalRuntimeConfigurationTest {
     }
 
     @Test
+    void requiresSkewSafeReaderLeaseToCoverTheRuntimeOperationTtl() {
+        NereusKafkaRuntimeConfiguration runtime = runtime(
+                Set.of(
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT));
+
+        assertThatThrownBy(() -> new NereusKafkaObjectWalRuntimeConfiguration(
+                runtime,
+                streams(false),
+                oxia(),
+                objects(),
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(5),
+                Duration.ofHours(24),
+                2))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must cover runtime operationTtl");
+
+        new NereusKafkaObjectWalRuntimeConfiguration(
+                runtime,
+                streams(false),
+                oxia(),
+                objects(),
+                Duration.ofSeconds(35),
+                Duration.ofSeconds(5),
+                Duration.ofHours(24),
+                2);
+    }
+
+    @Test
     void validatesBookKeeperLedgerGcAgainstReaderLeaseAuthority() {
         assertThatThrownBy(
                         () ->

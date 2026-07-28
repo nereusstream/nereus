@@ -240,7 +240,7 @@ public final class KafkaCheckpointRecoveryCoordinator {
         KafkaCheckpointSourceState current = request.currentSource();
         if (current.commitVersion() == header.sourceCommitVersion()) {
             if (!current.lastCommitId().equals(header.sourceLastCommitId())
-                    || !current.headSha256().equals(header.sourceHeadSha256())) {
+                    || current.endOffset() != header.stableEndOffset()) {
                 return CompletableFuture.failedFuture(invariant(
                         "NKC1 source anchor conflicts at the same commit version"));
             }

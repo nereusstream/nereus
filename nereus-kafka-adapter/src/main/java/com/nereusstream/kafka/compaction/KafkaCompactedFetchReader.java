@@ -39,6 +39,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Executes a binding-rooted Fetch plan and composes its sparse compacted prefix with its lossless
@@ -250,8 +252,28 @@ public final class KafkaCompactedFetchReader {
     } else {
       sourceRead = streams.read(streamId, sourceRequest);
     }
-    return sourceRead.thenCompose(
-        source -> {
+    return sourceRead
+        .handle(
+            (source, failure) -> {
+              if (failure == null) {
+                return Optional.of(
+                    Objects.requireNonNull(source, "Kafka semantic-view read result"));
+              }
+              Throwable cause = unwrap(failure);
+              if (!accumulator.batches.isEmpty()
+                  && cause instanceof NereusException nereus
+                  && nereus.code() == ErrorCode.READ_LIMIT_TOO_SMALL) {
+                accumulator.stoppedAtReadLimit = true;
+                return Optional.<SemanticReadResult>empty();
+              }
+              throw new CompletionException(cause);
+            })
+        .thenCompose(
+            optionalSource -> {
+          if (optionalSource.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+          }
+          SemanticReadResult source = optionalSource.orElseThrow();
           long nextCursor;
           try {
             nextCursor = accept(request, segment, cursor, source, accumulator);
@@ -288,6 +310,15 @@ public final class KafkaCompactedFetchReader {
               accumulator,
               readCalls + 1);
         });
+  }
+
+  private static Throwable unwrap(Throwable failure) {
+    Throwable current = failure;
+    while ((current instanceof CompletionException || current instanceof ExecutionException)
+        && current.getCause() != null) {
+      current = current.getCause();
+    }
+    return current;
   }
 
   private long accept(

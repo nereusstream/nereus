@@ -40,6 +40,8 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 /** Exact NCP2/NTC2 target adapter; physical and logical format identities are both registry keys. */
 public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
@@ -154,16 +156,51 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
             RangedCompactedObjectReadRequest physical = new RangedCompactedObjectReadRequest(
                     streamId, range.offsetRange(), start, target, range.payloadFormat(),
                     request.boundaryMode(), firstPolicy, remainingRecords, remainingBytes, deadline.remaining());
-            return ncp2Reader.read(physical).thenCompose(result -> appendNcp2(
-                    streamId, request, ranges, index, deadline, batches, stats,
-                    returnedRecords, returnedBytes, range, target, result));
+            return ncp2Reader.read(physical)
+                    .handle((result, failure) -> failure == null
+                            ? appendNcp2(
+                                    streamId, request, ranges, index, deadline, batches, stats,
+                                    returnedRecords, returnedBytes, range, target, result)
+                            : stopAtReadLimitOrFail(
+                                    failure, batches, stats, coverageEndOffset))
+                    .thenCompose(next -> next);
         }
         KafkaTopicCompactedObjectReadRequest physical = new KafkaTopicCompactedObjectReadRequest(
                 streamId, range.offsetRange(), start, target, request.boundaryMode(), firstPolicy,
                 remainingRecords, remainingBytes, deadline.remaining());
-        return ntc2Reader.read(physical).thenCompose(result -> appendNtc2(
-                streamId, request, ranges, index, deadline, batches, stats,
-                returnedRecords, returnedBytes, range, target, result));
+        return ntc2Reader.read(physical)
+                .handle((result, failure) -> failure == null
+                        ? appendNtc2(
+                                streamId, request, ranges, index, deadline, batches, stats,
+                                returnedRecords, returnedBytes, range, target, result)
+                        : stopAtReadLimitOrFail(
+                                failure, batches, stats, coverageEndOffset))
+                .thenCompose(next -> next);
+    }
+
+    private static CompletableFuture<PhysicalReadResult> stopAtReadLimitOrFail(
+            Throwable failure,
+            List<ReadBatch> batches,
+            List<PhysicalReadStats> stats,
+            long coverageEndOffset) {
+        Throwable cause = unwrap(failure);
+        if (!batches.isEmpty()
+                && cause instanceof NereusException nereus
+                && nereus.code() == ErrorCode.READ_LIMIT_TOO_SMALL) {
+            return CompletableFuture.completedFuture(new PhysicalReadResult(
+                    batches, stats, OptionalLong.of(coverageEndOffset)));
+        }
+        return CompletableFuture.failedFuture(cause);
+    }
+
+    private static Throwable unwrap(Throwable failure) {
+        Throwable current = failure;
+        while ((current instanceof CompletionException
+                        || current instanceof ExecutionException)
+                && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
     }
 
     private CompletableFuture<PhysicalReadResult> appendNcp2(

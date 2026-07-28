@@ -2133,9 +2133,9 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
         @Override
         public void hydrateCheckpoint(
                 List<KafkaReplayBatch> state,
+                com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointHeader header,
                 List<com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointSection>
-                        sections,
-                long checkpointOffset) {
+                        sections) {
             throw new AssertionError(
                     "takeover provider test does not publish checkpoints");
         }
@@ -2176,8 +2176,9 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
         @Override
         public void hydrateCheckpoint(
                 Object state,
-                List<com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointSection> sections,
-                long checkpointOffset) {
+                com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointHeader header,
+                List<com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointSection>
+                        sections) {
             throw new AssertionError("checkpoint hydration not expected");
         }
 

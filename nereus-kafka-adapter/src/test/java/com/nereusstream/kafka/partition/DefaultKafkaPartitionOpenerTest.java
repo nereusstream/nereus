@@ -20,6 +20,9 @@ import com.nereusstream.kafka.codec.KafkaFetchAssembler;
 import com.nereusstream.kafka.codec.KafkaRecordBatchCodec;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryRequest;
 import com.nereusstream.kafka.recovery.KafkaRecoveredPartition;
+import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
+import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
+import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.time.Duration;
@@ -28,6 +31,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -67,6 +71,42 @@ class DefaultKafkaPartitionOpenerTest {
         assertThat(storage.storageProfile()).isEqualTo(plan.profilePolicy().storageProfile());
         assertThat(storage.state()).isEqualTo(KafkaPartitionState.LEADER_WRITABLE);
         assertThat(storage.stableSnapshot()).isEqualTo(KafkaStableSnapshot.nonTransactional(0, 0, 0));
+        storage.resign().join();
+    }
+
+    @Test
+    void publishesExactLeaderAndStableHeadObservationAfterRecovery() {
+        KafkaLeaderAuthority authority = new KafkaLeaderAuthority(
+                KafkaPartitionStorageTestSupport.identity(), 1, 5, 9);
+        KafkaPartitionOpenPlan plan = KafkaPartitionStorageTestSupport.openPlan(authority);
+        AcquiredAppendSession acquired = new AcquiredAppendSession(
+                new AppendSession(plan.binding().streamId(), "broker-run", 1, "token", 1, 40_000),
+                Optional.of(authority.appendAuthority()));
+        AtomicReference<VersionedKafkaPartitionBinding> durable =
+                new AtomicReference<>(plan.binding().durableRoot());
+        AtomicReference<KafkaPartitionRecoveryRequest> recoveryRequest = new AtomicReference<>();
+        AtomicBoolean recoveryCompleted = new AtomicBoolean();
+        DefaultKafkaPartitionOpener opener = opener(
+                streams(acquired, head(plan, acquired), new AtomicReference<>()),
+                request -> {
+                    recoveryRequest.set(request);
+                    var source = request.checkpointRequest().currentSource();
+                    recoveryCompleted.set(true);
+                    return CompletableFuture.completedFuture(new KafkaRecoveredPartition<>(
+                            new Object(), source, 0, 0, 0, Optional.empty()));
+                },
+                metadataStore(durable, recoveryCompleted));
+
+        KafkaPartitionStorage storage = opener.open(plan).join();
+
+        KafkaPartitionBindingRecord observed = durable.get().value();
+        assertThat(observed.observedLeaderId()).isEqualTo(authority.leaderId());
+        assertThat(observed.observedLeaderEpoch()).isEqualTo(authority.leaderEpoch());
+        assertThat(observed.observedBrokerEpoch()).isEqualTo(authority.brokerEpoch());
+        assertThat(observed.observedLogStartOffset()).isZero();
+        assertThat(observed.observedStableEndOffset()).isZero();
+        assertThat(recoveryRequest.get().checkpointRequest().binding())
+                .isEqualTo(plan.binding().durableRoot());
         storage.resign().join();
     }
 
@@ -112,7 +152,31 @@ class DefaultKafkaPartitionOpenerTest {
     private static DefaultKafkaPartitionOpener opener(
             StreamStorage streams,
             com.nereusstream.kafka.recovery.KafkaPartitionRecoveryLauncher launcher) {
+        return opener(streams, launcher, null);
+    }
+
+    private static DefaultKafkaPartitionOpener opener(
+            StreamStorage streams,
+            com.nereusstream.kafka.recovery.KafkaPartitionRecoveryLauncher launcher,
+            KafkaPartitionMetadataStore metadataStore) {
         KafkaRecordBatchCodec codec = new KafkaRecordBatchCodec();
+        if (metadataStore != null) {
+            return new DefaultKafkaPartitionOpener(
+                    streams,
+                    "broker-run",
+                    Duration.ofSeconds(30),
+                    Duration.ofSeconds(10),
+                    Executors.newSingleThreadScheduledExecutor(runnable -> {
+                        Thread thread = new Thread(runnable, "opener-test-renewal");
+                        thread.setDaemon(true);
+                        return thread;
+                    }),
+                    launcher,
+                    new KafkaAppendBatchEncoder(codec),
+                    new KafkaFetchAssembler(codec),
+                    metadataStore,
+                    CLOCK);
+        }
         return new DefaultKafkaPartitionOpener(
                 streams,
                 "broker-run",
@@ -127,6 +191,49 @@ class DefaultKafkaPartitionOpenerTest {
                 new KafkaAppendBatchEncoder(codec),
                 new KafkaFetchAssembler(codec),
                 CLOCK);
+    }
+
+    private static KafkaPartitionMetadataStore metadataStore(
+            AtomicReference<VersionedKafkaPartitionBinding> durable,
+            AtomicBoolean recoveryCompleted) {
+        return (KafkaPartitionMetadataStore)
+                Proxy.newProxyInstance(
+                        KafkaPartitionMetadataStore.class.getClassLoader(),
+                        new Class<?>[] {KafkaPartitionMetadataStore.class},
+                        (proxy, method, arguments) -> switch (method.getName()) {
+                            case "get" ->
+                                    CompletableFuture.completedFuture(
+                                            Optional.of(durable.get()));
+                            case "compareAndSet" -> {
+                                if (!recoveryCompleted.get()) {
+                                    throw new AssertionError(
+                                            "leader observation was published before recovery completed");
+                                }
+                                VersionedKafkaPartitionBinding expected =
+                                        (VersionedKafkaPartitionBinding) arguments[0];
+                                KafkaPartitionBindingRecord update =
+                                        (KafkaPartitionBindingRecord) arguments[1];
+                                if (!durable.get().equals(expected)) {
+                                    throw new AssertionError("unexpected binding CAS");
+                                }
+                                VersionedKafkaPartitionBinding published =
+                                        new VersionedKafkaPartitionBinding(
+                                                expected.key(),
+                                                update.withMetadataVersion(
+                                                        expected.metadataVersion() + 1),
+                                                expected.metadataVersion() + 1,
+                                                new Checksum(
+                                                        ChecksumType.SHA256,
+                                                        "44".repeat(32)));
+                                durable.set(published);
+                                yield CompletableFuture.completedFuture(published);
+                            }
+                            case "close" -> null;
+                            case "toString" -> "opener-metadata";
+                            case "hashCode" -> System.identityHashCode(proxy);
+                            case "equals" -> proxy == arguments[0];
+                            default -> throw new UnsupportedOperationException(method.getName());
+                        });
     }
 
     private static StreamStorage streams(

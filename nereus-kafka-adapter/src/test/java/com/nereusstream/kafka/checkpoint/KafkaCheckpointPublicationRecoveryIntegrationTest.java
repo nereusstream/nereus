@@ -106,6 +106,79 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
     }
 
     @Test
+    void recoversTheSameCommitAfterTrimOrSessionMetadataChangesTheDurableHeadDigest()
+            throws Exception {
+        try (Fixture fixture = fixture()) {
+            KafkaCheckpointSourceState captured =
+                    source(fixture.identity, 0, 42, 12, 'a');
+            fixture.publish(fixture.activeBinding(), captured);
+            KafkaCheckpointSourceState current =
+                    new KafkaCheckpointSourceState(
+                            captured.authority(),
+                            captured.writerId(),
+                            captured.sessionEpoch(),
+                            captured.fencingToken(),
+                            captured.leaseVersion() + 1,
+                            3,
+                            captured.endOffset(),
+                            captured.commitVersion(),
+                            captured.lastCommitId(),
+                            sha256('b'),
+                            false,
+                            captured.endOffset());
+
+            KafkaCheckpointRecoveryResult recovered =
+                    fixture.recover(fixture.currentBinding(), current);
+
+            assertThat(recovered.checkpoint()).isPresent();
+            assertThat(recovered.checkpoint().orElseThrow().header().sourceCommitVersion())
+                    .isEqualTo(captured.commitVersion());
+            assertThat(fixture.unusable).isEmpty();
+        }
+    }
+
+    @Test
+    void rejectsAConflictingEndOffsetAtTheSameCommitVersion() throws Exception {
+        try (Fixture fixture = fixture()) {
+            KafkaCheckpointSourceState captured =
+                    source(fixture.identity, 0, 42, 12, 'a');
+            KafkaCheckpointObject object =
+                    fixture.publish(fixture.activeBinding(), captured);
+            KafkaCheckpointSourceState conflicting =
+                    new KafkaCheckpointSourceState(
+                            captured.authority(),
+                            captured.writerId(),
+                            captured.sessionEpoch(),
+                            captured.fencingToken(),
+                            captured.leaseVersion() + 1,
+                            3,
+                            captured.endOffset() + 1,
+                            captured.commitVersion(),
+                            captured.lastCommitId(),
+                            sha256('b'),
+                            false,
+                            captured.endOffset() + 1);
+
+            assertThatThrownBy(
+                            () ->
+                                    fixture.recover(
+                                            fixture.currentBinding(),
+                                            conflicting))
+                    .satisfies(
+                            failure ->
+                                    assertThat(unwrap(failure))
+                                            .isInstanceOfSatisfying(
+                                                    NereusException.class,
+                                                    nereus ->
+                                                            assertThat(nereus.code())
+                                                                    .isEqualTo(
+                                                                            ErrorCode
+                                                                                    .METADATA_INVARIANT_VIOLATION)));
+            assertThat(fixture.unusable).containsExactly(object.objectId().value());
+        }
+    }
+
+    @Test
     void verifiesOneExactRootWithoutNewestFirstFallback() throws Exception {
         try (Fixture fixture = fixture()) {
             KafkaCheckpointSourceState oldSource = source(fixture.identity, 0, 42, 12, 'a');
@@ -665,8 +738,8 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
         @Override
         public void hydrateCheckpoint(
                 SyntheticKafkaState state,
-                List<KafkaCheckpointSection> sections,
-                long checkpointOffset) {
+                KafkaCheckpointHeader header,
+                List<KafkaCheckpointSection> sections) {
             assertThat(state.hydrated).isFalse();
             assertThat(sections).hasSize(KafkaCheckpointSectionType.values().length);
             KafkaCheckpointSection producer = sections.stream()
@@ -677,8 +750,8 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
             ByteBuffer payload = ByteBuffer.wrap(producer.payload());
             assertThat(payload.getInt()).isEqualTo(KafkaCheckpointSectionType.PRODUCER_STATE.wireId());
             state.nextOffset = payload.getLong();
-            assertThat(state.nextOffset).isEqualTo(checkpointOffset);
-            state.producerSequence = Math.toIntExact(checkpointOffset);
+            assertThat(state.nextOffset).isEqualTo(header.checkpointOffset());
+            state.producerSequence = Math.toIntExact(header.checkpointOffset());
             state.hydrated = true;
         }
 

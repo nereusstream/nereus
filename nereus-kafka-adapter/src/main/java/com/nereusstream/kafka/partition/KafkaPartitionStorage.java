@@ -39,6 +39,15 @@ public interface KafkaPartitionStorage extends AutoCloseable {
                 "Kafka partition storage does not support derived-offset publication");
     }
 
+    /**
+     * Publishes a product-confirmed durable trim into the partition snapshot before the Kafka fork
+     * exposes the matching local log start.
+     */
+    default KafkaStableSnapshot publishDurableLogStart(long durableLogStartOffset) {
+        throw new UnsupportedOperationException(
+                "Kafka partition storage does not support durable log-start publication");
+    }
+
     CompletableFuture<KafkaStableAppendResult> append(
             ByteBuffer validatedRecords, KafkaAppendContext context);
 

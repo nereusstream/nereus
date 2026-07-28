@@ -229,12 +229,41 @@ tasks.register<Test>("f9M6KafkaProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9CheckpointTrimRecoveryProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Run native Kafka DeleteRecords through NKC1 publication, durable trim, and forced-restart virtual-segment recovery."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9M6KafkaProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-checkpoint-trim-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "deleteRecordsPublishesCheckpointAndRecoversVirtualSegmentsAfterForcedRestart",
+        )
+    }
+}
+
 tasks.register<Test>("f9MultiBrokerTakeoverProcessIntegrationTest") {
     group = "verification"
     description =
         "Run two release Kafka processes through a live RF1 shared-storage leader reassignment."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
-    shouldRunAfter(tasks.named("f9M6KafkaProcessIntegrationTest"))
+    shouldRunAfter(tasks.named("f9CheckpointTrimRecoveryProcessIntegrationTest"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
     classpath = f9ProviderIntegrationTest.runtimeClasspath
     systemProperty(

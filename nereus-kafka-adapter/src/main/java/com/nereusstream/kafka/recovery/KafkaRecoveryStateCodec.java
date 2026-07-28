@@ -2,6 +2,7 @@
 package com.nereusstream.kafka.recovery;
 
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointHeader;
 import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointSection;
 import java.util.List;
 
@@ -10,7 +11,9 @@ public interface KafkaRecoveryStateCodec<S> {
     S freshState();
 
     void hydrateCheckpoint(
-            S freshState, List<KafkaCheckpointSection> sections, long checkpointOffset);
+            S freshState,
+            KafkaCheckpointHeader header,
+            List<KafkaCheckpointSection> sections);
 
     void replayBatch(S freshState, KafkaReplayBatch batch);
 

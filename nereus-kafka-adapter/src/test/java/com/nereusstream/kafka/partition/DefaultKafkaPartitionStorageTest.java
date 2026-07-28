@@ -73,6 +73,28 @@ class DefaultKafkaPartitionStorageTest {
     }
 
     @Test
+    void publishesDurableLogStartAtomicallyAndNotifiesBlockedFetches() {
+        Fixture fixture = fixture(0, 6);
+        List<KafkaPartitionEvent> events = new ArrayList<>();
+        fixture.storage.subscribe(events::add);
+
+        KafkaStableSnapshot published = fixture.storage.publishDurableLogStart(3);
+
+        assertThat(published).isEqualTo(new KafkaStableSnapshot(3, 6, 6, 6, 1));
+        assertThat(fixture.storage.stableSnapshot()).isEqualTo(published);
+        assertThat(events)
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.type()).isEqualTo(KafkaPartitionEventType.LOG_START_CHANGED);
+                    assertThat(event.stableSnapshot()).isEqualTo(published);
+                });
+        assertThat(fixture.storage.publishDurableLogStart(3)).isEqualTo(published);
+        assertThat(events).hasSize(1);
+        assertThatThrownBy(() -> fixture.storage.publishDurableLogStart(7))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void serializesSamePartitionAppendsAndRejectsSpeculativeOffsetGaps() {
         Fixture fixture = fixture(0, 0);
         CompletableFuture<KafkaStableAppendResult> first = fixture.storage.append(

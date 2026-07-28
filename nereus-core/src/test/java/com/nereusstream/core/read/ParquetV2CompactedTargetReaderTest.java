@@ -7,7 +7,9 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
 import com.nereusstream.api.EntryIndexRef;
+import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.FirstEntryPolicy;
+import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
@@ -34,12 +36,98 @@ import com.nereusstream.objectstore.compacted.RangedCompactedObjectReadResult;
 import com.nereusstream.objectstore.compacted.RangedCompactedObjectRow;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 import org.junit.jupiter.api.Test;
 
 class ParquetV2CompactedTargetReaderTest {
+    @Test
+    void stopsBeforeAnOversizedEntryInTheNextResolvedObject() {
+        StreamId streamId = new StreamId("s-ncp2-cross-object-limit");
+        OffsetRange firstCoverage = new OffsetRange(10, 11);
+        OffsetRange secondCoverage = new OffsetRange(11, 12);
+        ObjectSliceReadTarget firstTarget =
+                target(streamId, firstCoverage, ReadView.COMMITTED);
+        ObjectSliceReadTarget secondTarget =
+                target(streamId, secondCoverage, ReadView.COMMITTED);
+        byte[] payload = new byte[70];
+        List<FirstEntryPolicy> policies = new ArrayList<>();
+        List<Integer> byteLimits = new ArrayList<>();
+        ParquetV2CompactedTargetReader reader = new ParquetV2CompactedTargetReader(
+                request -> {
+                    policies.add(request.firstEntryPolicy());
+                    byteLimits.add(request.maxBytes());
+                    if (request.startOffset() == 10) {
+                        RangedCompactedObjectRow row = new RangedCompactedObjectRow(
+                                10,
+                                1,
+                                0,
+                                ByteBuffer.wrap(payload),
+                                crc(payload),
+                                OptionalLong.empty());
+                        return java.util.concurrent.CompletableFuture.completedFuture(
+                                new RangedCompactedObjectReadResult(
+                                        metadata(
+                                                streamId,
+                                                firstCoverage,
+                                                ReadView.COMMITTED,
+                                                1,
+                                                1,
+                                                1,
+                                                payload.length),
+                                        List.of(row),
+                                        11,
+                                        100,
+                                        10));
+                    }
+                    return java.util.concurrent.CompletableFuture.failedFuture(
+                            new NereusException(
+                                    ErrorCode.READ_LIMIT_TOO_SMALL,
+                                    false,
+                                    "next object entry exceeds the remaining limit"));
+                },
+                ignored -> java.util.concurrent.CompletableFuture.failedFuture(
+                        new AssertionError("NTC2 reader must not run")));
+        ReadRequest request = new ReadRequest(
+                10,
+                ReadView.COMMITTED,
+                ReadBoundaryMode.CONTAINING_ENTRY,
+                FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
+                new ReadOptions(
+                        100,
+                        100,
+                        ReadIsolation.COMMITTED,
+                        Duration.ofSeconds(10)));
+
+        PhysicalReadResult result = reader.readPhysicalWithStats(
+                        streamId,
+                        request,
+                        List.of(
+                                resolved(
+                                        firstCoverage,
+                                        firstTarget,
+                                        1,
+                                        1,
+                                        payload.length),
+                                resolved(
+                                        secondCoverage,
+                                        secondTarget,
+                                        1,
+                                        1,
+                                        payload.length)))
+                .join();
+
+        assertThat(result.batches()).singleElement()
+                .satisfies(batch -> assertThat(batch.range()).isEqualTo(firstCoverage));
+        assertThat(result.sourceCoverageEndOffset()).hasValue(11);
+        assertThat(policies).containsExactly(
+                FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
+                FirstEntryPolicy.LEGACY_STRICT_LIMIT);
+        assertThat(byteLimits).containsExactly(100, 30);
+    }
+
     @Test
     void ncp2ContainingReadReturnsWholeRangedEntryAndExactCoverage() {
         StreamId streamId = new StreamId("s-ncp2-core");

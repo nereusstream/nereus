@@ -169,9 +169,9 @@ public final class KafkaCheckpointPublicationCoordinator {
             }
             if (current.commitVersion() == header.sourceCommitVersion()) {
                 if (!current.lastCommitId().equals(header.sourceLastCommitId())
-                        || !current.headSha256().equals(header.sourceHeadSha256())) {
+                        || current.endOffset() != header.stableEndOffset()) {
                     return CompletableFuture.failedFuture(invariant(
-                            "Kafka checkpoint source head changed at the same commit version"));
+                            "Kafka checkpoint source commit anchor changed at the same commit version"));
                 }
                 return CompletableFuture.completedFuture(current);
             }

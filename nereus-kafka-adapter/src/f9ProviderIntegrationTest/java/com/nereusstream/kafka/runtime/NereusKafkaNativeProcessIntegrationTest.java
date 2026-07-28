@@ -19,6 +19,7 @@ import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
 import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
 import com.nereusstream.metadata.oxia.KafkaPartitionId;
 import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaBookKeeperMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaKafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
@@ -27,6 +28,7 @@ import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperAppendReservationRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
+import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
 import com.nereusstream.metadata.oxia.records.KafkaStorageActivationLifecycle;
 import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.KafkaStorageReadinessRecord;
@@ -456,6 +458,216 @@ class NereusKafkaNativeProcessIntegrationTest {
         assertThat(objectCount(bucket))
                 .as("user and internal-topic commits must persist S3-compatible objects")
                 .isPositive();
+    }
+
+    @Test
+    @Timeout(value = 4, unit = TimeUnit.MINUTES)
+    void deleteRecordsPublishesCheckpointAndRecoversVirtualSegmentsAfterForcedRestart()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-checkpoint-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path deleteRecordsScript =
+                executable(kafkaHome.resolve("bin/kafka-delete-records.sh"));
+        Path config = root.resolve("checkpoint-server.properties");
+        Path formatLog = root.resolve("checkpoint-format.log");
+        Path firstServerLog = root.resolve("checkpoint-first-server.log");
+        Path restartServerLog = root.resolve("checkpoint-restart-server.log");
+        Path deleteOffsets = root.resolve("checkpoint-delete-offsets.json");
+        Path deleteRecordsLog = root.resolve("checkpoint-delete-records.log");
+        String bucket = "n-cp-" + UUID.randomUUID();
+        String topic = "checkpoint-process-" + UUID.randomUUID();
+        int brokerPort = freePort();
+        int controllerPort = differentFreePort(brokerPort);
+        String bootstrapServers = "127.0.0.1:" + brokerPort;
+        String nereusCluster = writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                root.resolve("checkpoint-kafka-log"),
+                root.resolve("checkpoint-metadata-log"),
+                root.resolve("checkpoint-cache"));
+
+        createBucket(bucket);
+        formatStorage(formatScript, kafkaHome, config, formatLog);
+
+        TopicPartition partition = new TopicPartition(topic, 0);
+        int initialRecordCount = 6;
+        long trimmedOffset = 3;
+        List<byte[]> values = new ArrayList<>(initialRecordCount);
+        for (int offset = 0; offset < initialRecordCount; offset++) {
+            byte[] value = new byte[600 * 1024];
+            java.util.Arrays.fill(value, (byte) (offset + 1));
+            values.add(value);
+        }
+        AtomicReference<KafkaPartitionId> durablePartition = new AtomicReference<>();
+
+        runBrokerWithProcess(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                firstServerLog,
+                bootstrapServers,
+                StopMode.FORCE,
+                broker -> {
+                    try (Admin admin =
+                            Admin.create(checkpointAdminProperties(bootstrapServers))) {
+                        NewTopic created = new NewTopic(topic, 1, (short) 1);
+                        created.configs(Map.of(
+                                "cleanup.policy", "delete",
+                                "segment.bytes", "1048576"));
+                        admin.createTopics(List.of(created))
+                                .all()
+                                .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                        for (int offset = 0; offset < initialRecordCount; offset++) {
+                            RecordMetadata produced = produce(
+                                    bootstrapServers,
+                                    topic,
+                                    ("checkpoint-key-" + offset)
+                                            .getBytes(StandardCharsets.UTF_8),
+                                    values.get(offset));
+                            assertThat(produced.offset()).isEqualTo(offset);
+                        }
+                        assertOffsets(admin, partition, 0, initialRecordCount);
+
+                        KafkaPartitionId partitionId = kafkaPartitionId(
+                                bootstrapServers,
+                                partition,
+                                topic);
+                        durablePartition.set(partitionId);
+                        Process deletion = startNativeDeleteRecords(
+                                deleteRecordsScript,
+                                kafkaHome,
+                                bootstrapServers,
+                                partition,
+                                trimmedOffset,
+                                deleteOffsets,
+                                deleteRecordsLog);
+                        KafkaCheckpointReferenceRecord checkpoint;
+                        try {
+                            try {
+                                checkpoint =
+                                        awaitTrimmedCheckpoint(
+                                                nereusCluster,
+                                                partitionId,
+                                                0,
+                                                trimmedOffset,
+                                                initialRecordCount,
+                                                firstServerLog,
+                                                Duration.ofSeconds(30));
+                            } catch (Throwable failure) {
+                                Path threadDumpOutput =
+                                        deleteRecordsLog.resolveSibling(
+                                                "checkpoint-delete-records-thread-dump.log");
+                                Files.writeString(
+                                        threadDumpOutput,
+                                        threadDump(broker, firstServerLog),
+                                        StandardCharsets.UTF_8);
+                                preserveAdditionalFailureEvidence(
+                                        deleteRecordsLog,
+                                        threadDumpOutput);
+                                throw failure;
+                            }
+                            awaitNativeDeleteRecords(
+                                    deletion,
+                                    partition,
+                                    trimmedOffset,
+                                    deleteRecordsLog,
+                                    broker,
+                                    firstServerLog);
+                        } finally {
+                            if (deletion.isAlive()) {
+                                deletion.destroyForcibly();
+                                deletion.waitFor(10, TimeUnit.SECONDS);
+                            }
+                        }
+                        assertThat(checkpoint.checkpointOffset())
+                                .isEqualTo(initialRecordCount);
+                        assertOffsets(
+                                admin,
+                                partition,
+                                trimmedOffset,
+                                initialRecordCount);
+
+                        ConsumerRecord<byte[], byte[]> retained = fetch(
+                                bootstrapServers,
+                                partition,
+                                trimmedOffset,
+                                firstServerLog);
+                        assertThat(retained.offset()).isEqualTo(trimmedOffset);
+                        assertThat(retained.value())
+                                .isEqualTo(values.get((int) trimmedOffset));
+                    }
+                });
+
+        assertThat(durablePartition.get())
+                .as("the first process must resolve the durable partition identity")
+                .isNotNull();
+        assertThat(objectCount(bucket))
+                .as("DeleteRecords must persist a rooted NKC1 checkpoint object")
+                .isPositive();
+
+        runBroker(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                restartServerLog,
+                bootstrapServers,
+                () -> {
+                    try (Admin admin =
+                            Admin.create(checkpointAdminProperties(bootstrapServers))) {
+                        assertOffsets(
+                                admin,
+                                partition,
+                                trimmedOffset,
+                                initialRecordCount);
+                        ConsumerRecord<byte[], byte[]> recovered = fetch(
+                                bootstrapServers,
+                                partition,
+                                trimmedOffset,
+                                restartServerLog);
+                        assertThat(recovered.offset()).isEqualTo(trimmedOffset);
+                        assertThat(recovered.value())
+                                .isEqualTo(values.get((int) trimmedOffset));
+
+                        byte[] appendedValue = new byte[600 * 1024];
+                        java.util.Arrays.fill(appendedValue, (byte) 7);
+                        RecordMetadata appended = produce(
+                                bootstrapServers,
+                                topic,
+                                "checkpoint-key-6".getBytes(StandardCharsets.UTF_8),
+                                appendedValue);
+                        assertThat(appended.offset()).isEqualTo(initialRecordCount);
+                        assertThat(fetch(
+                                                bootstrapServers,
+                                                partition,
+                                                initialRecordCount,
+                                                restartServerLog)
+                                        .value())
+                                .isEqualTo(appendedValue);
+                        assertOffsets(
+                                admin,
+                                partition,
+                                trimmedOffset,
+                                initialRecordCount + 1L);
+
+                        awaitTrimmedCheckpoint(
+                                nereusCluster,
+                                durablePartition.get(),
+                                0,
+                                trimmedOffset,
+                                initialRecordCount + 1L,
+                                restartServerLog,
+                                Duration.ofSeconds(30));
+                    }
+                });
     }
 
     @Test
@@ -4135,6 +4347,88 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private static KafkaCheckpointReferenceRecord awaitTrimmedCheckpoint(
+            String nereusCluster,
+            KafkaPartitionId partitionId,
+            long checkpointLogStartOffset,
+            long durableTrimOffset,
+            long stableEndOffset,
+            Path serverLog,
+            Duration timeout
+    ) {
+        OxiaClientConfiguration oxia = oxiaConfiguration();
+        Clock clock = Clock.systemUTC();
+        long deadline = System.nanoTime() + timeout.toNanos();
+        Throwable lastFailure = null;
+        try (SharedOxiaClientRuntime shared =
+                        SharedOxiaClientRuntime.connect(oxia, clock);
+                OxiaJavaClientMetadataStore metadata =
+                        OxiaJavaClientMetadataStore.usingSharedRuntime(
+                                oxia,
+                                shared,
+                                clock);
+                OxiaJavaKafkaPartitionMetadataStore partitions =
+                        OxiaJavaKafkaPartitionMetadataStore.usingSharedRuntime(
+                                oxia,
+                                shared,
+                                nereusCluster,
+                                partitionId.kafkaClusterId())) {
+            while (System.nanoTime() < deadline) {
+                try {
+                    var binding = partitions.get(partitionId).join();
+                    if (binding.isPresent()) {
+                        var value = binding.orElseThrow().value();
+                        var durableHead = metadata.getStableStreamHeadSnapshot(
+                                        nereusCluster,
+                                        new StreamId(value.streamId()))
+                                .join();
+                        Optional<KafkaCheckpointReferenceRecord> checkpoint =
+                                value.checkpointReferences().stream()
+                                        .filter(reference ->
+                                                reference.checkpointOffset()
+                                                                <= stableEndOffset
+                                                        && reference.logStartOffsetAtCheckpoint()
+                                                                == checkpointLogStartOffset)
+                                        .findFirst();
+                        if (checkpoint.isPresent()) {
+                            KafkaCheckpointReferenceRecord exact =
+                                    checkpoint.orElseThrow();
+                            if (durableHead.trimOffset() == durableTrimOffset
+                                    && durableHead.committedEndOffset()
+                                            == stableEndOffset
+                                    && value.observedLogStartOffset()
+                                            == durableTrimOffset
+                                    && value.observedStableEndOffset()
+                                            >= exact.checkpointOffset()
+                                    && value.observedStableEndOffset()
+                                            <= stableEndOffset) {
+                                return exact;
+                            }
+                        }
+                        lastFailure = new AssertionError(
+                                "expected trim/checkpoint/end "
+                                        + durableTrimOffset
+                                        + "/"
+                                        + checkpointLogStartOffset
+                                        + "/"
+                                        + stableEndOffset
+                                        + " but observed binding "
+                                        + value
+                                        + " and durable stream head "
+                                        + durableHead);
+                    }
+                } catch (Throwable failure) {
+                    lastFailure = failure;
+                }
+                pauseForProviderState("Kafka trimmed checkpoint root");
+            }
+        }
+        throw new AssertionError(
+                "Kafka trimmed checkpoint root did not converge before the deadline:\n"
+                        + readLog(serverLog),
+                lastFailure);
+    }
+
     private static StreamId awaitPartitionStreamId(
             OxiaJavaKafkaPartitionMetadataStore partitions,
             KafkaPartitionId partitionId,
@@ -4543,6 +4837,92 @@ class NereusKafkaNativeProcessIntegrationTest {
                         .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
         assertThat(earliest.get(partition).offset()).isEqualTo(earliestOffset);
         assertThat(latest.get(partition).offset()).isEqualTo(latestOffset);
+    }
+
+    private static Process startNativeDeleteRecords(
+            Path deleteRecordsScript,
+            Path kafkaHome,
+            String bootstrapServers,
+            TopicPartition partition,
+            long trimmedOffset,
+            Path offsetJson,
+            Path output
+    ) throws Exception {
+        Files.writeString(
+                offsetJson,
+                "{\"partitions\":[{\"topic\":\""
+                        + partition.topic()
+                        + "\",\"partition\":"
+                        + partition.partition()
+                        + ",\"offset\":"
+                        + trimmedOffset
+                        + "}]}",
+                StandardCharsets.UTF_8);
+        return start(
+                        List.of(
+                                deleteRecordsScript.toString(),
+                                "--bootstrap-server",
+                                bootstrapServers,
+                                "--offset-json-file",
+                                offsetJson.toString()),
+                        kafkaHome,
+                        output);
+    }
+
+    private static void awaitNativeDeleteRecords(
+            Process deletion,
+            TopicPartition partition,
+            long trimmedOffset,
+            Path output,
+            Process broker,
+            Path serverLog
+    ) throws Exception {
+        Path threadDumpOutput =
+                output.resolveSibling(
+                        "checkpoint-delete-records-thread-dump.log");
+        if (!deletion.waitFor(15, TimeUnit.SECONDS)) {
+            Files.writeString(
+                    threadDumpOutput,
+                    threadDump(broker, serverLog),
+                    StandardCharsets.UTF_8);
+            preserveAdditionalFailureEvidence(
+                    output,
+                    threadDumpOutput);
+        }
+        int exit;
+        if (deletion.isAlive()) {
+            if (!deletion.waitFor(
+                    CLIENT_TIMEOUT.minusSeconds(15).toMillis(),
+                    TimeUnit.MILLISECONDS)) {
+                deletion.destroyForcibly();
+                deletion.waitFor(10, TimeUnit.SECONDS);
+                preserveAdditionalFailureEvidence(
+                        output,
+                        threadDumpOutput);
+                throw new AssertionError(
+                        "Kafka native DeleteRecords timed out:\n"
+                                + readLog(output)
+                                + "\nBroker thread dump while blocked:\n"
+                                + readLog(threadDumpOutput));
+            }
+            exit = deletion.exitValue();
+        } else {
+            exit = deletion.exitValue();
+        }
+        String evidence = readLog(output);
+        assertThat(exit)
+                .withFailMessage(
+                        () ->
+                                "Kafka native DeleteRecords failed:\n"
+                                        + evidence)
+                .isZero();
+        assertThat(evidence)
+                .contains("Records delete operation completed:")
+                .contains(
+                        "partition: "
+                                + partition
+                                + "\tlow_watermark: "
+                                + trimmedOffset);
     }
 
     private static OxiaClientConfiguration oxiaConfiguration() {
@@ -4979,7 +5359,7 @@ class NereusKafkaNativeProcessIntegrationTest {
             String bootstrapServers,
             BrokerAssertions assertions
     ) throws Exception {
-        runBroker(
+        runBrokerWithProcess(
                 startScript,
                 kafkaHome,
                 config,
@@ -4987,7 +5367,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 serverLog,
                 bootstrapServers,
                 StopMode.NORMAL,
-                assertions);
+                ignored -> assertions.verify());
     }
 
     private static void runBroker(
@@ -5000,6 +5380,27 @@ class NereusKafkaNativeProcessIntegrationTest {
             StopMode stopMode,
             BrokerAssertions assertions
     ) throws Exception {
+        runBrokerWithProcess(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                serverLog,
+                bootstrapServers,
+                stopMode,
+                ignored -> assertions.verify());
+    }
+
+    private static void runBrokerWithProcess(
+            Path startScript,
+            Path kafkaHome,
+            Path config,
+            Path formatLog,
+            Path serverLog,
+            String bootstrapServers,
+            StopMode stopMode,
+            BrokerProcessAssertions assertions
+    ) throws Exception {
         Process broker = start(
                 List.of(startScript.toString(), config.toString()),
                 kafkaHome,
@@ -5007,7 +5408,7 @@ class NereusKafkaNativeProcessIntegrationTest {
         Throwable failure = null;
         try {
             awaitBroker(bootstrapServers, broker, serverLog);
-            assertions.verify();
+            assertions.verify(broker);
         } catch (Exception | AssertionError operationFailure) {
             failure = operationFailure;
         }
@@ -5893,6 +6294,19 @@ class NereusKafkaNativeProcessIntegrationTest {
         return properties;
     }
 
+    private static Properties checkpointAdminProperties(
+            String bootstrapServers
+    ) {
+        Properties properties = adminProperties(bootstrapServers);
+        properties.setProperty(
+                AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG,
+                "30000");
+        properties.setProperty(
+                AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG,
+                "30000");
+        return properties;
+    }
+
     private static Properties controllerAdminProperties(
             String bootstrapControllers
     ) {
@@ -6172,6 +6586,28 @@ class NereusKafkaNativeProcessIntegrationTest {
         } catch (IOException failure) {
             throw new AssertionError(
                     "failed to preserve Kafka process evidence under " + target,
+                    failure);
+        }
+    }
+
+    private static void preserveAdditionalFailureEvidence(
+            Path... evidenceFiles) {
+        String configured = System.getProperty("nereus.kafka.process.evidence.dir");
+        if (configured == null || configured.isBlank()) {
+            return;
+        }
+        Path target = Path.of(configured).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(target);
+            for (Path evidence : evidenceFiles) {
+                copyIfPresent(
+                        evidence,
+                        target.resolve(evidence.getFileName()));
+            }
+        } catch (IOException failure) {
+            throw new AssertionError(
+                    "failed to preserve additional Kafka process evidence under "
+                            + target,
                     failure);
         }
     }
@@ -6857,6 +7293,11 @@ class NereusKafkaNativeProcessIntegrationTest {
     @FunctionalInterface
     private interface BrokerAssertions {
         void verify() throws Exception;
+    }
+
+    @FunctionalInterface
+    private interface BrokerProcessAssertions {
+        void verify(Process broker) throws Exception;
     }
 
     @FunctionalInterface

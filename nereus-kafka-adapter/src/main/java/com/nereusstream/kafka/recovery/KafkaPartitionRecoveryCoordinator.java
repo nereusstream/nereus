@@ -120,7 +120,7 @@ public final class KafkaPartitionRecoveryCoordinator<S> {
             long replayStart = checkpoint.checkpoint()
                     .map(value -> {
                         stateCodec.hydrateCheckpoint(
-                                fresh, value.sections(), value.header().checkpointOffset());
+                                fresh, value.header(), value.sections());
                         return value.header().checkpointOffset();
                     })
                     .orElse(0L);

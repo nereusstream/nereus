@@ -20,7 +20,9 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
 import com.nereusstream.api.EntryIndexRef;
+import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.FirstEntryPolicy;
+import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectType;
@@ -75,7 +77,11 @@ class KafkaCompactedFetchIntegrationTest {
                     List.of(readBatch(new OffsetRange(0, 1), first, 0, 1)),
                     1));
           }
-          return CompletableFuture.completedFuture(result(request, List.of(), 1));
+          return CompletableFuture.failedFuture(
+              new NereusException(
+                  ErrorCode.READ_LIMIT_TOO_SMALL,
+                  false,
+                  "the next committed batch does not fit the remaining Fetch budget"));
         });
     KafkaCompactedFetchReader reader =
         KafkaCompactedFetchReader.committedOnly(

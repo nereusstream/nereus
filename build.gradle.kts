@@ -64,6 +64,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
     task.startsWith("phase9M3")
         || task.startsWith("phase9M6Kafka")
         || task == "f9M6KafkaProcessIntegrationTest"
+        || task == "f9CheckpointTrimRecoveryProcessIntegrationTest"
         || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
         || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
         || task == "f9MultiControllerFailoverProcessIntegrationTest"
@@ -142,6 +143,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "f9BookKeeperWalOnlyProviderIntegrationTest",
         "f9BookKeeperLedgerDeletionProviderIntegrationTest",
         "f9M6KafkaProcessIntegrationTest",
+        "f9CheckpointTrimRecoveryProcessIntegrationTest",
         "f9MultiBrokerTakeoverProcessIntegrationTest",
         "f9MultiControllerFailoverProcessIntegrationTest",
         "f9ActivationCutFailoverProcessIntegrationTest",
@@ -2882,7 +2884,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "df238bb387706f60bc020e43c8dc6878fbf41051",
+        "1cbe8b65a8a802e8fd06503af3d5449ea79353e0",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -3103,6 +3105,7 @@ tasks.register("phase9M6KafkaProcessCheck") {
     description =
         "Run real Oxia + LocalStack + BookKeeper cold-restart, broker/controller takeover, and in-flight fencing acceptance."
     dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9CheckpointTrimRecoveryProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiControllerFailoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9ActivationCutFailoverProcessIntegrationTest")

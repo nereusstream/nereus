@@ -18,13 +18,19 @@ import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryRequest;
 import com.nereusstream.kafka.recovery.KafkaRecoveredPartition;
 import com.nereusstream.kafka.retention.KafkaPartitionMaintenance;
 import com.nereusstream.kafka.retention.KafkaPartitionMaintenanceFactory;
+import com.nereusstream.metadata.oxia.KafkaMetadataConditionFailedException;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
+import com.nereusstream.metadata.oxia.KafkaPartitionMetadataTransitions;
+import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
+import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
+import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
@@ -32,6 +38,8 @@ import java.util.concurrent.ScheduledExecutorService;
  * construction.
  */
 public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
+    private static final int MAX_OBSERVATION_RETRIES = 32;
+
     private final StreamStorage streams;
     private final String writerId;
     private final Duration sessionTtl;
@@ -232,28 +240,163 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
                 .loadCurrent()
                 .thenCompose(
                         source -> {
-                            Duration remaining = remaining(deadline);
-                            KafkaCheckpointRecoveryRequest checkpointRequest =
-                                    new KafkaCheckpointRecoveryRequest(
-                                            plan.authority().identity(),
-                                            plan.binding().durableRoot(),
-                                            source,
-                                            validator,
-                                            remaining);
-                            return recoveryLauncher
-                                    .recover(
-                                            new KafkaPartitionRecoveryRequest(
-                                                    checkpointRequest, remaining))
-                                    .thenApply(
-                                            recovered ->
-                                                    validateRecovered(
-                                                            plan,
-                                                            acquired,
-                                                            source,
-                                                            recovered,
-                                                            validator,
-                                                            deadline));
+                            return currentBinding(plan, source, deadline)
+                                    .thenCompose(
+                                            current -> {
+                                                Duration remaining = remaining(deadline);
+                                                KafkaCheckpointRecoveryRequest checkpointRequest =
+                                                        new KafkaCheckpointRecoveryRequest(
+                                                                plan.authority().identity(),
+                                                                current,
+                                                                source,
+                                                                validator,
+                                                                remaining);
+                                                return recoveryLauncher
+                                                        .recover(
+                                                                new KafkaPartitionRecoveryRequest(
+                                                                        checkpointRequest,
+                                                                        remaining))
+                                                        .thenCompose(
+                                                                recovered -> {
+                                                                    RecoveredOpen validated =
+                                                                            validateRecovered(
+                                                                                    plan,
+                                                                                    acquired,
+                                                                                    source,
+                                                                                    recovered,
+                                                                                    validator,
+                                                                                    deadline);
+                                                                    return observeBinding(
+                                                                                    plan,
+                                                                                    source,
+                                                                                    deadline,
+                                                                                    0)
+                                                                            .thenApply(
+                                                                                    ignored ->
+                                                                                            validated);
+                                                                });
+                                            });
                         });
+    }
+
+    private CompletableFuture<VersionedKafkaPartitionBinding> currentBinding(
+            KafkaPartitionOpenPlan plan,
+            KafkaCheckpointSourceState source,
+            long deadline) {
+        if (partitionMetadataStore.isEmpty()) {
+            return CompletableFuture.completedFuture(plan.binding().durableRoot());
+        }
+        remaining(deadline);
+        return partitionMetadataStore
+                .orElseThrow()
+                .get(plan.authority().identity().durableId())
+                .thenApply(
+                        optional -> {
+                            VersionedKafkaPartitionBinding current =
+                                    optional.orElseThrow(
+                                            () ->
+                                                    invariant(
+                                                            "Kafka binding disappeared before"
+                                                                    + " partition recovery"));
+                            validateObservation(plan, source, current);
+                            return current;
+                        });
+    }
+
+    private CompletableFuture<VersionedKafkaPartitionBinding> observeBinding(
+            KafkaPartitionOpenPlan plan,
+            KafkaCheckpointSourceState source,
+            long deadline,
+            int attempt) {
+        if (partitionMetadataStore.isEmpty()) {
+            return CompletableFuture.completedFuture(plan.binding().durableRoot());
+        }
+        if (attempt >= MAX_OBSERVATION_RETRIES) {
+            return CompletableFuture.failedFuture(
+                    new NereusException(
+                            ErrorCode.METADATA_CONDITION_FAILED,
+                            true,
+                            "Kafka leader observation CAS retry budget exhausted"));
+        }
+        remaining(deadline);
+        KafkaPartitionMetadataStore store = partitionMetadataStore.orElseThrow();
+        return store
+                .get(plan.authority().identity().durableId())
+                .thenCompose(
+                        optional -> {
+                            VersionedKafkaPartitionBinding current =
+                                    optional.orElseThrow(
+                                            () ->
+                                                    invariant(
+                                                            "Kafka binding disappeared while"
+                                                                    + " publishing leader"
+                                                                    + " observation"));
+                            validateObservation(plan, source, current);
+                            KafkaPartitionBindingRecord root = current.value();
+                            KafkaLeaderAuthority authority = plan.authority();
+                            if (root.observedTopicName()
+                                            .equals(authority.identity().observedTopicName())
+                                    && root.observedLeaderId() == authority.leaderId()
+                                    && root.observedLeaderEpoch() == authority.leaderEpoch()
+                                    && root.observedBrokerEpoch() == authority.brokerEpoch()
+                                    && root.observedLogStartOffset() == source.trimOffset()
+                                    && root.observedStableEndOffset() == source.endOffset()) {
+                                return CompletableFuture.completedFuture(current);
+                            }
+                            KafkaPartitionBindingRecord update =
+                                    KafkaPartitionMetadataTransitions.observe(
+                                            root,
+                                            authority.identity().observedTopicName(),
+                                            root.lastAppliedMetadataOffset(),
+                                            authority.leaderId(),
+                                            authority.leaderEpoch(),
+                                            authority.brokerEpoch(),
+                                            source.trimOffset(),
+                                            source.endOffset(),
+                                            Math.max(clock.millis(), root.updatedAtMillis()));
+                            return store
+                                    .compareAndSet(current, update)
+                                    .exceptionallyCompose(
+                                            failure ->
+                                                    conditionFailure(failure)
+                                                            ? observeBinding(
+                                                                    plan,
+                                                                    source,
+                                                                    deadline,
+                                                                    attempt + 1)
+                                                            : CompletableFuture.failedFuture(
+                                                                    unwrap(failure)));
+                        });
+    }
+
+    private static void validateObservation(
+            KafkaPartitionOpenPlan plan,
+            KafkaCheckpointSourceState source,
+            VersionedKafkaPartitionBinding current) {
+        KafkaPartitionBindingRecord expected = plan.binding().durableRoot().value();
+        KafkaPartitionBindingRecord actual = current.value();
+        KafkaLeaderAuthority authority = plan.authority();
+        if (!actual.identity().equals(expected.identity())
+                || actual.lifecycle() != KafkaPartitionLifecycle.ACTIVE
+                || actual.incarnation() != expected.incarnation()
+                || !actual.streamId().equals(expected.streamId())
+                || actual.payloadMappingId() != expected.payloadMappingId()
+                || !actual.storageProfile().equals(expected.storageProfile())) {
+            throw invariant("Kafka binding changed before leader observation publication");
+        }
+        if (actual.observedLeaderEpoch() > authority.leaderEpoch()
+                || (actual.observedLeaderEpoch() == authority.leaderEpoch()
+                        && actual.observedLeaderId() >= 0
+                        && actual.observedLeaderId() != authority.leaderId())
+                || (actual.observedLeaderEpoch() == authority.leaderEpoch()
+                        && actual.observedLeaderId() == authority.leaderId()
+                        && actual.observedBrokerEpoch() > authority.brokerEpoch())) {
+            throw fenced("Kafka binding already records a newer or conflicting leader authority");
+        }
+        if (actual.observedLogStartOffset() > source.trimOffset()
+                || actual.observedStableEndOffset() > source.endOffset()) {
+            throw invariant("Kafka binding observation is ahead of the durable stream head");
+        }
     }
 
     private KafkaPartitionStorage storage(KafkaPartitionOpenPlan plan, RecoveredOpen recovered) {
@@ -381,6 +524,18 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
 
     private static NereusException invariant(String message) {
         return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+    }
+
+    private static boolean conditionFailure(Throwable failure) {
+        return unwrap(failure) instanceof KafkaMetadataConditionFailedException;
+    }
+
+    private static Throwable unwrap(Throwable failure) {
+        Throwable current = Objects.requireNonNull(failure, "failure");
+        while (current instanceof CompletionException && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
     }
 
     private record RecoveredOpen(

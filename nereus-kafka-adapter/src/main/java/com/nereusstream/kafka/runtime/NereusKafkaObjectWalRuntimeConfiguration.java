@@ -147,6 +147,11 @@ public record NereusKafkaObjectWalRuntimeConfiguration(
             throw new IllegalArgumentException(
                     "pendingProtectionDuration must exceed maximumClockSkew");
         }
+        Duration safeReadWindow = pendingProtectionDuration.minus(maximumClockSkew);
+        if (safeReadWindow.compareTo(runtime.operationTtl()) < 0) {
+            throw new IllegalArgumentException(
+                    "pendingProtectionDuration minus maximumClockSkew must cover runtime operationTtl");
+        }
         if (!materialization.committedPolicy().targetPhysicalFormat()
                 .equals(
                         com.nereusstream.materialization

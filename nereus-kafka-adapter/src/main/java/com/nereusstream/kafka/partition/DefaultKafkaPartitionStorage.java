@@ -410,6 +410,34 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     }
 
     @Override
+    public KafkaStableSnapshot publishDurableLogStart(long durableLogStartOffset) {
+        KafkaStableSnapshot published;
+        synchronized (guard) {
+            if (state != KafkaPartitionState.LEADER_WRITABLE) {
+                throw fenced("Kafka partition cannot publish durable log start: " + state);
+            }
+            if (durableLogStartOffset < stableSnapshot.logStartOffset()
+                    || durableLogStartOffset > stableSnapshot.highWatermark()) {
+                throw new IllegalArgumentException(
+                        "Kafka durable log start is outside the stable high-watermark window");
+            }
+            if (durableLogStartOffset == stableSnapshot.logStartOffset()) {
+                return stableSnapshot;
+            }
+            published =
+                    new KafkaStableSnapshot(
+                            durableLogStartOffset,
+                            stableSnapshot.stableEndOffset(),
+                            stableSnapshot.highWatermark(),
+                            Math.max(stableSnapshot.lastStableOffset(), durableLogStartOffset),
+                            stableSnapshot.commitVersion());
+            stableSnapshot = published;
+        }
+        publishEvent(KafkaPartitionEventType.LOG_START_CHANGED, published);
+        return published;
+    }
+
+    @Override
     public CompletableFuture<KafkaStableAppendResult> append(
             ByteBuffer validatedRecords, KafkaAppendContext context) {
         Objects.requireNonNull(context, "context");

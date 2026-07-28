@@ -67,7 +67,7 @@ class KafkaTrimBarrierTest {
             (snapshot, target) -> CompletableFuture.completedFuture(verified(CHECKPOINT)),
             () -> CompletableFuture.completedFuture(fixture.currentWithCheckpoint()),
             target -> {
-              fixture.durableHead.set(head(target));
+              fixture.durableHead.set(trimmedHead(target));
               return CompletableFuture.completedFuture(null);
             },
             (snapshot, durableTrim, checkpoint) -> {
@@ -84,6 +84,19 @@ class KafkaTrimBarrierTest {
     assertThat(notified).hasValue(20);
     assertThat(fixture.trimCalls).hasValue(1);
     assertThat(fixture.trimReason.get()).startsWith("KAFKA_RETENTION_V1:TIME+SIZE:");
+  }
+
+  @Test
+  void acceptsLaggingObservedStableEndButRejectsBindingAheadOfDurableSource() {
+    KafkaRetentionPlanner.Snapshot retention = retentionSnapshot(250, 2_500, 20, 5_000);
+
+    KafkaTrimBarrier.Snapshot captured = snapshot(binding(false, 0), head(0), retention);
+
+    assertThat(captured.binding().value().observedStableEndOffset()).isZero();
+    assertThat(captured.sourceHead().committedEndOffset()).isEqualTo(40);
+    assertThatThrownBy(() -> snapshot(binding(false, 41), head(0), retention))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Kafka trim snapshot is not one exact active view");
   }
 
   @Test
@@ -160,7 +173,7 @@ class KafkaTrimBarrierTest {
             (snapshot, target) -> CompletableFuture.completedFuture(verified(CHECKPOINT)),
             () -> CompletableFuture.completedFuture(fixture.currentWithCheckpoint()),
             target -> {
-              fixture.durableHead.set(head(target));
+              fixture.durableHead.set(trimmedHead(target));
               return CompletableFuture.failedFuture(
                   new IllegalStateException("trim response lost"));
             },
@@ -346,7 +359,28 @@ class KafkaTrimBarrierTest {
         1);
   }
 
+  private static StableStreamHeadSnapshot trimmedHead(long trimOffset) {
+    StableStreamHeadSnapshot before = head(trimOffset);
+    return new StableStreamHeadSnapshot(
+        before.streamId(),
+        before.state(),
+        before.storageProfile(),
+        before.trimOffset(),
+        before.committedEndOffset(),
+        before.cumulativeSize(),
+        before.commitVersion(),
+        before.lastCommitId(),
+        before.appendSession(),
+        sha256('d'),
+        before.metadataVersion() + 1);
+  }
+
   private static VersionedKafkaPartitionBinding binding(boolean includeCheckpoint) {
+    return binding(includeCheckpoint, 40);
+  }
+
+  private static VersionedKafkaPartitionBinding binding(
+      boolean includeCheckpoint, long observedStableEndOffset) {
     KafkaPartitionPendingOperationRecord operation =
         new KafkaPartitionPendingOperationRecord(
             KafkaPartitionOperationType.CREATE.wireId(),
@@ -370,7 +404,15 @@ class KafkaTrimBarrierTest {
             creating, "kafka-stream", STREAM_ID.value(), 7, 10_001);
     var observed =
         KafkaPartitionMetadataTransitions.observe(
-            active, IDENTITY.observedTopicName(), 7, 1, 3, 4, 0, 40, 10_002);
+            active,
+            IDENTITY.observedTopicName(),
+            7,
+            1,
+            3,
+            4,
+            0,
+            observedStableEndOffset,
+            10_002);
     var root =
         includeCheckpoint
             ? KafkaPartitionMetadataTransitions.prependCheckpoint(

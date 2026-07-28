@@ -287,15 +287,20 @@ public final class KafkaTrimBarrier {
       StableStreamHeadSnapshot expected, StableStreamHeadSnapshot actual) {
     if (!expected.streamId().equals(actual.streamId())
         || actual.state() != StreamState.ACTIVE
+        || !expected.storageProfile().equals(actual.storageProfile())
+        || actual.trimOffset() < expected.trimOffset()
         || actual.committedEndOffset() < expected.committedEndOffset()
+        || actual.cumulativeSize() < expected.cumulativeSize()
         || actual.commitVersion() < expected.commitVersion()
+        || actual.metadataVersion() < expected.metadataVersion()
         || expected.appendSession().isEmpty()
         || actual.appendSession().isEmpty()) {
       throw invariant("Kafka stream or append authority disappeared during trim");
     }
     if (actual.commitVersion() == expected.commitVersion()
         && (!actual.lastCommitId().equals(expected.lastCommitId())
-            || !actual.durableHeadSha256().equals(expected.durableHeadSha256()))) {
+            || actual.committedEndOffset() != expected.committedEndOffset()
+            || actual.cumulativeSize() != expected.cumulativeSize())) {
       throw invariant("Kafka stream head changed at the same commit version during trim");
     }
     AcquiredAppendSession expectedAcquired = expected.appendSession().orElseThrow();
@@ -347,7 +352,7 @@ public final class KafkaTrimBarrier {
           || sourceHead.trimOffset() != retention.virtualSegments().logStartOffset()
           || sourceHead.committedEndOffset() != retention.virtualSegments().stableEndOffset()
           || root.observedLogStartOffset() != sourceHead.trimOffset()
-          || root.observedStableEndOffset() != sourceHead.committedEndOffset()) {
+          || root.observedStableEndOffset() > sourceHead.committedEndOffset()) {
         throw new IllegalArgumentException("Kafka trim snapshot is not one exact active view");
       }
       AppendAuthority authority =
