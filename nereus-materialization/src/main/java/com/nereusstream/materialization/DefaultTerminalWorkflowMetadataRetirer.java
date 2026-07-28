@@ -1177,7 +1177,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 && value.readTarget().equals(encodedTarget)
                 && value.targetIdentitySha256().equals(output.targetIdentitySha256().value())
                 && value.materializationPolicySha256().equals(task.policyDigestSha256().value())
-                && value.payloadFormat().equals(output.logicalFormat())
+                && value.payloadFormat().equals(output.payloadFormat().name())
                 && value.sourceRecordCount() == output.sourceRecordCount()
                 && value.outputRecordCount() == output.outputRecordCount()
                 && value.entryCount() == output.entryCount()

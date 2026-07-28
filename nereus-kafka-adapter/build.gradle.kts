@@ -121,6 +121,23 @@ tasks.register<Test>("f9BookKeeperWalOnlyProviderIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9BookKeeperLedgerDeletionProviderIntegrationTest") {
+    group = "verification"
+    description =
+        "Run the F9 Kafka proof activation and physical BookKeeper ledger-deletion gate."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.named("f9BookKeeperWalOnlyProviderIntegrationTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
+                "activatesKafkaProofThenPhysicallyDeletesSealedBookKeeperLedger",
+        )
+    }
+}
+
 tasks.register<Test>("f9M6KafkaProcessIntegrationTest") {
     group = "verification"
     description = "Run the F9 provider-backed Nereus Kafka cold-restart Produce/Fetch/ListOffsets gate."

@@ -153,6 +153,65 @@ class TerminalWorkflowMetadataRetirementTest {
     }
 
     @Test
+    void retiresPublishedKafkaOutputUsingItsCanonicalPayloadFormat() {
+        try (GenerationPublicationTestSupport.Context context =
+                GenerationPublicationTestSupport
+                        .directKafkaTopicContext()) {
+            assertThat(context.output().logicalFormat())
+                    .isEqualTo("KAFKA_RECORD_BATCH_V1");
+            assertThat(context.output().payloadFormat().name())
+                    .isEqualTo("KAFKA_RECORD_BATCH");
+            context.committer(
+                            context.generations(),
+                            GenerationPublicationTestSupport
+                                    .successfulGuard(),
+                            MaterializationStreamAuthorityMode
+                                    .DIRECT_STREAM)
+                    .publish(context.task(), context.output())
+                    .join();
+            advanceCheckpoint(context);
+            MaterializationTaskStore tasks =
+                    new MaterializationTaskStore(
+                            CLUSTER,
+                            context.generations(),
+                            GenerationPublicationTestSupport
+                                    .CLOCK);
+            DefaultTerminalWorkflowMetadataRetirer retirer =
+                    new DefaultTerminalWorkflowMetadataRetirer(
+                            CLUSTER,
+                            tasks,
+                            context.generations(),
+                            context.physical(),
+                            Duration.ofMillis(500),
+                            1,
+                            Duration.ofSeconds(10),
+                            context.scheduler(),
+                            RETIREMENT_CLOCK);
+
+            var retired =
+                    retirer.retire(
+                                    context.task().streamId(),
+                                    context.task().policy(),
+                                    0,
+                                    MaterializationTaskMutationGuard
+                                            .noOp())
+                            .join();
+
+            assertThat(retired.tasksEligible()).isOne();
+            assertThat(retired.tasksRetired()).isOne();
+            assertThat(retired.protectionsReleased())
+                    .isEqualTo(2);
+            assertThat(
+                            tasks.get(
+                                            context.task().streamId(),
+                                            context.task().taskId())
+                                    .join())
+                    .isEmpty();
+            assertThat(taskOwnedProtections(context)).isEmpty();
+        }
+    }
+
+    @Test
     void retiresTerminalFailureOnlyWhenNoPublicationIndexReferencesItsTaskOrOutput() {
         try (GenerationPublicationTestSupport.Context context =
                 GenerationPublicationTestSupport.context()) {

@@ -3180,6 +3180,7 @@ tasks.register("phase9M5RetentionCheck") {
     description = "Run the partial F9-M5 retention, DeleteRecords, and checkpoint-before-trim gate."
     dependsOn("phase9M4ProducerStateCheck")
     dependsOn(":nereus-kafka-adapter:f9RetentionTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperLedgerDeletionProviderIntegrationTest")
 }
 
 tasks.register("phase9M5CompactionCoreCheck") {

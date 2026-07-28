@@ -440,7 +440,13 @@ coordinator/transaction/compaction remain M4/M5。
   proves exact authoritative binding/L0/direct-materialization agreement，then starts one-shot deletion activation between
   materialization and retention。`KafkaBookKeeperStreamCoverageProofProducerTest` covers deterministic digest、both complete
   shard sets、WAL-only、missing registration and L0 drift；`CompositeKafkaRuntimeBackgroundServiceTest` covers forward
-  start、reverse close and rollback。Real ledger deletion/restart and multi-broker takeover remain open；
+  start、reverse close and rollback。`f9BookKeeperLedgerDeletionProviderIntegrationTest` now starts real Oxia plus two
+  bookies，forces one sealed async ledger、waits for NCP2 and terminal-source protection retirement，observes the exact
+  `SEALED -> MARKED -> DELETING -> DELETED` chain，proves the provider ledger is absent and reads the same Kafka bytes from
+  NCP2。`TerminalWorkflowMetadataRetirementTest` separately locks the Kafka-specific
+  `KAFKA_RECORD_BATCH_V1 -> KAFKA_RECORD_BATCH` logical/payload mapping used by terminal proof。The task is wired into
+  `phase9M5RetentionCheck` as `f9BookKeeperLedgerDeletionProviderIntegrationTest`。Fresh-process deletion/restart、
+  response-loss cuts and multi-broker takeover remain open；
 - the 2026-07-28 Kafka NCP2 materialization core checkpoint adds the distinct
   `nereus-kafka-committed-v2` / `NEREUS_COMPACTED_PARQUET_V2` committed policy，without reinterpreting NCP1 durable
   records。`DefaultMaterializationWorker` now has an NCP2-only ranged writer path that preserves every Kafka

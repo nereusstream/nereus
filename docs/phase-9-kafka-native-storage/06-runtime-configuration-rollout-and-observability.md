@@ -446,8 +446,14 @@ scope → readiness recheck → root → readiness recheck → stream → readin
 Composite startup order is materialization → deletion activation → retention；close order is retention → deletion
 activation(no-op) → materialization。任一 proof/CAS 失败会触发既有 composite rollback，retention 不会启动。
 Safe default 不创建 activation/retention owner。确定性测试覆盖两组全 64 shards、digest 幂等、WAL-only、
-缺失 direct registration、L0 profile drift、start/close/rollback ordering。Real two-bookie physical ledger deletion
-and fresh-process NCP2/WAL-only recovery evidence remain required；physical deletion acceptance is not claimed yet。
+缺失 direct registration、L0 profile drift、start/close/rollback ordering。
+`f9BookKeeperLedgerDeletionProviderIntegrationTest` 使用缩短但仍保持
+`metadataAuditGrace -> readerLeaseTtl/drainGrace -> lateCreateAuditGrace` 顺序的测试窗口，在 real Oxia +
+two-bookie BookKeeper 上证明动态 materialization-source protection 先删除、WAL references 后退休、root 再按
+`MARKED/DELETING/DELETED` 收敛；随后 provider open 返回 no-such-ledger，而 Kafka 从已提交 NCP2 继续读回同一
+bytes。测试 capability/readiness authority 有效期必须覆盖完整删除窗口；生产 verifier 仍严格拒绝过期 proof。
+Fresh-process NCP2/WAL-only recovery after physical deletion、delete response-loss 和 takeover evidence 仍需
+release-process gate，因此这里只声明 adapter-level R-tier physical deletion。
 
 `f9BookKeeperWalOnlyProcessIntegrationTest` closes the native process boundary for this first BookKeeper profile。The fixture
 starts two real bookies over BookKeeper's stock ZooKeeper

@@ -9,6 +9,7 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadiness;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadinessProvider;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
+import com.nereusstream.bookkeeper.BookKeeperLedgerGcConfiguration;
 import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceProvisioningCoordinator;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationCoordinator;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationUpdate;
@@ -32,6 +33,12 @@ import com.nereusstream.kafka.recovery.KafkaRecoveryState;
 import com.nereusstream.kafka.recovery.KafkaRecoveryStateCodec;
 import com.nereusstream.kafka.recovery.KafkaReplayBatch;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
+import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
+import com.nereusstream.metadata.oxia.BookKeeperScanToken;
+import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
+import com.nereusstream.metadata.oxia.BookKeeperKeyspace;
+import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
+import com.nereusstream.metadata.oxia.OxiaJavaBookKeeperMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaGenerationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaKafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
@@ -39,6 +46,8 @@ import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPayloadMapping;
 import com.nereusstream.metadata.oxia.records.KafkaStorageActivationLifecycle;
 import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
@@ -57,6 +66,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.List;
 import java.util.Optional;
@@ -65,6 +75,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.common.allocator.PoolingPolicy;
 import org.apache.bookkeeper.conf.ServerConfiguration;
@@ -637,6 +648,291 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
         assertThat(provider.closed()).isTrue();
     }
 
+    @Test
+    void activatesKafkaProofThenPhysicallyDeletesSealedBookKeeperLedger()
+            throws Exception {
+        String nereusCluster =
+                "f9-bookkeeper-gc-" + java.util.UUID.randomUUID();
+        String kafkaCluster = "kraft-bookkeeper-gc";
+        String writer = "kafka-broker-1-epoch-21";
+        String deployment = "kafka-deployment-gc";
+        Clock clock = Clock.systemUTC();
+        OxiaClientConfiguration oxia =
+                new OxiaClientConfiguration(
+                        OXIA.getServiceAddress(),
+                        "default",
+                        Duration.ofSeconds(10),
+                        Duration.ofSeconds(30),
+                        10_000,
+                        1_024);
+        BookKeeperWalConfiguration bookKeeperConfiguration =
+                bookKeeperDeletionConfiguration();
+        BookKeeperLedgerGcConfiguration ledgerGc =
+                new BookKeeperLedgerGcConfiguration(
+                        1,
+                        Duration.ZERO,
+                        bookKeeperConfiguration.readerLeaseTtl(),
+                        Duration.ofSeconds(1),
+                        true,
+                        false);
+        String readinessSha256 = "66".repeat(32);
+        seedBookKeeperAuthority(
+                oxia,
+                bookKeeperConfiguration,
+                deployment,
+                readinessSha256,
+                clock);
+
+        LocalObjectStoreProvider provider =
+                new LocalObjectStoreProvider(
+                        root.resolve("bookkeeper-gc-objects"));
+        ScheduledExecutorService scheduler =
+                Executors.newSingleThreadScheduledExecutor();
+        NereusKafkaRuntime runtime = null;
+        String metadataServiceUri =
+                "oxia://" + OXIA.getServiceAddress();
+        try (BKCluster bookKeeperCluster =
+                startBookKeeper(metadataServiceUri)) {
+            BookKeeper client = bookKeeperCluster.newClient();
+            try {
+                Set<StorageProfile> profiles =
+                        Set.of(
+                                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                                StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
+                                StorageProfile.BOOKKEEPER_WAL_ONLY,
+                                StorageProfile
+                                        .BOOKKEEPER_WAL_ASYNC_OBJECT,
+                                StorageProfile
+                                        .BOOKKEEPER_WAL_SYNC_OBJECT);
+                NereusKafkaRuntimeConfiguration runtimeConfiguration =
+                        new NereusKafkaRuntimeConfiguration(
+                                nereusCluster,
+                                kafkaCluster,
+                                writer,
+                                Duration.ofSeconds(30),
+                                Duration.ofSeconds(5),
+                                writer,
+                                21,
+                                Duration.ofSeconds(30),
+                                100_000,
+                                256 * 1024 * 1024,
+                                profiles);
+                NereusKafkaObjectWalRuntimeConfiguration configuration =
+                        new NereusKafkaObjectWalRuntimeConfiguration(
+                                runtimeConfiguration,
+                                streamConfiguration(
+                                        nereusCluster,
+                                        writer),
+                                oxia,
+                                objectConfiguration(provider),
+                                Duration.ofMinutes(10),
+                                Duration.ofSeconds(5),
+                                Duration.ofHours(24),
+                                2,
+                                bookKeeperDeletionMaterializationConfig(
+                                        root.resolve(
+                                                        "bookkeeper-gc-materialization")
+                                                .toAbsolutePath()),
+                                Optional.of(
+                                        new NereusKafkaBookKeeperWalRuntimeConfiguration(
+                                                deployment,
+                                                bookKeeperConfiguration,
+                                                ledgerGc)));
+                KafkaBrokerIdentity broker =
+                        new KafkaBrokerIdentity(1, 21);
+                KafkaBrokerCapabilitySpecification capability =
+                        new KafkaBrokerCapabilitySpecification(
+                                kafkaCluster,
+                                broker,
+                                writer,
+                                "4.3.0",
+                                "f9-bookkeeper-gc-test",
+                                System.getProperty("java.version"),
+                                profiles,
+                                StorageProfile
+                                        .BOOKKEEPER_WAL_ASYNC_OBJECT,
+                                bytes(21),
+                                bytes(22),
+                                bytes(23),
+                                Duration.ofSeconds(1),
+                                Duration.ofMinutes(5));
+                KafkaStorageClusterSnapshot clusterSnapshot =
+                        new KafkaStorageClusterSnapshot(
+                                kafkaCluster,
+                                211,
+                                KafkaStorageProtocolActivationRecord
+                                        .KAFKA_FEATURE_LEVEL,
+                                List.of(broker),
+                                false,
+                                false,
+                                false);
+                seedActiveAuthority(
+                        oxia,
+                        nereusCluster,
+                        capability,
+                        clusterSnapshot,
+                        clock);
+                runtime =
+                        NereusKafkaObjectWalRuntimeFactory
+                                .createActivated(
+                                        configuration,
+                                        new NereusKafkaObjectWalRuntimeContext(
+                                                provider,
+                                                reference -> Optional.empty(),
+                                                scheduler,
+                                                request ->
+                                                        new KafkaRecoveryState<>(
+                                                                new EmptyRecoveryStateCodec(),
+                                                                recovered ->
+                                                                        CompletableFuture
+                                                                                .completedFuture(
+                                                                                        null)),
+                                                clock,
+                                                () ->
+                                                        CompletableFuture
+                                                                .completedFuture(
+                                                                        null),
+                                                Optional.of(
+                                                        new NereusKafkaBookKeeperWalRuntimeContext(
+                                                                client,
+                                                                readinessProvider(
+                                                                        readinessSha256),
+                                                                ignored ->
+                                                                        "f9-bookkeeper-password"
+                                                                                .getBytes(
+                                                                                        java.nio.charset
+                                                                                                .StandardCharsets
+                                                                                                .UTF_8)))),
+                                        new NereusKafkaObjectWalActivationContext(
+                                                capability,
+                                                () ->
+                                                        CompletableFuture
+                                                                .completedFuture(
+                                                                        clusterSnapshot),
+                                                Duration.ofSeconds(10),
+                                                Duration.ofMillis(100)));
+                runtime.start().toCompletableFuture().join();
+
+                KafkaPartitionIdentity identity =
+                        new KafkaPartitionIdentity(
+                                kafkaCluster,
+                                "AAAAAAAAAAAAAAAAAAAAGA",
+                                0,
+                                "bookkeeper-gc-orders");
+                KafkaPartitionStorage storage =
+                        runtime.partitionStorageManager()
+                                .openLeader(
+                                        new KafkaPartitionLeaderOpenRequest(
+                                                identity,
+                                                1,
+                                                1,
+                                                21,
+                                                StorageProfile
+                                                        .BOOKKEEPER_WAL_ASYNC_OBJECT,
+                                                1,
+                                                Duration.ofSeconds(20)))
+                                .join();
+                byte[] expected =
+                        appendKafkaBatches(
+                                storage,
+                                2,
+                                5_000,
+                                "bookkeeper-gc-value-");
+                VersionedGenerationIndex ncp2 =
+                        awaitCommittedGeneration(
+                                oxia,
+                                nereusCluster,
+                                kafkaCluster,
+                                identity,
+                                clock,
+                                2);
+                assertThat(ncp2.value().lifecycle())
+                        .isEqualTo(GenerationLifecycle.COMMITTED);
+
+                StreamId streamId =
+                        partitionStreamId(
+                                oxia,
+                                nereusCluster,
+                                kafkaCluster,
+                                identity,
+                                clock);
+                long deletedLedgerId;
+                BookKeeperMetadataStoreConfig metadataConfiguration =
+                        bookKeeperMetadataConfiguration(
+                                bookKeeperConfiguration);
+                try (SharedOxiaClientRuntime inspector =
+                                SharedOxiaClientRuntime.connect(
+                                        oxia,
+                                        clock);
+                        OxiaJavaBookKeeperMetadataStore metadata =
+                                OxiaJavaBookKeeperMetadataStore
+                                        .usingSharedRuntime(
+                                                oxia,
+                                                inspector,
+                                                clock,
+                                                metadataConfiguration);
+                        OxiaJavaGenerationMetadataStore generations =
+                                OxiaJavaGenerationMetadataStore
+                                        .usingSharedRuntime(
+                                                oxia,
+                                                inspector,
+                                                clock)) {
+                    BookKeeperVersionedValue<BookKeeperLedgerRootRecord>
+                            retired =
+                                    awaitRetiredLedgerRoot(
+                                            metadata,
+                                            nereusCluster,
+                                            streamId,
+                                            Duration.ofSeconds(30));
+                    deletedLedgerId = retired.value().ledgerId();
+                    BookKeeperVersionedValue<BookKeeperLedgerRootRecord>
+                            deleted =
+                                    awaitDeletedLedgerRoot(
+                                            metadata,
+                                            nereusCluster,
+                                            bookKeeperConfiguration
+                                                    .providerScopeSha256(),
+                                            deletedLedgerId,
+                                            generations,
+                                            streamId,
+                                            Duration.ofSeconds(35));
+                    assertThat(deleted.value().lifecycle())
+                            .isEqualTo(
+                                    BookKeeperLedgerLifecycle.DELETED);
+                }
+                assertPhysicalLedgerAbsent(
+                        client,
+                        deletedLedgerId);
+                assertThat(
+                                storage.read(
+                                                new KafkaStorageReadRequest(
+                                                        0,
+                                                        2,
+                                                        10,
+                                                        1024 * 1024,
+                                                        1024 * 1024,
+                                                        true,
+                                                        0,
+                                                        0,
+                                                        Duration.ofSeconds(
+                                                                20)))
+                                        .join()
+                                        .fetchAssembly()
+                                        .encodedRecords())
+                        .containsExactly(expected);
+            } finally {
+                if (runtime != null) {
+                    runtime.close();
+                    runtime = null;
+                }
+                client.close();
+            }
+        } finally {
+            scheduler.shutdownNow();
+        }
+        assertThat(provider.closed()).isTrue();
+    }
+
     private static byte[] appendKafkaBatches(
             KafkaPartitionStorage storage,
             int batchCount,
@@ -709,7 +1005,7 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                     capabilitySha256,
                     specification.providerScopeSha256(),
                     now,
-                    now + 30_000,
+                    now + Duration.ofMinutes(5).toMillis(),
                     0)).join();
             store.createActivation(new KafkaStorageProtocolActivationRecord(
                     KafkaStorageProtocolActivationRecord.RECORD_VERSION,
@@ -803,6 +1099,307 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
         }
         throw new AssertionError(
                 "Kafka NCP2 generation did not commit before the integration deadline");
+    }
+
+    private static StreamId partitionStreamId(
+            OxiaClientConfiguration oxia,
+            String nereusCluster,
+            String kafkaCluster,
+            KafkaPartitionIdentity identity,
+            Clock clock) {
+        try (SharedOxiaClientRuntime inspector =
+                        SharedOxiaClientRuntime.connect(oxia, clock);
+                OxiaJavaKafkaPartitionMetadataStore partitions =
+                        OxiaJavaKafkaPartitionMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        inspector,
+                                        nereusCluster,
+                                        kafkaCluster)) {
+            return new StreamId(
+                    partitions
+                            .get(identity.durableId())
+                            .join()
+                            .orElseThrow()
+                            .value()
+                            .streamId());
+        }
+    }
+
+    private static BookKeeperVersionedValue<BookKeeperLedgerRootRecord>
+            awaitRetiredLedgerRoot(
+                    OxiaJavaBookKeeperMetadataStore metadata,
+                    String cluster,
+                    StreamId streamId,
+                    Duration timeout) {
+        long deadline =
+                System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            ArrayList<
+                            BookKeeperVersionedValue<
+                                    BookKeeperLedgerRootRecord>>
+                    candidates = new ArrayList<>();
+            for (int shard = 0;
+                    shard < BookKeeperKeyspace.LEDGER_SHARDS;
+                    shard++) {
+                Optional<BookKeeperScanToken> continuation =
+                        Optional.empty();
+                do {
+                    var page =
+                            metadata.scanRoots(
+                                            cluster,
+                                            shard,
+                                            continuation,
+                                            100)
+                                    .join();
+                    page.values().stream()
+                            .filter(
+                                    value ->
+                                            value.value()
+                                                    .streamId()
+                                                    .equals(
+                                                            streamId
+                                                                    .value()))
+                            .filter(
+                                    value ->
+                                            switch (value
+                                                    .value()
+                                                    .lifecycle()) {
+                                                case SEALED,
+                                                        MARKED,
+                                                        DELETING,
+                                                        DELETED ->
+                                                        true;
+                                                default -> false;
+                                            })
+                            .forEach(candidates::add);
+                    continuation = page.continuation();
+                } while (continuation.isPresent());
+            }
+            Optional<
+                            BookKeeperVersionedValue<
+                                    BookKeeperLedgerRootRecord>>
+                    earliest =
+                            candidates.stream()
+                                    .min(
+                                            java.util.Comparator.comparingLong(
+                                                    value ->
+                                                            value.value()
+                                                                    .segmentSequence()));
+            if (earliest.isPresent()) {
+                return earliest.orElseThrow();
+            }
+            pauseForProviderState(
+                    "retired BookKeeper ledger root");
+        }
+        throw new AssertionError(
+                "BookKeeper rollover did not publish a retired ledger root before the deadline");
+    }
+
+    private static BookKeeperVersionedValue<BookKeeperLedgerRootRecord>
+            awaitDeletedLedgerRoot(
+                    OxiaJavaBookKeeperMetadataStore metadata,
+            String cluster,
+            String providerScopeSha256,
+            long ledgerId,
+            OxiaJavaGenerationMetadataStore generations,
+            StreamId streamId,
+            Duration timeout) {
+        long deadline =
+                System.nanoTime() + timeout.toNanos();
+        BookKeeperVersionedValue<BookKeeperLedgerRootRecord> last =
+                null;
+        while (System.nanoTime() < deadline) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord>
+                    root =
+                            metadata.getRoot(
+                                            cluster,
+                                            providerScopeSha256,
+                                            ledgerId)
+                                    .join()
+                                    .orElseThrow();
+            last = root;
+            if (root.value().lifecycle()
+                    == BookKeeperLedgerLifecycle.DELETED) {
+                return root;
+            }
+            if (root.value().lifecycle()
+                            == BookKeeperLedgerLifecycle.QUARANTINED
+                    || root.value().lifecycle()
+                            == BookKeeperLedgerLifecycle.ABORTED) {
+                throw new AssertionError(
+                        "BookKeeper retention entered terminal "
+                                + root.value().lifecycle());
+            }
+            pauseForProviderState(
+                    "deleted BookKeeper ledger root");
+        }
+        throw new AssertionError(
+                "BookKeeper ledger did not reach DELETED before the integration deadline; last root="
+                        + last
+                        + "; retention inventory="
+                        + retentionInventory(
+                                metadata,
+                                cluster,
+                                providerScopeSha256,
+                                ledgerId,
+                                last)
+                        + "; materialization tasks="
+                        + materializationInventory(
+                                generations,
+                                cluster,
+                                streamId));
+    }
+
+    private static String materializationInventory(
+            OxiaJavaGenerationMetadataStore generations,
+            String cluster,
+            StreamId streamId) {
+        var tasks =
+                generations.scanTasks(
+                                cluster,
+                                streamId,
+                                Optional.empty(),
+                                100)
+                        .join();
+        StringBuilder diagnostic =
+                new StringBuilder(tasks.toString());
+        for (var task : tasks.values()) {
+            diagnostic
+                    .append("; checkpoint[")
+                    .append(task.value().taskId())
+                    .append("]=")
+                    .append(
+                            generations.getMaterializationCheckpoint(
+                                            cluster,
+                                            streamId,
+                                            task.value().policyId(),
+                                            task.value()
+                                                    .policyVersion())
+                                    .join());
+            if (task.value()
+                    .allocatedGeneration()
+                    .isPresent()) {
+                diagnostic
+                        .append("; index[")
+                        .append(task.value().taskId())
+                        .append("]=")
+                        .append(
+                                generations.getIndex(
+                                                cluster,
+                                                new GenerationIndexIdentity(
+                                                        streamId,
+                                                        ReadView.COMMITTED,
+                                                        task.value()
+                                                                .offsetEnd(),
+                                                        task.value()
+                                                                .allocatedGeneration()
+                                                                .orElseThrow()))
+                                        .join());
+            }
+        }
+        return diagnostic.toString();
+    }
+
+    private static String retentionInventory(
+            OxiaJavaBookKeeperMetadataStore metadata,
+            String cluster,
+            String providerScopeSha256,
+            long ledgerId,
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root) {
+        var protections =
+                metadata.scanProtections(
+                                cluster,
+                                providerScopeSha256,
+                                ledgerId,
+                                Optional.empty(),
+                                100)
+                        .join();
+        var readers =
+                metadata.scanReaderLeases(
+                                cluster,
+                                providerScopeSha256,
+                                ledgerId,
+                                Optional.empty(),
+                                100)
+                        .join();
+        var writer =
+                metadata.getWriter(
+                                cluster,
+                                new StreamId(
+                                        root.value()
+                                                .streamId()))
+                        .join();
+        var allocationSlot =
+                metadata.getAllocationSlot(
+                                cluster,
+                                root.value()
+                                        .allocationSlot())
+                        .join();
+        return "protections="
+                + protections.values()
+                + ", protectionContinuation="
+                + protections.continuation()
+                + ", readers="
+                + readers.values()
+                + ", readerContinuation="
+                + readers.continuation()
+                + ", writer="
+                + writer
+                + ", allocationSlot="
+                + allocationSlot;
+    }
+
+    private static void assertPhysicalLedgerAbsent(
+            BookKeeper client,
+            long ledgerId)
+            throws Exception {
+        try {
+            var handle =
+                    client.openLedgerNoRecovery(
+                            ledgerId,
+                            BookKeeper.DigestType.CRC32C,
+                            "f9-bookkeeper-password"
+                                    .getBytes(
+                                            java.nio.charset
+                                                    .StandardCharsets
+                                                    .UTF_8));
+            try {
+                handle.close();
+            } finally {
+                throw new AssertionError(
+                        "physically deleted BookKeeper ledger reopened: "
+                                + ledgerId);
+            }
+        } catch (BKException failure) {
+            assertThat(failure.getCode())
+                    .isIn(
+                            BKException.Code
+                                    .NoSuchLedgerExistsException,
+                            BKException.Code
+                                    .NoSuchLedgerExistsOnMetadataServerException);
+        }
+    }
+
+    private static void pauseForProviderState(String state) {
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(
+                    "interrupted while awaiting " + state,
+                    failure);
+        }
+    }
+
+    private static BookKeeperMetadataStoreConfig
+            bookKeeperMetadataConfiguration(
+                    BookKeeperWalConfiguration configuration) {
+        return new BookKeeperMetadataStoreConfig(
+                configuration.maxAppendRangesPerLedger(),
+                configuration.protectionSlotsPerRange(),
+                configuration.maxReaderLeasesPerLedger(),
+                configuration.maxUncertainAllocations());
     }
 
     private static byte[] bytes(int seed) {
@@ -916,6 +1513,82 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                 Duration.ofSeconds(30),
                 Duration.ofMinutes(1),
                 256);
+    }
+
+    private static BookKeeperWalConfiguration
+            bookKeeperDeletionConfiguration() {
+        return new BookKeeperWalConfiguration(
+                "primary",
+                "22".repeat(32),
+                12,
+                0x802,
+                "reservation-gc",
+                2,
+                2,
+                2,
+                BookKeeperDigestType.CRC32C,
+                new BookKeeperSecretRef(
+                        "secret://bookkeeper/password",
+                        "v1"),
+                1,
+                256L * 1024 * 1024,
+                1_000,
+                8,
+                64,
+                32,
+                Duration.ofHours(1),
+                8,
+                8,
+                64L * 1024 * 1024,
+                Duration.ofSeconds(20),
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(20),
+                Duration.ofSeconds(20),
+                Duration.ofSeconds(21),
+                Duration.ofSeconds(2),
+                Duration.ofMillis(250),
+                256);
+    }
+
+    private static MaterializationConfig
+            bookKeeperDeletionMaterializationConfig(
+                    Path stagingDirectory) {
+        MaterializationConfig defaults =
+                MaterializationConfig.kafkaDefaults(
+                        stagingDirectory);
+        return new MaterializationConfig(
+                defaults.committedPolicy(),
+                defaults.registryScanPageSize(),
+                Duration.ofMillis(250),
+                defaults.plannerPageSize(),
+                defaults.taskScanPageSize(),
+                defaults.maxTasksPerPlan(),
+                defaults.maxConcurrentWorkers(),
+                defaults.maxConcurrentWorkersPerStream(),
+                defaults.sourceReadPageRecords(),
+                defaults.sourceReadPageBytes(),
+                defaults.stagingDirectory(),
+                defaults.maxStagingBytes(),
+                defaults.uploadChunkBytes(),
+                defaults.workerClaimDuration(),
+                defaults.workerClaimRenewInterval(),
+                defaults.maximumClockSkew(),
+                defaults.operationTimeout(),
+                defaults.closeTimeout(),
+                defaults.retryMinBackoff(),
+                defaults.retryMaxBackoff(),
+                defaults.maxTaskAttempts(),
+                defaults.lagThrottleRecords(),
+                defaults.lagRejectRecords(),
+                defaults.lagThrottleBytes(),
+                defaults.lagRejectBytes(),
+                defaults.lagRejectAge(),
+                defaults.lagThrottleDelay(),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                defaults.recoveryCheckpointMaxEntries(),
+                defaults.recoveryCheckpointMaxBytes());
     }
 
     private static BKCluster startBookKeeper(

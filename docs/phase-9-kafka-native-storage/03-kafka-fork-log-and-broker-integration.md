@@ -923,8 +923,13 @@ shards，重读 authoritative root，核对 ACTIVE BookKeeper binding 与 exact 
 version，以同一 broker-readiness 生成 scope/root/`NBKKAFKASTREAM1` stream proof，并由通用 coordinator 一次
 CAS 安装三份 digest 与 deletion bit；retention scanner 只在该步骤成功后启动。任一 shard pagination、
 hint/root、L0、registration、namespace、readiness 或 activation version 漂移都使启动失败。确定性测试已通过，
-但真实 ledger 删除与 fresh-process restart/read evidence 仍需后续 gate，当前不能把 deletion bit 的
-deterministic activation 等同于物理删除验收。真实 combined-node
+`f9BookKeeperLedgerDeletionProviderIntegrationTest` 已在 real Oxia + two bookies 上覆盖 adapter-level
+物理删除：BookKeeper async append/rollover、NCP2 COMMITTED、terminal materialization-source protection
+retirement、activation-guarded retention、provider ledger absence 和删除后的 NCP2 byte-exact read 全部通过。
+它还锁定 Kafka logical format `KAFKA_RECORD_BATCH_V1` 必须 canonicalize 为 generation index payload format
+`KAFKA_RECORD_BATCH`，否则 terminal task 会永久保护旧 ledger。fresh-process restart/read、delete-response-loss
+和 multi-broker takeover 仍需后续 process gate，当前不能把这条 R-tier evidence 等同于完整 KF-RET-009。
+真实 combined-node
 KRaft/Oxia/S3 process baseline 已通过；
 同节点 fresh-JVM cold restart 也已通过；独立 BookKeeper WAL-only/async/sync release-distribution
 首启/冷重启 gates 也在同一 fork head 通过。这些 gates 没有给 Kafka 引入 Pulsar metadata runtime：
