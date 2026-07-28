@@ -41,7 +41,8 @@ import org.apache.bookkeeper.client.api.WriteAdvHandle;
  * <p>The permanent audit root is created before CreateAdv, so an ordinary allocator can never race the canary for the
  * same advanced ledger id. Only an exact NBKL1 match may be fenced or deleted after an uncertain provider response.
  */
-public final class BookKeeperScopeCapabilityProbe {
+public final class BookKeeperScopeCapabilityProbe
+        implements BookKeeperScopeCapabilityProofProvider {
     private static final int MAX_CANDIDATE_ATTEMPTS = 16;
     private static final int MAX_DELETE_ATTEMPTS = 3;
     private static final String DOMAIN = "NBKSCOPE1";
@@ -107,6 +108,7 @@ public final class BookKeeperScopeCapabilityProbe {
         requireNamespace(expectedNamespace);
     }
 
+    @Override
     public CompletableFuture<BookKeeperScopeCapabilityProof> probe(
             BookKeeperScopeCapabilityRequest request) {
         final BookKeeperScopeCapabilityRequest exact;

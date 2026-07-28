@@ -68,6 +68,16 @@ committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、C
 remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing。The Kafka
 fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@b443750be4`。
 
+Current deterministic BookKeeper deletion-activation evidence（product 2026-07-28）：
+`KafkaBookKeeperStreamCoverageProofProducerTest` proves complete 64-shard Kafka binding inventory plus complete 64-shard F4
+registration inventory、authoritative hint/root reload、stable `NBKKAFKASTREAM1` digest、WAL-only without object
+registration、async missing-registration rejection and L0 profile-drift rejection。
+`BookKeeperDeletionActivationCoordinatorTest` covers one-CAS installation、idempotent exact winner、readiness rebinding/
+mid-proof drift and producer-owned proof digests；`CompositeKafkaRuntimeBackgroundServiceTest` proves materialization →
+activation → retention startup、reverse close and partial-start rollback。This is deterministic partial evidence for
+KF-RET-009 and KF-OPS-012/018 only。Those rows remain `PLANNED` because real two-bookie physical deletion、fresh process
+restart/read fallback and failure-cut evidence have not run。
+
 Current checkpoint-failure quarantine evidence（product 2026-07-28）：closed V1 record/envelope and canonical key tests
 cover exact partition-incarnation/object identity、immutable first-winner、reference-digest collision、raw-failure
 redaction and applied-but-response-lost reconciliation。Recovery and retention tests prove persisted refs skip object I/O，
@@ -360,7 +370,7 @@ full replay；no request-path or recovery claim is inferred from codec-only evid
 | KF-RET-006 | DeleteRecords at batch start/middle/end/HW maps durable logStart/low watermark correctly | product `KafkaDeleteRecordsCoordinatorTest` + fork `PartitionTest`/`NereusUnifiedLogFactoryTest`（exact target/HW/local publication D/K partial）；`KafkaNativeDeleteRecordsIntegrationTest`（real-provider matrix pending） | R,K | M5 |
 | KF-RET-007 | retention/config/new-append races revalidate and never over-trim | `KafkaRetentionRacePropertyTest` | M,R,C | M5 |
 | KF-RET-008 | compact+delete preserves compacted visibility until logical trim passes range | `KafkaCompactionRetentionIntegrationTest` | R,K | M5 |
-| KF-RET-009 | logical trim success is independent of delayed protected physical GC | `KafkaRetentionPhysicalGcIntegrationTest` | R,C | M5 |
+| KF-RET-009 | logical trim success is independent of delayed protected physical GC | product `KafkaBookKeeperStreamCoverageProofProducerTest` + `BookKeeperDeletionActivationCoordinatorTest`（deletion activation D partial）；`KafkaRetentionPhysicalGcIntegrationTest`（real physical GC pending） | R,C | M5 |
 | KF-RET-010 | all storage profiles obey same checkpoint barrier and trim semantics | `KafkaRetentionProfileMatrixTest` | R | M5/M7 |
 
 Implementation note（2026-07-27）：product `KafkaDerivedIndexStateCodecV1Test` provides canonical-format partial evidence

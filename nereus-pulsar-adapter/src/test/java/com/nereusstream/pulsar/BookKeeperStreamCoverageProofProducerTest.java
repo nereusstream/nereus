@@ -12,6 +12,7 @@ import com.nereusstream.api.StreamState;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadiness;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
 import com.nereusstream.bookkeeper.BookKeeperSecretRef;
+import com.nereusstream.bookkeeper.BookKeeperStreamCoverageProof;
 import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProjectionRefV1;
 import com.nereusstream.metadata.oxia.F4Keyspace;

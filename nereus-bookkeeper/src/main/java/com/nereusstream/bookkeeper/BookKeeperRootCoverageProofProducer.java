@@ -25,7 +25,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /** Produces NBKROOT1 only after a strict empty-continuation traversal of all 256 root shards. */
-public final class BookKeeperRootCoverageProofProducer {
+public final class BookKeeperRootCoverageProofProducer
+        implements BookKeeperRootCoverageProofProvider {
     private static final String DOMAIN = "NBKROOT1";
 
     private final String cluster;
@@ -54,6 +55,7 @@ public final class BookKeeperRootCoverageProofProducer {
         this.pageSize = Math.min(configuration.retentionPageSize(), 1_024);
     }
 
+    @Override
     public CompletableFuture<BookKeeperRootCoverageProof> produce(
             BookKeeperBrokerReadiness readiness, Duration timeout) {
         final BookKeeperBrokerReadiness exactReadiness;

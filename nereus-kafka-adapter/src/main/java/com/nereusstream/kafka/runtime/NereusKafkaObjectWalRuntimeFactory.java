@@ -38,6 +38,7 @@ import com.nereusstream.kafka.activation.KafkaStorageActivationRuntime;
 import com.nereusstream.kafka.activation.KafkaStorageActivationVerifier;
 import com.nereusstream.kafka.activation.KafkaStorageBindingAwareClusterSnapshotProvider;
 import com.nereusstream.kafka.activation.KafkaAsyncAppendAdmissionGuard;
+import com.nereusstream.kafka.activation.KafkaBookKeeperStreamCoverageProofProducer;
 import com.nereusstream.kafka.activation.KafkaGenerationProtocolActivationGuard;
 import com.nereusstream.kafka.checkpoint.DurableKafkaCheckpointFailureQuarantine;
 import com.nereusstream.kafka.checkpoint.KafkaCanonicalCheckpointPublicationFactory;
@@ -470,6 +471,38 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                 if (objectMaterializationRuntime != null) {
                     KafkaObjectMaterializationRuntime exactMaterialization =
                             objectMaterializationRuntime;
+                    if (bookKeeperConfiguration.ledgerGc().enabled()
+                            && !bookKeeperConfiguration.ledgerGc().dryRun()) {
+                        KafkaBookKeeperDeletionActivationService deletionActivation =
+                                new KafkaBookKeeperDeletionActivationService(
+                                        bookKeeperRuntime,
+                                        bookKeeperConfiguration.ledgerGc(),
+                                        new KafkaBookKeeperStreamCoverageProofProducer(
+                                                exactConfiguration
+                                                        .runtime()
+                                                        .nereusCluster(),
+                                                exactConfiguration
+                                                        .runtime()
+                                                        .kafkaClusterId(),
+                                                bookKeeperConfiguration.wal(),
+                                                bookKeeperRuntime
+                                                        .namespace()
+                                                        .ledgerIdNamespaceSha256()
+                                                        .value(),
+                                                generationMetadataStore,
+                                                l0MetadataStore,
+                                                partitionMetadataStore),
+                                        "kafka-gc-"
+                                                + durableProcessRunId(
+                                                        exactConfiguration
+                                                                .streamStorage()
+                                                                .processRunId()),
+                                        bookKeeperConfiguration
+                                                .wal()
+                                                .operationTimeout());
+                        backgroundServiceFactories.add(
+                                ignored -> deletionActivation);
+                    }
                     bookKeeperRuntime
                             .createRetentionService(
                                     bookKeeperConfiguration.ledgerGc(),

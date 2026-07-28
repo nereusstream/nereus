@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；97-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed five-profile provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh、Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit 与 fail-closed BookKeeper ledger-retention service composition are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie BookKeeper WAL-only/async/sync release-distribution initial process + fresh-JVM cold-restart gates pass；an independent `OBJECT_WAL_ASYNC_OBJECT` initial/fresh-JVM cold-restart gate passes over the same real Object provider；Kafka stream-coverage deletion activation、real ledger deletion、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
+> 状态：Implementation in progress；97-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed five-profile provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh、Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit、Kafka 64+64-shard stream-coverage deletion activation 与 fail-closed BookKeeper ledger-retention service composition are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie BookKeeper WAL-only/async/sync release-distribution initial process + fresh-JVM cold-restart gates pass；an independent `OBJECT_WAL_ASYNC_OBJECT` initial/fresh-JVM cold-restart gate passes over the same real Object provider；real ledger deletion、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -419,9 +419,35 @@ validated against the exact WAL reader-lease TTL before any provider I/O。Disab
 Enabled/non-dry-run policy requires an activated Kafka materialization runtime，then
 `BookKeeperPrimaryWalRuntime.createRetentionService` composes the common/async retirement authorities、reference manager、
 sealed-ledger materialization trigger、retention gate/manager/scanner/service against the same Oxia/BookKeeper graph。
-Materialization is registered before retention，so startup occurs in that order and reverse close stops retention first。
-This composition deliberately continues to fail closed without a Kafka-specific stream-coverage deletion activation；
-physical ledger deletion is not claimed by this milestone。
+Before retention starts，`KafkaBookKeeperStreamCoverageProofProducer` performs two independent complete inventories：
+
+1. `KafkaPartitionKeyspace.REGISTRY_SHARDS == 64`：strictly ordered pagination；每个 hint 都解析回 canonical
+   `KafkaPartitionId`，重读 binding root，并校验 root key、identity、epoch/digest。非 DELETED BookKeeper binding
+   必须为 ACTIVE，且 exact L0 stream ID/name/profile/state、trim offset、stable end 与 binding 完全相等；
+2. `F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS == 64`：strictly ordered pagination；BookKeeper async/sync binding
+   必须恰有一个 canonical direct-stream registration，projection ref/identity 与 profile 完全一致且
+   `lastHintCommitVersion <= L0 commitVersion`。WAL-only binding 不要求且不允许这类 object registration。
+
+`registrationsScanned` 对 Kafka provider 表示扫描到的 authoritative binding registrations，因此合法的
+WAL-only stream 仍满足 `bookKeeperStreamsVerified <= registrationsScanned`；F4 registration 总数作为独立字段
+进入 `NBKKAFKASTREAM1` digest，而不是伪装成 WAL-only 的注册。Digest 还绑定 Nereus/Kafka cluster、WAL
+configuration binding、ledger namespace、broker readiness、所有 hint/root 版本与 SHA、BookKeeper L0 authority
+以及相关 direct registrations。
+
+`BookKeeperDeletionActivationCoordinator`、request/result/proof records 和三个 proof-provider interface 已下沉到
+`nereus-bookkeeper`。`BookKeeperPrimaryWalRuntime.createDeletionActivationCoordinator` 固定组装 provider-neutral
+root producer、scope probe、namespace verifier、activation store/coordinator，只允许 adapter 注入 stream proof
+provider；调用者不能注入 digest。`KafkaBookKeeperDeletionActivationService.start()` 先读取 publication
+activation metadata version，以 bounded operation deadline 调用 coordinator。Coordinator 在同一 readiness 下按
+scope → readiness recheck → root → readiness recheck → stream → readiness recheck → namespace recheck 顺序工作，
+最后一次 CAS 同时写入三份 digest 与 `ledgerDeletionEnabled=true`；响应丢失只接受 exact durable winner，
+已激活且 readiness 未变时幂等返回，readiness 变化则重新生成全部 proofs。
+
+Composite startup order is materialization → deletion activation → retention；close order is retention → deletion
+activation(no-op) → materialization。任一 proof/CAS 失败会触发既有 composite rollback，retention 不会启动。
+Safe default 不创建 activation/retention owner。确定性测试覆盖两组全 64 shards、digest 幂等、WAL-only、
+缺失 direct registration、L0 profile drift、start/close/rollback ordering。Real two-bookie physical ledger deletion
+and fresh-process NCP2/WAL-only recovery evidence remain required；physical deletion acceptance is not claimed yet。
 
 `f9BookKeeperWalOnlyProcessIntegrationTest` closes the native process boundary for this first BookKeeper profile。The fixture
 starts two real bookies over BookKeeper's stock ZooKeeper

@@ -1,5 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
-package com.nereusstream.pulsar;
+package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;

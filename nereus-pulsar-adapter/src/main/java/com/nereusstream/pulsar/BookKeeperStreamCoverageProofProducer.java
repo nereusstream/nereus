@@ -11,6 +11,8 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadiness;
 import com.nereusstream.bookkeeper.BookKeeperOperationDeadline;
+import com.nereusstream.bookkeeper.BookKeeperStreamCoverageProof;
+import com.nereusstream.bookkeeper.BookKeeperStreamCoverageProofProvider;
 import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProjectionRefV1;
 import com.nereusstream.metadata.oxia.F4Keyspace;
@@ -38,7 +40,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /** Produces NBKSTREAM1 only after all 64 registrations and each live BK L0/F2 authority agree. */
-public final class BookKeeperStreamCoverageProofProducer {
+public final class BookKeeperStreamCoverageProofProducer
+        implements BookKeeperStreamCoverageProofProvider {
     private static final String DOMAIN = "NBKSTREAM1";
 
     private final String cluster;
@@ -72,6 +75,7 @@ public final class BookKeeperStreamCoverageProofProducer {
         this.pageSize = Math.min(configuration.retentionPageSize(), 1_000);
     }
 
+    @Override
     public CompletableFuture<BookKeeperStreamCoverageProof> produce(
             BookKeeperBrokerReadiness readiness, Duration timeout) {
         final BookKeeperBrokerReadiness exactReadiness;

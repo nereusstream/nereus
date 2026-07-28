@@ -433,8 +433,14 @@ coordinator/transaction/compaction remain M4/M5。
   `f9BookKeeperWalAsyncObjectProcessIntegrationTest` appends four batches、waits for an NCP2 object in real
   LocalStack、normally stops and recovers/appends in a fresh JVM；`f9BookKeeperWalSyncObjectProcessIntegrationTest`
   proves a one-batch append does not complete before its required NCP2 object is COMMITTED/readable，then performs the same
-  cold recovery。The WAL-only/async/sync tasks are composed by `phase9M6KafkaBookKeeperProcessCheck`；multi-broker takeover
-  remains open；
+  cold recovery。The WAL-only/async/sync tasks are composed by `phase9M6KafkaBookKeeperProcessCheck`。The next deletion
+  slice moves `BookKeeperDeletionActivationCoordinator` and its request/result/stream-proof contract into
+  `nereus-bookkeeper`，adds provider interfaces for root/stream/scope evidence，and lets both Pulsar and Kafka retain their
+  adapter-specific stream authority producer。Kafka now scans all 64 binding shards plus all 64 F4 registration shards，
+  proves exact authoritative binding/L0/direct-materialization agreement，then starts one-shot deletion activation between
+  materialization and retention。`KafkaBookKeeperStreamCoverageProofProducerTest` covers deterministic digest、both complete
+  shard sets、WAL-only、missing registration and L0 drift；`CompositeKafkaRuntimeBackgroundServiceTest` covers forward
+  start、reverse close and rollback。Real ledger deletion/restart and multi-broker takeover remain open；
 - the 2026-07-28 Kafka NCP2 materialization core checkpoint adds the distinct
   `nereus-kafka-committed-v2` / `NEREUS_COMPACTED_PARQUET_V2` committed policy，without reinterpreting NCP1 durable
   records。`DefaultMaterializationWorker` now has an NCP2-only ranged writer path that preserves every Kafka

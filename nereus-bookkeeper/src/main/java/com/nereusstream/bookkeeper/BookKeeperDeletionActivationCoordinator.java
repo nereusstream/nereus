@@ -1,26 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
-package com.nereusstream.pulsar;
+package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
-import com.nereusstream.bookkeeper.BookKeeperBrokerReadiness;
-import com.nereusstream.bookkeeper.BookKeeperBrokerReadinessProvider;
-import com.nereusstream.bookkeeper.BookKeeperLedgerGcConfiguration;
-import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservation;
-import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationVerifier;
-import com.nereusstream.bookkeeper.BookKeeperOperationDeadline;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivation;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivationCoordinator;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivationStore;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivationUpdate;
-import com.nereusstream.bookkeeper.BookKeeperRootCoverageProof;
-import com.nereusstream.bookkeeper.BookKeeperRootCoverageProofProducer;
-import com.nereusstream.bookkeeper.BookKeeperScopeCapabilityProbe;
-import com.nereusstream.bookkeeper.BookKeeperScopeCapabilityProof;
-import com.nereusstream.bookkeeper.BookKeeperScopeCapabilityRequest;
-import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -64,44 +48,9 @@ public final class BookKeeperDeletionActivationCoordinator {
             BookKeeperBrokerReadinessProvider readinessProvider,
             BookKeeperProtocolActivationStore activationStore,
             BookKeeperProtocolActivationCoordinator activationCoordinator,
-            BookKeeperRootCoverageProofProducer rootCoverage,
-            BookKeeperStreamCoverageProofProducer streamCoverage,
-            BookKeeperScopeCapabilityProbe scopeProbe) {
-        this(
-                configuration,
-                gcConfiguration,
-                namespace,
-                namespaceVerifier,
-                readinessProvider,
-                activationStore,
-                activationCoordinator,
-                Objects.requireNonNull(rootCoverage, "rootCoverage")::produce,
-                Objects.requireNonNull(streamCoverage, "streamCoverage")::produce,
-                Objects.requireNonNull(scopeProbe, "scopeProbe")::probe);
-    }
-
-    BookKeeperDeletionActivationCoordinator(
-            BookKeeperWalConfiguration configuration,
-            BookKeeperLedgerGcConfiguration gcConfiguration,
-            BookKeeperLedgerIdNamespaceReservation namespace,
-            BookKeeperLedgerIdNamespaceReservationVerifier namespaceVerifier,
-            BookKeeperBrokerReadinessProvider readinessProvider,
-            BookKeeperProtocolActivationStore activationStore,
-            BookKeeperProtocolActivationCoordinator activationCoordinator,
-            BiFunction<
-                            BookKeeperBrokerReadiness,
-                            Duration,
-                            CompletableFuture<BookKeeperRootCoverageProof>>
-                    rootCoverage,
-            BiFunction<
-                            BookKeeperBrokerReadiness,
-                            Duration,
-                            CompletableFuture<BookKeeperStreamCoverageProof>>
-                    streamCoverage,
-            Function<
-                            BookKeeperScopeCapabilityRequest,
-                            CompletableFuture<BookKeeperScopeCapabilityProof>>
-                    scopeProbe) {
+            BookKeeperRootCoverageProofProvider rootCoverage,
+            BookKeeperStreamCoverageProofProvider streamCoverage,
+            BookKeeperScopeCapabilityProofProvider scopeProbe) {
         this.configuration = Objects.requireNonNull(configuration, "configuration");
         this.gcConfiguration = Objects.requireNonNull(gcConfiguration, "gcConfiguration");
         this.gcConfiguration.validateAgainst(configuration);
@@ -111,9 +60,12 @@ public final class BookKeeperDeletionActivationCoordinator {
         this.activationStore = Objects.requireNonNull(activationStore, "activationStore");
         this.activationCoordinator = Objects.requireNonNull(
                 activationCoordinator, "activationCoordinator");
-        this.rootCoverage = Objects.requireNonNull(rootCoverage, "rootCoverage");
-        this.streamCoverage = Objects.requireNonNull(streamCoverage, "streamCoverage");
-        this.scopeProbe = Objects.requireNonNull(scopeProbe, "scopeProbe");
+        this.rootCoverage =
+                Objects.requireNonNull(rootCoverage, "rootCoverage")::produce;
+        this.streamCoverage =
+                Objects.requireNonNull(streamCoverage, "streamCoverage")::produce;
+        this.scopeProbe =
+                Objects.requireNonNull(scopeProbe, "scopeProbe")::probe;
     }
 
     public CompletableFuture<BookKeeperDeletionActivationResult> activate(

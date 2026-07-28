@@ -323,6 +323,46 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
     }
 
     /**
+     * Creates the provider-neutral deletion activation state machine with an adapter-owned stream
+     * authority proof.
+     */
+    public BookKeeperDeletionActivationCoordinator createDeletionActivationCoordinator(
+            BookKeeperLedgerGcConfiguration gcConfiguration,
+            BookKeeperStreamCoverageProofProvider streamCoverage) {
+        ensureOpen();
+        BookKeeperLedgerGcConfiguration exactGc =
+                Objects.requireNonNull(gcConfiguration, "gcConfiguration");
+        exactGc.validateAgainst(configuration);
+        return new BookKeeperDeletionActivationCoordinator(
+                configuration,
+                exactGc,
+                namespace,
+                namespaceVerifier,
+                brokerReadiness,
+                activationStore,
+                new BookKeeperProtocolActivationCoordinator(
+                        activationStore,
+                        clock),
+                new BookKeeperRootCoverageProofProducer(
+                        cluster,
+                        configuration,
+                        namespace.ledgerIdNamespaceSha256().value(),
+                        metadata),
+                Objects.requireNonNull(
+                        streamCoverage,
+                        "streamCoverage"),
+                new BookKeeperScopeCapabilityProbe(
+                        cluster,
+                        configuration,
+                        namespace,
+                        namespaceVerifier,
+                        metadata,
+                        operations,
+                        passwords,
+                        clock));
+    }
+
+    /**
      * Creates the single provider-neutral whole-ledger collector for this runtime.
      *
      * <p>The returned service borrows this runtime, the shared materialization graph and both

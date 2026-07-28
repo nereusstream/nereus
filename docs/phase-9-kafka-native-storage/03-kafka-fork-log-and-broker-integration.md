@@ -915,8 +915,16 @@ BookKeeper-primary + Object-materialization graph，暴露完整五档 capabilit
 authoritative cache root；第三十五个 `b443750be4` 增加六个 ledger-GC rollout key、typed snapshot/cross-field
 validation、compatibility-digest binding 以及 `BookKeeperLedgerGcConfiguration` 映射。默认 disabled/dry-run
 不会启动 scanner；enabled/non-dry-run 只有在 materialization runtime 已激活时才允许创建 retention service。
-Kafka stream-coverage deletion activation 与真实 ledger 删除仍需后续 gate，当前不能把配置/扫描器组装等同于
-物理删除授权。真实 combined-node
+Product adapter 现已把 provider-neutral deletion coordinator 下沉到 `nereus-bookkeeper`，并新增 Kafka-owned
+`KafkaBookKeeperStreamCoverageProofProducer`。它完整扫描 64 个 binding shards 与 64 个 F4 registration
+shards，重读 authoritative root，核对 ACTIVE BookKeeper binding 与 exact L0 profile/lifecycle/trim/stable end，
+并要求 async/sync 使用 `DirectMaterializationStreamAuthority`；WAL-only 必须没有 object registration。一次性
+`KafkaBookKeeperDeletionActivationService` 在 materialization start 后读取 publication activation metadata
+version，以同一 broker-readiness 生成 scope/root/`NBKKAFKASTREAM1` stream proof，并由通用 coordinator 一次
+CAS 安装三份 digest 与 deletion bit；retention scanner 只在该步骤成功后启动。任一 shard pagination、
+hint/root、L0、registration、namespace、readiness 或 activation version 漂移都使启动失败。确定性测试已通过，
+但真实 ledger 删除与 fresh-process restart/read evidence 仍需后续 gate，当前不能把 deletion bit 的
+deterministic activation 等同于物理删除验收。真实 combined-node
 KRaft/Oxia/S3 process baseline 已通过；
 同节点 fresh-JVM cold restart 也已通过；独立 BookKeeper WAL-only/async/sync release-distribution
 首启/冷重启 gates 也在同一 fork head 通过。这些 gates 没有给 Kafka 引入 Pulsar metadata runtime：

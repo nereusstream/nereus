@@ -1,9 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
-package com.nereusstream.pulsar;
+package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
-import com.nereusstream.bookkeeper.BookKeeperProtocolActivation;
 import java.util.Objects;
 
 /** Exact durable activation and the three producer-owned proof identities installed by its one CAS. */
