@@ -36,6 +36,11 @@ import com.nereusstream.kafka.checkpoint.KafkaDerivedIndexState.SegmentLogicalBy
 import com.nereusstream.kafka.checkpoint.KafkaLeaderEpochState;
 import com.nereusstream.kafka.checkpoint.KafkaProducerTransactionState;
 import com.nereusstream.kafka.checkpoint.KafkaVirtualSegmentState;
+import com.nereusstream.kafka.compaction.KafkaCompactionPartitionPass;
+import com.nereusstream.kafka.compaction.KafkaCompactionPlanner;
+import com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1;
+import com.nereusstream.materialization.MaterializationPolicyFactory;
+import com.nereusstream.materialization.TopicCompactionSpec;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
@@ -198,6 +203,91 @@ class DefaultKafkaPartitionMaintenanceTest {
     assertThat(trimCalls).hasValue(0);
   }
 
+  @Test
+  void compactionCaptureFreezesSelectedHorizonAndRevalidatesDurableAuthority() {
+    AtomicReference<StableStreamHeadSnapshot> durableHead =
+        new AtomicReference<>(head(0));
+    AtomicReference<VersionedKafkaPartitionBinding> durableBinding =
+        new AtomicReference<>(binding());
+    DefaultKafkaPartitionMaintenance maintenance =
+        new DefaultKafkaPartitionMaintenance(
+            IDENTITY,
+            3,
+            STREAM_ID,
+            sourceValidator(durableHead),
+            bindings(durableBinding),
+            storage(
+                durableHead,
+                new AtomicInteger(),
+                new AtomicReference<>(),
+                ignored -> {}),
+            ignored ->
+                (snapshot, target) ->
+                    CompletableFuture.failedFuture(
+                        new AssertionError("compaction capture must not publish a checkpoint")),
+            Duration.ofSeconds(5),
+            CLOCK);
+    AtomicReference<KafkaCompactionPlanner.Candidate> selected = new AtomicReference<>();
+    KafkaPartitionMaintenance.CompactionHooks hooks =
+        new KafkaPartitionMaintenance.CompactionHooks() {
+          @Override
+          public CompletableFuture<KafkaPartitionMaintenance.CompactionState> capture(
+              KafkaCheckpointSourceState currentSource) {
+            return CompletableFuture.completedFuture(
+                new KafkaPartitionMaintenance.CompactionState(
+                    canonicalState(
+                        currentSource,
+                        currentSource.trimOffset(),
+                        KafkaVirtualSegmentState.LogConfigHistoryEntry
+                            .CLEANUP_COMPACT_FLAG),
+                    40,
+                    40,
+                    MaterializationPolicyFactory.kafkaTopicCompacted(
+                        new TopicCompactionSpec(
+                            KafkaCompactionStrategyV1.STRATEGY_ID,
+                            KafkaCompactionStrategyV1.STRATEGY_VERSION,
+                            "KCK2"),
+                        2,
+                        128,
+                        1_048_576,
+                        1 << 20,
+                        1_024,
+                        "ZSTD"),
+                    new KafkaCompactionPartitionPass.WriteSettings("test-build", false)));
+          }
+
+          @Override
+          public CompletableFuture<KafkaCompactionPartitionPass.PassOneInputs> capturePassOne(
+              KafkaCheckpointSourceState currentSource,
+              KafkaCompactionPlanner.Candidate candidate,
+              KafkaPartitionMaintenance.CompactionState state) {
+            selected.set(candidate);
+            return CompletableFuture.completedFuture(
+                new KafkaCompactionPartitionPass.PassOneInputs(
+                    currentSource.endOffset(),
+                    1_000,
+                    1 << 20,
+                    1 << 20,
+                    List.of(),
+                    List.of(),
+                    List.of()));
+          }
+        };
+
+    KafkaCompactionPartitionPass.Capture capture =
+        maintenance.captureCompaction(hooks).join();
+
+    assertThat(capture.binding()).isEqualTo(durableBinding.get());
+    assertThat(capture.plannerSnapshot().virtualSegments().stableEndOffset()).isEqualTo(40);
+    assertThat(selected.get().outputCoverage())
+        .isEqualTo(new com.nereusstream.api.OffsetRange(0, 30));
+    capture.authorityGuard().revalidate().join();
+
+    durableHead.set(head(10));
+    assertThatThrownBy(() -> capture.authorityGuard().revalidate().join())
+        .hasRootCauseMessage("Kafka compaction partition authority changed after capture");
+  }
+
   private static KafkaPartitionMaintenance.Hooks hooks(
       java.util.function.Function<
               KafkaCheckpointSourceState, KafkaPartitionMaintenance.Capture>
@@ -230,14 +320,27 @@ class DefaultKafkaPartitionMaintenanceTest {
       long highWatermark,
       long lastStableOffset,
       long canonicalLogStart) {
+    return new KafkaPartitionMaintenance.Capture(
+        canonicalState(
+            source,
+            canonicalLogStart,
+            KafkaVirtualSegmentState.LogConfigHistoryEntry.CLEANUP_DELETE_FLAG),
+        highWatermark,
+        lastStableOffset);
+  }
+
+  private static KafkaCanonicalCheckpointState canonicalState(
+      KafkaCheckpointSourceState source,
+      long canonicalLogStart,
+      int cleanupPolicyFlags) {
     KafkaVirtualSegmentState virtual =
         retentionSnapshot(
                 canonicalLogStart,
                 -1,
                 -1,
-                highWatermark,
+                source.endOffset(),
                 CLOCK.millis(),
-                KafkaVirtualSegmentState.LogConfigHistoryEntry.CLEANUP_DELETE_FLAG)
+                cleanupPolicyFlags)
             .virtualSegments();
     KafkaDerivedIndexState indexes =
         new KafkaDerivedIndexState(
@@ -250,20 +353,18 @@ class DefaultKafkaPartitionMaintenanceTest {
                         new SegmentLogicalByteIndex(
                             segment.baseOffset(), segment.logicalBytes(), List.of()))
                 .toList());
-    KafkaCanonicalCheckpointState state =
-        new KafkaCanonicalCheckpointState(
-            source.endOffset(),
+    return new KafkaCanonicalCheckpointState(
+        source.endOffset(),
+        canonicalLogStart,
+        source.endOffset(),
+        new KafkaProducerTransactionState(
+            source.endOffset(), List.of(), List.of(), List.of()),
+        new KafkaLeaderEpochState(
             canonicalLogStart,
             source.endOffset(),
-            new KafkaProducerTransactionState(
-                source.endOffset(), List.of(), List.of(), List.of()),
-            new KafkaLeaderEpochState(
-                canonicalLogStart,
-                source.endOffset(),
-                List.of(new KafkaLeaderEpochState.LeaderEpochRange(3, canonicalLogStart))),
-            virtual,
-            indexes);
-    return new KafkaPartitionMaintenance.Capture(state, highWatermark, lastStableOffset);
+            List.of(new KafkaLeaderEpochState.LeaderEpochRange(3, canonicalLogStart))),
+        virtual,
+        indexes);
   }
 
   private static KafkaCheckpointSourceValidator sourceValidator(

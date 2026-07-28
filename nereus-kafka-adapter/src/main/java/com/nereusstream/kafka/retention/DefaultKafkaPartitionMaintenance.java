@@ -16,6 +16,8 @@ package com.nereusstream.kafka.retention;
 
 import com.nereusstream.api.AcquiredAppendSession;
 import com.nereusstream.api.AppendSession;
+import com.nereusstream.api.Checksum;
+import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StableStreamHeadSnapshot;
@@ -26,10 +28,18 @@ import com.nereusstream.kafka.checkpoint.KafkaCanonicalCheckpointState;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointPublicationCoordinator;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceValidator;
+import com.nereusstream.kafka.compaction.KafkaCompactionPartitionPass;
+import com.nereusstream.kafka.compaction.KafkaCompactionPlanner;
+import com.nereusstream.kafka.compaction.KafkaCompactionPlanner.MandatoryCoverage;
 import com.nereusstream.kafka.partition.KafkaPartitionIdentity;
 import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryCoordinator;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
+import com.nereusstream.metadata.oxia.records.KafkaCompactionCoverageRecord;
+import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
+import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
+import java.util.HexFormat;
+import java.util.Optional;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
@@ -154,6 +164,37 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
                     .deleteTo(snapshot, normalizedRequestedOffset));
   }
 
+  @Override
+  public CompletableFuture<KafkaCompactionPartitionPass.Capture> captureCompaction(
+      CompactionHooks hooks) {
+    CompactionHooks exactHooks = Objects.requireNonNull(hooks, "hooks");
+    return sourceValidator
+        .loadCurrent()
+        .thenCompose(
+            source ->
+                streams
+                    .getStableHeadSnapshot(streamId)
+                    .thenCompose(
+                        head ->
+                            bindings
+                                .get(identity.durableId())
+                                .thenCompose(
+                                    current ->
+                                        captureCompactionState(exactHooks, source)
+                                            .thenCompose(
+                                                captured ->
+                                                    finishCompactionCapture(
+                                                        exactHooks,
+                                                        source,
+                                                        head,
+                                                        current.orElseThrow(
+                                                            () ->
+                                                                invariant(
+                                                                    "Kafka compaction binding"
+                                                                        + " disappeared")),
+                                                        captured)))));
+  }
+
   private Operation operation(Hooks hooks) {
     Hooks exactHooks = Objects.requireNonNull(hooks, "hooks");
     KafkaRetentionPlanner planner = new KafkaRetentionPlanner();
@@ -169,6 +210,174 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
         new KafkaTrimBarrier(
             planner, snapshots, checkpointGate, streams, trimTimeout, listener);
     return new Operation(planner, snapshots, barrier);
+  }
+
+  private CompletableFuture<KafkaCompactionPartitionPass.Capture> finishCompactionCapture(
+      CompactionHooks hooks,
+      KafkaCheckpointSourceState source,
+      StableStreamHeadSnapshot head,
+      VersionedKafkaPartitionBinding binding,
+      CompactionState captured) {
+    requireSameSource(source, head);
+    requireCompactionBinding(source, binding, captured);
+    KafkaCompactionPlanner.Snapshot plannerSnapshot =
+        compactionSnapshot(binding, captured);
+    KafkaCompactionPlanner.Candidate candidate =
+        new KafkaCompactionPlanner().select(plannerSnapshot);
+    CompletableFuture<KafkaCompactionPartitionPass.PassOneInputs> passOne;
+    try {
+      passOne =
+          Objects.requireNonNull(
+              hooks.capturePassOne(source, candidate, captured),
+              "Kafka compaction pass-one capture hook returned a null future");
+    } catch (Throwable failure) {
+      passOne = CompletableFuture.failedFuture(failure);
+    }
+    return passOne.thenApply(
+        inputs ->
+            new KafkaCompactionPartitionPass.Capture(
+                binding,
+                plannerSnapshot,
+                captured.outputPolicy(),
+                Objects.requireNonNull(inputs, "Kafka compaction pass-one capture"),
+                captured.writeSettings(),
+                compactionAuthorityGuard(source, binding)));
+  }
+
+  private CompletableFuture<CompactionState> captureCompactionState(
+      CompactionHooks hooks, KafkaCheckpointSourceState source) {
+    CompletableFuture<CompactionState> captured;
+    try {
+      captured =
+          Objects.requireNonNull(
+              hooks.capture(source),
+              "Kafka compaction state capture hook returned a null future");
+    } catch (Throwable failure) {
+      captured = CompletableFuture.failedFuture(failure);
+    }
+    return captured.thenApply(
+        value -> {
+          CompactionState exact = Objects.requireNonNull(value, "Kafka compaction state capture");
+          if (exact.canonicalState().stableEndOffset() != source.endOffset()
+              || exact.canonicalState().logStartOffset() != source.trimOffset()) {
+            throw invariant("Kafka compaction hook captured another stable source");
+          }
+          return exact;
+        });
+  }
+
+  private KafkaCompactionPlanner.Snapshot compactionSnapshot(
+      VersionedKafkaPartitionBinding binding, CompactionState captured) {
+    var history = captured.canonicalState().virtualSegmentState().configHistory();
+    if (history.isEmpty()) {
+      throw invariant("Kafka compaction capture has no effective log config");
+    }
+    return new KafkaCompactionPlanner.Snapshot(
+        captured.canonicalState().virtualSegmentState(),
+        KafkaCompactionPlanner.Policy.from(history.get(history.size() - 1)),
+        mandatoryCoverage(binding.value().compactionCoverage()),
+        captured.lastStableOffset(),
+        captured.highWatermark(),
+        clock.millis());
+  }
+
+  private com.nereusstream.materialization.MaterializationTaskMutationGuard
+      compactionAuthorityGuard(
+          KafkaCheckpointSourceState capturedSource,
+          VersionedKafkaPartitionBinding capturedBinding) {
+    return () ->
+        sourceValidator
+            .loadCurrent()
+            .thenCompose(
+                currentSource ->
+                    bindings
+                        .get(identity.durableId())
+                        .thenApply(
+                            currentBinding -> {
+                              requireCurrentCompactionAuthority(
+                                  capturedSource,
+                                  capturedBinding,
+                                  currentSource,
+                                  currentBinding.orElseThrow(
+                                      () ->
+                                          invariant(
+                                              "Kafka compaction binding disappeared during"
+                                                  + " authority revalidation")));
+                              return null;
+                            }));
+  }
+
+  private void requireCompactionBinding(
+      KafkaCheckpointSourceState source,
+      VersionedKafkaPartitionBinding binding,
+      CompactionState captured) {
+    KafkaPartitionBindingRecord root = binding.value();
+    KafkaCanonicalCheckpointState canonical = captured.canonicalState();
+    if (!root.identity().equals(identity.durableId())
+        || root.lifecycle() != KafkaPartitionLifecycle.ACTIVE
+        || !root.streamId().equals(streamId.value())
+        || root.observedLeaderEpoch() != leaderEpoch
+        || root.observedLogStartOffset() != source.trimOffset()
+        || root.observedStableEndOffset() != source.endOffset()
+        || canonical.checkpointOffset() != source.endOffset()
+        || canonical.stableEndOffset() != source.endOffset()
+        || canonical.logStartOffset() != source.trimOffset()
+        || source.appendInFlight()
+        || source.stateMapEndOffset() != source.endOffset()) {
+      throw invariant(
+          "Kafka compaction capture does not match the ACTIVE binding and stable source");
+    }
+  }
+
+  private void requireCurrentCompactionAuthority(
+      KafkaCheckpointSourceState capturedSource,
+      VersionedKafkaPartitionBinding capturedBinding,
+      KafkaCheckpointSourceState currentSource,
+      VersionedKafkaPartitionBinding currentBinding) {
+    KafkaPartitionBindingRecord captured = capturedBinding.value();
+    KafkaPartitionBindingRecord current = currentBinding.value();
+    if (!current.identity().equals(captured.identity())
+        || current.lifecycle() != KafkaPartitionLifecycle.ACTIVE
+        || current.incarnation() != captured.incarnation()
+        || current.bindingEpoch() != captured.bindingEpoch()
+        || !current.streamId().equals(captured.streamId())
+        || current.payloadMappingId() != captured.payloadMappingId()
+        || !current.storageProfile().equals(captured.storageProfile())
+        || current.observedLeaderId() != captured.observedLeaderId()
+        || current.observedLeaderEpoch() != captured.observedLeaderEpoch()
+        || current.observedBrokerEpoch() != captured.observedBrokerEpoch()
+        || current.observedLogStartOffset() != captured.observedLogStartOffset()
+        || current.observedStableEndOffset() < captured.observedStableEndOffset()
+        || !currentSource.authority().equals(capturedSource.authority())
+        || !currentSource.writerId().equals(capturedSource.writerId())
+        || currentSource.sessionEpoch() != capturedSource.sessionEpoch()
+        || !currentSource.fencingToken().equals(capturedSource.fencingToken())
+        || currentSource.leaseVersion() != capturedSource.leaseVersion()
+        || currentSource.trimOffset() != capturedSource.trimOffset()
+        || currentSource.endOffset() < capturedSource.endOffset()
+        || currentSource.commitVersion() < capturedSource.commitVersion()
+        || currentSource.appendInFlight()
+        || currentSource.stateMapEndOffset() != currentSource.endOffset()) {
+      throw invariant("Kafka compaction partition authority changed after capture");
+    }
+  }
+
+  private static Optional<MandatoryCoverage> mandatoryCoverage(
+      KafkaCompactionCoverageRecord coverage) {
+    if (coverage.coverageVersion() == 0) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        new MandatoryCoverage(
+            coverage.startOffset(),
+            coverage.endOffset(),
+            coverage.activationEpoch(),
+            sha256(coverage.generationSetSha256()),
+            sha256(coverage.policySha256())));
+  }
+
+  private static Checksum sha256(byte[] value) {
+    return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(value));
   }
 
   private CompletableFuture<KafkaTrimBarrier.Snapshot> loadSnapshot(Hooks hooks) {
