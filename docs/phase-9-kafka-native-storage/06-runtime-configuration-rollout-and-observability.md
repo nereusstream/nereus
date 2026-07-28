@@ -594,7 +594,13 @@ operational sequence is：
 The task requires a full JDK containing `${java.home}/bin/jcmd` and runs with `maxParallelForks=1` because it owns POSIX
 process signals and one fault proxy。It is a process/chaos gate, not a production runtime dependency or test hook。
 
-Multi-controller、checkpoint/virtual-segment cuts、BookKeeper-profile takeover、transaction/internal-topic coordinator
+`f9BookKeeperProfileTakeoverProcessIntegrationTest` adds a separate P-tier matrix：one stock ZooKeeper metadata service and
+two Bookies host isolated WAL-only/async/sync authorities；two release brokers per profile commit on `[1]`，atomically
+reassign to exact `[2]` while the old process remains live，recover the old batch and continue at the next offset。WAL-only
+requires zero S3 objects and async/sync require real NCP2 objects before and after handoff。The task passes 64/64 actionable
+tasks in 2m17s and belongs to both M6 process aggregates。
+
+Multi-controller、checkpoint/virtual-segment cuts、BookKeeper already-in-flight append、transaction/internal-topic coordinator
 migration and complete rollout evidence 尚未闭合，所以整个路径
 仍不能用于 production rollout readiness。
 

@@ -67,6 +67,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
         || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
         || task == "f9InFlightTakeoverProcessIntegrationTest"
+        || task == "f9BookKeeperProfileTakeoverProcessIntegrationTest"
         || task == "f9BookKeeperWalOnlyProcessIntegrationTest"
         || task == "f9BookKeeperWalAsyncObjectProcessIntegrationTest"
         || task == "f9BookKeeperWalSyncObjectProcessIntegrationTest"
@@ -3093,6 +3094,7 @@ tasks.register("phase9M6KafkaProcessCheck") {
     dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9InFlightTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperProfileTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalAsyncObjectProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalSyncObjectProcessIntegrationTest")
@@ -3102,7 +3104,8 @@ tasks.register("phase9M6KafkaProcessCheck") {
 tasks.register("phase9M6KafkaBookKeeperProcessCheck") {
     group = "verification"
     description =
-        "Run the focused real BookKeeper WAL-only/async/sync cold-restart and physical-deletion process gates."
+        "Run the focused real BookKeeper three-profile cold-restart, deletion, and live-takeover process gates."
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperProfileTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalAsyncObjectProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalSyncObjectProcessIntegrationTest")

@@ -1,7 +1,7 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
 > 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs/full composition and Object-WAL exact-reference durable checkpoint quarantine partial slices implemented
-> 2026-07-28 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 又证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；BookKeeper/profile、multi-controller 与 coordinator migration 仍 open
+> 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 又证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；新增真实两 Bookie/两 Kafka release-process gate 闭合 BookKeeper 三 profile 的 post-handoff recovery/continuation；BookKeeper in-flight cut、multi-controller 与 coordinator migration 仍 open
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -568,8 +568,8 @@ The focused deterministic regression is
 `DefaultKafkaPartitionStorageTest.knownNotCommittedAuthorityOrHeadFailureStillFencesTheOldLeader`。The real gate is wired into
 `phase9M3ProviderCheck` as `:nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest`。This closes an R-tier
 two-runtime Object-provider live-preemption slice for KF-META-007/KF-META-012；it is not yet a two Kafka-process/KRaft
-failover、BookKeeper-profile takeover or multi-controller proof。The separate section 7.4 process gate now supplies the
-Object-WAL old in-flight publication cut。
+failover、BookKeeper-profile takeover or multi-controller proof。The separate sections 7.3–7.5 process gates now supply
+the Object-WAL post-handoff/old in-flight cuts and the BookKeeper three-profile post-handoff matrix。
 
 ### 7.3 Release-process handoff and binding-preservation boundary（2026-07-28）
 
@@ -638,6 +638,38 @@ This proves two independent safety layers：the process-local storage call alrea
 session revalidation still prevents stale physical publication；KRaft handoff recovers only the old stable head and does not
 consume a future/in-memory end offset。The current proof is Object-WAL P/C evidence。The same cut remains required for all
 BookKeeper profiles before KF-APP-014 may leave `PLANNED` in the complete profile/service matrix。
+
+### 7.5 BookKeeper three-profile post-handoff boundary（2026-07-29）
+
+`f9BookKeeperProfileTakeoverProcessIntegrationTest` reuses one real stock ZooKeeper long-hierarchical metadata service and
+two Bookies，but creates a separate Kafka cluster ID、Nereus cluster、bucket、F1-BK namespace reservation and ACTIVE exact
+publication for each profile：
+
+```text
+BOOKKEEPER_WAL_ONLY
+BOOKKEEPER_WAL_ASYNC_OBJECT
+BOOKKEEPER_WAL_SYNC_OBJECT
+```
+
+Each iteration starts node 1 combined controller/broker and node 2 broker-only concurrently so both exact readiness
+identities can participate before provider construction。Node 1 owns singleton `[1]` and commits/fetches `[0,1)`；
+Admin then installs singleton `[2]` and the harness requires exact `leader=2, replicas=[2], ISR=[2]`、empty
+`listPartitionReassignments`、earliest/latest `0/1` and a still-live old JVM。Node 2 must recover the original Kafka
+RecordBatch from shared BookKeeper authority，commit/fetch `[1,2)` and expose earliest/latest `0/2`。
+
+The profile invariants are not inferred from the selected enum。WAL-only must leave its S3 bucket empty both before and after
+handoff；async and sync must expose at least one real NCP2 object before takeover and after continuation。The async
+operator-seeded activation is built with the same one-entry rollover/physical-deletion BookKeeper configuration as both broker
+processes；a mismatched compatibility digest is expected to fail closed before storage I/O。Fresh execution passes 64/64
+actionable tasks in 2m17s and is aggregated by `phase9M6KafkaProcessCheck` and
+`phase9M6KafkaBookKeeperProcessCheck`。
+
+This is P-tier post-handoff evidence：it proves all three provider graphs can resign/open/recover/continue without deleting
+shared authority while both JVMs remain live。It does not hold a BookKeeper append after provider dispatch，does not sample
+the old worker stack and does not prove current-term-only publication under a BookKeeper response-loss cut；that C-tier
+boundary remains the next KF-APP-014 requirement。
+
+### 7.6 Recovery component ownership
 
 The executable recovery boundary is now split by resource ownership：
 
@@ -1030,6 +1062,10 @@ F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kaf
   stable end 1，resuming broker 1 must surface `append session changed before guarded object upload`；the stale future
   fails、the process survives、the pre-takeover WAL key set is unchanged and only broker 2 may publish `[1,2)`。This is the
   concrete process implementation of “old in-flight head CAS/upload must not outlive authority” for Object-WAL；
+- `f9BookKeeperProfileTakeoverProcessIntegrationTest` uses real stock ZooKeeper metadata、two Bookies and two Kafka release
+  JVMs per profile to prove exact `[1] -> [2]` singleton handoff、live old-owner resign、shared committed recovery and
+  continuation for WAL-only/async/sync。It also requires zero objects for WAL-only and real NCP2 objects for both Object
+  profiles。This is BookKeeper post-handoff P evidence；already-dispatched BookKeeper append C evidence remains open；
 - config-free Kafka identity/domain values、the `nereus-kafka-adapter` module skeleton、canonical binding/registry keys、
   all 25 binding-root fields、closed lifecycle/mapping/operation wire IDs and explicit V1 codecs are implemented；
 - frozen Kafka metadata envelope SHA-256 values are binding

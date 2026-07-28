@@ -36,7 +36,7 @@ protocol/table state = projection
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
 | F8 Advanced Pulsar | later phase | Designed | F2/F3/F4/F7 foundations |
-| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7 | In progress；F9-M1 public API slice implemented，no Kafka capability | finish F9-M1 core/read/Object-WAL/NCP2/NTC2 foundation |
+| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7 | In progress；M1/M2 and substantial M3–M6 code complete；real Object-WAL P/C takeover and BookKeeper three-profile post-handoff P matrix pass | close remaining BookKeeper in-flight、coordinator、multi-controller、chaos and final aggregate gates |
 
 Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes the L0 abstraction/recovery/lifecycle
 foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL
@@ -348,8 +348,11 @@ explicit native-storage CLI/log selection and deferred activation-backed Object-
 gate now proves a real combined-node KRaft/Oxia/S3 start plus same-node fresh-JVM recovery of user data、
 `__consumer_offsets` and `__transaction_state`，including committed group offset resume and same-transactional-ID continuation。
 It also proves forced-process-loss recovery of stable open-transaction data into an ABORT marker before the next committed
-transaction。M4 multi-broker/checkpoint/virtual-segment cuts、M5 provider retention/compaction completion、multi-controller
-and broader chaos/aggregate evidence remain open，so F9 remains in progress rather than production-ready.
+transaction。Real release processes now also prove atomic Object-WAL singleton handoff、an already-dispatched stale
+Object-WAL append fenced before upload，and WAL-only/async/sync BookKeeper post-handoff recovery/continuation with exact
+profile Object invariants。BookKeeper already-in-flight、M4 coordinator/checkpoint/virtual-segment cuts、M5 provider
+retention/compaction completion、multi-controller and broader chaos/aggregate evidence remain open，so F9 remains in
+progress rather than production-ready.
 
 F9 is deliberately separate from F5. F5 projects the Kafka protocol through KoP on the Pulsar facade；F9 integrates
 a KRaft Kafka broker fork directly with Nereus as the partition log. The two tracks share logical storage primitives

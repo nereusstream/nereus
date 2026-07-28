@@ -240,6 +240,36 @@ tasks.register<Test>("f9InFlightTakeoverProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9BookKeeperProfileTakeoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Reassign a live partition across two release Kafka processes for all three BookKeeper profiles."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9InFlightTakeoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-bookkeeper-takeover-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "threeBookKeeperProfilesAtomicallyReassignLiveSharedStorageLeader",
+        )
+    }
+}
+
 tasks.register<Test>("f9BookKeeperWalOnlyProcessIntegrationTest") {
     group = "verification"
     description = "Run the native Kafka BookKeeper-WAL-only Produce/Fetch cold-restart process gate."

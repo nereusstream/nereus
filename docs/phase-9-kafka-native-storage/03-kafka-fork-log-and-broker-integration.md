@@ -1,7 +1,7 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart、BookKeeper WAL-only/async/sync cold-restart and real-Oxia two-runtime Object-WAL live takeover gates 均通过；multi-controller failover、two Kafka-process live takeover and extended kill/chaos process gates remain open
-> 2026-07-28 状态增量：fork `bb7e8937c5` 与 product `f9MultiBrokerTakeoverProcessIntegrationTest` 已通过 two-release-process Object-WAL/KRaft singleton live reassignment；product `f9InFlightTakeoverProcessIntegrationTest` 又以第三个 controller/broker JVM、Toxiproxy、`jcmd` 栈采样和 `SIGSTOP/SIGCONT` 闭合 Object-WAL already-dispatched old append 切点；尚未覆盖 BookKeeper-profile takeover、transaction/internal-topic coordinator migration、multi-controller 和更广 kill/response-loss chaos
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart、BookKeeper WAL-only/async/sync cold-restart、BookKeeper three-profile two-process post-handoff and real-Oxia two-runtime Object-WAL live takeover gates 均通过；multi-controller failover、BookKeeper in-flight append cut and extended kill/chaos process gates remain open
+> 2026-07-29 状态增量：fork `bb7e8937c5` 与 product `f9MultiBrokerTakeoverProcessIntegrationTest` 已通过 two-release-process Object-WAL/KRaft singleton live reassignment；product `f9InFlightTakeoverProcessIntegrationTest` 又以第三个 controller/broker JVM、Toxiproxy、`jcmd` 栈采样和 `SIGSTOP/SIGCONT` 闭合 Object-WAL already-dispatched old append 切点；`f9BookKeeperProfileTakeoverProcessIntegrationTest` 已以真实 ZooKeeper/two-bookie/two-Kafka-process topology 闭合三 BookKeeper profile 的 post-handoff P-tier matrix；尚未覆盖 BookKeeper already-in-flight cut、transaction/internal-topic coordinator migration、multi-controller 和更广 kill/response-loss chaos
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -295,8 +295,9 @@ earliest=0/latest=1、正常停机、fresh-JVM offset 0 恢复、offset 1 继续
 fresh-JVM 恢复并继续追加；sync gate 写入一个 batch，并以 append 返回前 required NCP2 COMMITTED/readable
 作为同步语义证据，再完成 fresh-JVM 恢复。独立 provider gate 已覆盖 real Oxia 上的 two-runtime Object-WAL
 live takeover。后续 fork `fe308359b6` / `bb7e8937c5` 与 product release-process gates 又闭合了真实
-two-process KRaft singleton takeover 和 already-dispatched old Object-WAL append fencing；尚未实现的是真实
-controller failover、BookKeeper-profile takeover 和更广 kill-cut process tests。显式
+two-process KRaft singleton takeover、already-dispatched old Object-WAL append fencing，以及 BookKeeper 三
+profile 的 two-process post-handoff recovery/continuation；尚未实现的是真实
+controller failover、BookKeeper already-dispatched append cut 和更广 kill-cut process tests。显式
 launcher/KafkaRaftServer broker/controller factory selection 已实现；`phase9M6KafkaProcessCheck` 现使用真实 release
 distribution、四分片 Oxia 和 pinned LocalStack S3 覆盖显式 feature format、broker/controller registration、
 activation、Admin create、Produce/Fetch/ListOffsets、S3 object existence 和 SIGTERM shutdown，并以同一 KRaft
@@ -316,8 +317,18 @@ node 2/controller bootstrap 提交原子 `[1] -> [2]` 重分配，并要求
 `leader=2, replicas=[2], ISR=[2]`、无 ongoing reassignment、earliest/latest 仍为 `0/1`。`SIGCONT` 后旧请求以
 `FencedLeaderEpochException: append session changed before guarded object upload` 结束，旧进程保持存活，S3 WAL key
 集合不变，broker 2 随后在 offset 1 提交并把 latest 推到 2。该 gate 闭合 Object-WAL P/C 边界，但仍不包含
-checkpoint/virtual-segment transaction cut、BookKeeper profile matrix、coordinator migration 或 multi-controller，
+checkpoint/virtual-segment transaction cut、BookKeeper already-in-flight cut、coordinator migration 或 multi-controller，
 因此不足以宣称 production rollout ready。
+
+`f9BookKeeperProfileTakeoverProcessIntegrationTest` supplies the independent BookKeeper post-handoff matrix without a new
+fork seam。One stock ZooKeeper long-hierarchical metadata service and two real Bookies host three isolated authorities，
+one for each BookKeeper profile。Each authority starts node 1 combined controller/broker and node 2 broker-only concurrently，
+commits/fetches offset 0 on singleton `[1]`，atomically reassigns to `[2]` with exact leader/replicas/ISR and no transitional
+reassignment，keeps node 1 alive，then recovers offset 0 and commits/fetches offset 1 on node 2。WAL-only requires zero
+bucket objects before and after the handoff；async/sync require a real NCP2 object at both points。The async activation digest
+uses the same one-entry rollover/physical-deletion configuration as the broker mapping，so configuration drift is rejected
+before BookKeeper I/O。Fresh execution passes 64/64 actionable tasks in 2m17s。This proves P-tier resign/open/recovery/
+continuation for all three profiles；it is not the C-tier already-dispatched BookKeeper append cut。
 
 ### 3.3 `core/.../kafka/log/LogManager.scala`
 
@@ -980,15 +991,16 @@ is rejected and the local storage enters `WRITE_FENCED_RECOVERY_REQUIRED`。The 
 the known-not-committed outcome cannot override an authority/session/head fence。This gate is
 `:nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest` and is included in `phase9M3ProviderCheck`。The
 separate `f9InFlightTakeoverProcessIntegrationTest` now supplies the previously missing release-process already-dispatched
-Object-WAL cut；BookKeeper-profile and multi-controller variants remain open。
+Object-WAL cut；the BookKeeper three-profile post-handoff variant also passes，while BookKeeper in-flight and
+multi-controller variants remain open。
 真实 combined-node
 KRaft/Oxia/S3 process baseline 已通过；
 同节点 fresh-JVM cold restart 也已通过；独立 BookKeeper WAL-only/async/sync release-distribution
 首启/冷重启 gates 也在同一 fork head 通过。这些 gates 没有给 Kafka 引入 Pulsar metadata runtime：
 BookKeeper client/bookies 使用 stock
 ZooKeeper `LongHierarchicalLedgerManagerFactory`，Nereus durable authority 继续使用 Oxia。Object-WAL singleton 与
-already-dispatched append live takeover 已覆盖；多 Controller failover、BookKeeper takeover、kill-cut matrix 与完整 stock
-cleaner differential matrix 尚未实现。
+already-dispatched append live takeover 以及 BookKeeper three-profile post-handoff takeover 已覆盖；多 Controller
+failover、BookKeeper already-dispatched append、kill-cut matrix 与完整 stock cleaner differential matrix 尚未实现。
 
 ## 6. Produce execution and threading
 
@@ -1134,7 +1146,8 @@ LSO 继续由 stock ProducerStateManager/first unstable offset 算法计算，re
 shutdown wiring、显式 native-storage CLI selection 与 controller-leader-only first-activation scheduling 已实现；
 combined-node native-storage KRaft process baseline 已通过；real-Oxia two-runtime Object-WAL gate 已覆盖 durable
 live preemption/replay/old-token fencing；two-release-process singleton reassignment 与 three-release-process
-Object-WAL old in-flight append cut 也已通过。真实 controller failover 与 BookKeeper-profile takeover 尚未实现。
+Object-WAL old in-flight append cut，以及 BookKeeper three-profile two-release-process post-handoff matrix 也已通过。
+真实 controller failover 与 BookKeeper already-in-flight append cut 尚未实现。
 
 ### 7.2 Shared-storage singleton reassignment and local lifecycle（2026-07-28）
 
@@ -1176,7 +1189,8 @@ controller voter、Nereus cluster/Oxia/Object root，并隔离 KRaft metadata、
 并由 `phase9M6KafkaProcessCheck` 聚合。它证明 post-handoff recovery/continuation，不证明 handoff 时已经进入
 provider 的旧 append 只能由 current term publication，也不证明 coordinator/internal-topic、BookKeeper 或
 multi-controller takeover；Object-WAL already-dispatched append 的 release-process cut 由
-`f9InFlightTakeoverProcessIntegrationTest` 覆盖，BookKeeper-profile 等价切点仍待补齐。
+`f9InFlightTakeoverProcessIntegrationTest` 覆盖，BookKeeper profile 的 post-handoff 等价路径由
+`f9BookKeeperProfileTakeoverProcessIntegrationTest` 覆盖，BookKeeper already-dispatched 等价切点仍待补齐。
 
 ## 8. Fetch execution
 

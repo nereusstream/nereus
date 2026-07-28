@@ -1035,6 +1035,348 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     @Test
+    @Timeout(value = 10, unit = TimeUnit.MINUTES)
+    void threeBookKeeperProfilesAtomicallyReassignLiveSharedStorageLeader()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome =
+                extractReleaseDistribution(
+                        kafkaCheckout,
+                        root.resolve("kafka-bookkeeper-takeover-distribution"));
+        Path formatScript =
+                executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript =
+                executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        int zooKeeperPort = freePort();
+        String metadataServiceUri =
+                "zk+longhierarchical://127.0.0.1:"
+                        + zooKeeperPort
+                        + "/ledgers";
+
+        try (LocalBookKeeper ignored = startBookKeeper(zooKeeperPort)) {
+            for (BookKeeperTakeoverProfile profile :
+                    List.of(
+                            new BookKeeperTakeoverProfile(
+                                    "BOOKKEEPER_WAL_ONLY",
+                                    "wal-only",
+                                    4,
+                                    false),
+                            new BookKeeperTakeoverProfile(
+                                    "BOOKKEEPER_WAL_ASYNC_OBJECT",
+                                    "wal-async-object",
+                                    5,
+                                    true),
+                            new BookKeeperTakeoverProfile(
+                                    "BOOKKEEPER_WAL_SYNC_OBJECT",
+                                    "wal-sync-object",
+                                    6,
+                                    true))) {
+                runBookKeeperProfileLiveTakeover(
+                        formatScript,
+                        startScript,
+                        kafkaHome,
+                        metadataServiceUri,
+                        profile);
+            }
+        }
+    }
+
+    private void runBookKeeperProfileLiveTakeover(
+            Path formatScript,
+            Path startScript,
+            Path kafkaHome,
+            String metadataServiceUri,
+            BookKeeperTakeoverProfile profile
+    ) throws Exception {
+        String fixtureToken = "bookkeeper-takeover-" + profile.fixtureToken();
+        Path brokerOneConfig =
+                root.resolve(fixtureToken + "-one.properties");
+        Path brokerTwoConfig =
+                root.resolve(fixtureToken + "-two.properties");
+        Path brokerOneFormatLog =
+                root.resolve(fixtureToken + "-one-format.log");
+        Path brokerTwoFormatLog =
+                root.resolve(fixtureToken + "-two-format.log");
+        Path brokerOneServerLog =
+                root.resolve(fixtureToken + "-one-server.log");
+        Path brokerTwoServerLog =
+                root.resolve(fixtureToken + "-two-server.log");
+        Path passwordFile =
+                root.resolve(fixtureToken + "-password.bin");
+        Files.write(
+                passwordFile,
+                ("f9-" + fixtureToken + "-process-password")
+                        .getBytes(StandardCharsets.UTF_8));
+
+        String bucket =
+                "nereus-kafka-bk-takeover-"
+                        + profile.authoritySeed()
+                        + "-"
+                        + UUID.randomUUID();
+        String topic =
+                fixtureToken + "-process-gate-" + UUID.randomUUID();
+        String nereusCluster =
+                "f9-" + fixtureToken + "-" + UUID.randomUUID();
+        String kafkaClusterId =
+                org.apache.kafka.common.Uuid.randomUuid().toString();
+        int brokerOnePort = freePort();
+        int controllerPort = differentFreePort(brokerOnePort);
+        int brokerTwoPort =
+                differentFreePort(brokerOnePort, controllerPort);
+        String brokerOneBootstrap = "127.0.0.1:" + brokerOnePort;
+        String brokerTwoBootstrap = "127.0.0.1:" + brokerTwoPort;
+        String clusterBootstrap =
+                brokerOneBootstrap + "," + brokerTwoBootstrap;
+        BookKeeperProcessConfiguration bookKeeper =
+                bookKeeperProcessConfiguration(
+                        metadataServiceUri,
+                        fixtureToken,
+                        passwordFile,
+                        profile.authoritySeed(),
+                        2);
+        seedBookKeeperAuthority(
+                oxiaConfiguration(),
+                bookKeeperWalConfiguration(
+                        bookKeeper,
+                        profile.storageProfile()
+                                .equals(
+                                        "BOOKKEEPER_WAL_ASYNC_OBJECT")),
+                bookKeeper,
+                Clock.systemUTC());
+        createBucket(bucket);
+        writeConfiguration(
+                brokerOneConfig,
+                brokerOnePort,
+                controllerPort,
+                bucket,
+                root.resolve(fixtureToken + "-one-log"),
+                root.resolve(fixtureToken + "-one-metadata"),
+                root.resolve(fixtureToken + "-one-cache"),
+                profile.storageProfile(),
+                bookKeeper,
+                1,
+                true,
+                nereusCluster);
+        writeConfiguration(
+                brokerTwoConfig,
+                brokerTwoPort,
+                controllerPort,
+                bucket,
+                root.resolve(fixtureToken + "-two-log"),
+                root.resolve(fixtureToken + "-two-metadata"),
+                root.resolve(fixtureToken + "-two-cache"),
+                profile.storageProfile(),
+                bookKeeper,
+                2,
+                false,
+                nereusCluster);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerOneConfig,
+                brokerOneFormatLog,
+                kafkaClusterId);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerTwoConfig,
+                brokerTwoFormatLog,
+                kafkaClusterId);
+
+        TopicPartition partition = new TopicPartition(topic, 0);
+        byte[] firstKey =
+                (fixtureToken + "-key-0")
+                        .getBytes(StandardCharsets.UTF_8);
+        byte[] firstValue =
+                (fixtureToken + "-first")
+                        .getBytes(StandardCharsets.UTF_8);
+        byte[] secondKey =
+                (fixtureToken + "-key-1")
+                        .getBytes(StandardCharsets.UTF_8);
+        byte[] secondValue =
+                (fixtureToken + "-second")
+                        .getBytes(StandardCharsets.UTF_8);
+        Process brokerOne =
+                start(
+                        List.of(
+                                startScript.toString(),
+                                brokerOneConfig.toString()),
+                        kafkaHome,
+                        brokerOneServerLog);
+        Process brokerTwo =
+                start(
+                        List.of(
+                                startScript.toString(),
+                                brokerTwoConfig.toString()),
+                        kafkaHome,
+                        brokerTwoServerLog);
+        Throwable failure = null;
+        try {
+            awaitBroker(
+                    brokerOneBootstrap,
+                    brokerOne,
+                    brokerOneServerLog);
+            awaitBroker(
+                    brokerTwoBootstrap,
+                    brokerTwo,
+                    brokerTwoServerLog);
+            awaitClusterBrokers(
+                    clusterBootstrap,
+                    List.of(1, 2),
+                    List.of(brokerOne, brokerTwo),
+                    brokerOneServerLog,
+                    brokerTwoServerLog);
+            try (Admin admin =
+                    Admin.create(adminProperties(clusterBootstrap))) {
+                admin.createTopics(
+                                List.of(
+                                        new NewTopic(
+                                                topic,
+                                                Map.of(0, List.of(1)))))
+                        .all()
+                        .get(
+                                CLIENT_TIMEOUT.toSeconds(),
+                                TimeUnit.SECONDS);
+            }
+            RecordMetadata first =
+                    produce(
+                            brokerOneBootstrap,
+                            topic,
+                            firstKey,
+                            firstValue);
+            assertThat(first.offset()).isZero();
+            assertThat(
+                            fetch(
+                                            brokerOneBootstrap,
+                                            partition,
+                                            0,
+                                            brokerOneServerLog)
+                                    .value())
+                    .isEqualTo(firstValue);
+            assertBookKeeperProfileObjects(
+                    profile,
+                    bucket,
+                    "before takeover");
+
+            try (Admin admin =
+                    Admin.create(adminProperties(clusterBootstrap))) {
+                admin.alterPartitionReassignments(
+                                Map.of(
+                                        partition,
+                                        Optional.of(
+                                                new NewPartitionReassignment(
+                                                        List.of(2)))))
+                        .all()
+                        .get(
+                                CLIENT_TIMEOUT.toSeconds(),
+                                TimeUnit.SECONDS);
+                awaitPartitionLeader(
+                        admin,
+                        partition,
+                        2,
+                        brokerOne,
+                        brokerTwo,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+                assertThat(
+                                admin.listPartitionReassignments(
+                                                Set.of(partition))
+                                        .reassignments()
+                                        .get(
+                                                CLIENT_TIMEOUT.toSeconds(),
+                                                TimeUnit.SECONDS))
+                        .as(
+                                profile.storageProfile()
+                                        + " handoff must not retain a stock catch-up reassignment")
+                        .isEmpty();
+                assertOffsets(admin, partition, 0, 1);
+            }
+            assertThat(brokerOne.isAlive())
+                    .as(
+                            profile.storageProfile()
+                                    + " old process remains live after higher-epoch takeover")
+                    .isTrue();
+            ConsumerRecord<byte[], byte[]> recovered =
+                    fetch(
+                            brokerTwoBootstrap,
+                            partition,
+                            0,
+                            brokerTwoServerLog);
+            assertThat(recovered.key()).isEqualTo(firstKey);
+            assertThat(recovered.value()).isEqualTo(firstValue);
+
+            RecordMetadata second =
+                    produce(
+                            brokerTwoBootstrap,
+                            topic,
+                            secondKey,
+                            secondValue);
+            assertThat(second.offset()).isEqualTo(1L);
+            ConsumerRecord<byte[], byte[]> appended =
+                    fetch(
+                            brokerTwoBootstrap,
+                            partition,
+                            1,
+                            brokerTwoServerLog);
+            assertThat(appended.key()).isEqualTo(secondKey);
+            assertThat(appended.value()).isEqualTo(secondValue);
+            try (Admin admin =
+                    Admin.create(adminProperties(clusterBootstrap))) {
+                assertOffsets(admin, partition, 0, 2);
+            }
+            assertBookKeeperProfileObjects(
+                    profile,
+                    bucket,
+                    "after takeover continuation");
+        } catch (Throwable operationFailure) {
+            failure = operationFailure;
+        }
+        try {
+            stopBroker(brokerTwo, brokerTwoServerLog);
+        } catch (Throwable shutdownFailure) {
+            failure = mergeFailure(failure, shutdownFailure);
+        }
+        try {
+            stopBroker(brokerOne, brokerOneServerLog);
+        } catch (Throwable shutdownFailure) {
+            failure = mergeFailure(failure, shutdownFailure);
+        }
+        if (failure != null) {
+            try {
+                preserveBookKeeperTakeoverFailureEvidence(
+                        profile.fixtureToken(),
+                        brokerOneConfig,
+                        brokerTwoConfig,
+                        brokerOneFormatLog,
+                        brokerTwoFormatLog,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    private static void assertBookKeeperProfileObjects(
+            BookKeeperTakeoverProfile profile,
+            String bucket,
+            String phase
+    ) throws InterruptedException {
+        if (profile.requireMaterializedObject()) {
+            awaitPositiveObjectCount(bucket);
+            return;
+        }
+        assertThat(objectCount(bucket))
+                .as(
+                        profile.storageProfile()
+                                + " must remain BookKeeper-only "
+                                + phase)
+                .isZero();
+    }
+
+    @Test
     @Timeout(value = 3, unit = TimeUnit.MINUTES)
     void objectWalAsyncObjectProcessRecoversAcrossFreshJvmRestart()
             throws Exception {
@@ -1172,20 +1514,11 @@ class NereusKafkaNativeProcessIntegrationTest {
         boolean requirePhysicalLedgerDeletion =
                 storageProfile.equals("BOOKKEEPER_WAL_ASYNC_OBJECT");
         BookKeeperProcessConfiguration bookKeeper =
-                new BookKeeperProcessConfiguration(
+                bookKeeperProcessConfiguration(
                         metadataServiceUri,
-                        "kafka-" + fixtureToken + "-deployment",
-                        "primary-" + fixtureToken,
-                        String.format("%02x", 0x10 + authoritySeed)
-                                .repeat(32),
-                        12,
-                        0x800L + authoritySeed,
-                        "kafka-" + fixtureToken + "-reservation",
+                        fixtureToken,
                         passwordFile,
-                        "v1",
-                        1,
-                        String.format("%02x", 0x54 + authoritySeed)
-                                .repeat(32),
+                        authoritySeed,
                         1);
         BookKeeperWalConfiguration bookKeeperWal =
                 bookKeeperWalConfiguration(
@@ -2148,6 +2481,29 @@ class NereusKafkaNativeProcessIntegrationTest {
                 256);
     }
 
+    private static BookKeeperProcessConfiguration
+            bookKeeperProcessConfiguration(
+                    String metadataServiceUri,
+                    String fixtureToken,
+                    Path passwordFile,
+                    int authoritySeed,
+                    int persistentBrokerCount
+            ) {
+        return new BookKeeperProcessConfiguration(
+                metadataServiceUri,
+                "kafka-" + fixtureToken + "-deployment",
+                "primary-" + fixtureToken,
+                String.format("%02x", 0x10 + authoritySeed).repeat(32),
+                12,
+                0x800L + authoritySeed,
+                "kafka-" + fixtureToken + "-reservation",
+                passwordFile,
+                "v1",
+                1,
+                String.format("%02x", 0x54 + authoritySeed).repeat(32),
+                persistentBrokerCount);
+    }
+
     private static void seedBookKeeperAuthority(
             OxiaClientConfiguration oxia,
             BookKeeperWalConfiguration configuration,
@@ -3019,6 +3375,51 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private static void preserveBookKeeperTakeoverFailureEvidence(
+            String profile,
+            Path brokerOneConfig,
+            Path brokerTwoConfig,
+            Path brokerOneFormatLog,
+            Path brokerTwoFormatLog,
+            Path brokerOneServerLog,
+            Path brokerTwoServerLog
+    ) {
+        String configured =
+                System.getProperty("nereus.kafka.process.evidence.dir");
+        if (configured == null || configured.isBlank()) {
+            return;
+        }
+        Path target = Path.of(configured).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(target);
+            copyIfPresent(
+                    brokerOneConfig,
+                    target.resolve(profile + "-one.properties"));
+            copyIfPresent(
+                    brokerTwoConfig,
+                    target.resolve(profile + "-two.properties"));
+            copyIfPresent(
+                    brokerOneFormatLog,
+                    target.resolve(profile + "-one-format.log"));
+            copyIfPresent(
+                    brokerTwoFormatLog,
+                    target.resolve(profile + "-two-format.log"));
+            copyIfPresent(
+                    brokerOneServerLog,
+                    target.resolve(profile + "-one-server.log"));
+            copyIfPresent(
+                    brokerTwoServerLog,
+                    target.resolve(profile + "-two-server.log"));
+        } catch (IOException failure) {
+            throw new AssertionError(
+                    "failed to preserve "
+                            + profile
+                            + " BookKeeper takeover evidence under "
+                            + target,
+                    failure);
+        }
+    }
+
     private static void clearFailureEvidence() throws IOException {
         String configured = System.getProperty("nereus.kafka.process.evidence.dir");
         if (configured == null || configured.isBlank()) {
@@ -3050,6 +3451,24 @@ class NereusKafkaNativeProcessIntegrationTest {
         Files.deleteIfExists(target.resolve("inflight-controller-server.log"));
         Files.deleteIfExists(target.resolve("inflight-broker-one-server.log"));
         Files.deleteIfExists(target.resolve("inflight-broker-two-server.log"));
+        for (String profile :
+                List.of(
+                        "wal-only",
+                        "wal-async-object",
+                        "wal-sync-object")) {
+            Files.deleteIfExists(
+                    target.resolve(profile + "-one.properties"));
+            Files.deleteIfExists(
+                    target.resolve(profile + "-two.properties"));
+            Files.deleteIfExists(
+                    target.resolve(profile + "-one-format.log"));
+            Files.deleteIfExists(
+                    target.resolve(profile + "-two-format.log"));
+            Files.deleteIfExists(
+                    target.resolve(profile + "-one-server.log"));
+            Files.deleteIfExists(
+                    target.resolve(profile + "-two-server.log"));
+        }
     }
 
     private static void copyIfPresent(Path source, Path target) throws IOException {
@@ -3285,6 +3704,13 @@ class NereusKafkaNativeProcessIntegrationTest {
             long readinessEpoch,
             String readinessSha256,
             int persistentBrokerCount) {
+    }
+
+    private record BookKeeperTakeoverProfile(
+            String storageProfile,
+            String fixtureToken,
+            int authoritySeed,
+            boolean requireMaterializedObject) {
     }
 
     private record PendingProduce(
