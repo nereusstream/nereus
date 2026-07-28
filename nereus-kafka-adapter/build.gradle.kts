@@ -23,6 +23,7 @@ val f9ProviderIntegrationTest by sourceSets.creating {
 }
 
 val f9BookKeeperFaultAgent by sourceSets.creating
+val f9ActivationFaultAgent by sourceSets.creating
 
 configurations[f9ProviderIntegrationTest.implementationConfigurationName].extendsFrom(
     configurations.testImplementation.get(),
@@ -45,6 +46,7 @@ dependencies {
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.assertj)
     add(f9ProviderIntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
     add(f9BookKeeperFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
+    add(f9ActivationFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
 }
 
 val f9BookKeeperFaultAgentJar =
@@ -62,6 +64,27 @@ val f9BookKeeperFaultAgentJar =
         from(f9BookKeeperFaultAgent.output)
         from({
             configurations[f9BookKeeperFaultAgent.runtimeClasspathConfigurationName]
+                .map { dependency ->
+                    if (dependency.isDirectory) dependency else zipTree(dependency)
+                }
+        })
+    }
+
+val f9ActivationFaultAgentJar =
+    tasks.register<Jar>("f9ActivationFaultAgentJar") {
+        group = "build"
+        description =
+            "Build the test-only Java agent that gates one applied activation-store completion."
+        archiveFileName.set("nereus-f9-activation-fault-agent.jar")
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        manifest {
+            attributes[
+                "Premain-Class"
+            ] = "com.nereusstream.kafka.testing.agent.ActivationCompletionGateAgent"
+        }
+        from(f9ActivationFaultAgent.output)
+        from({
+            configurations[f9ActivationFaultAgent.runtimeClasspathConfigurationName]
                 .map { dependency ->
                     if (dependency.isDirectory) dependency else zipTree(dependency)
                 }
@@ -264,12 +287,46 @@ tasks.register<Test>("f9MultiControllerFailoverProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9ActivationCutFailoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Kill the active controller after real PREPARED/ACTIVE Oxia application and prove failover recovery."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9ActivationFaultAgentJar)
+    shouldRunAfter(tasks.named("f9MultiControllerFailoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.activation.fault.agent",
+        layout.buildDirectory.file("libs/nereus-f9-activation-fault-agent.jar").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-activation-cut-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "threeControllersRecoverPreparedAndAppliedActiveCuts",
+        )
+    }
+}
+
 tasks.register<Test>("f9InFlightTakeoverProcessIntegrationTest") {
     group = "verification"
     description =
         "Hold an old broker inside real Object-WAL IO while a separate controller reassigns its partition."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
-    shouldRunAfter(tasks.named("f9MultiControllerFailoverProcessIntegrationTest"))
+    shouldRunAfter(tasks.named("f9ActivationCutFailoverProcessIntegrationTest"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
     classpath = f9ProviderIntegrationTest.runtimeClasspath
     systemProperty(

@@ -679,8 +679,20 @@ kills the controller process。The survivors must elect a different leader at a 
 that leader must emit the same success marker for its new exact epoch，while the durable activation record remains immutable
 and readiness epoch does not regress。Native Produce/Fetch/ListOffsets then continue through offset 1 with final `0/2` and a
 positive S3 object count。The fresh direct task passes 64/64 actionable tasks in 36s and is aggregated by
-`phase9M6KafkaProcessCheck`。This is P/C evidence for ACTIVE-state failover，not yet the PREPARED/first-ACTIVE/
-provider-response-loss cut matrix required to close KF-OPS-005。
+`phase9M6KafkaProcessCheck`。This is the ACTIVE steady-state P/C subset of KF-OPS-005。
+
+`f9ActivationCutFailoverProcessIntegrationTest` adds the two provider-applied publication cuts with three dedicated
+controller release JVMs and one dedicated broker JVM。A test-only Byte Buddy agent is armed on every controller but captures
+only the current leader's real Oxia `createActivation` or `compareAndSetActivation` completion。The underlying future must
+succeed and write the applied marker while the future returned to the coordinator stays incomplete；the harness then directly
+reads PREPARED or ACTIVE from Oxia、asserts the leader has not logged reconciliation success and forcibly kills that exact
+process。A different higher-epoch controller must reconcile：PREPARED preserves every immutable preparation fact while
+advancing to ACTIVE，and an already-applied ACTIVE record remains exactly equal。Both cuts preserve/non-regress readiness
+for the stable broker set `[4]`，then admit node 4 and pass native Produce/Fetch/ListOffsets at `0/1` with a positive Object
+count。Fresh `--rerun-tasks` execution passes 66/66 actionable tasks in 1m06s and the task is aggregated by
+`phase9M6KafkaProcessCheck`。This closes provider-applied PREPARED-create and first-ACTIVE-CAS response-loss P/C evidence；
+second-proof/pre-CAS process cuts、unapplied transport failure and the M7 aggregate remain before KF-OPS-005 can leave
+`PLANNED`。
 
 The 2026-07-28 fresh partial aggregate exposed a second-generation BookKeeper materialization planner defect after the first
 source ledger had already completed terminal retirement and physical deletion。The next wider task must select the committed

@@ -32,9 +32,13 @@ commits the next batch at the exact old stable end。The dedicated
 The same aggregate now also covers all three BookKeeper profiles through post-handoff recovery plus their shared
 Bookie-acked/metadata-`WRITING` stale-completion cut，and a three-voter/three-combined-node process gate kills the current
 KRaft controller、requires a different higher-epoch controller to reconcile Nereus ACTIVE authority，then proves native
-Produce/Fetch/ListOffsets and object persistence continue。These are still partial F9 results；activation PREPARED and
-response-loss controller cuts、coordinator/checkpoint migration、release-process response-loss restart and the stock
-retention oracle remain open。
+Produce/Fetch/ListOffsets and object persistence continue。A second controller gate now uses three dedicated controller
+release JVMs plus one broker JVM and a test-only completion-gate agent to kill the current controller after the real Oxia
+provider has durably applied either `createActivation(PREPARED)` or the `PREPARED -> ACTIVE` CAS but before the coordinator
+observes completion。The replacement controller preserves the exact PREPARED facts or byte-identical ACTIVE authority，
+publishes non-regressing readiness for broker `[4]`，and the broker subsequently completes native
+Produce/Fetch/ListOffsets with Object persistence。These are still partial F9 results；pre-publication proof/pre-CAS process
+cuts、coordinator/checkpoint migration、release-process response-loss restart and the stock retention oracle remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation
@@ -133,9 +137,10 @@ BookKeeper configuration snapshot、exact password-file identity、client lifecy
 `OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT + BOOKKEEPER_WAL_ONLY` capability mapping。The BookKeeper process gate uses a real two-bookie
 cluster with stock ZooKeeper long-hierarchical metadata，then restarts the exact formatted KRaft broker in a fresh JVM，
 recovers offset 0 and appends offset 1 with earliest=0/latest=2；
-The current process suite additionally covers Object/BookKeeper live takeover and ACTIVE-state three-voter controller
-failover。Checkpoint/virtual-segment cuts、PREPARED/response-loss activation cuts and wider chaos evidence remain future
-work，so this is not yet a production-rollout claim.
+The current process suite additionally covers Object/BookKeeper live takeover、ACTIVE-state three-voter controller
+failover and provider-applied PREPARED-create/ACTIVE-CAS controller cuts。Checkpoint/virtual-segment cuts、
+second-proof/pre-CAS/unapplied activation process cuts and wider chaos evidence remain future work，so this is not yet a
+production-rollout claim.
 
 ## Current Phase
 
