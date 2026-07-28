@@ -33,15 +33,22 @@ actual-page aborted filtering。The stock `ProducerStateManagerTest` also locks 
 and TV2 marker through the configured storage executor。`BrokerMetadataPublisherTest` and
 `NereusTopicDeltaLifecycleTest` cover the deterministic ordering part of KF-TXN-011/012：both elections wait for ready，
 and transaction-state ready waits for exact recovered storage installation。Rows stay `PLANNED` because required
-real-service、process/restart、takeover and aggregate tiers have not run，and the fork commits are not remotely published。
+real-service、process/restart、takeover and aggregate tiers have not run。The fork commits are published in
+`nereusstream/kafka:nereus/future9-native-kafka-storage@58342d9dca`。
 
 Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
 `3eb6b63` + `57dcf35`）：stock DeleteRecords normalization/capture invokes the shared checkpoint-before-trim path；
 the fork exposes bounded owned writable partitions and the same `NereusUnifiedLog` local updater；the product schedules
 non-overlapping maintenance；and canonical virtual segment/config/time/logical state is rebuilt from checkpoint plus
 committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、Checkstyle and SpotBugs evidence passes。Rows
-remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing，and the Kafka
-fork commits are not remotely published。
+remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing。The Kafka
+fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@58342d9dca`。
+
+Current deterministic compaction fork evidence（product `e18bf36`；fork `58342d9dca`）：typed bounded runtime config、
+one-time product composition、leader-only owned-partition registration、internal/user work classification、partition-lock
+canonical/HW/LSO capture and stock `CleanedTransactionMetadata` marker pre-scan pass focused adapter/fork tests plus
+Checkstyle、SpotBugs and the executable 25-commit/86-file source lock。Rows remain `PLANNED` until real-provider
+fresh-process/restart/takeover and full LogCleaner differential evidence exist。
 
 ## 2. Machine-readable manifest target
 
@@ -86,7 +93,8 @@ stale-resign isolation 的 deterministic partial evidence，但不替代 durable
 `KafkaListOffsetsResolverTest` 为 KF-FET-009 提供 stable-snapshot earliest/latest、compressed exact-record
 timestamp/max-timestamp、跨页硬预算、inspector invariant 与 mid-scan leadership fencing 的 deterministic partial
 evidence；local fork `NereusRecordTimestampInspectorTest` 进一步提供 stock 4.3 compressed `MemoryRecords` exact-record
-iterator、minimum-offset、buffer preservation 与 max-timestamp tie-break 证据，但尚未推送，也不替代 fork handler/
+iterator、minimum-offset、buffer preservation 与 max-timestamp tie-break 证据；该测试现已包含在远端 F9 branch，
+但仍不替代 fork handler/
 time-index recovery/real KRaft baseline；local fork `NereusTopicDeltaLifecycleTest`、`ReplicaManagerTest` 与
 `BrokerMetadataPublisherTest` 已为 KF-OPS-017 提供 stock-state-first recovery preparation、coordinator callback-after-open
 和 `firstPublishFuture` non-readiness 的 deterministic Kafka-fork partial evidence，但 provider-backed BrokerServer
@@ -377,8 +385,11 @@ ACTIVE/readiness admission/revalidation before an ACTIVE Kafka binding is return
 starts its bounded owned-partition source and drains cleanly；`NereusKafkaRuntimeFactoryTest` proves the background graph is
 late-bound to the exact product partition manager and is started/closed under runtime readiness/drain ownership；
 `NereusKafkaCompactionRuntimeConfigurationTest` freezes the cross-limit and private staging-path bounds，while
-`KafkaCompactionBatchSourceTest` proves recovered KCP1 `streamId` selects the exact dynamic reader。Fork registration/concrete
-partition-lock/KRaft/local-log capture、provider fresh-process restart and stock `LogCleaner` comparison remain absent，so
+`KafkaCompactionBatchSourceTest` proves recovered KCP1 `streamId` selects the exact dynamic reader。Product
+`DefaultKafkaPartitionMaintenanceTest` and fork mapper/bridge/`NereusUnifiedLogFactoryTest`/`PartitionTest` now prove
+ACTIVE binding/source validation、bounded current-leader registration、partition-lock canonical capture and stock
+`CleanedTransactionMetadata` marker pre-scan。Provider fresh-process restart and broad stock `LogCleaner` differential
+comparison remain absent，so
 end-to-end rows remain `PLANNED`。The production-graph、durable-output and full-pass tests are deterministic local
 composition/restart evidence only；the real-provider fresh-process restart tier remains absent。
 

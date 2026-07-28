@@ -383,12 +383,12 @@ source-lock diff、method map、format/API compatibility review 和 scenario imp
 把它解释为完成 KF-SRC-004；组织 fork 建立后必须新增 fork commit/remote/marker/signature lock，并替换这里的
 baseline-only completion evidence。
 
-### 12.2 Current organization-fork development lock（2026-07-23）
+### 12.2 Current organization-fork development lock（2026-07-28）
 
 `github.com/nereusstream/kafka` 已存在且是 `apache/kafka` fork；审计时 remote `trunk` 为
 `c300006a7705c240642db6950b5a95fec982bfc5`，并包含锁定 Apache base
-`427b409cf440f745ad6195673d3342f6bd3974d4`。隔离 worktree
-`/Users/liusinan/apps/ideaproject/GITHUB/kafka-nereus` 的本地 branch
+`427b409cf440f745ad6195673d3342f6bd3974d4`。当前 working clone
+`/Users/liusinan/apps/ideaproject/GITHUB/nereusstream` 的 branch
 `nereus/future9-native-kafka-storage` 从该 base 创建；首个 exact-record bridge commit 是
 `2379c63933dd0a155d5a5bf90fca85c7b24db58b`，第二个 async ListOffsets/error-mapping commit 是
 `c2b1b4b3a00fb7cfa222a3e6df659011795f3b3e`，第三个 stock request-path seam commit 是
@@ -408,10 +408,16 @@ baseline-only completion evidence。
 `dc8c66388a8b093f219d314d97188feb8fd93f92`，第十七个 bounded Produce request-path handoff commit 是
 `ee608625e4dde95089b25765e874d50edec044d4`，第十八个 whole-request async Fetch handoff commit 是
 `bba3ef01217a9f6728104e45f1b7d0e867e02459`，第十九个 admitted-Fetch wakeup capacity fix 是
-`47d36a1d9fd3ae670e6b799b90df42fb86502e41`。
+`47d36a1d9fd3ae670e6b799b90df42fb86502e41`，第二十个 producer/transaction state restore 是
+`ec7f0db991`，第二十一个 transaction handoff/coordinator ordering test 是 `032974067c`，第二十二个
+checkpoint-before-DeleteRecords trim 是 `4c060aec89`，第二十三个 partition retention scheduling 是
+`feabf6c686`，第二十四个 virtual log segment state 是 `378e9f8967`，第二十五个 compaction partition
+authority capture 是 `58342d9dca31009bb63b2c6a3be8a7c7ff68f9ec`。该 head 已通过 SSH 发布到
+`origin/nereus/future9-native-kafka-storage`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/base ancestry/nineteen-commit count/version、Apache 与组织 remote
-identity、cached organization trunk ancestry、七十三文件 exact change set/blob、成对 inject marker、adapter/async bridge/
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/twenty-five-commit
+count/version、组织 fork fetch/push identity、cached organization trunk ancestry、八十六文件 exact change set/blob、
+成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
 BrokerServer runtime create/ready/drain/close signature、typed adapter factory/ReplicaManager binding，以及 package-wide
 no-reflection/no-service-loader 规则；新增 runtime composition 还锁定 executable-profile、explicit-provider、
@@ -425,6 +431,9 @@ owned buffer capture、`RequestLocal.noCaching` worker、per-partition FIFO、�
 completion，以及 stock optional fetch executor、whole-request `readFromLog` routing、initial/event
 `readFromPurgatory` mode、response completion、bounded worker/callback pools、logical operation admission、
 exact partition subscription 和 combined runtime drain signatures。
+M4/M5/F9 compaction 还锁定 canonical producer/transaction replay/freeze、virtual log/config state、DeleteRecords
+authority、typed compaction config/two-pass limits、one-time product composition、leader-only owned-partition registration、
+internal/user work class、partition-read-lock capture 和 stock `CleanedTransactionMetadata` marker oracle。
 `publishPhase9DevelopmentArtifacts` 只把 `0.1.0-f9-dev` 发布到 Nereus build 目录的隔离 Maven repository；
 fork build 必须显式同时传入 repository 与 version，缺任一参数即 configuration failure，不读取 Maven local。
 `phase9M3KafkaForkStockCheck` 不传参数从头验证 stock server/core compile/static analysis、完整 `KafkaConfigTest`、
@@ -532,6 +541,8 @@ Against exact product source and local head `47d36a1d9f`，the fresh
 builds pass 92/92 and 95/95 actionable tasks，including 146/146 scenario synchronization、real provider recovery、stock
 KRaft restart、the simultaneous-wakeup regression and all Checkstyle/SpotBugs/Spotless gates。
 
-当前 GitHub credential 对组织 fork 的 API permission 是 `read`，因此该 branch/commit 尚未推送。这个 task 只能称为
-development source lock，不能标记 KF-SRC-004 complete；取得 write 权限并推送后，production lock 必须再要求
-`refs/remotes/nereus/nereus/future9-native-kafka-storage == expected HEAD`。
+该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
+lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
+`nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
+`58342d9dca31009bb63b2c6a3be8a7c7ff68f9ec`。Executable source-lock expectation 已更新到该 reviewed、
+published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

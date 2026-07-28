@@ -65,15 +65,18 @@ private `StagingFileManager` and creates `KafkaCompactionProductionRuntimeFactor
 `KafkaPartitionStorageManager` exists。The resulting background graph reuses the same L0/Generation/physical/binding/KCP1
 Oxia stores、object protection/read pins、semantic reader registry、ObjectStore、activation verifier and borrowed scheduler。
 `KafkaRuntimeBackgroundServiceFactory` is the late-binding seam that prevents a parallel manager graph。Product construction
-and lifecycle are executable；the fork still has to map the 58-key snapshot into the additional bounded compaction runtime
-settings and provide the partition-lock/KRaft/local-log-backed `OwnedPartitionSource`/`CaptureProvider`。
+and lifecycle are executable。Kafka fork commit `58342d9dca` now maps the 58-key snapshot into the bounded compaction
+runtime settings，installs `NereusKafkaCompactionContext` only after pure mapping succeeds，and provides the
+partition-lock/KRaft/local-log-backed `OwnedPartitionSource`/`CaptureProvider`。The one-time bridge freezes the Kafka
+compaction strategy/KCK2/materialization policy and rejects conflicting reconfiguration。
 
 The activated context can independently carry `NereusKafkaMaintenanceContext`。The product runtime then creates one
 `DefaultKafkaPartitionMaintenance` per opened leader and a `KafkaPartitionMaintenanceRuntime` that periodically enumerates
 the fork-owned writable partition snapshot，orders internal topics first，bounds cross-partition work，coalesces overlap and
 drains accepted work before the partition manager closes。Kafka fork commit `feabf6c686` maps the retention interval、
 partition/task bounds and checkpoint budget，and supplies partition-lock/KRaft/local-log capture through
-`NereusKafkaOwnedPartitionSourceBridge`；compaction still requires its separate richer capture mapping。
+`NereusKafkaOwnedPartitionSourceBridge`。The same bridge now also supplies compaction work class、capture provider and
+stock transaction-marker facts；retention and compaction remain separate typed callback contracts。
 
 Kafka fork commits `46e6703761..47d36a1d9f` supply the stock-owned `BrokerStorageRuntimeFactory`/optional
 `BrokerStorageAppendExecutor`/`BrokerStorageFetchExecutor` injection boundaries and the exact

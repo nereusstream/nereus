@@ -2801,7 +2801,7 @@ val kafkaBaselineCheckoutPath = providers.gradleProperty("kafkaCheckout")
 
 val kafkaForkCheckoutPath = providers.gradleProperty("kafkaForkCheckout")
     .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
-    .orElse(layout.projectDirectory.dir("../kafka-nereus").asFile.absolutePath)
+    .orElse(layout.projectDirectory.dir("../nereusstream").asFile.absolutePath)
 
 tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
     group = "verification"
@@ -2826,7 +2826,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "47d36a1d9fd3ae670e6b799b90df42fb86502e41",
+        "58342d9dca31009bb63b2c6a3be8a7c7ff68f9ec",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",

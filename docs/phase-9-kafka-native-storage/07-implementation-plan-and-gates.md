@@ -456,18 +456,18 @@ coordinator/transaction/compaction remain M4/M5。
 - the M3 head rejects idempotent/transaction/control input until M4 owns producer/transaction state；isolated M4 commits
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
-- the organization fork exists and the isolated local branch
-  `nereus/future9-native-kafka-storage@378e9f8967` contains the nineteen reviewed M3 commits、two M4
-  producer/transaction and ordering-test commits and three M5 DeleteRecords/retention/virtual-log commits，but push to
-  `nereusstream/kafka` is rejected with GitHub 403，so KF-SRC-004 remains
-  incomplete。Produce hands off exact owned bytes
+- the organization fork exists and the published branch
+  `nereus/future9-native-kafka-storage@58342d9dca` contains the nineteen reviewed M3 commits、two M4
+  producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits and one
+  compaction-authority commit。The SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection and the real KRaft final gate remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
-  does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the local
-  fork branch/head/base ancestry/nineteen-commit count/remotes/seventy-three log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition
+  does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the
+  fork branch/local+remote head/base ancestry/twenty-five-commit count/organization remote/eighty-six log-IO/bridge/recovery/
+  metadata-lifecycle/configuration/runtime-composition/retention/compaction
   blobs/markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
   seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、five stock Partition seam tests、two
@@ -547,8 +547,8 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 10 passing focused tests，with Checkstyle and SpotBugs。Follow-up `032974067c` adds three regressions：the actual
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
-storage installation。All 13 focused tests pass together。Both commits remain local because push to the organization fork
-is rejected with GitHub 403。
+storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
+`nereus/future9-native-kafka-storage@58342d9dca` branch。
 The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、fresh
 process restart/takeover index recovery、real internal-topic coordinator replay/restart/failover、upstream focused suites
 and real two-broker evidence are still required before M4 completion。
@@ -602,7 +602,8 @@ provide stock DeleteRecords invocation、partition-lock capture、same-log local
 enumeration；`378e9f8967` supplies the live virtual segment/config/index facts consumed by the planner。The focused
 retention suite and fork UnifiedLog/Partition/config regressions pass。This task deliberately does not use the
 `phase9M5Check` completion name：real-provider/fresh-process retention、restart/takeover/chaos evidence、compaction
-production fork registration/concrete authority capture、stock oracle and aggregate gates remain required。
+full stock-cleaner differential oracle and aggregate gates remain required。Compaction production fork
+registration/concrete authority capture is now implemented separately by product `e18bf36` and fork `58342d9dca`。
 
 The product-side DeleteRecords slice now accepts only Kafka-normalized non-negative offsets，rechecks delete policy and
 the frozen HW，returns the current durable low watermark without I/O for already-deleted requests，and otherwise routes the
@@ -681,8 +682,9 @@ partition-authority-fenced Generation publication、coverage activation and term
 `NereusKafkaObjectWalRuntimeFactory` conditionally owns this graph from
 `NereusKafkaObjectWalActivationContext.compaction`，late-binds it to the same product partition manager through
 `KafkaRuntimeBackgroundServiceFactory`，and closes staging only after accepted compaction work drains。Production fork
-registration/concrete partition-lock/KRaft/local-log capture、real-provider fresh-process gates and the cleaner differential
-oracle remain pending。This closes the
+commit `58342d9dca` now maps the bounded config and supplies current-leader registration plus
+partition-lock/KRaft/local-log canonical and stock marker capture。Real-provider fresh-process gates and the full cleaner
+differential oracle remain pending。This closes the
 deterministic adapter no-resurrection/write-composition boundary but does not yet claim end-to-end client compaction
 visibility。
 
@@ -692,7 +694,8 @@ that is revalidated immediately before the Generation `COMMITTED` CAS。The old 
 `PROJECTION_REQUIRED`，so existing Pulsar/F4 publication and source-resolution contracts are unchanged。
 `KafkaPartitionLifecycleCoordinator` installs/verifies this registration before an ACTIVE binding is returned。
 Production Object-WAL runtime construction now assembles these pieces with the concrete compaction pass；the remaining seam
-is the fork-owned partition registration and partition-lock/KRaft/local-log capture provider。
+is real-provider process restart/takeover plus the broad stock-cleaner differential gate；fork-owned partition registration
+and partition-lock/KRaft/local-log capture are implemented。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
 

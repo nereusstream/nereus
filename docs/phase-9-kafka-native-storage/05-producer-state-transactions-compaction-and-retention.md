@@ -143,7 +143,8 @@ COMMITTED-batch replay。Stock `ProducerStateEntry.fromBatchMetadata` reconstruc
 calling the scalar-mutating add path，so a later marker-updated `lastTimestamp` remains independent。Import is accepted only
 into a fresh manager and immediately re-exported for exact canonical equality；ordinary local snapshot IO remains disabled。
 Deterministic tests cover sequence wrap、five-batch retention、marker timestamp preservation、checkpoint encode/decode and
-replay equality。The commit is local because `nereusstream/kafka` rejected the current GitHub credential with 403。
+replay equality。该 commit 现已作为 published F9 branch 的第二十个 commit 包含在
+`nereusstream/kafka:nereus/future9-native-kafka-storage@58342d9dca`。
 
 ## 4. Transaction state and indexes
 
@@ -1056,10 +1057,13 @@ runtime reads are implemented。`KafkaCompactionPartitionPass` now owns the full
 scheduling。`KafkaCompactionProductionRuntimeFactory` now supplies the production Object-WAL composition behind both：
 direct-stream COMMITTED source resolution、recovered-plan stream-bound exact readers、shared KCSR/KCRS/NTC2 staging、
 strict object verification、activation/partition-authority-fenced Generation commit、coverage activation、terminal
-retirement and the process scheduler all use the same Oxia/Object-WAL/read-pin/provider graph。The remaining boundary is the
-production fork registration/concrete partition-lock/KRaft/local-log authority capture provider and the
-real-provider/process-restart gate，not generation discovery、durable-output re-entry、per-partition lifecycle routing、
-process-level dispatch or product provider composition。
+retirement and the process scheduler all use the same Oxia/Object-WAL/read-pin/provider graph。Product commit `e18bf36`
+and Kafka fork commit `58342d9dca` close the former production-fork boundary：the product validates one exact
+ACTIVE binding/source and constructs the mutation guard；the fork enumerates current leaders，captures canonical state under
+the partition lock，then scans the selected decision horizon with stock `CleanedTransactionMetadata` and revalidates the
+producer/transaction image。The remaining boundary is the real-provider/process-restart and full stock-cleaner
+differential gate，not registration、authority capture、generation discovery、durable-output re-entry、per-partition
+lifecycle routing、process-level dispatch or product provider composition。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate
@@ -1362,7 +1366,7 @@ per-partition serialization described above。
 | Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex`、`NereusCanonicalLogState`、`NereusLogSegment` implemented locally；dedicated `NereusTimeIndex`/`NereusLeaderEpochCache` subclasses are unnecessary unless a later stock caller cannot consume the canonical facade |
 | adapter checkpoint | producer/txn/epoch/segment/time/byte section codecs V1 + full composition implemented |
 | adapter retention | planner/checkpoint/barrier/DeleteRecords/durable listener + per-partition maintenance + bounded periodic owned-partition runtime implemented；real provider/restart gates pending |
-| adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge + projection-free Kafka stream registration/ACTIVE-readiness generation guard + activated Object-WAL production composition implemented；fork registration and concrete partition-lock/KRaft/local-log capture wiring pending |
+| adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge + projection-free Kafka stream registration/ACTIVE-readiness generation guard + activated Object-WAL production composition + fork registration/concrete partition-lock/KRaft/local-log capture + stock marker pre-scan implemented；real-provider restart/takeover and full cleaner differential gate pending |
 | materialization | ranged decoder SPI、V2 two-pass engine/publisher/verifier + explicit projection-required/direct-stream authority modes and caller authority final-CAS fence |
 | metadata | binding compaction coverage nested record/codec/transition validators + partition-scoped KCP1 scan continuation |
 | object store | NTC2 writer/reader/goldens from document 02 |

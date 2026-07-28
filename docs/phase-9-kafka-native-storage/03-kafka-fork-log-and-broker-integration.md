@@ -735,10 +735,15 @@ runtime bridge；对应 product commits `3eb6b63`、`57dcf35` 组合 checkpointe
 第二十四个 `378e9f8967` 增加 `NereusCanonicalLogState`、多 virtual-segment shell、stable-only roll、exact KRaft
 config metadata offset history、checkpoint + committed-tail 恢复、logical/time indexes、真实 offset metadata 和
 bounded timestamp lookup。focused UnifiedLog/recovery/config regression、Checkstyle 与 SpotBugs 均通过。
-Controller activation scheduling、compaction fork capture、CLI/KafkaRaftServer production selection 和 real KRaft
-process gate 尚未实现。当前 branch
-尚未推送，因而仍未满足 production fork source-lock entry；bounded Produce/Fetch/M4 transaction 单元与组合证据也不构成真实
-KRaft runtime claim。
+第二十五个 `58342d9dca` 把 58-key typed config 映射为 bounded compaction runtime，复用
+`NereusKafkaOwnedPartitionSourceBridge` 枚举 current leaders，并在 `Partition.leaderIsrUpdateLock` 下冻结
+canonical source/HW/LSO 与 producer/transaction state。选择 exact decision horizon 后，`NereusUnifiedLog`
+使用 stock `CleanedTransactionMetadata` 扫描 dense RecordBatch，逐 control marker 冻结
+`RETAIN_REQUIRED/DELETE_ELIGIBLE`，保留 active producer last marker，并在返回前再次校验 source 和
+producer/transaction image。该 branch 已通过 SSH 推送到 `nereusstream/kafka`，工作 clone 为
+`/Users/liusinan/apps/ideaproject/GITHUB/nereusstream`。Controller activation scheduling、
+CLI/KafkaRaftServer production selection、real KRaft/provider process gate 与完整 stock cleaner differential
+matrix 尚未实现；bounded Produce/Fetch/M4/M5 deterministic 证据仍不构成真实 KRaft runtime claim。
 
 ## 6. Produce execution and threading
 

@@ -20,8 +20,11 @@ execution、restart publication and dual-root retirement。`KafkaCompactionRunti
 enumeration、internal-topic-first scheduling、process-current leader revalidation、cross-partition concurrency and
 drain-safe scheduler integration。Kafka native streams now install a canonical projection-free materialization registration，
 and Generation admission/final commit revalidate both cluster ACTIVE/readiness and caller-owned partition authority without
-relaxing the existing projection-required path；production Object-WAL compaction composition、fork registration/capture
-provider、real-provider process restart and the stock cleaner oracle remain pending。The Kafka fork now has
+relaxing the existing projection-required path；production Object-WAL compaction composition and fork
+registration/capture are now wired through the current leader's partition lock。The fork freezes canonical
+source/HW/LSO，scans the exact decision horizon with stock `CleanedTransactionMetadata`，emits one decision for every
+control marker and revalidates producer/transaction state before returning。Real-provider process restart/takeover and the
+broad stock-`LogCleaner` differential gate remain pending。The Kafka fork now has
 local stock-`MemoryRecords` timestamp inspection/recovery-state rebuild、Kafka
 sentinel/request mapping、
 leader-epoch-fenced `Partition` lookup installation、`ReplicaManager` delayed-operation wakeup、async completion/cancellation
