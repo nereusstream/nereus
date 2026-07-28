@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；97-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed five-profile provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh、Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit、Kafka 64+64-shard stream-coverage deletion activation 与 fail-closed BookKeeper ledger-retention service composition are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie BookKeeper WAL-only/async/sync release-distribution initial process + fresh-JVM cold-restart gates pass；an independent `OBJECT_WAL_ASYNC_OBJECT` initial/fresh-JVM cold-restart gate passes over the same real Object provider；real ledger deletion、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
+> 状态：Implementation in progress；100-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed five-profile provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh、Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit、Kafka 64+64-shard stream-coverage deletion activation 与 fail-closed BookKeeper ledger-retention service composition are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie BookKeeper WAL-only/async/sync release-distribution initial process + fresh-JVM cold-restart gates pass；an independent `OBJECT_WAL_ASYNC_OBJECT` initial/fresh-JVM cold-restart gate passes over the same real Object provider；real two-bookie ledger deletion and fresh-JVM NCP2 fallback after physical deletion pass；delete-response-loss、multi-broker takeover、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -37,7 +37,7 @@ binding-operation owner/epoch/TTL and the exact non-empty executable-profile set
 store、borrowed renewal scheduler、a prepared recovery launcher、clock、startup action and provider resources with exact
 ownership。The factory constructs one keyspace/lifecycle/opener/manager/runtime graph and one shared RecordBatch codec；it has
 no Kafka server type、reflection、service loader、global registry or duplicate provider lifecycle。Broker/controller identity、
-KRaft metadata view、Kafka `Time`/metrics and the mapping from the fork's 97-key snapshot are explicit inputs to the
+KRaft metadata view、Kafka `Time`/metrics and the mapping from the fork's 100-key snapshot are explicit inputs to the
 provider/activation creator。The manager checks that set before binding lifecycle I/O，so a partial provider deployment cannot
 persist an unusable binding。Independent runtimes can run in one JVM。
 
@@ -139,8 +139,9 @@ shutdown。
 
 ## 2. Configuration namespace
 
-All 97 keys below are registered in Kafka `ConfigDef` by the local fork。The original 58-key inert surface is extended by
-39 BookKeeper binding/resource/readiness/ledger-GC keys in fork `b443750be4`。Primitive types、defaults、independent hard ranges、
+All 100 keys below are registered in Kafka `ConfigDef` by the local fork。The original 58-key inert surface is extended by
+39 BookKeeper binding/resource/readiness/ledger-GC keys and three materialization-retirement lifecycle keys in fork
+`5169b57986`。Primitive types、defaults、independent hard ranges、
 profile dependencies and broker-local cross-field rules are executable；dynamic mutation and provider connectivity remain
 startup/runtime behavior。
 
@@ -219,6 +220,19 @@ reads at most 64 KiB on demand，and never adds secret bytes to compatibility/pr
 and compaction generations remain ObjectStore-backed，every currently executable enabled profile—including
 `BOOKKEEPER_WAL_ONLY`—still requires the typed Object provider/bucket。This does not make BookKeeper generation zero an
 Object WAL；it preserves the Kafka checkpoint/materialization plane shared by both executable profiles。
+
+#### 2.1.2 Materialization retirement lifecycle
+
+The fork head `5169b57986` adds three static keys to the
+`NereusKafkaStorageConfig.RetentionCompaction` record。They are parsed and cross-field validated before provider I/O，
+mapped into `MaterializationConfig` while preserving all other production defaults，and included in the configuration
+compatibility digest so a broker cannot join with a different physical-deletion safety window：
+
+| Key | Default | Code-level validation/consumer |
+| --- | --- | --- |
+| `nereus.kafka.storage.materialization.source.retirement.grace.ms` | `3600000` | `1000..2592000000`；terminal source-protection retirement grace |
+| `nereus.kafka.storage.materialization.append.replay.grace.ms` | `21600000` | `1000..2592000000`；late append-replay protection grace |
+| `nereus.kafka.storage.materialization.metadata.audit.grace.ms` | `86400000` | `1000..2592000000` and `>= source.retirement.grace.ms`；metadata audit/retirement horizon |
 
 Allowed initial profiles after their existing activation proofs：
 
@@ -406,15 +420,16 @@ views，requires an exact ACTIVE publication before admission，and registers th
 physical-reference publisher and profile resolver in the same storage graph。`BOOKKEEPER_WAL_ONLY` deliberately skips Object
 materialization；async/sync profiles register the shared NCP2 runtime，with async lag admission or sync required-generation
 completion respectively。The adapter closes its owned BookKeeper runtime before the embedding owner closes the borrowed
-client。Fork `b443750be4` maps the complete typed snapshot to
+client。Fork `5169b57986` maps the complete typed snapshot to
 `BookKeeperWalConfiguration`/`NereusKafkaBookKeeperWalRuntimeConfiguration`，constructs the BookKeeper client only after
 pre-I/O validation，passes it as borrowed context to the product runtime，and wraps the result in
 `NereusKafkaOwnedProviderRuntime`。Close order is product graph first and client second；both closes are attempted，suppressed
 failure is preserved，and repeated close is idempotent。A construction failure closes the already-created client before it
 escapes。With BookKeeper installed，the executable set is all five profiles and the mapper retains the exact configured
 profile as default；without BookKeeper the set is the two Object profiles and the mapper retains the selected sync/async
-profile as default。The configuration compatibility digest includes every ledger-GC field in addition to the binding
-checksum and readiness identity，without including password bytes。The mapped `BookKeeperLedgerGcConfiguration` is
+profile as default。The configuration compatibility digest includes every ledger-GC and materialization-retirement field
+in addition to the binding checksum and readiness identity，without including password bytes。The mapped
+`BookKeeperLedgerGcConfiguration` is
 validated against the exact WAL reader-lease TTL before any provider I/O。Disabled or dry-run policy constructs no scanner。
 Enabled/non-dry-run policy requires an activated Kafka materialization runtime，then
 `BookKeeperPrimaryWalRuntime.createRetentionService` composes the common/async retirement authorities、reference manager、
@@ -452,8 +467,12 @@ Safe default 不创建 activation/retention owner。确定性测试覆盖两组�
 two-bookie BookKeeper 上证明动态 materialization-source protection 先删除、WAL references 后退休、root 再按
 `MARKED/DELETING/DELETED` 收敛；随后 provider open 返回 no-such-ledger，而 Kafka 从已提交 NCP2 继续读回同一
 bytes。测试 capability/readiness authority 有效期必须覆盖完整删除窗口；生产 verifier 仍严格拒绝过期 proof。
-Fresh-process NCP2/WAL-only recovery after physical deletion、delete response-loss 和 takeover evidence 仍需
-release-process gate，因此这里只声明 adapter-level R-tier physical deletion。
+`f9BookKeeperWalAsyncObjectProcessIntegrationTest` then closes the release-process restart cut：the generated
+configuration sets `max.entries.per.ledger=1` and the three materialization lifecycle windows to one second，the first
+release JVM produces enough batches to roll the ledger，waits for `DELETED`，and uses an independent BookKeeper client that
+has never cached the target to prove `NoSuchLedger`。After normal first-JVM shutdown，a fresh higher-epoch JVM fetches offset
+0 through NCP2 fallback，continues append/fetch，and verifies ListOffsets。Delete-response-loss and multi-broker takeover
+evidence remain open，so this is not yet the final KF-RET-009 gate。
 
 `f9BookKeeperWalOnlyProcessIntegrationTest` closes the native process boundary for this first BookKeeper profile。The fixture
 starts two real bookies over BookKeeper's stock ZooKeeper

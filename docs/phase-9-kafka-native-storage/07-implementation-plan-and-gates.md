@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping and BookKeeper async/sync fresh-process gates are implemented；multi-broker/controller、remaining M4 internal-topic cuts and inherited final gates remain open
+> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates and release-process physical-deletion/fresh-JVM NCP2 fallback are implemented；delete-response-loss、multi-broker/controller、remaining M4 internal-topic cuts and inherited final gates remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -422,7 +422,7 @@ coordinator/transaction/compaction remain M4/M5。
   and cold generation-zero Fetch against the shared Oxia graph。The BookKeeper client remains borrowed and the provider-neutral
   runtime/stores/readers are closed through the product ledger。The same gate now opens `BOOKKEEPER_WAL_ASYNC_OBJECT` and
   `BOOKKEEPER_WAL_SYNC_OBJECT`，verifies NCP2 COMMITTED publication、byte-exact normal reads and the sync append
-  required-generation completion barrier。Fork `b443750be4` adds the complete stock-owned typed
+  required-generation completion barrier。Fork `5169b57986` adds the complete stock-owned typed
   BookKeeper binding、exact file/version secret reference、pre-I/O cross-field validation、BookKeeper client construction and
   product-before-client close wrapper；six server config tests、eight mapper/ownership tests、Checkstyle、SpotBugs and
   Spotless pass。`f9BookKeeperWalOnlyProcessIntegrationTest` now adds real release-distribution P-tier evidence：stock
@@ -445,8 +445,11 @@ coordinator/transaction/compaction remain M4/M5。
   `SEALED -> MARKED -> DELETING -> DELETED` chain，proves the provider ledger is absent and reads the same Kafka bytes from
   NCP2。`TerminalWorkflowMetadataRetirementTest` separately locks the Kafka-specific
   `KAFKA_RECORD_BATCH_V1 -> KAFKA_RECORD_BATCH` logical/payload mapping used by terminal proof。The task is wired into
-  `phase9M5RetentionCheck` as `f9BookKeeperLedgerDeletionProviderIntegrationTest`。Fresh-process deletion/restart、
-  response-loss cuts and multi-broker takeover remain open；
+  `phase9M5RetentionCheck` as `f9BookKeeperLedgerDeletionProviderIntegrationTest`。
+  `f9BookKeeperWalAsyncObjectProcessIntegrationTest` additionally uses the release distribution with one-entry rollover，
+  waits for metadata `DELETED` and independent-client `NoSuchLedger`，normally stops the first JVM，then proves a fresh
+  JVM can recover offset 0 from NCP2 and continue append/fetch/ListOffsets。Delete-response-loss cuts and multi-broker
+  takeover remain open；
 - the 2026-07-28 Kafka NCP2 materialization core checkpoint adds the distinct
   `nereus-kafka-committed-v2` / `NEREUS_COMPACTED_PARQUET_V2` committed policy，without reinterpreting NCP1 durable
   records。`DefaultMaterializationWorker` now has an NCP2-only ranged writer path that preserves every Kafka
@@ -509,13 +512,13 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@b443750be4` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@5169b57986` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
   compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
   controller activation scheduling commit、one durable feature/control commit、one aggregate Spotless alignment commit and one
   cache-directory KRaft identity commit、one typed BookKeeper runtime/client-ownership commit、one async Object-WAL
-  profile-mapping commit、one BookKeeper Object-profile/cache-root NCP2 mapping commit and one BookKeeper ledger-GC
-  configuration/digest-mapping commit。The
+  profile-mapping commit、one BookKeeper Object-profile/cache-root NCP2 mapping commit、one BookKeeper ledger-GC
+  configuration/digest-mapping commit and one materialization-retirement configuration/digest-mapping commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
@@ -611,7 +614,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@b443750be4` branch。
+`nereus/future9-native-kafka-storage@5169b57986` branch。
 The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、fresh
 process restart/takeover index recovery、real internal-topic coordinator replay/restart/failover、upstream focused suites
 and real two-broker evidence are still required before M4 completion。
@@ -664,7 +667,7 @@ owner and drain it through the runtime background-service lifecycle。Kafka fork
 provide stock DeleteRecords invocation、partition-lock capture、same-log local updater and owned writable-partition
 enumeration；`378e9f8967` supplies the live virtual segment/config/index facts consumed by the planner。The focused
 retention suite and fork UnifiedLog/Partition/config regressions pass。This task deliberately does not use the
-`phase9M5Check` completion name：real-provider/fresh-process retention、restart/takeover/chaos evidence、compaction
+`phase9M5Check` completion name：delete-response-loss/multi-broker takeover/chaos evidence、compaction
 full stock-cleaner differential oracle and aggregate gates remain required。Compaction production fork
 registration/concrete authority capture is now implemented separately by product `e18bf36` and fork `58342d9dca`。
 

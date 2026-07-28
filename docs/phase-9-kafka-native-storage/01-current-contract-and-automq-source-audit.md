@@ -422,10 +422,12 @@ source-isolation fix 是 `faaffc8a75`，第二十七个 native-storage launcher 
 `50b46aab2dad56850fc5d76ec11cf929b14c1bd9`，第三十三个 async Object-WAL profile mapping commit 是
 `80445853a3ee718089933615776d910f0414470f`，第三十四个 BookKeeper Object-profile/cache-root NCP2 mapping
 commit 是 `116052aa53867e4f41bdb4b61f4dc171923a0659`，第三十五个 BookKeeper ledger-GC typed
-configuration/digest mapping commit 是 `b443750be4ea34eb7dd5b827104b7eec7db65292`。该 head 已通过 SSH 发布到
+configuration/digest mapping commit 是 `b443750be4ea34eb7dd5b827104b7eec7db65292`，第三十六个 materialization
+retirement policy/configuration-digest mapping commit 是
+`5169b57986f9b940d6f2c96ab3e1f777d4aa9cfa`。该 head 已通过 SSH 发布到
 `origin/nereus/future9-native-kafka-storage`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/thirty-five-commit
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/thirty-six-commit
 count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百二十一文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
@@ -599,5 +601,5 @@ earliest=0/latest=2 over the same formatted KRaft directories、Oxia and LocalSt
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`b443750be4ea34eb7dd5b827104b7eec7db65292`。Executable source-lock expectation 已更新到该 reviewed、
+`5169b57986f9b940d6f2c96ab3e1f777d4aa9cfa`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

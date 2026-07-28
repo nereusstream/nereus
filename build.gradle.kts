@@ -2854,7 +2854,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "b443750be4ea34eb7dd5b827104b7eec7db65292",
+        "5169b57986f9b940d6f2c96ab3e1f777d4aa9cfa",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -3082,7 +3082,8 @@ tasks.register("phase9M6KafkaProcessCheck") {
 
 tasks.register("phase9M6KafkaBookKeeperProcessCheck") {
     group = "verification"
-    description = "Run the focused real BookKeeper WAL-only/async/sync native Kafka cold-restart process gates."
+    description =
+        "Run the focused real BookKeeper WAL-only/async/sync cold-restart and physical-deletion process gates."
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalAsyncObjectProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalSyncObjectProcessIntegrationTest")

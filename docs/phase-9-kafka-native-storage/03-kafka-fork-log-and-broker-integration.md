@@ -282,7 +282,7 @@ BookKeeper 模式复用 provider-neutral `BookKeeperPrimaryWalRuntime`、Oxia na
 physical-reference publisher、profile resolver 和 exact reader registry；只有 F1-BK namespace 与 ACTIVE publication
 已由 operator provision、broker readiness exact 匹配时才允许启动。`f9BookKeeperWalOnlyProviderIntegrationTest`
 用真实四分片 Oxia + 两个 bookie 证明 leader open、strict append 和 cold generation-zero Fetch。Fork
-`b443750be4` 已实现完整 97-key typed BookKeeper 配置映射、password file/version identity、pre-I/O cross-field
+`5169b57986` 已实现完整 100-key typed storage 配置映射、BookKeeper password file/version identity、pre-I/O cross-field
 validation、fork-owned client 和 product-first/client-second close wrapper。`f9BookKeeperWalOnlyProcessIntegrationTest`
 进一步从真实 release tarball 启动 combined-node Kafka，使用 stock
 `zk+longhierarchical://127.0.0.1:<port>/ledgers` 管理 BookKeeper 自身元数据，同时把 Nereus
@@ -913,7 +913,9 @@ password-file exact identity、fork-owned client construction，以及 product-f
 Object profile 作为 default；第三十四个 `116052aa53` 将 BookKeeper async/sync 映射到同一
 BookKeeper-primary + Object-materialization graph，暴露完整五档 capability/default，并把 staging 目录锚定到
 authoritative cache root；第三十五个 `b443750be4` 增加六个 ledger-GC rollout key、typed snapshot/cross-field
-validation、compatibility-digest binding 以及 `BookKeeperLedgerGcConfiguration` 映射。默认 disabled/dry-run
+validation、compatibility-digest binding 以及 `BookKeeperLedgerGcConfiguration` 映射。第三十六个
+`5169b57986` 增加三个 materialization retirement lifecycle key、`RetentionCompaction` typed snapshot/
+cross-field validation、`MaterializationConfig` 映射与 compatibility-digest binding。默认 disabled/dry-run
 不会启动 scanner；enabled/non-dry-run 只有在 materialization runtime 已激活时才允许创建 retention service。
 Product adapter 现已把 provider-neutral deletion coordinator 下沉到 `nereus-bookkeeper`，并新增 Kafka-owned
 `KafkaBookKeeperStreamCoverageProofProducer`。它完整扫描 64 个 binding shards 与 64 个 F4 registration
@@ -927,8 +929,11 @@ hint/root、L0、registration、namespace、readiness 或 activation version 漂
 物理删除：BookKeeper async append/rollover、NCP2 COMMITTED、terminal materialization-source protection
 retirement、activation-guarded retention、provider ledger absence 和删除后的 NCP2 byte-exact read 全部通过。
 它还锁定 Kafka logical format `KAFKA_RECORD_BATCH_V1` 必须 canonicalize 为 generation index payload format
-`KAFKA_RECORD_BATCH`，否则 terminal task 会永久保护旧 ledger。fresh-process restart/read、delete-response-loss
-和 multi-broker takeover 仍需后续 process gate，当前不能把这条 R-tier evidence 等同于完整 KF-RET-009。
+`KAFKA_RECORD_BATCH`，否则 terminal task 会永久保护旧 ledger。
+`f9BookKeeperWalAsyncObjectProcessIntegrationTest` 又用真实 release tarball 强制单 entry rollover，等待 ledger
+root `DELETED` 并以独立 client 证明 `NoSuchLedger`；首 JVM 正常停机后，fresh JVM 从 NCP2 读取 offset 0
+并继续 append/fetch/ListOffsets。delete-response-loss 和 multi-broker takeover 仍需后续 process gate，
+当前不能把这条 R-tier evidence 等同于完整 KF-RET-009。
 真实 combined-node
 KRaft/Oxia/S3 process baseline 已通过；
 同节点 fresh-JVM cold restart 也已通过；独立 BookKeeper WAL-only/async/sync release-distribution

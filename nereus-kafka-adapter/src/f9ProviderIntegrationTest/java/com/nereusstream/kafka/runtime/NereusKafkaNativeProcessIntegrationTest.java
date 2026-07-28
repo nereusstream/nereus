@@ -3,6 +3,7 @@ package com.nereusstream.kafka.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nereusstream.api.StreamId;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
 import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceProvisioningCoordinator;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationCoordinator;
@@ -11,8 +12,17 @@ import com.nereusstream.bookkeeper.BookKeeperSecretRef;
 import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.bookkeeper.OxiaBookKeeperLedgerIdNamespaceReservationStore;
 import com.nereusstream.bookkeeper.OxiaBookKeeperProtocolActivationStore;
+import com.nereusstream.metadata.oxia.BookKeeperKeyspace;
+import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
+import com.nereusstream.metadata.oxia.BookKeeperScanToken;
+import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
+import com.nereusstream.metadata.oxia.KafkaPartitionId;
+import com.nereusstream.metadata.oxia.OxiaJavaBookKeeperMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaJavaKafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
 import io.oxia.testcontainers.OxiaContainer;
 import java.io.IOException;
 import java.io.Writer;
@@ -26,6 +36,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -50,7 +61,10 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.bookkeeper.client.BKException;
+import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.common.allocator.PoolingPolicy;
+import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.meta.LongHierarchicalLedgerManagerFactory;
 import org.apache.bookkeeper.util.LocalBookKeeper;
@@ -563,6 +577,8 @@ class NereusKafkaNativeProcessIntegrationTest {
         int zooKeeperPort = differentFreePort(controllerPort, brokerPort);
         String metadataServiceUri =
                 "zk+longhierarchical://127.0.0.1:" + zooKeeperPort + "/ledgers";
+        boolean requirePhysicalLedgerDeletion =
+                storageProfile.equals("BOOKKEEPER_WAL_ASYNC_OBJECT");
         BookKeeperProcessConfiguration bookKeeper =
                 new BookKeeperProcessConfiguration(
                         metadataServiceUri,
@@ -579,13 +595,17 @@ class NereusKafkaNativeProcessIntegrationTest {
                         String.format("%02x", 0x54 + authoritySeed)
                                 .repeat(32),
                         1);
+        BookKeeperWalConfiguration bookKeeperWal =
+                bookKeeperWalConfiguration(
+                        bookKeeper,
+                        requirePhysicalLedgerDeletion);
         seedBookKeeperAuthority(
                 oxiaConfiguration(),
-                bookKeeperWalConfiguration(bookKeeper),
+                bookKeeperWal,
                 bookKeeper,
                 Clock.systemUTC());
         try (LocalBookKeeper ignored = startBookKeeper(zooKeeperPort)) {
-            writeConfiguration(
+            String nereusCluster = writeConfiguration(
                     config,
                     brokerPort,
                     controllerPort,
@@ -595,21 +615,43 @@ class NereusKafkaNativeProcessIntegrationTest {
                     root.resolve(fixtureToken + "-nereus-cache"),
                     storageProfile,
                     bookKeeper);
-            runSimpleProfileColdRestart(
-                    formatScript,
-                    startScript,
-                    kafkaHome,
-                    config,
-                    formatLog,
-                    firstServerLog,
-                    restartServerLog,
-                    bootstrapServers,
-                    topic,
-                    fixtureToken,
-                    initialRecordCount,
-                    requireMaterializedObject
-                            ? bucket
-                            : null);
+            try (BookKeeper inspector =
+                    requirePhysicalLedgerDeletion
+                            ? bookKeeperClient(metadataServiceUri)
+                            : null) {
+                FirstBrokerAssertions firstBrokerAssertions =
+                        requirePhysicalLedgerDeletion
+                                ? (runningBootstrapServers,
+                                        partition,
+                                        runningTopic,
+                                        serverLog) ->
+                                        assertProcessLedgerDeletion(
+                                                runningBootstrapServers,
+                                                partition,
+                                                runningTopic,
+                                                serverLog,
+                                                nereusCluster,
+                                                bookKeeperWal,
+                                                bookKeeper,
+                                                inspector)
+                                : FirstBrokerAssertions.NONE;
+                runSimpleProfileColdRestart(
+                        formatScript,
+                        startScript,
+                        kafkaHome,
+                        config,
+                        formatLog,
+                        firstServerLog,
+                        restartServerLog,
+                        bootstrapServers,
+                        topic,
+                        fixtureToken,
+                        initialRecordCount,
+                        requireMaterializedObject
+                                ? bucket
+                                : null,
+                        firstBrokerAssertions);
+            }
         } catch (Exception | AssertionError failure) {
             try {
                 preserveFailureEvidence(
@@ -624,7 +666,7 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
-    private void writeConfiguration(
+    private String writeConfiguration(
             Path config,
             int brokerPort,
             int controllerPort,
@@ -633,7 +675,7 @@ class NereusKafkaNativeProcessIntegrationTest {
             Path metadataDirectory,
             Path cacheDirectory
     ) throws IOException {
-        writeConfiguration(
+        return writeConfiguration(
                 config,
                 brokerPort,
                 controllerPort,
@@ -645,7 +687,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 null);
     }
 
-    private void writeConfiguration(
+    private String writeConfiguration(
             Path config,
             int brokerPort,
             int controllerPort,
@@ -698,7 +740,8 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty("log.cleaner.enable", "false");
 
         properties.setProperty("nereus.kafka.storage.enabled", "true");
-        properties.setProperty("nereus.kafka.storage.cluster", "f9-process-" + UUID.randomUUID());
+        String nereusCluster = "f9-process-" + UUID.randomUUID();
+        properties.setProperty("nereus.kafka.storage.cluster", nereusCluster);
         properties.setProperty(
                 "nereus.kafka.storage.profile",
                 storageProfile);
@@ -729,16 +772,22 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty("nereus.kafka.storage.shutdown.drain.timeout.ms", "30000");
         properties.setProperty("nereus.kafka.storage.shutdown.checkpoint.timeout.ms", "30000");
         if (bookKeeper != null) {
-            addBookKeeperConfiguration(properties, bookKeeper);
+            addBookKeeperConfiguration(
+                    properties,
+                    bookKeeper,
+                    storageProfile.equals(
+                            "BOOKKEEPER_WAL_ASYNC_OBJECT"));
         }
         try (Writer writer = Files.newBufferedWriter(config, StandardCharsets.UTF_8)) {
             properties.store(writer, "F9 native Kafka provider-backed process gate");
         }
+        return nereusCluster;
     }
 
     private static void addBookKeeperConfiguration(
             Properties properties,
-            BookKeeperProcessConfiguration bookKeeper
+            BookKeeperProcessConfiguration bookKeeper,
+            boolean enablePhysicalLedgerDeletion
     ) {
         properties.setProperty(
                 "nereus.kafka.storage.bookkeeper.metadata.service.uri",
@@ -779,6 +828,65 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty(
                 "nereus.kafka.storage.bookkeeper.persistent.broker.count",
                 Integer.toString(bookKeeper.persistentBrokerCount()));
+        if (enablePhysicalLedgerDeletion) {
+            properties.setProperty(
+                    "nereus.kafka.storage.fetch.executor.threads",
+                    "8");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.max.reads.inflight",
+                    "8");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.max.entries.per.ledger",
+                    "1");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.operation.timeout.ms",
+                    "4000");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.allocation.timeout.ms",
+                    "4000");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.seal.timeout.ms",
+                    "4000");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.delete.timeout.ms",
+                    "4000");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.reader.lease.ttl.ms",
+                    "5000");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.reader.lease.renew.ms",
+                    "1000");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.retention.scan.interval.ms",
+                    "1000");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.gc.enabled",
+                    "true");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.gc.dry.run",
+                    "false");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.gc.max.concurrent.deletes",
+                    "1");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.gc.max.clock.skew.ms",
+                    "0");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.gc.drain.grace.ms",
+                    "5000");
+            properties.setProperty(
+                    "nereus.kafka.storage.bookkeeper.gc.late.create.audit.grace.ms",
+                    "1000");
+            properties.setProperty(
+                    "nereus.kafka.storage.materialization.source.retirement.grace.ms",
+                    "1000");
+            properties.setProperty(
+                    "nereus.kafka.storage.materialization.append.replay.grace.ms",
+                    "1000");
+            properties.setProperty(
+                    "nereus.kafka.storage.materialization.metadata.audit.grace.ms",
+                    "1000");
+        }
     }
 
     private static void formatStorage(
@@ -830,7 +938,8 @@ class NereusKafkaNativeProcessIntegrationTest {
                 topic,
                 payloadPrefix,
                 1,
-                null);
+                null,
+                FirstBrokerAssertions.NONE);
     }
 
     private static void runSimpleProfileColdRestart(
@@ -845,7 +954,8 @@ class NereusKafkaNativeProcessIntegrationTest {
             String topic,
             String payloadPrefix,
             int initialRecordCount,
-            String requiredMaterializationBucket
+            String requiredMaterializationBucket,
+            FirstBrokerAssertions firstBrokerAssertions
     ) throws Exception {
         if (initialRecordCount <= 0) {
             throw new IllegalArgumentException(
@@ -918,6 +1028,11 @@ class NereusKafkaNativeProcessIntegrationTest {
                             awaitPositiveObjectCount(
                                     requiredMaterializationBucket);
                         }
+                        firstBrokerAssertions.verify(
+                                bootstrapServers,
+                                partition,
+                                topic,
+                                firstServerLog);
                     }
                 });
 
@@ -985,6 +1100,287 @@ class NereusKafkaNativeProcessIntegrationTest {
                 "Kafka NCP2 object did not appear before the process deadline");
     }
 
+    private static void assertProcessLedgerDeletion(
+            String bootstrapServers,
+            TopicPartition partition,
+            String topic,
+            Path serverLog,
+            String nereusCluster,
+            BookKeeperWalConfiguration bookKeeperWal,
+            BookKeeperProcessConfiguration bookKeeper,
+            BookKeeper inspector
+    ) throws Exception {
+        KafkaPartitionId partitionId =
+                kafkaPartitionId(
+                        bootstrapServers,
+                        partition,
+                        topic);
+        OxiaClientConfiguration oxia = oxiaConfiguration();
+        Clock clock = Clock.systemUTC();
+        BookKeeperMetadataStoreConfig metadataConfiguration =
+                new BookKeeperMetadataStoreConfig(
+                        bookKeeperWal.maxAppendRangesPerLedger(),
+                        bookKeeperWal.protectionSlotsPerRange(),
+                        bookKeeperWal.maxReaderLeasesPerLedger(),
+                        bookKeeperWal.maxUncertainAllocations());
+        try (SharedOxiaClientRuntime shared =
+                        SharedOxiaClientRuntime.connect(
+                                oxia,
+                                clock);
+                OxiaJavaKafkaPartitionMetadataStore partitions =
+                        OxiaJavaKafkaPartitionMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        shared,
+                                        nereusCluster,
+                                        partitionId.kafkaClusterId());
+                OxiaJavaBookKeeperMetadataStore metadata =
+                        OxiaJavaBookKeeperMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        shared,
+                                        clock,
+                                        metadataConfiguration)) {
+            StreamId streamId =
+                    awaitPartitionStreamId(
+                            partitions,
+                            partitionId,
+                            serverLog,
+                            Duration.ofSeconds(30));
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord>
+                    retired =
+                            awaitProcessRetiredLedger(
+                                    metadata,
+                                    nereusCluster,
+                                    streamId,
+                                    serverLog,
+                                    Duration.ofSeconds(45));
+            long deletedLedgerId = retired.value().ledgerId();
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord>
+                    deleted =
+                            awaitProcessDeletedLedger(
+                                    metadata,
+                                    nereusCluster,
+                                    bookKeeperWal.providerScopeSha256(),
+                                    deletedLedgerId,
+                                    serverLog,
+                                    Duration.ofSeconds(45));
+            assertThat(deleted.value().lifecycle())
+                    .isEqualTo(BookKeeperLedgerLifecycle.DELETED);
+            assertPhysicalLedgerAbsent(
+                    inspector,
+                    deletedLedgerId,
+                    Files.readAllBytes(bookKeeper.passwordFile()));
+        }
+    }
+
+    private static KafkaPartitionId kafkaPartitionId(
+            String bootstrapServers,
+            TopicPartition partition,
+            String topic
+    ) throws Exception {
+        try (Admin admin =
+                Admin.create(adminProperties(bootstrapServers))) {
+            String kafkaClusterId =
+                    admin.describeCluster()
+                            .clusterId()
+                            .get(
+                                    CLIENT_TIMEOUT.toSeconds(),
+                                    TimeUnit.SECONDS);
+            String topicId =
+                    admin.describeTopics(List.of(topic))
+                            .allTopicNames()
+                            .get(
+                                    CLIENT_TIMEOUT.toSeconds(),
+                                    TimeUnit.SECONDS)
+                            .get(topic)
+                            .topicId()
+                            .toString();
+            return new KafkaPartitionId(
+                    kafkaClusterId,
+                    topicId,
+                    partition.partition());
+        }
+    }
+
+    private static StreamId awaitPartitionStreamId(
+            OxiaJavaKafkaPartitionMetadataStore partitions,
+            KafkaPartitionId partitionId,
+            Path serverLog,
+            Duration timeout
+    ) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            var binding = partitions.get(partitionId).join();
+            if (binding.isPresent()
+                    && !binding.orElseThrow().value().streamId().isBlank()) {
+                return new StreamId(
+                        binding.orElseThrow().value().streamId());
+            }
+            pauseForProviderState(
+                    "Kafka process partition binding");
+        }
+        throw new AssertionError(
+                "Kafka process partition binding did not publish a stream before the deadline:\n"
+                        + readLog(serverLog));
+    }
+
+    private static BookKeeperVersionedValue<BookKeeperLedgerRootRecord>
+            awaitProcessRetiredLedger(
+                    OxiaJavaBookKeeperMetadataStore metadata,
+                    String nereusCluster,
+                    StreamId streamId,
+                    Path serverLog,
+                    Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            ArrayList<
+                            BookKeeperVersionedValue<
+                                    BookKeeperLedgerRootRecord>>
+                    candidates = new ArrayList<>();
+            for (int shard = 0;
+                    shard < BookKeeperKeyspace.LEDGER_SHARDS;
+                    shard++) {
+                Optional<BookKeeperScanToken> continuation =
+                        Optional.empty();
+                do {
+                    var page =
+                            metadata.scanRoots(
+                                            nereusCluster,
+                                            shard,
+                                            continuation,
+                                            100)
+                                    .join();
+                    page.values().stream()
+                            .filter(
+                                    value ->
+                                            value.value()
+                                                    .streamId()
+                                                    .equals(
+                                                            streamId
+                                                                    .value()))
+                            .filter(
+                                    value ->
+                                            switch (value
+                                                    .value()
+                                                    .lifecycle()) {
+                                                case SEALED,
+                                                        MARKED,
+                                                        DELETING,
+                                                        DELETED ->
+                                                        true;
+                                                default -> false;
+                                            })
+                            .forEach(candidates::add);
+                    continuation = page.continuation();
+                } while (continuation.isPresent());
+            }
+            Optional<
+                            BookKeeperVersionedValue<
+                                    BookKeeperLedgerRootRecord>>
+                    earliest =
+                            candidates.stream()
+                                    .min(
+                                            java.util.Comparator
+                                                    .comparingLong(
+                                                            value ->
+                                                                    value.value()
+                                                                            .segmentSequence()));
+            if (earliest.isPresent()) {
+                return earliest.orElseThrow();
+            }
+            pauseForProviderState(
+                    "retired process BookKeeper ledger");
+        }
+        throw new AssertionError(
+                "Kafka process did not roll a BookKeeper ledger before the deadline:\n"
+                        + readLog(serverLog));
+    }
+
+    private static BookKeeperVersionedValue<BookKeeperLedgerRootRecord>
+            awaitProcessDeletedLedger(
+                    OxiaJavaBookKeeperMetadataStore metadata,
+                    String nereusCluster,
+                    String providerScopeSha256,
+                    long ledgerId,
+                    Path serverLog,
+                    Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        BookKeeperVersionedValue<BookKeeperLedgerRootRecord> last =
+                null;
+        while (System.nanoTime() < deadline) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord>
+                    current =
+                            metadata.getRoot(
+                                            nereusCluster,
+                                            providerScopeSha256,
+                                            ledgerId)
+                                    .join()
+                                    .orElseThrow();
+            last = current;
+            if (current.value().lifecycle()
+                    == BookKeeperLedgerLifecycle.DELETED) {
+                return current;
+            }
+            if (current.value().lifecycle()
+                            == BookKeeperLedgerLifecycle.QUARANTINED
+                    || current.value().lifecycle()
+                            == BookKeeperLedgerLifecycle.ABORTED) {
+                throw new AssertionError(
+                        "Kafka process BookKeeper retention entered terminal "
+                                + current.value().lifecycle()
+                                + ":\n"
+                                + readLog(serverLog));
+            }
+            pauseForProviderState(
+                    "deleted process BookKeeper ledger");
+        }
+        throw new AssertionError(
+                "Kafka process BookKeeper ledger did not reach DELETED before the deadline; last="
+                        + last
+                        + ":\n"
+                        + readLog(serverLog));
+    }
+
+    private static void assertPhysicalLedgerAbsent(
+            BookKeeper inspector,
+            long ledgerId,
+            byte[] password
+    ) throws Exception {
+        try {
+            var handle =
+                    inspector.openLedgerNoRecovery(
+                            ledgerId,
+                            BookKeeper.DigestType.CRC32C,
+                            password);
+            try {
+                handle.close();
+            } finally {
+                throw new AssertionError(
+                        "physically deleted BookKeeper ledger reopened: "
+                                + ledgerId);
+            }
+        } catch (BKException failure) {
+            assertThat(failure.getCode())
+                    .isIn(
+                            BKException.Code
+                                    .NoSuchLedgerExistsException,
+                            BKException.Code
+                                    .NoSuchLedgerExistsOnMetadataServerException);
+        }
+    }
+
+    private static void pauseForProviderState(String state) {
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(
+                    "interrupted while awaiting " + state,
+                    failure);
+        }
+    }
+
     private static void assertOffsets(
             Admin admin,
             TopicPartition partition,
@@ -1014,7 +1410,8 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     private static BookKeeperWalConfiguration bookKeeperWalConfiguration(
-            BookKeeperProcessConfiguration bookKeeper
+            BookKeeperProcessConfiguration bookKeeper,
+            boolean physicalLedgerDeletion
     ) {
         return new BookKeeperWalConfiguration(
                 bookKeeper.clusterAlias(),
@@ -1029,7 +1426,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 new BookKeeperSecretRef(
                         bookKeeper.passwordFile().toUri().toASCIIString(),
                         bookKeeper.passwordVersion()),
-                100_000,
+                physicalLedgerDeletion ? 1 : 100_000,
                 256L * 1024 * 1024,
                 1_000,
                 8,
@@ -1037,15 +1434,29 @@ class NereusKafkaNativeProcessIntegrationTest {
                 32,
                 Duration.ofHours(1),
                 8,
-                2,
+                physicalLedgerDeletion ? 8 : 2,
                 64L * 1024 * 1024,
-                Duration.ofSeconds(30),
-                Duration.ofSeconds(20),
-                Duration.ofSeconds(30),
-                Duration.ofSeconds(30),
-                Duration.ofMinutes(2),
-                Duration.ofSeconds(30),
-                Duration.ofMinutes(1),
+                physicalLedgerDeletion
+                        ? Duration.ofSeconds(4)
+                        : Duration.ofSeconds(30),
+                physicalLedgerDeletion
+                        ? Duration.ofSeconds(4)
+                        : Duration.ofSeconds(20),
+                physicalLedgerDeletion
+                        ? Duration.ofSeconds(4)
+                        : Duration.ofSeconds(30),
+                physicalLedgerDeletion
+                        ? Duration.ofSeconds(4)
+                        : Duration.ofSeconds(30),
+                physicalLedgerDeletion
+                        ? Duration.ofSeconds(5)
+                        : Duration.ofMinutes(2),
+                physicalLedgerDeletion
+                        ? Duration.ofSeconds(1)
+                        : Duration.ofSeconds(30),
+                physicalLedgerDeletion
+                        ? Duration.ofSeconds(1)
+                        : Duration.ofMinutes(1),
                 256);
     }
 
@@ -1133,6 +1544,15 @@ class NereusKafkaNativeProcessIntegrationTest {
                         configuration);
         cluster.start();
         return cluster;
+    }
+
+    private static BookKeeper bookKeeperClient(
+            String metadataServiceUri
+    ) throws Exception {
+        ClientConfiguration configuration =
+                new ClientConfiguration();
+        configuration.setMetadataServiceUri(metadataServiceUri);
+        return new BookKeeper(configuration);
     }
 
     private static RecordMetadata produce(
@@ -1723,6 +2143,23 @@ class NereusKafkaNativeProcessIntegrationTest {
     @FunctionalInterface
     private interface BrokerAssertions {
         void verify() throws Exception;
+    }
+
+    @FunctionalInterface
+    private interface FirstBrokerAssertions {
+        FirstBrokerAssertions NONE =
+                (bootstrapServers,
+                        partition,
+                        topic,
+                        serverLog) -> {
+                };
+
+        void verify(
+                String bootstrapServers,
+                TopicPartition partition,
+                String topic,
+                Path serverLog
+        ) throws Exception;
     }
 
     private enum StopMode {

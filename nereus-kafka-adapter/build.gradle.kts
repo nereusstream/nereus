@@ -196,7 +196,8 @@ tasks.register<Test>("f9BookKeeperWalOnlyProcessIntegrationTest") {
 
 tasks.register<Test>("f9BookKeeperWalAsyncObjectProcessIntegrationTest") {
     group = "verification"
-    description = "Run the native Kafka BookKeeper async-object NCP2 cold-restart process gate."
+    description =
+        "Run the native Kafka BookKeeper async-object physical-deletion and fresh-JVM NCP2 recovery process gate."
     jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
     mustRunAfter(tasks.named("f9BookKeeperWalOnlyProcessIntegrationTest"))
