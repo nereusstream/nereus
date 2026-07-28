@@ -1,7 +1,7 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
 > 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs/full composition and Object-WAL exact-reference durable checkpoint quarantine partial slices implemented
-> 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；真实两 Bookie/两 Kafka release-process gate 闭合 BookKeeper 三 profile 的 post-handoff recovery/continuation；test-only agent gate further proves Bookie-acked/metadata-`WRITING` stale append recovery and fencing；three-voter/three-combined-node gate further proves ACTIVE activation remains immutable across controller kill and readiness epoch does not regress；a second completion-gate test proves provider-applied PREPARED create and ACTIVE CAS survive exact-controller loss；pre-publication proof/pre-CAS process cuts、checkpoint/virtual-segment 与 coordinator migration 仍 open
+> 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；真实两 Bookie/两 Kafka release-process gate 闭合 BookKeeper 三 profile 的 post-handoff recovery/continuation；test-only agent gate further proves Bookie-acked/metadata-`WRITING` stale append recovery and fencing；three-voter/three-combined-node gate further proves ACTIVE activation remains immutable across controller kill and readiness epoch does not regress；a second fault-agent test now proves all four PREPARED-create/ACTIVE-CAS before-provider and after-provider publication boundaries survive exact-controller loss；initial-proof/readiness、transport-error、checkpoint/virtual-segment 与 coordinator migration cuts 仍 open
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -751,34 +751,45 @@ This cut does not persist controller epoch inside
 coordinator；the existing Oxia CAS records remain the durable safety authority。Therefore the gate supplies ACTIVE steady-state
 P/C evidence only；the following independent gate owns the provider-applied publication cuts。
 
-### 7.8 Provider-applied activation publication cuts（2026-07-29）
+### 7.8 Activation store publication-boundary cuts（2026-07-29）
 
 `f9ActivationCutFailoverProcessIntegrationTest` separates control-plane failure from broker-set drift by running three
 dedicated controllers plus one dedicated broker。Every controller receives a separate test-only completion-gate agent and
-marker set，but only the current controller leader can invoke the armed activation operation。The agent replaces the future
-returned to `KafkaStorageFirstActivationCoordinator` only after capturing one invocation；the real
-`OxiaJavaKafkaStorageActivationMetadataStore` future is left untouched and must complete successfully before the
-provider-applied marker is written。The replacement future intentionally remains incomplete until the process is killed。
+marker set，but the harness arms only the current controller leader after discovering it through direct controller Admin。
+The agent captures exactly one invocation and supports two explicit phases：`before-provider` skips the real store method
+and returns an incomplete future；`after-provider` leaves the real
+`OxiaJavaKafkaStorageActivationMetadataStore` future untouched，requires it to complete successfully and write an
+`applied` marker，then keeps the replacement future incomplete until the process is killed。
 
-The test runs two isolated clusters：
+The test runs four isolated clusters：
 
-| Cut | Intercepted store method | Durable state before kill | Required replacement action |
+| Cut | Phase and intercepted store method | Durable state before kill | Required replacement action |
 | --- | --- | --- | --- |
-| `PREPARED` | `createActivation(record)` | exact PREPARED record exists；readiness brokers are `[4]` | resume the same prepared tuple and publish ACTIVE |
-| `ACTIVE_APPLIED` | `compareAndSetActivation(expected, active)` | exact ACTIVE record exists but old coordinator has not observed success | treat ACTIVE as the winner；do not rewrite it |
+| `PREPARED_BEFORE_PROVIDER` | before `createActivation(record)` | activation absent；readiness brokers are `[4]` | reuse the exact readiness tuple，create PREPARED and publish ACTIVE |
+| `PREPARED_APPLIED` | after `createActivation(record)` succeeds | exact PREPARED record exists；readiness brokers are `[4]` | resume the same prepared tuple and publish ACTIVE |
+| `ACTIVE_BEFORE_PROVIDER` | before `compareAndSetActivation(expected, active)` | exact PREPARED record exists after the second empty-cluster proof | publish ACTIVE from the same prepared tuple |
+| `ACTIVE_APPLIED` | after `compareAndSetActivation(expected, active)` succeeds | exact ACTIVE record exists but old coordinator has not observed success | treat ACTIVE as the winner；do not rewrite it |
 
 Before killing the gated leader，the harness uses `bootstrap.controllers` to freeze exact controller ID/epoch/voters and a
-direct Oxia client to freeze activation/readiness。It also rejects a false-positive cut if the old leader already emitted
-the reconciliation-success marker。After `destroyForcibly()`，a different controller at a strictly higher epoch must emit
-its own success marker。For PREPARED，cluster/profile/capability/broker-set digests、source metadata offset and creation
-facts must be preserved into ACTIVE；for ACTIVE-applied，the complete activation record must compare equal。Both paths
-require readiness epoch monotonicity、broker admission only after recovery、RF1 native offset-0 Produce/Fetch、
+direct Oxia client to freeze activation/readiness。A before-provider cut requires `blocked` and forbids `applied`；an
+after-provider cut requires `applied`。It also rejects a false-positive cut if the old leader already emitted the
+reconciliation-success marker。After `destroyForcibly()`，a different controller at a strictly higher epoch must emit
+its own success marker。For absent activation，the replacement binds PREPARED to the existing readiness epoch and
+`kraftMetadataOffset` even when its local KRaft image has advanced；for durable PREPARED，all immutable facts are preserved
+into ACTIVE；for durable ACTIVE，the complete activation record compares equal。All four paths require readiness epoch
+monotonicity、broker admission only after recovery、RF1 native offset-0 Produce/Fetch、
 earliest/latest `0/1` and a positive Object count。
 
-This supplies process P/C evidence for both provider-applied response-loss boundaries without adding controller epoch or
-test markers to durable schemas。It does not prove every earlier cut：leadership loss during the second empty-cluster proof、
-immediately before ACTIVE CAS，and unapplied provider/transport failure remain deterministic-only or open process evidence。
-Accordingly KF-OPS-005 remains `PLANNED` until those cuts and the final aggregate close。
+The first before-provider run exposed a production recovery defect：a replacement controller could reuse valid readiness
+at offset `r` but build PREPARED from its newer snapshot offset `s`，then reject the tuple because `s != r`。
+`KafkaStorageFirstActivationCoordinator.createPrepared` now takes `preparedAtMetadataOffset` from the durable readiness
+record；`resumesAbsentActivationFromExistingReadinessAfterControllerFailure` fixes this contract with a deterministic
+regression。
+
+This supplies process P/C evidence for the complete two-operation store-publication boundary matrix without adding
+controller epoch or test markers to durable schemas。It does not prove leadership loss during the initial empty-cluster
+proof/readiness write、an actual provider/transport error，or the final aggregate。Accordingly KF-OPS-005 remains
+`PLANNED` until those cuts and the final aggregate close。
 
 ### 7.9 Recovery component ownership
 

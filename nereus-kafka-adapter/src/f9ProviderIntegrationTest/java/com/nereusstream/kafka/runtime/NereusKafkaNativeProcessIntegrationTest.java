@@ -984,7 +984,7 @@ class NereusKafkaNativeProcessIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.MINUTES)
-    void threeControllersRecoverPreparedAndAppliedActiveCuts()
+    void threeControllersRecoverEveryActivationPublicationCut()
             throws Exception {
         clearFailureEvidence();
         Path kafkaCheckout = requiredKafkaCheckout();
@@ -1170,14 +1170,17 @@ class NereusKafkaNativeProcessIntegrationTest {
                                     prefix
                                             + "-controller-"
                                             + nodeId
+                                            + "-agent-blocked"),
+                            root.resolve(
+                                    prefix
+                                            + "-controller-"
+                                            + nodeId
                                             + "-agent-applied"),
                             root.resolve(
                                     prefix
                                             + "-controller-"
                                             + nodeId
                                             + "-agent-installed"));
-            Files.createFile(
-                    markers[index].arm());
         }
 
         Process[] nodes =
@@ -1210,13 +1213,6 @@ class NereusKafkaNativeProcessIntegrationTest {
                         serverLogs[index],
                         Duration.ofSeconds(30));
             }
-            nodes[3] =
-                    start(
-                            List.of(
-                                    startScript.toString(),
-                                    configs[3].toString()),
-                            kafkaHome,
-                            serverLogs[3]);
             ControllerQuorumEvidence initialQuorum =
                     awaitControllerQuorum(
                             controllerAdminProperties(
@@ -1224,32 +1220,44 @@ class NereusKafkaNativeProcessIntegrationTest {
                             List.of(1, 2, 3),
                             -1,
                             -1,
-                            List.of(nodes),
-                            serverLogs);
+                            List.of(
+                                    nodes[0],
+                                    nodes[1],
+                                    nodes[2]),
+                            serverLogs[0],
+                            serverLogs[1],
+                            serverLogs[2]);
             int gatedControllerIndex =
-                    awaitAnyActivationAppliedMarker(
-                            cut,
-                            markers,
-                            nodes,
-                            serverLogs,
-                            Duration.ofSeconds(45));
-            assertThat(gatedControllerIndex + 1)
-                    .as(
-                            "the provider-applied completion must be held on the active controller")
-                    .isEqualTo(
-                            initialQuorum.leaderId());
+                    initialQuorum.leaderId() - 1;
+            Files.createFile(
+                    markers[gatedControllerIndex]
+                            .arm());
+            nodes[3] =
+                    start(
+                            List.of(
+                                    startScript.toString(),
+                                    configs[3].toString()),
+                            kafkaHome,
+                            serverLogs[3]);
+            awaitActivationCutMarker(
+                    cut,
+                    markers,
+                    gatedControllerIndex,
+                    nodes,
+                    serverLogs,
+                    Duration.ofSeconds(45));
             assertThat(
                             Files.exists(
                                     markers[
                                                     gatedControllerIndex]
-                                            .captured()))
+                                    .captured()))
                     .isTrue();
-            KafkaActivationEvidence cutEvidence =
-                    awaitActivationLifecycle(
+            KafkaActivationCutEvidence cutEvidence =
+                    awaitActivationCutEvidence(
                             nereusCluster,
                             kafkaClusterId,
                             List.of(4),
-                            cut.lifecycle(),
+                            cut,
                             serverLogs,
                             Duration.ofSeconds(30));
             assertThat(
@@ -1310,18 +1318,31 @@ class NereusKafkaNativeProcessIntegrationTest {
                             survivorLogs.toArray(
                                     Path[]::new),
                             Duration.ofSeconds(30));
-            if (cut.lifecycle()
-                    == KafkaStorageActivationLifecycle
+            if (cut.durableState()
+                    == ActivationDurableState
                             .PREPARED) {
                 assertPreparedFactsPreserved(
-                        cutEvidence.activation(),
+                        cutEvidence
+                                .activation()
+                                .orElseThrow(),
                         recovered.activation());
-            } else {
+            } else if (cut.durableState()
+                    == ActivationDurableState
+                            .ACTIVE) {
                 assertThat(recovered.activation())
                         .as(
                                 "an applied ACTIVE response loss must not rewrite activation")
                         .isEqualTo(
-                                cutEvidence.activation());
+                                cutEvidence
+                                        .activation()
+                                        .orElseThrow());
+            } else {
+                assertThat(
+                                cutEvidence
+                                        .activation())
+                        .as(
+                                "a before-provider PREPARED cut must not create activation")
+                        .isEmpty();
             }
             assertThat(
                             recovered
@@ -4707,57 +4728,76 @@ class NereusKafkaNativeProcessIntegrationTest {
                 + readLog(serverLog));
     }
 
-    private static int awaitAnyActivationAppliedMarker(
+    private static void awaitActivationCutMarker(
             ActivationPublicationCut cut,
             ActivationAgentMarkers[] markers,
+            int gatedControllerIndex,
             Process[] nodes,
             Path[] serverLogs,
             Duration timeout
     ) throws Exception {
-        long deadline =
-                System.nanoTime()
-                        + timeout.toNanos();
-        while (System.nanoTime() < deadline) {
-            int found = -1;
-            for (int index = 0;
-                    index < markers.length;
-                    index++) {
-                if (!Files.exists(
-                        markers[index].applied())) {
-                    continue;
-                }
-                if (found >= 0) {
-                    throw new AssertionError(
-                            "multiple controllers applied the same activation cut:\n"
-                                    + joinedLogs(
-                                            serverLogs));
-                }
-                String operation =
-                        Files.readString(
-                                        markers[index]
-                                                .applied(),
-                                        StandardCharsets
-                                                .UTF_8)
-                                .strip();
-                assertThat(operation)
-                        .isEqualTo(
-                                cut.operation());
-                found = index;
+        Path expectedMarker =
+                cut.phase()
+                        == ActivationFaultPhase
+                                .BEFORE_PROVIDER
+                        ? markers[
+                                        gatedControllerIndex]
+                                .blocked()
+                        : markers[
+                                        gatedControllerIndex]
+                                .applied();
+        String operation =
+                awaitMarker(
+                                expectedMarker,
+                                nodes[gatedControllerIndex],
+                                serverLogs[
+                                        gatedControllerIndex],
+                                timeout)
+                        .strip();
+        assertThat(operation)
+                .isEqualTo(
+                        cut.operation());
+        Path unexpectedMarker =
+                cut.phase()
+                        == ActivationFaultPhase
+                                .BEFORE_PROVIDER
+                        ? markers[
+                                        gatedControllerIndex]
+                                .applied()
+                        : markers[
+                                        gatedControllerIndex]
+                                .blocked();
+        assertThat(
+                        Files.exists(
+                                unexpectedMarker))
+                .as(
+                        "the gated controller must expose only the selected activation fault phase")
+                .isFalse();
+        for (int index = 0;
+                index < markers.length;
+                index++) {
+            if (index
+                    == gatedControllerIndex) {
+                continue;
             }
-            if (found >= 0) {
-                return found;
-            }
-            assertProcessesAlive(
-                    List.of(nodes),
-                    serverLogs);
-            Thread.sleep(100);
+            assertThat(
+                            Files.exists(
+                                    markers[index]
+                                            .captured()))
+                    .as(
+                            "only the armed current controller may capture the activation cut")
+                    .isFalse();
+            assertThat(
+                            Files.exists(
+                                    markers[index]
+                                            .blocked()))
+                    .isFalse();
+            assertThat(
+                            Files.exists(
+                                    markers[index]
+                                            .applied()))
+                    .isFalse();
         }
-        throw new AssertionError(
-                "no controller published the "
-                        + cut.operation()
-                        + " provider-applied marker before the deadline:\n"
-                        + joinedLogs(
-                                serverLogs));
     }
 
     private static void awaitClusterBrokers(
@@ -4922,6 +4962,129 @@ class NereusKafkaNativeProcessIntegrationTest {
                 + quorum.leaderId()
                 + " at epoch "
                 + quorum.leaderEpoch();
+    }
+
+    private static KafkaActivationCutEvidence
+            awaitActivationCutEvidence(
+                    String nereusCluster,
+                    String kafkaClusterId,
+                    List<Integer> expectedBrokerIds,
+                    ActivationPublicationCut cut,
+                    Path[] serverLogs,
+                    Duration timeout
+            ) {
+        if (cut.durableState()
+                == ActivationDurableState.ABSENT) {
+            return new KafkaActivationCutEvidence(
+                    Optional.empty(),
+                    awaitAbsentActivationReadiness(
+                            nereusCluster,
+                            kafkaClusterId,
+                            expectedBrokerIds,
+                            serverLogs,
+                            timeout));
+        }
+        KafkaActivationEvidence evidence =
+                awaitActivationLifecycle(
+                        nereusCluster,
+                        kafkaClusterId,
+                        expectedBrokerIds,
+                        cut.durableState()
+                                .lifecycle(),
+                        serverLogs,
+                        timeout);
+        return new KafkaActivationCutEvidence(
+                Optional.of(
+                        evidence.activation()),
+                evidence.readiness());
+    }
+
+    private static KafkaStorageReadinessRecord
+            awaitAbsentActivationReadiness(
+                    String nereusCluster,
+                    String kafkaClusterId,
+                    List<Integer> expectedBrokerIds,
+                    Path[] serverLogs,
+                    Duration timeout
+            ) {
+        List<Integer> expected =
+                expectedBrokerIds.stream()
+                        .sorted()
+                        .toList();
+        OxiaClientConfiguration oxia =
+                oxiaConfiguration();
+        Clock clock = Clock.systemUTC();
+        long deadline =
+                System.nanoTime()
+                        + timeout.toNanos();
+        Throwable lastFailure = null;
+        try (SharedOxiaClientRuntime shared =
+                        SharedOxiaClientRuntime.connect(
+                                oxia,
+                                clock);
+                KafkaStorageActivationMetadataStore store =
+                        KafkaStorageActivationMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        shared,
+                                        nereusCluster,
+                                        kafkaClusterId)) {
+            while (System.nanoTime() < deadline) {
+                try {
+                    var activation =
+                            store.getActivation()
+                                    .join();
+                    var readiness =
+                            store.getReadiness()
+                                    .join();
+                    if (activation.isEmpty()
+                            && readiness.isPresent()) {
+                        KafkaStorageReadinessRecord ready =
+                                readiness.orElseThrow()
+                                        .value();
+                        List<Integer> brokers =
+                                ready.brokers()
+                                        .stream()
+                                        .map(
+                                                KafkaBrokerIdentity
+                                                        ::brokerId)
+                                        .sorted()
+                                        .toList();
+                        if (ready.kafkaClusterId()
+                                        .equals(
+                                                kafkaClusterId)
+                                && brokers.equals(
+                                        expected)
+                                && ready.expiresAtMillis()
+                                        > clock.millis()) {
+                            return ready;
+                        }
+                        lastFailure =
+                                new AssertionError(
+                                        "activation is absent but readiness has not converged: "
+                                                + ready);
+                    } else {
+                        lastFailure =
+                                new AssertionError(
+                                        "expected absent activation and present readiness but observed activation="
+                                                + activation
+                                                + ", readiness="
+                                                + readiness);
+                    }
+                } catch (Throwable failure) {
+                    lastFailure = failure;
+                }
+                pauseForProviderState(
+                        "absent activation");
+            }
+        }
+        throw new AssertionError(
+                "Nereus absent-activation/readiness did not converge for brokers "
+                        + expected
+                        + ":\n"
+                        + joinedLogs(
+                                serverLogs),
+                lastFailure);
     }
 
     private static KafkaActivationEvidence
@@ -5291,10 +5454,14 @@ class NereusKafkaNativeProcessIntegrationTest {
                 Map.of(
                         "operation",
                         cut.operation(),
+                        "phase",
+                        cut.phase().agentValue(),
                         "arm",
                         markers.arm().toString(),
                         "captured",
                         markers.captured().toString(),
+                        "blocked",
+                        markers.blocked().toString(),
                         "applied",
                         markers.applied().toString(),
                         "installed",
@@ -5608,6 +5775,10 @@ class NereusKafkaNativeProcessIntegrationTest {
                         target.resolve(
                                 prefix + "captured"));
                 copyIfPresent(
+                        markers[index].blocked(),
+                        target.resolve(
+                                prefix + "blocked"));
+                copyIfPresent(
                         markers[index].applied(),
                         target.resolve(
                                 prefix + "applied"));
@@ -5880,6 +6051,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                         List.of(
                                 "arm",
                                 "captured",
+                                "blocked",
                                 "applied",
                                 "installed")) {
                     Files.deleteIfExists(
@@ -6156,29 +6328,50 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     private enum ActivationPublicationCut {
-        PREPARED(
-                "prepared",
+        PREPARED_BEFORE_PROVIDER(
+                "prep-before",
                 "createActivation",
-                KafkaStorageActivationLifecycle
+                ActivationFaultPhase
+                        .BEFORE_PROVIDER,
+                ActivationDurableState
+                        .ABSENT),
+        PREPARED_APPLIED(
+                "prep-applied",
+                "createActivation",
+                ActivationFaultPhase
+                        .AFTER_PROVIDER,
+                ActivationDurableState
+                        .PREPARED),
+        ACTIVE_BEFORE_PROVIDER(
+                "active-before",
+                "compareAndSetActivation",
+                ActivationFaultPhase
+                        .BEFORE_PROVIDER,
+                ActivationDurableState
                         .PREPARED),
         ACTIVE_APPLIED(
                 "active-applied",
                 "compareAndSetActivation",
-                KafkaStorageActivationLifecycle
+                ActivationFaultPhase
+                        .AFTER_PROVIDER,
+                ActivationDurableState
                         .ACTIVE);
 
         private final String slug;
         private final String operation;
-        private final KafkaStorageActivationLifecycle lifecycle;
+        private final ActivationFaultPhase phase;
+        private final ActivationDurableState durableState;
 
         ActivationPublicationCut(
                 String slug,
                 String operation,
-                KafkaStorageActivationLifecycle lifecycle
+                ActivationFaultPhase phase,
+                ActivationDurableState durableState
         ) {
             this.slug = slug;
             this.operation = operation;
-            this.lifecycle = lifecycle;
+            this.phase = phase;
+            this.durableState = durableState;
         }
 
         private String slug() {
@@ -6189,7 +6382,54 @@ class NereusKafkaNativeProcessIntegrationTest {
             return operation;
         }
 
+        private ActivationFaultPhase phase() {
+            return phase;
+        }
+
+        private ActivationDurableState durableState() {
+            return durableState;
+        }
+    }
+
+    private enum ActivationFaultPhase {
+        BEFORE_PROVIDER("before-provider"),
+        AFTER_PROVIDER("after-provider");
+
+        private final String agentValue;
+
+        ActivationFaultPhase(
+                String agentValue
+        ) {
+            this.agentValue = agentValue;
+        }
+
+        private String agentValue() {
+            return agentValue;
+        }
+    }
+
+    private enum ActivationDurableState {
+        ABSENT(null),
+        PREPARED(
+                KafkaStorageActivationLifecycle
+                        .PREPARED),
+        ACTIVE(
+                KafkaStorageActivationLifecycle
+                        .ACTIVE);
+
+        private final KafkaStorageActivationLifecycle lifecycle;
+
+        ActivationDurableState(
+                KafkaStorageActivationLifecycle lifecycle
+        ) {
+            this.lifecycle = lifecycle;
+        }
+
         private KafkaStorageActivationLifecycle lifecycle() {
+            if (lifecycle == null) {
+                throw new IllegalStateException(
+                        "ABSENT activation has no lifecycle");
+            }
             return lifecycle;
         }
     }
@@ -6280,9 +6520,15 @@ class NereusKafkaNativeProcessIntegrationTest {
             KafkaStorageReadinessRecord readiness) {
     }
 
+    private record KafkaActivationCutEvidence(
+            Optional<KafkaStorageProtocolActivationRecord> activation,
+            KafkaStorageReadinessRecord readiness) {
+    }
+
     private record ActivationAgentMarkers(
             Path arm,
             Path captured,
+            Path blocked,
             Path applied,
             Path installed) {
     }

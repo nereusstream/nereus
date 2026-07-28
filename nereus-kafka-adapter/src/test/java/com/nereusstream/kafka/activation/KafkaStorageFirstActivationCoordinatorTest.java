@@ -89,6 +89,31 @@ class KafkaStorageFirstActivationCoordinatorTest {
     }
 
     @Test
+    void resumesAbsentActivationFromExistingReadinessAfterControllerFailure() {
+        InMemoryKafkaStorageActivationStore store = capableStore();
+        store.failNextActivationCreate();
+        KafkaStorageFirstActivationCoordinator first = coordinator(
+                store, new SequenceSnapshots(empty(100)));
+
+        assertThatThrownBy(() -> first.activate().toCompletableFuture().join())
+                .hasRootCauseMessage("activation create interrupted");
+        assertThat(store.getActivation().join()).isEmpty();
+        var originalReadiness = store.getReadiness().join().orElseThrow();
+        assertThat(originalReadiness.value().kraftMetadataOffset()).isEqualTo(100);
+
+        VersionedKafkaStorageProtocolActivation active = coordinator(
+                store, new SequenceSnapshots(empty(102), empty(103)))
+                .activate().toCompletableFuture().join();
+
+        assertThat(active.value().lifecycle()).isEqualTo(KafkaStorageActivationLifecycle.ACTIVE);
+        assertThat(active.value().preparedAtMetadataOffset())
+                .isEqualTo(originalReadiness.value().kraftMetadataOffset());
+        assertThat(active.value().activationEpoch())
+                .isEqualTo(originalReadiness.value().readinessEpoch());
+        assertThat(store.getReadiness().join().orElseThrow()).isEqualTo(originalReadiness);
+    }
+
+    @Test
     void leavesPreparedWhenTheClusterStopsBeingEmptyAtTheSecondProof() {
         InMemoryKafkaStorageActivationStore store = capableStore();
         KafkaStorageClusterSnapshot topicsAppeared = new KafkaStorageClusterSnapshot(

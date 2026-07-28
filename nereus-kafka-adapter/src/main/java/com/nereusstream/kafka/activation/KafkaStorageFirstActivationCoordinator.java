@@ -176,7 +176,7 @@ public final class KafkaStorageFirstActivationCoordinator {
                 proof.capabilitySha256(),
                 readiness.value().brokerSetSha256(),
                 KafkaStorageProtocolActivationRecord.KAFKA_FEATURE_LEVEL,
-                snapshot.metadataOffset(),
+                readiness.value().kraftMetadataOffset(),
                 readiness.value().readinessEpoch(),
                 readiness.value().createdAtMillis(),
                 0,

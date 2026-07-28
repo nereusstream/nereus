@@ -1,7 +1,7 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart、BookKeeper WAL-only/async/sync cold-restart、BookKeeper three-profile two-process post-handoff、BookKeeper provider-applied cut、real-Oxia two-runtime Object-WAL live takeover、three-voter ACTIVE controller failover and provider-applied PREPARED/ACTIVE publication-cut gates 均通过；remaining activation process cuts and extended kill/chaos gates remain open
-> 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：fork `df238bb387` 与 product `f9MultiBrokerTakeoverProcessIntegrationTest` 已通过 two-release-process Object-WAL/KRaft singleton live reassignment；product `f9InFlightTakeoverProcessIntegrationTest` 以第三个 controller/broker JVM、Toxiproxy、`jcmd` 栈采样和 `SIGSTOP/SIGCONT` 闭合 Object-WAL already-dispatched old append；`f9BookKeeperProfileTakeoverProcessIntegrationTest` 闭合三 BookKeeper profile 的 post-handoff P-tier matrix；`f9BookKeeperInFlightTakeoverProcessIntegrationTest` further proves a real Bookie-acked、Oxia-`WRITING` append is abandoned/sealed by the new leader and cannot publish after the old JVM resumes；`f9MultiControllerFailoverProcessIntegrationTest` further proves a three-voter ACTIVE controller kill/election/reconciliation and native IO continuity；`f9ActivationCutFailoverProcessIntegrationTest` further kills the exact active controller after real PREPARED create or ACTIVE CAS application and proves higher-epoch recovery with broker `[4]` native IO；remaining gaps are transaction/internal-topic coordinator migration、checkpoint/virtual-segment cuts、pre-publication proof/pre-CAS process cuts and broader kill/response-loss chaos
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart、BookKeeper WAL-only/async/sync cold-restart、BookKeeper three-profile two-process post-handoff、BookKeeper provider-applied cut、real-Oxia two-runtime Object-WAL live takeover、three-voter ACTIVE controller failover and four-way PREPARED/ACTIVE store-publication gates 均通过；remaining activation process cuts and extended kill/chaos gates remain open
+> 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：fork `df238bb387` 与 product `f9MultiBrokerTakeoverProcessIntegrationTest` 已通过 two-release-process Object-WAL/KRaft singleton live reassignment；product `f9InFlightTakeoverProcessIntegrationTest` 以第三个 controller/broker JVM、Toxiproxy、`jcmd` 栈采样和 `SIGSTOP/SIGCONT` 闭合 Object-WAL already-dispatched old append；`f9BookKeeperProfileTakeoverProcessIntegrationTest` 闭合三 BookKeeper profile 的 post-handoff P-tier matrix；`f9BookKeeperInFlightTakeoverProcessIntegrationTest` further proves a real Bookie-acked、Oxia-`WRITING` append is abandoned/sealed by the new leader and cannot publish after the old JVM resumes；`f9MultiControllerFailoverProcessIntegrationTest` further proves a three-voter ACTIVE controller kill/election/reconciliation and native IO continuity；`f9ActivationCutFailoverProcessIntegrationTest` further kills the exact active controller before or after real PREPARED create and ACTIVE CAS and proves higher-epoch recovery with broker `[4]` native IO；remaining gaps are transaction/internal-topic coordinator migration、checkpoint/virtual-segment cuts、initial-proof/readiness、actual transport-error and broader kill/response-loss chaos
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -310,8 +310,8 @@ two-process KRaft singleton takeover、already-dispatched old Object-WAL append 
 profile 的 two-process post-handoff recovery/continuation。The product-only fault-agent gate additionally closes the
 common BookKeeper provider-applied/pre-publication C boundary without a fork hook；three combined release nodes additionally
 close ACTIVE-state controller kill/re-election/reconciliation while retaining native IO；three dedicated controllers plus
-one broker further close provider-applied PREPARED-create/ACTIVE-CAS response loss；尚未实现的是
-second-proof/pre-CAS/unapplied controller process cuts、coordinator/checkpoint cuts 和更广 kill-cut process tests。显式
+one broker further close before-provider/after-provider PREPARED-create/ACTIVE-CAS failover；尚未实现的是
+initial-proof/readiness、actual transport-error、coordinator/checkpoint cuts 和更广 kill-cut process tests。显式
 launcher/KafkaRaftServer broker/controller factory selection 已实现；`phase9M6KafkaProcessCheck` 现使用真实 release
 distribution、四分片 Oxia 和 pinned LocalStack S3 覆盖显式 feature format、broker/controller registration、
 activation、Admin create、Produce/Fetch/ListOffsets、S3 object existence 和 SIGTERM shutdown，并以同一 KRaft
@@ -1026,8 +1026,8 @@ the known-not-committed outcome cannot override an authority/session/head fence�
 `:nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest` and is included in `phase9M3ProviderCheck`。The
 separate `f9InFlightTakeoverProcessIntegrationTest` supplies the release-process already-dispatched Object-WAL cut；
 the BookKeeper three-profile post-handoff matrix and common provider-applied C cut also pass；ACTIVE-state multi-controller
-kill failover and provider-applied PREPARED-create/ACTIVE-CAS takeover now pass separately，while
-second-proof/pre-CAS/unapplied controller and coordinator/checkpoint variants remain open。
+kill failover and four-way PREPARED-create/ACTIVE-CAS store-publication takeover now pass separately，while
+initial-proof/readiness、actual transport-error and coordinator/checkpoint variants remain open。
 真实 combined-node
 KRaft/Oxia/S3 process baseline 已通过；
 同节点 fresh-JVM cold restart 也已通过；独立 BookKeeper WAL-only/async/sync release-distribution
@@ -1184,8 +1184,8 @@ combined-node native-storage KRaft process baseline 已通过；real-Oxia two-ru
 live preemption/replay/old-token fencing；two-release-process singleton reassignment 与 three-release-process
 Object-WAL old in-flight append cut，以及 BookKeeper three-profile two-release-process post-handoff matrix 也已通过。
 The common BookKeeper `WRITING` C cut also passes through the test-only agent gate。真实 ACTIVE-state controller kill
-failover also passes。The dedicated activation completion-gate process test additionally covers provider-applied
-PREPARED-create and ACTIVE-CAS response loss；pre-publication proof/pre-CAS controller and coordinator/checkpoint cuts
+failover also passes。The dedicated activation fault-agent process test additionally covers before-provider and
+after-provider PREPARED-create and ACTIVE-CAS cuts；initial-proof/readiness、actual transport-error and coordinator/checkpoint cuts
 尚未实现。
 
 ### 7.2 Shared-storage singleton reassignment and local lifecycle（2026-07-28）

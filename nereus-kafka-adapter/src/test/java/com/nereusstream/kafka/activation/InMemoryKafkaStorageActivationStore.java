@@ -26,6 +26,7 @@ final class InMemoryKafkaStorageActivationStore implements KafkaStorageActivatio
     private VersionedKafkaStorageReadiness readiness;
     private long nextVersion = 1;
     private boolean failHeartbeats;
+    private boolean failNextActivationCreate;
     private boolean failNextActivationCas;
 
     @Override
@@ -37,6 +38,10 @@ final class InMemoryKafkaStorageActivationStore implements KafkaStorageActivatio
     @Override
     public synchronized CompletableFuture<VersionedKafkaStorageProtocolActivation> createActivation(
             KafkaStorageProtocolActivationRecord value) {
+        if (failNextActivationCreate) {
+            failNextActivationCreate = false;
+            return CompletableFuture.failedFuture(new IllegalStateException("activation create interrupted"));
+        }
         if (activation != null) return condition("activation exists");
         activation = activation(value);
         return CompletableFuture.completedFuture(activation);
@@ -115,6 +120,8 @@ final class InMemoryKafkaStorageActivationStore implements KafkaStorageActivatio
     int heartbeatCount() { return heartbeatCount.get(); }
 
     synchronized void failHeartbeats() { failHeartbeats = true; }
+
+    synchronized void failNextActivationCreate() { failNextActivationCreate = true; }
 
     synchronized void failNextActivationCas() { failNextActivationCas = true; }
 

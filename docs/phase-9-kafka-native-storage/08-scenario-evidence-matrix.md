@@ -122,16 +122,18 @@ record remains equal，and readiness epoch cannot regress。The surviving bootst
 earliest/latest `0/2` and retains a positive S3 object count。Fresh direct execution passes 64/64 actionable tasks in 36s and
 is included in `phase9M6KafkaProcessCheck`。This supplies the ACTIVE steady-state P/C subset of KF-OPS-005。
 
-`f9ActivationCutFailoverProcessIntegrationTest` adds two provider-applied publication cuts in isolated
-three-dedicated-controller/one-broker clusters。A test-only agent intercepts only the completion returned from the real Oxia
-store after `createActivation(PREPARED)` or `compareAndSetActivation(...ACTIVE)` succeeds。The applied marker must belong to
-the direct-controller-Admin-observed active leader；Oxia must already expose PREPARED or ACTIVE，and that leader must not yet
-have emitted reconciliation success when it is forcibly killed。A different controller at a higher epoch must resume the
-same prepared facts to ACTIVE or observe byte-identical ACTIVE，keep readiness non-regressing for broker `[4]` and emit its
-exact-epoch reconciliation marker。The broker then passes native offset-0 Produce/Fetch/ListOffsets `0/1` and positive Object
-count。Fresh `--rerun-tasks` execution passes 66/66 actionable tasks in 1m06s and is included in
-`phase9M6KafkaProcessCheck`。KF-OPS-005
-remains `PLANNED` because second-proof/pre-CAS、unapplied provider/transport and final aggregate cuts remain open。
+`f9ActivationCutFailoverProcessIntegrationTest` adds four store-publication boundary cuts in isolated
+three-dedicated-controller/one-broker clusters。A test-only agent is installed on all controllers but armed only on the
+direct-controller-Admin-observed active leader。It blocks before or after the real Oxia store for both
+`createActivation(PREPARED)` and `compareAndSetActivation(...ACTIVE)`；before-provider requires `blocked` without provider
+application，while after-provider requires `applied` after the real future succeeds。Oxia must expose the expected activation
+absent/PREPARED/ACTIVE state plus readiness，and that leader must not yet have emitted reconciliation success when forcibly
+killed。A different higher-epoch controller must reuse the exact readiness tuple、resume the same prepared facts to ACTIVE or
+observe byte-identical ACTIVE，keep readiness non-regressing for broker `[4]` and emit its exact-epoch reconciliation marker。
+The broker then passes native offset-0 Produce/Fetch/ListOffsets `0/1` and positive Object count。Fresh
+`--rerun-tasks` execution passes 75/75 actionable tasks in 2m02s and is included in `phase9M6KafkaProcessCheck`。
+KF-OPS-005 remains `PLANNED` because initial-proof/readiness、actual provider/transport-error and final aggregate cuts remain
+open。
 
 Current deterministic M4 fork evidence（local `ec7f0db991` + `032974067c`）：`NereusProducerStateManagerTest`、
 `NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
@@ -230,16 +232,16 @@ and the cluster commits offset 1 after exact `[1] -> [2]` KRaft handoff with no 
 The aggregate now also runs the three-voter ACTIVE controller-failover gate：it observes initial/replacement exact controller
 epochs and Nereus reconciliation markers、forces the active controller process down、requires immutable ACTIVE and
 nondecreasing readiness from Oxia，then continues native IO to final earliest/latest `0/2`。
-It additionally runs the dedicated-controller activation publication-cut gate：real Oxia application is observed before
-the PREPARED-create or ACTIVE-CAS completion is withheld，the exact current controller is killed，and a higher-epoch
-controller preserves the durable state before broker `[4]` completes native IO。
+It additionally runs the dedicated-controller activation publication-cut gate：the exact leader is blocked before or after
+PREPARED create and ACTIVE CAS，then killed；a higher-epoch controller preserves or completes the durable state before broker
+`[4]` completes native IO。
 KF-OPS-006/007 are `PASSED_CURRENT_SOURCE` deterministic evidence；the process gates add real cold-restart/takeover partial evidence to
 KF-META-009、KF-APP-005/006、KF-FET-001/006/007/009、KF-TXN-007/011/012/013/014 and
 KF-OPS-003/009/013/017，but those rows remain `PLANNED` where live preemption、timestamp/leader-epoch、
 remaining provider-profile matrix、checkpoint/virtual-segment、mandatory NTC2、activation-cut/chaos or aggregate requirements are
 still absent。
-ACTIVE steady-state plus provider-applied PREPARED-create/ACTIVE-CAS controller takeover are now present；
-second-proof/pre-CAS and unapplied provider/transport activation epoch process cuts remain open。
+ACTIVE steady-state plus all four PREPARED-create/ACTIVE-CAS store-publication controller takeovers are now present；
+initial-proof/readiness and actual provider/transport-error activation epoch process cuts remain open。
 
 ## 2. Machine-readable manifest target
 
@@ -315,15 +317,17 @@ evidence for KF-OPS-008/009/010/011，not process/controller completion。
 `KafkaStorageActivationRuntimeTest` proves publish-before-verify、bounded wait、downstream startup ordering、heartbeat-failure admission
 revocation and borrowed-scheduler ownership，adding deterministic partial evidence for KF-OPS-008/010/012/018。
 `KafkaStorageFirstActivationCoordinatorTest` adds deterministic partial evidence for KF-OPS-003/004/005：empty-cluster activation、
-non-destructive non-empty rejection、PREPARED crash resume、second-proof cut and post-ACTIVE idempotence。
+non-destructive non-empty rejection、activation-absent-with-existing-readiness takeover、PREPARED crash resume、second-proof
+cut and post-ACTIVE idempotence。The absent-activation regression requires PREPARED to retain the durable readiness metadata
+offset even when the replacement controller observes a newer KRaft snapshot。
 `KafkaStorageBindingAwareClusterSnapshotProviderTest` proves all 64 binding-registry shards are examined before an empty result，
 any non-empty shard is projected into the activation snapshot，and an already-positive fork fact avoids a weaker rescan；the
 activation-backed Object-WAL integration test proves this wrapper remains on the public production path。Kafka controller
 seam/context binding and deterministic activation scheduling are now implemented at fork `d23dc5c787`；the feature/control tests
 cover controller-current retry、leadership loss、in-flight coalescing、per-epoch process-local fault suppression、explicit feature
 format/advertisement and single-copy controller mutation。The current three-voter process gate now covers ACTIVE-state
-controller kill/reconciliation，and the dedicated-controller completion-gate process test covers provider-applied
-PREPARED-create/ACTIVE-CAS response loss；second-proof/pre-CAS/unapplied cuts、priority budgets and broader native-storage
+controller kill/reconciliation，and the dedicated-controller completion-gate process test covers before-provider and
+after-provider PREPARED-create/ACTIVE-CAS cuts；initial-proof/readiness、actual transport-error、priority budgets and broader native-storage
 process cuts 仍未实现；all three BookKeeper provider constructions and their first
 single-node/fresh-JVM native process slices now pass，
 除 KF-OPS-006/007 外 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
@@ -599,7 +603,7 @@ composition/restart evidence only；the real-provider fresh-process restart tier
 | KF-OPS-002 | KRaft-only、remote-log/cleaner/conflicting mode/message-limit violations reject before IO | fork `NereusKafkaConfigValidatorTest` | D,K | M6 |
 | KF-OPS-003 | empty cluster first activation PREPARED→ACTIVE succeeds with exact brokers/digests | `KafkaActivationIntegrationTest` | R,P,C | M6 |
 | KF-OPS-004 | any topic/internal topic/local authoritative log/binding makes first activation fail non-destructively | `KafkaActivationIntegrationTest` | R,P | M6 |
-| KF-OPS-005 | controller failover at every activation cut preserves one-way state | `KafkaActivationControllerFailoverTest`；product `f9MultiControllerFailoverProcessIntegrationTest` adds ACTIVE steady-state P/C；`f9ActivationCutFailoverProcessIntegrationTest` adds provider-applied PREPARED-create/ACTIVE-CAS P/C | P,C,K | M6 |
+| KF-OPS-005 | controller failover at every activation cut preserves one-way state | `KafkaActivationControllerFailoverTest`；product `f9MultiControllerFailoverProcessIntegrationTest` adds ACTIVE steady-state P/C；`f9ActivationCutFailoverProcessIntegrationTest` adds before-provider/after-provider PREPARED-create/ACTIVE-CAS P/C | P,C,K | M6 |
 | KF-OPS-006 | controller enforces RF=1/minISR=1 for create/create-partitions/manual assignment | fork `ReplicationControlManagerTest.testNereusStorageFeatureGatesTopicCreationAndPartitionGrowth` | D,K | M6 |
 | KF-OPS-007 | ISR/reassignment/directory APIs cannot create follower/local-placement semantics | fork `ReplicationControlManagerTest.testNereusStorageFeatureGatesIsrReassignmentAndDirectories` + `testNereusStorageFeatureAtomicallyHandsOffSingletonReplica`；product `f9MultiBrokerTakeoverProcessIntegrationTest` adds P evidence | D,K | M6 |
 | KF-OPS-008 | missing/mismatched/expired broker capability excludes leader ownership | `KafkaCapabilityReadinessIntegrationTest` | R,P,C | M6 |

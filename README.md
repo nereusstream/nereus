@@ -37,8 +37,10 @@ release JVMs plus one broker JVM and a test-only completion-gate agent to kill t
 provider has durably applied either `createActivation(PREPARED)` or the `PREPARED -> ACTIVE` CAS but before the coordinator
 observes completion。The replacement controller preserves the exact PREPARED facts or byte-identical ACTIVE authority，
 publishes non-regressing readiness for broker `[4]`，and the broker subsequently completes native
-Produce/Fetch/ListOffsets with Object persistence。These are still partial F9 results；pre-publication proof/pre-CAS process
-cuts、coordinator/checkpoint migration、release-process response-loss restart and the stock retention oracle remain open。
+Produce/Fetch/ListOffsets with Object persistence。The same gate now also covers before-provider PREPARED create and
+before-provider ACTIVE CAS，including activation-absent recovery from an existing readiness tuple。These are still partial
+F9 results；initial-proof/readiness and actual transport-error cuts、coordinator/checkpoint migration、
+release-process response-loss restart and the stock retention oracle remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation
@@ -138,8 +140,8 @@ BookKeeper configuration snapshot、exact password-file identity、client lifecy
 cluster with stock ZooKeeper long-hierarchical metadata，then restarts the exact formatted KRaft broker in a fresh JVM，
 recovers offset 0 and appends offset 1 with earliest=0/latest=2；
 The current process suite additionally covers Object/BookKeeper live takeover、ACTIVE-state three-voter controller
-failover and provider-applied PREPARED-create/ACTIVE-CAS controller cuts。Checkpoint/virtual-segment cuts、
-second-proof/pre-CAS/unapplied activation process cuts and wider chaos evidence remain future work，so this is not yet a
+failover and before-provider/after-provider PREPARED-create/ACTIVE-CAS controller cuts。Checkpoint/virtual-segment cuts、
+initial-proof/readiness、actual transport-error and wider chaos evidence remain future work，so this is not yet a
 production-rollout claim.
 
 ## Current Phase

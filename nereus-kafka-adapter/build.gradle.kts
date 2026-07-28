@@ -74,7 +74,7 @@ val f9ActivationFaultAgentJar =
     tasks.register<Jar>("f9ActivationFaultAgentJar") {
         group = "build"
         description =
-            "Build the test-only Java agent that gates one applied activation-store completion."
+            "Build the test-only Java agent that gates one activation-store publication boundary."
         archiveFileName.set("nereus-f9-activation-fault-agent.jar")
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
         manifest {
@@ -290,7 +290,7 @@ tasks.register<Test>("f9MultiControllerFailoverProcessIntegrationTest") {
 tasks.register<Test>("f9ActivationCutFailoverProcessIntegrationTest") {
     group = "verification"
     description =
-        "Kill the active controller after real PREPARED/ACTIVE Oxia application and prove failover recovery."
+        "Kill the active controller before/after PREPARED and ACTIVE Oxia publication and prove failover recovery."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
     dependsOn(f9ActivationFaultAgentJar)
     shouldRunAfter(tasks.named("f9MultiControllerFailoverProcessIntegrationTest"))
@@ -316,7 +316,7 @@ tasks.register<Test>("f9ActivationCutFailoverProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "threeControllersRecoverPreparedAndAppliedActiveCuts",
+                "threeControllersRecoverEveryActivationPublicationCut",
         )
     }
 }

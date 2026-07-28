@@ -20,11 +20,11 @@ import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.matcher.ElementMatcher;
 
 /**
- * Test-only Java agent that withholds one successful activation-store completion from the controller.
+ * Test-only Java agent that blocks one activation-store publication boundary from the controller.
  *
- * <p>The real Oxia-backed store still applies and observes the PREPARED create or ACTIVE CAS. The substituted future never
- * completes successfully, creating a deterministic process-loss boundary after durable application but before the
- * controller activation coordinator observes completion.
+ * <p>Before-provider mode skips the real PREPARED create or ACTIVE CAS. After-provider mode lets the real Oxia-backed
+ * store apply successfully. Both modes substitute a future that never completes, creating deterministic process-loss
+ * boundaries on either side of the durable store call.
  */
 public final class ActivationCompletionGateAgent {
     private static final String PROPERTY_PREFIX =
@@ -48,8 +48,16 @@ public final class ActivationCompletionGateAgent {
                     entry.getValue());
         }
         String operation = require(configuration, "operation");
+        String phase = require(configuration, "phase");
+        if (!phase.equals("before-provider")
+                && !phase.equals("after-provider")) {
+            throw new IllegalArgumentException(
+                    "unsupported activation completion gate phase: "
+                            + phase);
+        }
         require(configuration, "arm");
         require(configuration, "captured");
+        require(configuration, "blocked");
         require(configuration, "applied");
         require(configuration, "installed");
 
@@ -123,7 +131,7 @@ public final class ActivationCompletionGateAgent {
         return value;
     }
 
-    private static void writeMarker(
+    public static void writeMarker(
             Path marker,
             String value
     ) {
@@ -145,30 +153,37 @@ public final class ActivationCompletionGateAgent {
         private ActivationCompletionAdvice() {
         }
 
+        @Advice.OnMethodEnter(
+                skipOn = Advice.OnNonDefaultValue.class)
+        public static boolean gateBeforeProvider() {
+            if (!property("phase")
+                    .equals("before-provider")
+                    || !Files.exists(path("arm"))
+                    || !capture()) {
+                return false;
+            }
+            writeMarker(
+                    path("blocked"),
+                    property("operation"));
+            return true;
+        }
+
         @Advice.OnMethodExit
         public static void gate(
+                @Advice.Enter boolean skipped,
                 @Advice.Return(readOnly = false)
                         CompletableFuture<?> returned
         ) {
-            Path arm = path("arm");
-            if (!Files.exists(arm)) {
+            if (skipped) {
+                returned = new CompletableFuture<>();
                 return;
             }
-            Path captured = path("captured");
-            try {
-                Path parent = captured.getParent();
-                if (parent != null) {
-                    Files.createDirectories(parent);
-                }
-                Files.createFile(captured);
-            } catch (FileAlreadyExistsException ignored) {
+            if (!property("phase")
+                    .equals("after-provider")
+                    || !Files.exists(path("arm"))
+                    || !capture()) {
                 return;
-            } catch (IOException failure) {
-                throw new IllegalStateException(
-                        "cannot capture activation completion gate",
-                        failure);
             }
-
             CompletableFuture<?> provider = returned;
             CompletableFuture<Object> delayed =
                     new CompletableFuture<>();
@@ -177,15 +192,37 @@ public final class ActivationCompletionGateAgent {
                     new ProviderCompletion(delayed));
         }
 
+        public static boolean capture() {
+            Path captured = path("captured");
+            try {
+                Path parent = captured.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+                Files.createFile(captured);
+            } catch (FileAlreadyExistsException ignored) {
+                return false;
+            } catch (IOException failure) {
+                throw new IllegalStateException(
+                        "cannot capture activation completion gate",
+                        failure);
+            }
+            return true;
+        }
+
         public static Path path(String name) {
-            String configured =
-                    System.getProperty(PROPERTY_PREFIX + name);
+            return Path.of(property(name));
+        }
+
+        public static String property(String name) {
+            String configured = System.getProperty(
+                    PROPERTY_PREFIX + name);
             if (configured == null || configured.isBlank()) {
                 throw new IllegalStateException(
                         "activation completion gate property is absent: "
                                 + name);
             }
-            return Path.of(configured);
+            return configured;
         }
     }
 
