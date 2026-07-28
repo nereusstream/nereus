@@ -10,7 +10,10 @@ are in progress；the adapter now also has the process admission/runtime lifecyc
 ledger with reverse-order close。The product runtime can now optionally install the provider-neutral BookKeeper runtime
 beside Object WAL and admits exactly `OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY` only after the exact F1-BK namespace、
 publication activation and broker readiness are present；a real Oxia + two-bookie gate proves strict BookKeeper append and
-cold generation-zero Fetch。The local Kafka fork now also maintains checkpoint-restorable virtual segments、exact
+cold generation-zero Fetch。A second real release-distribution process gate now proves `BOOKKEEPER_WAL_ONLY` through
+Admin create、Produce、Fetch、ListOffsets、normal shutdown and fresh-JVM cold recovery over stock
+`zk+longhierarchical` BookKeeper metadata while Nereus authority remains in Oxia。The local Kafka fork now also maintains
+checkpoint-restorable virtual segments、exact
 KRaft config history、logical/time indexes and real offset metadata，routes stock DeleteRecords through the shared
 checkpoint-before-trim barrier，and supplies bounded owned-partition capture to the product's periodic retention runtime。
 The Object-WAL runtime now also persists an immutable exact-reference checkpoint-failure quarantine/redacted first-failure
@@ -108,10 +111,13 @@ transient page-read backpressure with bounded 10–250 ms exponential delay unde
 publishes a partial state，while ordinary Fetch continues to reject resource exhaustion immediately。A third JVM then
 stably appends open-transaction data at offset 5 and is forcibly killed；a fourth JVM reuses that transactional ID，recovers
 the coordinator state、writes ABORT marker 6、commits data/marker 7/8，proves `read_committed` skips the aborted record and
-advances the group to offset 8 with latest=9。The native Kafka process evidence is still single-node/Object-WAL。The product
+advances the group to offset 8 with latest=9。The native Kafka process evidence is still single-node, but now covers both
+Object-WAL and `BOOKKEEPER_WAL_ONLY`。The product
 adapter's focused real-service gate covers `BOOKKEEPER_WAL_ONLY`，and the Kafka fork now owns the complete typed
 BookKeeper configuration snapshot、exact password-file identity、client lifecycle and
-`OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY` capability mapping。The process distribution has not yet run that profile；
+`OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY` capability mapping。The BookKeeper process gate uses a real two-bookie
+cluster with stock ZooKeeper long-hierarchical metadata，then restarts the exact formatted KRaft broker in a fresh JVM，
+recovers offset 0 and appends offset 1 with earliest=0/latest=2；
 multi-controller and multi-broker live takeover、checkpoint/virtual-segment cuts、
 async/sync materialization profiles and wider chaos evidence remain future work，so this is not yet a production-rollout claim.
 

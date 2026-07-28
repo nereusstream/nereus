@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index、transactional request handoff 与 internal-topic ready ordering deterministic slices implemented locally；M5 checkpoint-before-DeleteRecords、周期性 owned-partition retention、virtual segment/config history/derived index、timestamp lookup 与 compaction fork capture deterministic slices implemented locally；stock-source isolation、显式 `NereusKafka`/server-start production-factory launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` feature/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh 与 product-side durable exact-reference checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 KRaft Produce/Fetch/ListOffsets/two-shutdown cold-restart gate passes；真实 internal-topic coordinator recovery、multi-controller failover、live takeover and extended kill/chaos/profile process gates remain open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index、transactional request handoff 与 internal-topic ready ordering deterministic slices implemented locally；M5 checkpoint-before-DeleteRecords、周期性 owned-partition retention、virtual segment/config history/derived index、timestamp lookup 与 compaction fork capture deterministic slices implemented locally；stock-source isolation、显式 `NereusKafka`/server-start production-factory launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` feature/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership 与 product-side durable exact-reference checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 KRaft user/internal-topic/transaction recovery gate 和独立 `BOOKKEEPER_WAL_ONLY` cold-restart gate 均通过；multi-controller failover、live takeover and extended kill/chaos/all-profile process gates remain open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -281,9 +281,15 @@ reader/retention verifier 外围组装同一个 exact-reference durable quaranti
 BookKeeper 模式复用 provider-neutral `BookKeeperPrimaryWalRuntime`、Oxia namespace/activation stores、generation-zero
 physical-reference publisher、profile resolver 和 exact reader registry；只有 F1-BK namespace 与 ACTIVE publication
 已由 operator provision、broker readiness exact 匹配时才允许启动。`f9BookKeeperWalOnlyProviderIntegrationTest`
-用真实四分片 Oxia + 两个 bookie 证明 leader open、strict append 和 cold generation-zero Fetch。尚未实现的是 Kafka
-fork BookKeeper 配置映射/客户端所有权、async/sync Object materialization、真实 controller failover、live takeover 和
-更广 kill-cut process tests。显式
+用真实四分片 Oxia + 两个 bookie 证明 leader open、strict append 和 cold generation-zero Fetch。Fork
+`50b46aab2d` 已实现完整 91-key typed BookKeeper 配置映射、password file/version identity、pre-I/O cross-field
+validation、fork-owned client 和 product-first/client-second close wrapper。`f9BookKeeperWalOnlyProcessIntegrationTest`
+进一步从真实 release tarball 启动 combined-node Kafka，使用 stock
+`zk+longhierarchical://127.0.0.1:<port>/ledgers` 管理 BookKeeper 自身元数据，同时把 Nereus
+namespace/activation/readiness authority 保留在 Oxia；它完成 Admin create、offset 0 Produce/Fetch、
+earliest=0/latest=1、正常停机、fresh-JVM offset 0 恢复、offset 1 继续追加和 earliest=0/latest=2。
+尚未实现的是 async/sync Object materialization、真实 controller failover、live takeover 和更广 kill-cut process
+tests。显式
 launcher/KafkaRaftServer broker/controller factory selection 已实现；`phase9M6KafkaProcessCheck` 现使用真实 release
 distribution、四分片 Oxia 和 pinned LocalStack S3 覆盖显式 feature format、broker/controller registration、
 activation、Admin create、Produce/Fetch/ListOffsets、S3 object existence 和 SIGTERM shutdown，并以同一 KRaft
@@ -901,7 +907,10 @@ format、dedicated-controller validation、activation feature wait 和 single-co
 password-file exact identity、fork-owned client construction，以及 product-first/client-second idempotent close wrapper。
 该 commit 只允许 `OBJECT_WAL_SYNC_OBJECT` 或 `BOOKKEEPER_WAL_ONLY` 进入 production creator；其余 profile 继续在
 provider I/O 前 fail closed。真实 combined-node KRaft/Oxia/S3 process baseline 已通过；
-同节点 fresh-JVM cold restart 也已通过；多 Controller failover、live takeover、kill-cut matrix 与完整 stock
+同节点 fresh-JVM cold restart 也已通过；独立 BookKeeper-WAL-only release-distribution 首启/冷重启 gate
+也在同一 fork head 通过。该 gate 没有给 Kafka 引入 Pulsar metadata runtime：BookKeeper client/bookies 使用 stock
+ZooKeeper `LongHierarchicalLedgerManagerFactory`，Nereus durable authority 继续使用 Oxia。多 Controller failover、
+live takeover、kill-cut matrix 与完整 stock
 cleaner differential matrix 尚未实现。
 
 ## 6. Produce execution and threading

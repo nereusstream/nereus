@@ -423,8 +423,10 @@ coordinator/transaction/compaction remain M4/M5。
   runtime/stores/readers are closed through the product ledger。Fork `50b46aab2d` adds the complete stock-owned typed
   BookKeeper binding、exact file/version secret reference、pre-I/O cross-field validation、BookKeeper client construction and
   product-before-client close wrapper；six server config tests、eight mapper/ownership tests、Checkstyle、SpotBugs and
-  Spotless pass。This remains deterministic/focused adapter evidence；the native Kafka process-level BookKeeper profile gate
-  remains open；
+  Spotless pass。`f9BookKeeperWalOnlyProcessIntegrationTest` now adds real release-distribution P-tier evidence：stock
+  ZooKeeper long-hierarchical metadata、two bookies、combined-node Kafka Admin create/Produce/Fetch/ListOffsets、normal
+  shutdown、fresh-JVM recovery and continued append all pass；multi-broker takeover and the other three provider profiles
+  remain open；
 - `NereusKafkaObjectWalRuntimeFactory` now owns durable checkpoint read pins、reader/verifier/recovery coordinator、
   configured `recoveryChunkRecords/recoveryChunkBytes` paging and `DefaultKafkaPartitionRecoveryLauncher`。
   `DefaultKafkaRecoveryBatchSourceTest` proves exact bounded COMMITTED/EXACT_START pages and fail-closed empty/non-Kafka
@@ -482,7 +484,8 @@ coordinator/transaction/compaction remain M4/M5。
   `bin/nereus-kafka-server-start.sh`；stock `ControllerServer` now owns a product-neutral metadata-publisher/runtime seam，
   and the artifact runtime deterministically schedules first activation only while locally current。The real single-node
   release-distribution provider-backed KRaft baseline and same-node fresh-JVM user/group/transaction-state cold restart pass；
-  stable open-transaction forced-exit/abort recovery also passes，while multi-controller/live takeover、BookKeeper process profile、
+  stable open-transaction forced-exit/abort recovery and the separate two-bookie `BOOKKEEPER_WAL_ONLY`
+  release-distribution cold restart also pass，while multi-controller/live takeover、
   checkpoint/virtual-segment and broader kill-cut final gates remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
@@ -799,6 +802,12 @@ It then starts a third JVM，stably appends an open-transaction data batch at of
 A fourth JVM must recover the internal-topic transaction state；reinitializing that same transactional ID must first resolve
 the interrupted transaction with ABORT marker 6，then commit data/marker offsets 7/8。A read-committed consumer and the
 existing group both start at visible offset 7，the group commits 8，and latest is 9。
+The same aggregate also runs `f9BookKeeperWalOnlyProcessIntegrationTest`。It starts stock ZooKeeper
+long-hierarchical metadata plus two real bookies，keeps F1-BK activation/readiness in Oxia，formats the same durable Kafka
+feature and starts the real release launcher with `BOOKKEEPER_WAL_ONLY`。The first JVM must Admin-create a topic、append and
+fetch offset 0、verify earliest=0/latest=1 and shut down normally；a fresh JVM must recover that batch、append/fetch offset 1、
+verify earliest=0/latest=2 and shut down normally。The Java 21 `java.io` module opening is confined to the in-process
+BookKeeper fixture and is not added to the Kafka runtime command。
 The recovery coordinator retries retriable page-read failures at the exact cursor with 10–250 ms exponential backoff under
 the original deadline；the deterministic regression requires two reads but exactly one publication。The root build now
 recognizes M6 feature/process and direct
@@ -817,6 +826,7 @@ phase9M6ActivationMetadataCheck
 phase9M6KafkaFeatureCheck
 phase9M6CheckpointQuarantineCheck
 phase9M6KafkaProcessCheck
+phase9M6KafkaBookKeeperProcessCheck
 Kafka fork: nereusF9ControllerTest
 Kafka fork: nereusF9BrokerLifecycleTest
 Kafka fork: nereusF9MetadataPublisherTest

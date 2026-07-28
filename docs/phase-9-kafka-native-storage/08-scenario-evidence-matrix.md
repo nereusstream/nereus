@@ -30,8 +30,12 @@ ledger-ID namespace、ACTIVE publication and exact broker readiness。`f9BookKee
 two-bookie BookKeeper、opens a Kafka leader with `BOOKKEEPER_WAL_ONLY`、strictly appends a magic-v2 batch、publishes the exact
 BookKeeper generation-zero target and Fetches it through the shared generation resolver。The client is borrowed and the
 provider graph closes before it。Fork `50b46aab2d` now supplies complete typed BookKeeper configuration、exact secret
-identity、client ownership and executable-profile mapping with focused static/unit evidence。All profile-matrix rows remain
-`PLANNED` because BookKeeper process startup/restart/takeover and async/sync Object materialization evidence have not run。
+identity、client ownership and executable-profile mapping with focused static/unit evidence。
+`f9BookKeeperWalOnlyProcessIntegrationTest` now supplies independent-process evidence for this one profile：a real release
+distribution runs against stock ZooKeeper long-hierarchical metadata and two bookies，creates a topic，produces/fetches offset
+0，checks earliest=0/latest=1，shuts down normally，then a fresh Kafka JVM recovers offset 0、appends/fetches offset 1 and
+checks earliest=0/latest=2 before another normal shutdown。All profile-matrix rows remain `PLANNED` because multi-broker
+BookKeeper takeover、async/sync Object materialization profiles and aggregate tiers have not run。
 
 Current deterministic M4 fork evidence（local `ec7f0db991` + `032974067c`）：`NereusProducerStateManagerTest`、
 `NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
@@ -102,7 +106,8 @@ that M6 task selection republishes the current `0.1.0-f9-dev` artifact rather th
 `PASSED_CURRENT_SOURCE` deterministic evidence；the process gate adds real cold-restart partial evidence to
 KF-META-009、KF-APP-005/006、KF-FET-001/006/007/009、KF-TXN-007/011/012/013/014 and
 KF-OPS-003/009/013/017，but those rows remain `PLANNED` where live preemption、timestamp/leader-epoch、
-BookKeeper/profile、checkpoint/virtual-segment、mandatory NTC2、multi-broker or aggregate requirements are still absent。
+remaining provider-profile matrix、checkpoint/virtual-segment、mandatory NTC2、multi-broker or aggregate requirements are
+still absent。
 In-flight activation epoch fencing and multi-controller takeover also remain open。
 
 ## 2. Machine-readable manifest target
@@ -186,8 +191,8 @@ activation-backed Object-WAL integration test proves this wrapper remains on the
 seam/context binding and deterministic activation scheduling are now implemented at fork `d23dc5c787`；the feature/control tests
 cover controller-current retry、leadership loss、in-flight coalescing、per-epoch process-local fault suppression、explicit feature
 format/advertisement and single-copy controller mutation。Real multi-controller process/takeover、
-BookKeeper/async-object provider construction、
-priority budgets and native-storage process cuts 仍未实现，
+async/sync-object provider construction、priority budgets and the broader native-storage process cuts 仍未实现；
+`BOOKKEEPER_WAL_ONLY` construction and its first single-node/fresh-JVM native process slice now pass，
 除 KF-OPS-006/007 外 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及
 BrokerServer stock start/drain/close compatibility；`NereusBrokerStorageRuntimeTest` additionally verifies disabled creator

@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；91-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL/BookKeeper-WAL-only provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh 与 Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；BookKeeper process profile、async/sync materialization、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
+> 状态：Implementation in progress；91-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL/BookKeeper-WAL-only provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh 与 Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie `BOOKKEEPER_WAL_ONLY` release-distribution initial process + fresh-JVM cold-restart gate also passes；async/sync materialization、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -267,6 +267,11 @@ storage worker。实际 records buffers 仍由 stock
 `readFromLog`/`FetchDataInfo` 所有，wrapper 不复制 request buffer，也不把 offset delta 当作 inflight-byte 计量。
 `max.rereads` 只限制 event storm，deadline-final wave 不受该预算影响。
 
+Native process gate 固定使用 4 个 Fetch worker，而不是把生产默认值压到 2：fresh-JVM 冷启动会同时加载用户
+partition、`__consumer_offsets` 和 `__transaction_state`，前三个槽属于 mandatory recovery，第四个槽保留给
+client probe。这个值仍显著低于生产默认的至少 16；任何少于 4 的 process-fixture 配置都不代表本场景的可执行
+最小预算，不能用延长 client timeout 来掩盖 recovery admission 竞争。
+
 ### 2.4 Lifecycle/recovery/checkpoint
 
 | Key | Type | Default | Validation |
@@ -401,6 +406,17 @@ failure is preserved，and repeated close is idempotent。A construction failure
 escapes。The executable set/default becomes exactly
 `{OBJECT_WAL_SYNC_OBJECT, BOOKKEEPER_WAL_ONLY}`/`BOOKKEEPER_WAL_ONLY`，and the configuration/provider/code digests include
 the binding checksum plus readiness identity without including password bytes。
+
+`f9BookKeeperWalOnlyProcessIntegrationTest` closes the native process boundary for this first BookKeeper profile。The fixture
+starts two real bookies over BookKeeper's stock ZooKeeper
+`LongHierarchicalLedgerManagerFactory`，while F1-BK namespace reservation、protocol activation and broker readiness remain
+durable Oxia facts。The generated Kafka config carries the exact `zk+longhierarchical` metadata URI、password file/version、
+reserved ledger-ID prefix and readiness identity into the release distribution。The first combined broker/controller JVM
+formats the explicit feature、creates one topic、produces/fetches offset 0、verifies earliest=0/latest=1 and exits normally；
+a fresh JVM over the same KRaft and remote state recovers offset 0、appends/fetches offset 1、verifies
+earliest=0/latest=2 and exits normally。The test task adds only the Java 21
+`--add-opens=java.base/java.io=ALL-UNNAMED` required by the in-process BookKeeper journal fixture；the launched Kafka
+distribution receives no Pulsar metadata driver or test-only classpath。
 
 The broker-epoch wait deadline is the typed rollout readiness timeout。The exact epoch is captured once and passed unchanged into
 the capability；the mapper derives only the separate checked operation epoch。`KafkaScheduler.scheduledExecutorService()` exposes

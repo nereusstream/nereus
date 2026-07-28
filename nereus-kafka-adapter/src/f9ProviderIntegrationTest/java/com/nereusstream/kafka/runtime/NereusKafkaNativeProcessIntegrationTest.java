@@ -3,6 +3,16 @@ package com.nereusstream.kafka.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nereusstream.bookkeeper.BookKeeperDigestType;
+import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceProvisioningCoordinator;
+import com.nereusstream.bookkeeper.BookKeeperProtocolActivationCoordinator;
+import com.nereusstream.bookkeeper.BookKeeperProtocolActivationUpdate;
+import com.nereusstream.bookkeeper.BookKeeperSecretRef;
+import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
+import com.nereusstream.bookkeeper.OxiaBookKeeperLedgerIdNamespaceReservationStore;
+import com.nereusstream.bookkeeper.OxiaBookKeeperProtocolActivationStore;
+import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
+import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import io.oxia.testcontainers.OxiaContainer;
 import java.io.IOException;
 import java.io.Writer;
@@ -11,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +49,10 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.bookkeeper.common.allocator.PoolingPolicy;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.meta.LongHierarchicalLedgerManagerFactory;
+import org.apache.bookkeeper.util.LocalBookKeeper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -412,6 +427,154 @@ class NereusKafkaNativeProcessIntegrationTest {
                 .isPositive();
     }
 
+    @Test
+    @Timeout(value = 4, unit = TimeUnit.MINUTES)
+    void bookKeeperWalOnlyProcessRecoversAcrossFreshJvmRestart()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-bookkeeper-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path config = root.resolve("bookkeeper-server.properties");
+        Path formatLog = root.resolve("bookkeeper-format.log");
+        Path firstServerLog = root.resolve("bookkeeper-server-first.log");
+        Path restartServerLog = root.resolve("bookkeeper-server-restart.log");
+        Path passwordFile = root.resolve("bookkeeper-password.bin");
+        Files.write(
+                passwordFile,
+                "f9-bookkeeper-process-password".getBytes(StandardCharsets.UTF_8));
+
+        String bucket = "nereus-kafka-bk-" + UUID.randomUUID();
+        String topic = "bookkeeper-process-gate-" + UUID.randomUUID();
+        int brokerPort = freePort();
+        int controllerPort = differentFreePort(brokerPort);
+        String bootstrapServers = "127.0.0.1:" + brokerPort;
+        createBucket(bucket);
+        int zooKeeperPort = differentFreePort(controllerPort, brokerPort);
+        String metadataServiceUri =
+                "zk+longhierarchical://127.0.0.1:" + zooKeeperPort + "/ledgers";
+        BookKeeperProcessConfiguration bookKeeper =
+                new BookKeeperProcessConfiguration(
+                        metadataServiceUri,
+                        "kafka-process-deployment",
+                        "primary",
+                        "11".repeat(32),
+                        12,
+                        0x801,
+                        "kafka-process-reservation",
+                        passwordFile,
+                        "v1",
+                        1,
+                        "55".repeat(32),
+                        1);
+        seedBookKeeperAuthority(
+                oxiaConfiguration(),
+                bookKeeperWalConfiguration(bookKeeper),
+                bookKeeper,
+                Clock.systemUTC());
+        try (LocalBookKeeper ignored = startBookKeeper(zooKeeperPort)) {
+            writeConfiguration(
+                    config,
+                    brokerPort,
+                    controllerPort,
+                    bucket,
+                    root.resolve("bookkeeper-kafka-log"),
+                    root.resolve("bookkeeper-metadata-log"),
+                    root.resolve("bookkeeper-nereus-cache"),
+                    bookKeeper);
+            formatStorage(formatScript, kafkaHome, config, formatLog);
+
+            TopicPartition partition = new TopicPartition(topic, 0);
+            byte[] firstKey = "bookkeeper-key-0".getBytes(StandardCharsets.UTF_8);
+            byte[] firstValue =
+                    "nereus-bookkeeper-process-first".getBytes(StandardCharsets.UTF_8);
+            runBroker(
+                    startScript,
+                    kafkaHome,
+                    config,
+                    formatLog,
+                    firstServerLog,
+                    bootstrapServers,
+                    () -> {
+                        try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
+                            admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1)))
+                                    .all()
+                                    .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                            RecordMetadata produced =
+                                    produce(
+                                            bootstrapServers,
+                                            topic,
+                                            firstKey,
+                                            firstValue);
+                            assertThat(produced.partition()).isZero();
+                            assertThat(produced.offset()).isZero();
+                            ConsumerRecord<byte[], byte[]> fetched =
+                                    fetch(
+                                            bootstrapServers,
+                                            partition,
+                                            0,
+                                            firstServerLog);
+                            assertThat(fetched.key()).isEqualTo(firstKey);
+                            assertThat(fetched.value()).isEqualTo(firstValue);
+                            assertOffsets(admin, partition, 0, 1);
+                        }
+                    });
+
+            byte[] secondKey = "bookkeeper-key-1".getBytes(StandardCharsets.UTF_8);
+            byte[] secondValue =
+                    "nereus-bookkeeper-process-second".getBytes(StandardCharsets.UTF_8);
+            runBroker(
+                    startScript,
+                    kafkaHome,
+                    config,
+                    formatLog,
+                    restartServerLog,
+                    bootstrapServers,
+                    () -> {
+                        ConsumerRecord<byte[], byte[]> recovered =
+                                fetch(
+                                        bootstrapServers,
+                                        partition,
+                                        0,
+                                        restartServerLog);
+                        assertThat(recovered.key()).isEqualTo(firstKey);
+                        assertThat(recovered.value()).isEqualTo(firstValue);
+                        RecordMetadata appended =
+                                produce(
+                                        bootstrapServers,
+                                        topic,
+                                        secondKey,
+                                        secondValue);
+                        assertThat(appended.offset()).isEqualTo(1);
+                        ConsumerRecord<byte[], byte[]> fetched =
+                                fetch(
+                                        bootstrapServers,
+                                        partition,
+                                        1,
+                                        restartServerLog);
+                        assertThat(fetched.key()).isEqualTo(secondKey);
+                        assertThat(fetched.value()).isEqualTo(secondValue);
+                        try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
+                            assertOffsets(admin, partition, 0, 2);
+                        }
+                    });
+        } catch (Exception | AssertionError failure) {
+            try {
+                preserveFailureEvidence(
+                        config,
+                        formatLog,
+                        firstServerLog,
+                        restartServerLog);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            throw failure;
+        }
+    }
+
     private void writeConfiguration(
             Path config,
             int brokerPort,
@@ -420,6 +583,27 @@ class NereusKafkaNativeProcessIntegrationTest {
             Path logDirectory,
             Path metadataDirectory,
             Path cacheDirectory
+    ) throws IOException {
+        writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                logDirectory,
+                metadataDirectory,
+                cacheDirectory,
+                null);
+    }
+
+    private void writeConfiguration(
+            Path config,
+            int brokerPort,
+            int controllerPort,
+            String bucket,
+            Path logDirectory,
+            Path metadataDirectory,
+            Path cacheDirectory,
+            BookKeeperProcessConfiguration bookKeeper
     ) throws IOException {
         Files.createDirectories(logDirectory);
         Files.createDirectories(metadataDirectory);
@@ -459,7 +643,11 @@ class NereusKafkaNativeProcessIntegrationTest {
 
         properties.setProperty("nereus.kafka.storage.enabled", "true");
         properties.setProperty("nereus.kafka.storage.cluster", "f9-process-" + UUID.randomUUID());
-        properties.setProperty("nereus.kafka.storage.profile", "OBJECT_WAL_SYNC_OBJECT");
+        properties.setProperty(
+                "nereus.kafka.storage.profile",
+                bookKeeper == null
+                        ? "OBJECT_WAL_SYNC_OBJECT"
+                        : "BOOKKEEPER_WAL_ONLY");
         properties.setProperty(
                 "nereus.kafka.storage.oxia.service.address",
                 OXIA.getServiceAddress());
@@ -476,7 +664,9 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty("nereus.kafka.storage.cache.dir", cacheDirectory.toString());
         properties.setProperty("nereus.kafka.storage.compaction.enabled", "true");
         properties.setProperty("nereus.kafka.storage.append.executor.threads", "2");
-        properties.setProperty("nereus.kafka.storage.fetch.executor.threads", "2");
+        // Cold restart loads the user log plus both Kafka coordinator logs concurrently. Keep one additional
+        // Fetch slot for the probe client while deliberately remaining well below the production default.
+        properties.setProperty("nereus.kafka.storage.fetch.executor.threads", "4");
         properties.setProperty("nereus.kafka.storage.lifecycle.executor.threads", "2");
         properties.setProperty("nereus.kafka.storage.recovery.executor.threads", "2");
         properties.setProperty("nereus.kafka.storage.readiness.timeout.ms", "90000");
@@ -484,9 +674,232 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty("nereus.kafka.storage.capability.expiry.ms", "30000");
         properties.setProperty("nereus.kafka.storage.shutdown.drain.timeout.ms", "30000");
         properties.setProperty("nereus.kafka.storage.shutdown.checkpoint.timeout.ms", "30000");
+        if (bookKeeper != null) {
+            addBookKeeperConfiguration(properties, bookKeeper);
+        }
         try (Writer writer = Files.newBufferedWriter(config, StandardCharsets.UTF_8)) {
             properties.store(writer, "F9 native Kafka provider-backed process gate");
         }
+    }
+
+    private static void addBookKeeperConfiguration(
+            Properties properties,
+            BookKeeperProcessConfiguration bookKeeper
+    ) {
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.metadata.service.uri",
+                bookKeeper.metadataServiceUri());
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.deployment.id",
+                bookKeeper.deploymentId());
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.cluster.alias",
+                bookKeeper.clusterAlias());
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.provider.scope.sha256",
+                bookKeeper.providerScopeSha256());
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.ledger.id.prefix.bits",
+                Integer.toString(bookKeeper.ledgerIdPrefixBits()));
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.ledger.id.prefix.value",
+                Long.toString(bookKeeper.ledgerIdPrefixValue()));
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.ledger.id.reservation.id",
+                bookKeeper.ledgerIdReservationId());
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.password.file",
+                bookKeeper.passwordFile().toString());
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.password.version",
+                bookKeeper.passwordVersion());
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.max.reads.inflight",
+                "2");
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.readiness.epoch",
+                Long.toString(bookKeeper.readinessEpoch()));
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.readiness.sha256",
+                bookKeeper.readinessSha256());
+        properties.setProperty(
+                "nereus.kafka.storage.bookkeeper.persistent.broker.count",
+                Integer.toString(bookKeeper.persistentBrokerCount()));
+    }
+
+    private static void formatStorage(
+            Path formatScript,
+            Path kafkaHome,
+            Path config,
+            Path formatLog
+    ) throws Exception {
+        Process format = start(
+                List.of(
+                        formatScript.toString(),
+                        "format",
+                        "--cluster-id",
+                        org.apache.kafka.common.Uuid.randomUuid().toString(),
+                        "--config",
+                        config.toString(),
+                        "--feature",
+                        "nereus.storage.version=1"),
+                kafkaHome,
+                formatLog);
+        int formatExit =
+                await(format, PROCESS_TIMEOUT, "Kafka storage format", formatLog);
+        assertThat(formatExit)
+                .withFailMessage(() -> "storage format failed:\n" + readLog(formatLog))
+                .isZero();
+    }
+
+    private static void assertOffsets(
+            Admin admin,
+            TopicPartition partition,
+            long earliestOffset,
+            long latestOffset
+    ) throws Exception {
+        Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliest =
+                admin.listOffsets(Map.of(partition, OffsetSpec.earliest()))
+                        .all()
+                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latest =
+                admin.listOffsets(Map.of(partition, OffsetSpec.latest()))
+                        .all()
+                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        assertThat(earliest.get(partition).offset()).isEqualTo(earliestOffset);
+        assertThat(latest.get(partition).offset()).isEqualTo(latestOffset);
+    }
+
+    private static OxiaClientConfiguration oxiaConfiguration() {
+        return new OxiaClientConfiguration(
+                OXIA.getServiceAddress(),
+                "default",
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(30),
+                10_000,
+                1_024);
+    }
+
+    private static BookKeeperWalConfiguration bookKeeperWalConfiguration(
+            BookKeeperProcessConfiguration bookKeeper
+    ) {
+        return new BookKeeperWalConfiguration(
+                bookKeeper.clusterAlias(),
+                bookKeeper.providerScopeSha256(),
+                bookKeeper.ledgerIdPrefixBits(),
+                bookKeeper.ledgerIdPrefixValue(),
+                bookKeeper.ledgerIdReservationId(),
+                2,
+                2,
+                2,
+                BookKeeperDigestType.CRC32C,
+                new BookKeeperSecretRef(
+                        bookKeeper.passwordFile().toUri().toASCIIString(),
+                        bookKeeper.passwordVersion()),
+                100_000,
+                256L * 1024 * 1024,
+                1_000,
+                8,
+                64,
+                32,
+                Duration.ofHours(1),
+                8,
+                2,
+                64L * 1024 * 1024,
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(20),
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(2),
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(1),
+                256);
+    }
+
+    private static void seedBookKeeperAuthority(
+            OxiaClientConfiguration oxia,
+            BookKeeperWalConfiguration configuration,
+            BookKeeperProcessConfiguration bookKeeper,
+            Clock clock
+    ) {
+        try (SharedOxiaClientRuntime shared =
+                SharedOxiaClientRuntime.connect(oxia, clock)) {
+            OxiaBookKeeperLedgerIdNamespaceReservationStore namespaces =
+                    new OxiaBookKeeperLedgerIdNamespaceReservationStore(
+                            oxia,
+                            shared);
+            var reservation =
+                    new BookKeeperLedgerIdNamespaceProvisioningCoordinator(
+                                    namespaces,
+                                    clock)
+                            .provision(
+                                    configuration,
+                                    bookKeeper.deploymentId(),
+                                    "44".repeat(32),
+                                    Duration.ofSeconds(30))
+                            .join();
+            OxiaBookKeeperProtocolActivationStore activations =
+                    new OxiaBookKeeperProtocolActivationStore(oxia, shared);
+            BookKeeperProtocolActivationCoordinator coordinator =
+                    new BookKeeperProtocolActivationCoordinator(
+                            activations,
+                            clock);
+            var prepared = coordinator.prepare(
+                            configuration,
+                            reservation,
+                            bookKeeper.readinessEpoch(),
+                            bookKeeper.readinessSha256(),
+                            Duration.ofSeconds(30))
+                    .join();
+            coordinator.activate(
+                            configuration,
+                            reservation,
+                            BookKeeperProtocolActivationUpdate.publications(
+                                    bookKeeper.readinessEpoch(),
+                                    bookKeeper.readinessSha256(),
+                                    true,
+                                    true,
+                                    prepared.metadataVersion()),
+                            Duration.ofSeconds(30))
+                    .join();
+        }
+    }
+
+    private static LocalBookKeeper startBookKeeper(
+            int zooKeeperPort
+    ) throws Exception {
+        ServerConfiguration configuration = new ServerConfiguration();
+        configuration.setJournalSyncData(false);
+        configuration.setJournalWriteData(false);
+        configuration.setProperty("journalMaxGroupWaitMSec", 0L);
+        configuration.setProperty("journalPreAllocSizeMB", 1);
+        configuration.setFlushInterval(60_000);
+        configuration.setGcWaitTime(60_000);
+        configuration.setAllowLoopback(true);
+        configuration.setAdvertisedAddress("127.0.0.1");
+        configuration.setAllowEphemeralPorts(true);
+        configuration.setNumAddWorkerThreads(0);
+        configuration.setNumReadWorkerThreads(0);
+        configuration.setNumHighPriorityWorkerThreads(0);
+        configuration.setNumJournalCallbackThreads(0);
+        configuration.setServerNumIOThreads(1);
+        configuration.setNumLongPollWorkerThreads(1);
+        configuration.setAllocatorPoolingPolicy(PoolingPolicy.UnpooledHeap);
+        configuration.setLedgerManagerFactoryClass(
+                LongHierarchicalLedgerManagerFactory.class);
+        configuration.setLedgerStorageClass(
+                "org.apache.bookkeeper.bookie.SortedLedgerStorage");
+        configuration.setDiskUsageThreshold(0.999F);
+        configuration.setDiskUsageWarnThreshold(0.99F);
+        LocalBookKeeper cluster =
+                LocalBookKeeper.getLocalBookies(
+                        "127.0.0.1",
+                        zooKeeperPort,
+                        2,
+                        true,
+                        configuration);
+        cluster.start();
+        return cluster;
     }
 
     private static RecordMetadata produce(
@@ -990,6 +1403,8 @@ class NereusKafkaNativeProcessIntegrationTest {
         Files.deleteIfExists(target.resolve("server-restart.log"));
         Files.deleteIfExists(target.resolve("server-interrupted-transaction.log"));
         Files.deleteIfExists(target.resolve("server-transaction-recovery.log"));
+        Files.deleteIfExists(target.resolve("bookkeeper-server-first.log"));
+        Files.deleteIfExists(target.resolve("bookkeeper-server-restart.log"));
     }
 
     private static void copyIfPresent(Path source, Path target) throws IOException {
@@ -1005,11 +1420,19 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
-    private static int differentFreePort(int first) throws IOException {
+    private static int differentFreePort(int... excluded) throws IOException {
         int candidate;
+        boolean conflict;
         do {
             candidate = freePort();
-        } while (candidate == first);
+            conflict = false;
+            for (int port : excluded) {
+                if (port == candidate) {
+                    conflict = true;
+                    break;
+                }
+            }
+        } while (conflict);
         return candidate;
     }
 
@@ -1082,6 +1505,21 @@ class NereusKafkaNativeProcessIntegrationTest {
         };
 
         abstract void stop(Process broker, Path serverLog) throws Exception;
+    }
+
+    private record BookKeeperProcessConfiguration(
+            String metadataServiceUri,
+            String deploymentId,
+            String clusterAlias,
+            String providerScopeSha256,
+            int ledgerIdPrefixBits,
+            long ledgerIdPrefixValue,
+            String ledgerIdReservationId,
+            Path passwordFile,
+            String passwordVersion,
+            long readinessEpoch,
+            String readinessSha256,
+            int persistentBrokerCount) {
     }
 
     private record OpenTransaction(

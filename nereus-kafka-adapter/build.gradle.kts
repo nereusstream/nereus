@@ -108,6 +108,7 @@ tasks.register<Test>("f9M3ProviderIntegrationTest") {
 tasks.register<Test>("f9BookKeeperWalOnlyProviderIntegrationTest") {
     group = "verification"
     description = "Run the F9 BookKeeper-WAL-only leader open/Produce/Fetch gate against real Oxia and BookKeeper."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
     classpath = f9ProviderIntegrationTest.runtimeClasspath
     shouldRunAfter(tasks.test, tasks.named("f9M3ProviderIntegrationTest"))
@@ -140,7 +141,39 @@ tasks.register<Test>("f9M6KafkaProcessIntegrationTest") {
     maxParallelForks = 1
     useJUnitPlatform()
     filter {
-        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest")
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "productProcessRecoversUserGroupAndTransactionStateAcrossGracefulAndForcedRestarts",
+        )
+    }
+}
+
+tasks.register<Test>("f9BookKeeperWalOnlyProcessIntegrationTest") {
+    group = "verification"
+    description = "Run the native Kafka BookKeeper-WAL-only Produce/Fetch cold-restart process gate."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9M6KafkaProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-bookkeeper-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "bookKeeperWalOnlyProcessRecoversAcrossFreshJvmRestart",
+        )
     }
 }
 

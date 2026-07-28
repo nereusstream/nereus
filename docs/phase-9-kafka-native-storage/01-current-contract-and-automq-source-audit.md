@@ -564,6 +564,9 @@ transactional ID、commits data offset 3 plus marker offset 4、resumes the grou
 verifies earliest=0/latest=5 before another normal shutdown。The process gate first exposed concurrent recovery read-budget
 backpressure as a terminal metadata publication fault；the product recovery coordinator now retries only retriable page-read
 failures with 10–250 ms exponential backoff under the original frozen-head deadline and publishes no partial state。The same
+gate deliberately uses four Fetch workers：cold restart can concurrently load the user log、`__consumer_offsets` and
+`__transaction_state`，and the fourth slot keeps the client probe from competing with those three mandatory recovery reads；
+this remains below the production default of at least 16 and makes the gate's minimum-resource contract deterministic。The same
 gate then starts a third JVM，stably appends open-transaction data at offset 5 and forcibly kills the process。A fourth JVM
 recovers that coordinator state；reinitializing the same transactional ID writes ABORT marker 6 before committed data/marker
 7/8，`read_committed` skips offset 5 and the group advances to offset 8 with latest=9。The same work corrected the root Gradle task
@@ -571,6 +574,16 @@ selection so M6 feature/process gates publish current `0.1.0-f9-dev` bytes；the
 release tarball had consumed an older same-coordinate adapter artifact。This is same-node graceful cold-restart evidence，not
 multi-broker live preemption、checkpoint/virtual-segment transaction cuts、multi-controller failover or provider-profile
 matrix evidence。
+
+The same published fork head now also has an independent `BOOKKEEPER_WAL_ONLY` release-distribution gate。Product-side
+provisioning writes the F1-BK ledger-ID namespace、ACTIVE protocol publication and exact broker readiness to the same
+four-shard Oxia authority，while a two-bookie fixture uses BookKeeper's stock ZooKeeper
+`LongHierarchicalLedgerManagerFactory` for BookKeeper metadata。The first real combined-node Kafka JVM Admin-creates a
+topic、produces/fetches offset 0、verifies earliest=0/latest=1 and shuts down normally；a fresh JVM over the same formatted
+KRaft directories and Nereus state recovers offset 0、produces/fetches offset 1、verifies earliest=0/latest=2 and shuts down
+normally。This proves the typed mapping/client ownership reaches a real process without introducing Pulsar's Oxia
+BookKeeper metadata driver into the Kafka distribution；it remains one-profile/single-node evidence rather than the complete
+five-profile or live-takeover matrix。
 
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
