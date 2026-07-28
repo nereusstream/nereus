@@ -1,7 +1,7 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
 > 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart、BookKeeper WAL-only/async/sync cold-restart、BookKeeper three-profile two-process post-handoff、BookKeeper provider-applied cut、real-Oxia two-runtime Object-WAL live takeover、three-voter ACTIVE controller failover、the complete six-way readiness/PREPARED/ACTIVE store-publication gates and four-way initial-proof gates 均通过；extended kill/chaos gates remain open
-> 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：fork `df238bb387` 与 product `f9MultiBrokerTakeoverProcessIntegrationTest` 已通过 two-release-process Object-WAL/KRaft singleton live reassignment；product `f9InFlightTakeoverProcessIntegrationTest` 以第三个 controller/broker JVM、Toxiproxy、`jcmd` 栈采样和 `SIGSTOP/SIGCONT` 闭合 Object-WAL already-dispatched old append；`f9BookKeeperProfileTakeoverProcessIntegrationTest` 闭合三 BookKeeper profile 的 post-handoff P-tier matrix；`f9BookKeeperInFlightTakeoverProcessIntegrationTest` further proves a real Bookie-acked、Oxia-`WRITING` append is abandoned/sealed by the new leader and cannot publish after the old JVM resumes；`f9MultiControllerFailoverProcessIntegrationTest` further proves a three-voter ACTIVE controller kill/election/reconciliation and native IO continuity；`f9ActivationCutFailoverProcessIntegrationTest` further kills the exact active controller before or after real readiness create、PREPARED create and ACTIVE CAS and proves higher-epoch recovery with broker `[4]` native IO；`f9ActivationProofCutFailoverProcessIntegrationTest` does the same before/after the initial snapshot proof and capability aggregation；`f9ActivationTransportRecoveryProcessIntegrationTest` further resets the actual Oxia transport and proves same-controller-epoch retry to ACTIVE plus native IO；remaining gaps are transaction/internal-topic coordinator migration、checkpoint/virtual-segment cuts and broader kill/response-loss chaos
+> 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：fork `1cbe8b65a8` 与 product process gates 已通过 two-release-process Object-WAL/KRaft singleton live reassignment、already-dispatched Object/BookKeeper append cuts、three-profile post-handoff、multi-controller activation/store/proof/transport cuts；同一 published fork 又闭合 native DeleteRecords 的 durable log-start publication、broker-epoch-ready recovery 和 pre-trim NKC1 hydration，product `f9CheckpointTrimRecoveryProcessIntegrationTest` 证明 forced restart 后按当前 trim 重建 virtual segments 并继续 native IO；remaining gaps are transaction/internal-topic coordinator migration and broader kill/response-loss chaos
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -554,8 +554,39 @@ executor 完成 replay，final publication 才以短 critical section 安装 log
 partition incarnation/leader epoch 的短 critical section 发布 `UnifiedLog.logStartOffset`、推进 producer/epoch
 derived state 并唤醒 delayed Fetch/DeleteRecords。Product coordinator 对 target `<= durable logStart` 返回无 I/O
 幂等成功；对 advancing target 使用共享 NKC1 checkpoint-before-trim barrier，且不把 mid-batch offset 向 segment
-边界取整。任一 leadership/config/root race 在 Nereus mutation 前失败。当前 product API/测试已实现，fork branch
-仍待接入。
+边界取整。任一 leadership/config/root race 在 Nereus mutation 前失败。当前 product API/测试及 fork branch
+均已接入。
+
+Durable completion 不能只更新 stock `UnifiedLog.logStartOffset`。Fork commit `1897f07fcd` 在
+`NereusUnifiedLog.publishDurableLogStart(expectedStorage, expectedLeaderEpoch, durableOffset)` 内持有
+`nereusGuard`，依次校验 exact storage identity、recovered leader epoch 与 `LEADER_WRITABLE`，调用
+`KafkaPartitionStorage.publishDurableLogStart(durableOffset)` 发布 product snapshot，然后执行
+`NereusCanonicalLogState.advanceLogStart`、重装 `NereusLocalLog` virtual segment shells，最后调用 stock
+`maybeIncrementLogStartOffset(...ClientRecordDeletion)`。这条顺序保证 Kafka 可见 log start 永远不领先于 durable
+trim；segment-shell rebuild 失败会进入 fenced recovery，而不是返回 DeleteRecords 成功。
+
+Fork commit `1cbe8b65a8` 同时把 recovery codec seam 固定为：
+
+```java
+void hydrateCheckpoint(
+    NereusKafkaRecoveredState state,
+    KafkaCheckpointHeader header,
+    List<KafkaCheckpointSection> sections);
+```
+
+`NereusKafkaRecoveredState.hydrateCheckpoint` 以 header 自带的
+`logStartOffset/stableEndOffset/checkpointOffset` 严格解码七个 NKC1 sections。允许的唯一 pre-trim 情况是
+`header.logStartOffset() <= currentDurableLogStart`；checkpoint offset 仍必须位于当前
+`[durableLogStart, durableEnd]`。恢复 stock producer/transaction state、leader epochs、virtual segments 和
+derived indexes，再 replay checkpoint 后的 COMMITTED tail；freeze 前调用 canonical
+`advanceLogStart(currentDurableLogStart)`，从而删除 checkpoint 中已被 durable trim 淘汰的 segment、batch
+position 和 config history。反过来使用 current trim 直接解码旧 checkpoint 会把合法的 pre-trim segment bases
+误判为越界，禁止这样实现。
+
+Fork commit `b300a169ee` 还消除了 metadata publisher 与 broker registration 的竞态：
+`NereusTopicDeltaLifecycle` 在 `brokerEpochSupplier` 返回 `-1` 时，通过受 runtime 管理的 scheduler 每
+`BrokerEpochPollMillis` 异步重试，直至得到非负 epoch 或 open deadline 到期；不得在 publisher callback 上
+阻塞，也不得因等待 epoch 取消已经准备完成的 leader lookup。
 
 当前 required-acks seam 仅扩展 stock `storage` package interface 和一个 `Partition` match branch；
 `testAuthoritativeAppendPreservesRequiredAcks` 同时证明 `-1` 原样路由、非法值在 adapter I/O 前拒绝，以及普通

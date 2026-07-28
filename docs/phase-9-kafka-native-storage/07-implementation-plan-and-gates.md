@@ -1,7 +1,7 @@
 # 07 — Implementation Plan and Gates
 
 > 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss、release-process physical-deletion/fresh-JVM NCP2 fallback、Object/BookKeeper process takeover cuts、real-Oxia two-runtime Object-WAL live leader takeover、ACTIVE-state three-voter controller failover、the complete six-way readiness/PREPARED/ACTIVE store-publication cuts and four-way initial proof cuts are implemented；release-process response-loss restart、remaining M4 internal-topic cuts and inherited final gates remain open
-> 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton takeover 已实现并进入 M6 process aggregate；`f9InFlightTakeoverProcessIntegrationTest` 已闭合 Object-WAL already-dispatched old append 的 P/C 边界；`f9BookKeeperProfileTakeoverProcessIntegrationTest` 已闭合 WAL-only/async/sync 的 post-handoff P-tier matrix；`f9BookKeeperInFlightTakeoverProcessIntegrationTest` 已闭合三 profile 共享的 Bookie-acked/metadata-`WRITING` C boundary；`f9MultiControllerFailoverProcessIntegrationTest` 已闭合 ACTIVE 稳态 controller kill/election/reconciliation and native IO continuity；`f9ActivationCutFailoverProcessIntegrationTest` 已闭合 readiness create、PREPARED create 与 ACTIVE CAS 的 before-provider/after-provider controller cuts，并修复 readiness 已存在但 activation 尚不存在时的 higher-offset replacement recovery；`f9ActivationProofCutFailoverProcessIntegrationTest` 已闭合 initial snapshot proof 与 capability aggregation 的 before-provider/after-provider cuts；`f9ActivationTransportRecoveryProcessIntegrationTest` 已闭合 actual Oxia transport reset、typed retriable failure normalization 与 same-controller-epoch recovery；仍 open 的 takeover 边界是 coordinator/internal topics、checkpoint/virtual segments 与更广 chaos
+> 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton takeover、Object/BookKeeper in-flight cuts、three-profile handoff、ACTIVE multi-controller failover、activation store/proof cuts 与 Oxia transport recovery 已进入 M6 process aggregate；`f9CheckpointTrimRecoveryProcessIntegrationTest` 又闭合 native DeleteRecords -> rooted NKC1 -> durable trim -> forced restart -> pre-trim checkpoint hydration/current-trim pruning -> continued IO；仍 open 的 takeover 边界是 coordinator/internal topics 与更广 chaos
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -442,7 +442,8 @@ coordinator/transaction/compaction remain M4/M5。
   `OxiaJavaKafkaStorageActivationMetadataStore` and being marked terminal by the fork runtime；the store now preserves typed
   conditions/invariants but maps unknown provider failures to retriable `METADATA_UNAVAILABLE` failed futures。The
   deterministic store contract passes and the fresh process task passes 73/73 actionable tasks in 1m10s；
-- coordinator/internal-topic、checkpoint/virtual-segment and broader chaos cuts remain open；
+- coordinator/internal-topic and broader chaos cuts remain open；the native checkpoint/virtual-segment trim/restart
+  subset is covered by the M5 process gate below；
 - fresh `phase9M3ProviderCheck --rerun-tasks` passes 64/64 actionable tasks on this source。The aggregate reruns the
   146/146 scenario manifest、29-blob Nereus source lock、Apache Kafka baseline lock、M1/M2/M3 codec predecessors and all
   three provider gates：Object sync/async round trip、two-bookie BookKeeper WAL-only/profile composition and the new live
@@ -613,7 +614,7 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@df238bb387` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@1cbe8b65a8` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
   compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
   controller activation scheduling commit、one durable feature/control commit、one aggregate Spotless alignment commit and one
@@ -623,7 +624,8 @@ coordinator/transaction/compaction remain M4/M5。
   stock config-fixture alignment commit、one logging-runtime isolation commit and one enabled-format
   default-BookKeeper-profile fixture completion commit、one atomic shared-storage reassignment commit and one
   local-replica-removal binding-preservation commit、one per-controller-epoch activation-reconciliation observability
-  commit。The
+  commit、one durable-log-start publication commit、one broker-epoch-ready recovery commit and one pre-trim checkpoint
+  recovery/current-trim pruning commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
@@ -636,13 +638,13 @@ coordinator/transaction/compaction remain M4/M5。
   three-profile two-process post-handoff matrix plus the common Bookie-acked/pre-publication C cut pass；the three-voter
   ACTIVE controller kill/reconciliation gate、the complete six-way readiness/PREPARED/ACTIVE store-publication-cut gate、
   the four-way initial snapshot-proof/capability-aggregation gate and actual Oxia transport reset/same-epoch retry also pass，
-  while checkpoint/virtual-segment/coordinator migration and broader kill-cut final gates
+  while coordinator migration and broader kill-cut final gates
   remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the
-  fork branch/local+remote head/base ancestry/forty-two-commit count/organization remote/one-hundred-twenty-one log-IO/bridge/recovery/
+  fork branch/local+remote head/base ancestry/forty-five-commit count/organization remote/one-hundred-twenty-one log-IO/bridge/recovery/
   metadata-lifecycle/configuration/runtime-composition/retention/compaction
   plus stock-isolation/launcher/controller-runtime/feature-control blobs and markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
@@ -724,7 +726,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@df238bb387` branch。
+`nereus/future9-native-kafka-storage@1cbe8b65a8` branch。
 The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、fresh
 process restart/takeover index recovery、real internal-topic coordinator replay/restart/failover、upstream focused suites
 and real two-broker evidence are still required before M4 completion。
@@ -777,7 +779,7 @@ owner and drain it through the runtime background-service lifecycle。Kafka fork
 provide stock DeleteRecords invocation、partition-lock capture、same-log local updater and owned writable-partition
 enumeration；`378e9f8967` supplies the live virtual segment/config/index facts consumed by the planner。The focused
 retention suite and fork UnifiedLog/Partition/config regressions pass。This task deliberately does not use the
-`phase9M5Check` completion name：delete-response-loss/multi-broker takeover/chaos evidence、compaction
+`phase9M5Check` completion name：delete-response-loss/all-profile/chaos evidence、compaction
 full stock-cleaner differential oracle and aggregate gates remain required。Compaction production fork
 registration/concrete authority capture is now implemented separately by product `e18bf36` and fork `58342d9dca`。
 
@@ -787,7 +789,41 @@ exact (including mid-batch) logical offset through the same rooted-checkpoint/re
 Its revalidation freezes KRaft config/leader authority but deliberately does not round or recompute a retention segment
 candidate。Fork commit `4c060aec89` now supplies stock policy/leader/range validation、`-1 -> HW` conversion、
 partition-lock capture and durable-result publication into the same `NereusUnifiedLog`。This closes the deterministic
-fork boundary for slice 3；real provider batch-boundary/response-loss/restart and delayed-Fetch wake-up gates remain open。
+fork boundary for slice 3；the following process checkpoint closes one concrete start-boundary/forced-restart/Fetch-wake-up
+path，while middle/end/HW、all-profile and response-loss matrices remain open。
+
+Current checkpoint/trim process gate（2026-07-29）：
+
+```text
+:nereus-kafka-adapter:f9CheckpointTrimRecoveryProcessIntegrationTest
+  profile = BOOKKEEPER_WAL_SYNC_OBJECT
+  RF = 1
+  six ~600 KiB RecordBatches; segment.bytes = 1 MiB
+  stock kafka-delete-records.sh target = 3
+  expected before kill = rooted NKC1(offset=6), trim/end=3/6
+  fault = forced release-JVM termination
+  expected after reopen = earliest/latest=3/6, Fetch(3), append(6), final=3/7
+```
+
+Implementation ownership is exact：
+
+- Nereus `KafkaCheckpointRecoveryCoordinator` passes the full `KafkaCheckpointHeader` into
+  `KafkaRecoveryStateCodec#hydrateCheckpoint`；publication/recovery/trim source revalidation uses stable committed anchor
+  `commitVersion + lastCommitId + endOffset + cumulativeSize` and does not compare the mutable durable-head digest。
+- Kafka fork `NereusKafkaRecoveredState` decodes sections under the checkpoint-captured window，then
+  `NereusCanonicalLogState.advanceLogStart(currentTrim)` removes trimmed segments/index positions/config history before
+  freeze；`NereusUnifiedLog.publishDurableLogStart` publishes product snapshot first and stock/local state last。
+- `DefaultKafkaPartitionOpener` publishes recovered `leader/epoch/brokerEpoch/logStart/end` to the binding only after
+  recovery succeeds；binding observed offsets may lag current stream head but may never lead it。
+- `NereusTopicDeltaLifecycle` asynchronously waits for a non-negative KRaft broker registration epoch before open；
+  Object-WAL read-pin/protection configuration rejects a clock-skew-adjusted lifetime shorter than operation TTL。
+- physical、dispatcher and compacted readers stop with accumulated batches when only the next entry exceeds the remaining
+  page budget，preventing large virtual-segment evidence reads from being misclassified as corruption。
+
+The fresh process gate passes and is a dependency of `phase9M6KafkaProcessCheck`。The same source then passes
+`f9M6KafkaProcessIntegrationTest` and `f9MultiBrokerTakeoverProcessIntegrationTest`，so the fix is regression-checked
+against the ordinary cold-restart and live reassignment paths。This is partial KF-RET-006 evidence，not
+`phase9M5FinalCheck` completion。
 
 `:nereus-kafka-adapter:f9CompactionPropertyTest` and `phase9M5CompactionCoreCheck` now add the first slice-4 partial
 gate。`nereus-materialization` owns immutable ranged decode/rewrite records rather than reusing the F4 one-entry/one-record
@@ -973,7 +1009,8 @@ recovery/continuation、already-dispatched append cut and BookKeeper three-profi
 the common BookKeeper provider-applied C cut、ACTIVE-state multi-controller kill/reconciliation、the complete
 before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store-publication matrix and actual Oxia
 transport reset/same-epoch retry are also covered；the initial snapshot-proof/capability-aggregation four-cut matrix is
-covered as well；priority budgets、coordinator migration and checkpoint/virtual-segment cuts remain open。
+covered as well；the native checkpoint/virtual-segment trim/restart slice is covered；priority budgets、coordinator migration
+and broader chaos cuts remain open。
 
 ### Tasks
 

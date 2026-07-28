@@ -1,7 +1,7 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
 > 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs/full composition and Object-WAL exact-reference durable checkpoint quarantine partial slices implemented
-> 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；真实两 Bookie/两 Kafka release-process gate 闭合 BookKeeper 三 profile 的 post-handoff recovery/continuation；test-only agent gate further proves Bookie-acked/metadata-`WRITING` stale append recovery and fencing；three-voter/three-combined-node gate further proves ACTIVE activation remains immutable across controller kill and readiness epoch does not regress；a second fault-agent test now proves all six readiness-create/PREPARED-create/ACTIVE-CAS before-provider and after-provider publication boundaries survive exact-controller loss；a third closes all four initial snapshot-proof/capability-aggregation cuts；a real Toxiproxy/Oxia connection-reset gate additionally proves raw transport failures are normalized to retriable metadata failures and the same controller epoch completes first activation after recovery；checkpoint/virtual-segment 与 coordinator migration cuts 仍 open
+> 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment、Object/BookKeeper in-flight cuts、three-profile handoff、three-voter ACTIVE failover、activation store/proof cuts 与 real Oxia transport reset 均通过；native DeleteRecords 的 rooted NKC1 publication、durable trim、forced process death、pre-trim checkpoint hydration/current-trim pruning 与 continued IO 也已通过；coordinator/internal-topic migration 和 broader chaos cuts 仍 open
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -911,6 +911,38 @@ When `NereusException.appendOutcome` is `MAY_HAVE_COMMITTED` or `KNOWN_COMMITTED
 
 Binding `observedStableEndOffset` may be stale throughout；it is updated only after successful reopen/checkpoint and never
 decides outcome。
+
+### 8.1 Trim-aware recovery anchor
+
+Checkpoint publication、recovery 和 trim revalidation 必须区分三类会同时变化的 durable facts：
+
+| Fact | Authority | Recovery rule |
+| --- | --- | --- |
+| committed append identity | stream head `commitVersion + lastCommitId + committedEndOffset + cumulativeSize` | 相同 commit version 必须完全相等；更高 commit version 只允许单调增长 |
+| current visibility window | stream head `trimOffset..committedEndOffset` | restart/fetch/ListOffsets 的权威边界 |
+| advisory observation | binding `observedLogStartOffset/observedStableEndOffset` | 允许落后；任一值领先 current stream head 都是 invariant violation |
+
+`durableHeadSha256` 不是 committed append identity：trim、append-session renewal 或其他 metadata-only transition
+可以在不新增 commit 的情况下改变它。因此 `KafkaCheckpointPublicationCoordinator`、
+`KafkaCheckpointRecoveryCoordinator` 与 `KafkaTrimBarrier.requireSameAuthority` 在相同 commit version 下都使用
+`lastCommitId + committedEndOffset + cumulativeSize`，不能要求旧/new durable-head digest 相等。
+
+`DefaultKafkaPartitionOpener` 在 session acquire 后先读取 current stream source，再从 Oxia 重载 binding；
+binding identity/incarnation/stream/profile 必须不变，observed leader/broker epoch 不得领先或冲突，observed
+offsets 不得领先 source。Recovery 成功后才以 bounded CAS loop 调用
+`KafkaPartitionMetadataTransitions.observe(...)` 发布 exact
+`topicName/leaderId/leaderEpoch/brokerEpoch/currentTrim/currentEnd`。CAS condition failure 可在同一 open deadline
+内重读重试；metadata invariant、fencing 或 deadline failure 直接关闭 open，禁止把 stale observation 当成成功。
+
+读取 NKC1 时，object/read-pin operation 的 TTL 必须完整覆盖 provider operation 加最大时钟偏差：
+
+```text
+pendingProtectionDuration - maximumClockSkew >= operationTtl
+```
+
+`NereusKafkaObjectWalRuntimeConfiguration` 在构造期验证该不等式；不满足时在创建 provider graph 前失败。这样
+checkpoint verification、trim barrier 与 fresh-process recovery 不会拿到“业务 timeout 尚未结束但保护已被
+另一节点判定过期”的窗口。
 
 ## 9. Checkpoint container `NKC1`
 

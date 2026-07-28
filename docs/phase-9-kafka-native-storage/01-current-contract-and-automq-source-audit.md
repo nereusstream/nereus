@@ -436,9 +436,12 @@ fixture completion commit 是 `ebf1d7616309a26ca95cffa3a2434bf9d5a20868`。该 h
 `origin/nereus/future9-native-kafka-storage`。第四十个 controller singleton shared-storage reassignment commit
 是 `fe308359b6edaec26819a3c207f7308f1cc15918`；第四十一个 local-replica-removal lifecycle fix 是
 `bb7e8937c5ec361b7e8bb6b79ea3833fe4e4a20e`；第四十二个 controller-epoch activation reconciliation
-observability commit 是 `df238bb387706f60bc020e43c8dc6878fbf41051`，并且是当前已发布 head。
+observability commit 是 `df238bb387706f60bc020e43c8dc6878fbf41051`；第四十三个 durable log-start
+publication commit 是 `1897f07fcd`；第四十四个 broker-registration-epoch-ready recovery commit 是
+`b300a169ee`；第四十五个 pre-trim checkpoint hydration/current-trim pruning commit 是
+`1cbe8b65a8a802e8fd06503af3d5449ea79353e0`，并且是当前已发布 head。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/forty-two-commit
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/forty-five-commit
 count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百二十一文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
@@ -625,7 +628,7 @@ Fresh `phase9M3ProviderCheck --rerun-tasks` passes 64/64 actionable tasks and co
 and two-bookie BookKeeper provider gates、M1/M2/M3 deterministic predecessors、146/146 scenario synchronization and the
 updated 29-source Nereus lock。
 
-The published fork head `df238bb387` and product process harness now close the narrower two-release-process/KRaft
+The published fork head `1cbe8b65a8` and product process harness now close the narrower two-release-process/KRaft
 reassignment boundary。The controller must not reuse stock reassignment's temporary `[old,new]` RF2 state under Nereus
 feature level 1，because the same feature contract rejects follower ISR and non-singleton assignments。
 `ReplicationControlManager.changeNereusPartitionReassignment` therefore accepts only a stable RF1 current partition and one
@@ -665,8 +668,11 @@ without changing production code：a test-only Java agent allows the real Bookie
 committing offset 1。Resuming broker 1 releases the delayed future but its stale metadata CAS cannot publish；LEO remains 2
 and WAL-only publishes no Object bytes。Fresh execution passes 66/66 actionable tasks in 1m30s。Because this cut precedes
 `DURABLE` and the profile-specific materialization branch，the same production boundary is shared by WAL-only、async and
-sync；the prior three-profile P matrix supplies the profile-specific half。Transaction/internal-topic coordinator migration、
-checkpoint/virtual-segment and broader chaos proof remain open。
+sync；the prior three-profile P matrix supplies the profile-specific half。Transaction/internal-topic coordinator migration
+and broader chaos proof remain open。The native checkpoint/virtual-segment trim/restart subset is now covered separately by
+`f9CheckpointTrimRecoveryProcessIntegrationTest`：stock DeleteRecords publishes a rooted NKC1、advances durable trim，
+survives forced broker death，hydrates the checkpoint under its captured pre-trim window，prunes canonical state to the
+current trim and continues Produce/Fetch/ListOffsets。
 
 The same published head and
 `f9MultiControllerFailoverProcessIntegrationTest` now close the ACTIVE steady-state controller-kill subset of the
@@ -742,5 +748,5 @@ the implemented slice，not KF-FINAL-001/002 release evidence。
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`df238bb387706f60bc020e43c8dc6878fbf41051`。Executable source-lock expectation 已更新到该 reviewed、
+`1cbe8b65a8a802e8fd06503af3d5449ea79353e0`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

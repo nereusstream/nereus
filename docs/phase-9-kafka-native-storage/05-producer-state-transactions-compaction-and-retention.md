@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture deterministic slices implemented locally；real checkpoint/process/coordinator/retention/compaction gates and full stock cleaner differential remain in progress
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；coordinator、full retention/profile matrix、real compaction restart and stock cleaner differential remain in progress
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -263,8 +263,8 @@ reinitializes the same transactional ID、commits the next transaction and resum
 The same gate then leaves transaction data stable without an end marker、forcibly kills the broker and proves a fresh JVM
 reinitializing that transactional ID writes the missing ABORT before its next committed transaction；read-committed and the
 real group both skip the aborted data。This is partial KF-TXN-007/014 evidence only；the exact rows still require their locked
-BookKeeper/provider matrix，and multi-broker coordinator takeover、checkpoint/virtual-segment cuts and mandatory NTC2
-unavailability remain process gates。
+BookKeeper/provider matrix，multi-broker coordinator takeover and mandatory NTC2 unavailability process gates；the native
+DeleteRecords checkpoint/virtual-segment trim/restart subset is covered in section 9.4.1。
 
 ## 6. Leader epoch section
 
@@ -667,8 +667,44 @@ negative/unconverted and above-HW rejection、compact-only policy rejection and 
 Kafka-fork commit `4c060aec89` now keeps the stock `Partition.deleteRecordsOnLeader` validation and `-1 -> HW`
 normalization，captures the product snapshot under the partition lock，waits on the storage worker and advances the same
 `NereusUnifiedLog` only after durable trim。Focused `PartitionTest` and `NereusUnifiedLogFactoryTest` cover normalized
-HW、exact mid-batch target and local log-start publication。Real provider batch-start/middle/end/HW、Fetch wake-up and
-process-restart evidence remain required before KF-RET-006 is complete。
+HW、exact mid-batch target and local log-start publication。The process slice below now supplies one exact
+`BOOKKEEPER_WAL_SYNC_OBJECT` start-boundary/Fetch-wake-up/forced-restart path；batch-middle/end/HW、all-profile and
+response-loss matrices remain required before KF-RET-006 is complete。
+
+#### 9.4.1 Forced-restart checkpoint/trim recovery
+
+`:nereus-kafka-adapter:f9CheckpointTrimRecoveryProcessIntegrationTest` runs the exact native sequence：
+
+```text
+format KRaft + activate Nereus BOOKKEEPER_WAL_SYNC_OBJECT
+  -> create RF1 topic with segment.bytes=1048576 and cleanup.policy=delete
+  -> Produce six independent ~600 KiB RecordBatches at offsets 0..5
+  -> kafka-delete-records.sh requests offset 3
+  -> require rooted NKC1(checkpointLogStart=0, checkpointOffset=6)
+  -> require stream trim=3/end=6 and Kafka earliest/latest=3/6
+  -> SIGKILL broker JVM
+  -> fresh release JVM opens the same partition
+  -> hydrate checkpoint under captured [0,6]
+  -> prune canonical state under current durable [3,6]
+  -> Fetch offset 3, Produce offset 6, ListOffsets=3/7
+```
+
+恢复实现必须遵守“先按历史 checkpoint window 验证，后按当前 trim 裁剪”的顺序。传入
+`KafkaCheckpointHeader` 的 `logStartOffset=0/stableEndOffset=6` 解码 section 4/6/7，可合法包含 base
+`1/2`；随后 `NereusCanonicalLogState.advanceLogStart(3)` 删除 end `<=3` 的 virtual segments、
+`exactBatchPositions.headMap(3,false)` 和过期 config history。若直接以 current `logStart=3` 解码，合法的
+pre-trim bases 会被错误报告为“logical-byte segment bases not bounded”，属于恢复实现缺陷，不得降级为 full
+replay：trim 已大于 0 时 full replay 缺失历史 producer/transaction state，必须 fail closed。
+
+`KafkaPartitionStorage.publishDurableLogStart(3)` 先把 product `KafkaStableSnapshot` 原子推进到 durable trim；
+fork 仅在 exact storage + leader epoch 仍 writable 时消费该结果，并更新 canonical/virtual/stock logStart。
+重启 open 完成后，`DefaultKafkaPartitionOpener` 再把 binding observation CAS 到 current `3/6`。Evidence 读取
+binding 时只要求 `observedStableEndOffset <= durableEnd` 且不低于 checkpoint offset；append 后它可以暂时停留在
+`6`，不能用 advisory value 否定 authoritative stream end `7`。
+
+大记录还固定了 page-boundary contract：若前一页已返回至少一个 batch，下一次 strict read 因剩余 byte budget
+小于首 entry 返回 `READ_LIMIT_TOO_SMALL`，`ParquetV2CompactedTargetReader`、`ReadTargetDispatcher` 与
+`KafkaCompactedFetchReader` 必须停止当前页并返回已累积 batches；只有 accumulator 为空时才把错误传给调用方。
 
 ### 9.5 Trim vs materialization
 
@@ -1382,7 +1418,7 @@ per-partition serialization described above。
 | --- | --- |
 | Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex`、`NereusCanonicalLogState`、`NereusLogSegment` implemented locally；dedicated `NereusTimeIndex`/`NereusLeaderEpochCache` subclasses are unnecessary unless a later stock caller cannot consume the canonical facade |
 | adapter checkpoint | producer/txn/epoch/segment/time/byte section codecs V1 + full composition implemented |
-| adapter retention | planner/checkpoint/barrier/DeleteRecords/durable listener + per-partition maintenance + bounded periodic owned-partition runtime implemented；real provider/restart gates pending |
+| adapter retention | planner/checkpoint/barrier/DeleteRecords/durable listener + per-partition maintenance + bounded periodic owned-partition runtime implemented；one native forced-restart checkpoint/trim process gate passes，full profile/response-loss/stock-oracle matrix pending |
 | adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge + projection-free Kafka stream registration/ACTIVE-readiness generation guard + activated Object-WAL production composition + fork registration/concrete partition-lock/KRaft/local-log capture + stock marker pre-scan implemented；real-provider restart/takeover and full cleaner differential gate pending |
 | materialization | ranged decoder SPI、V2 two-pass engine/publisher/verifier + explicit projection-required/direct-stream authority modes and caller authority final-CAS fence |
 | metadata | binding compaction coverage nested record/codec/transition validators + partition-scoped KCP1 scan continuation |

@@ -41,7 +41,10 @@ Produce/Fetch/ListOffsets with Object persistence。The same gate also covers th
 operations，including activation-absent recovery from an existing readiness tuple。A real Oxia connection-reset gate now
 also proves same-controller-epoch retry after transport recovery。A third controller gate now kills the exact leader on
 both sides of the complete empty-cluster `currentSnapshot` proof and `loadCapabilities` aggregation，then proves
-higher-epoch ACTIVE recovery and native IO。These are still partial F9 results；coordinator/checkpoint migration、
+higher-epoch ACTIVE recovery and native IO。The native checkpoint/trim process gate now uses stock DeleteRecords to publish
+a rooted NKC1、durably advances log start、kills the release JVM and proves a fresh process hydrates the captured pre-trim
+checkpoint window、prunes virtual segments to the current trim and continues Produce/Fetch/ListOffsets。These are still
+partial F9 results；coordinator/internal-topic migration、
 release-process response-loss restart and the stock retention oracle remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
