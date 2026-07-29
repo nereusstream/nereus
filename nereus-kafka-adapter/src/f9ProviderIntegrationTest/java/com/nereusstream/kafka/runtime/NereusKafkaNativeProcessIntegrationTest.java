@@ -5135,7 +5135,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                         brokerTwoServerLog);
                 try (Admin admin =
                         Admin.create(
-                                adminProperties(
+                                longRunningAdminProperties(
                                         brokerTwoBootstrap
                                                 + ","
                                                 + controllerBootstrap))) {
@@ -5223,7 +5223,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 brokerOnePaused = true;
                 try (Admin admin =
                         Admin.create(
-                                adminProperties(
+                                longRunningAdminProperties(
                                         brokerTwoBootstrap
                                                 + ","
                                                 + controllerBootstrap))) {
