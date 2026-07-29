@@ -529,7 +529,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 StopMode.FORCE,
                 broker -> {
                     try (Admin admin =
-                            Admin.create(checkpointAdminProperties(bootstrapServers))) {
+                            Admin.create(longRunningAdminProperties(bootstrapServers))) {
                         NewTopic created = new NewTopic(topic, 1, (short) 1);
                         created.configs(Map.of(
                                 "cleanup.policy", "delete",
@@ -634,7 +634,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 bootstrapServers,
                 () -> {
                     try (Admin admin =
-                            Admin.create(checkpointAdminProperties(bootstrapServers))) {
+                            Admin.create(longRunningAdminProperties(bootstrapServers))) {
                         assertOffsets(
                                 admin,
                                 partition,
@@ -733,7 +733,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 StopMode.NORMAL,
                 broker -> {
                     try (Admin admin =
-                            Admin.create(checkpointAdminProperties(bootstrapServers))) {
+                            Admin.create(longRunningAdminProperties(bootstrapServers))) {
                         NewTopic created = new NewTopic(topic, 1, (short) 1);
                         created.configs(Map.of(
                                 "cleanup.policy", "delete",
@@ -1061,7 +1061,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                                 firstServerLog,
                                 Duration.ofSeconds(30));
                         try (Admin admin =
-                                Admin.create(checkpointAdminProperties(bootstrapServers))) {
+                                Admin.create(longRunningAdminProperties(bootstrapServers))) {
                             NewTopic created = new NewTopic(topic, 1, (short) 1);
                             created.configs(Map.of(
                                     "cleanup.policy", "delete",
@@ -1141,7 +1141,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 StopMode.NORMAL,
                 broker -> {
                     try (Admin admin =
-                            Admin.create(checkpointAdminProperties(bootstrapServers))) {
+                            Admin.create(longRunningAdminProperties(bootstrapServers))) {
                         assertOffsets(
                                 admin,
                                 partition,
@@ -4306,7 +4306,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                         brokerTwoServerLog);
 
                 try (Admin admin =
-                        Admin.create(adminProperties(
+                        Admin.create(longRunningAdminProperties(
                                 brokerTwoBootstrap + "," + controllerBootstrap))) {
                     admin.createTopics(List.of(
                                     new NewTopic(
@@ -4363,7 +4363,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 toxicInstalled = false;
 
                 try (Admin admin =
-                        Admin.create(adminProperties(
+                        Admin.create(longRunningAdminProperties(
                                 brokerTwoBootstrap + "," + controllerBootstrap))) {
                     admin.alterPartitionReassignments(Map.of(
                                     partition,
@@ -8004,15 +8004,18 @@ class NereusKafkaNativeProcessIntegrationTest {
                 throw new AssertionError(
                         "Nereus Kafka exited before readiness:\n" + readLog(serverLog));
             }
-            try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
+            Admin admin = Admin.create(adminProperties(bootstrapServers));
+            try {
                 admin.describeCluster()
                         .nodes()
                         .get(2, TimeUnit.SECONDS);
                 return;
             } catch (Throwable failure) {
                 lastFailure = failure;
-                Thread.sleep(250);
+            } finally {
+                admin.close(Duration.ZERO);
             }
+            Thread.sleep(250);
         }
         throw new AssertionError(
                 "Nereus Kafka did not become ready:\n" + readLog(serverLog),
@@ -8199,7 +8202,8 @@ class NereusKafkaNativeProcessIntegrationTest {
         Throwable lastFailure = null;
         while (System.nanoTime() < deadline) {
             assertProcessesAlive(brokers, serverLogs);
-            try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
+            Admin admin = Admin.create(adminProperties(bootstrapServers));
+            try {
                 List<Integer> observed = admin.describeCluster()
                         .nodes()
                         .get(2, TimeUnit.SECONDS)
@@ -8215,6 +8219,8 @@ class NereusKafkaNativeProcessIntegrationTest {
                                 + " but observed " + observed);
             } catch (Throwable failure) {
                 lastFailure = failure;
+            } finally {
+                admin.close(Duration.ZERO);
             }
             Thread.sleep(250);
         }
@@ -8836,7 +8842,7 @@ class NereusKafkaNativeProcessIntegrationTest {
         return properties;
     }
 
-    private static Properties checkpointAdminProperties(
+    private static Properties longRunningAdminProperties(
             String bootstrapServers
     ) {
         Properties properties = adminProperties(bootstrapServers);
