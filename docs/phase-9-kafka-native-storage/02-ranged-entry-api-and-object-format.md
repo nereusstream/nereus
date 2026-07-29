@@ -480,7 +480,7 @@ source references 仍由 F4 durable protections/generation records 管理。
 | --- | --- | --- |
 | 1 | `RETAIN_VALUE` | keyed latest live record |
 | 2 | `RETAIN_TOMBSTONE` | tombstone within delete-retention window |
-| 3 | `RETAIN_UNKEYED` | null-key record，unique by absolute offset |
+| 3 | `RETAIN_UNKEYED` | durable backward-read ID；current stock-compatible strategy does not emit null-key survivors |
 | 4 | `RETAIN_CONTROL` | transaction/control record required by Kafka semantics |
 
 ID 是 durable int，不使用 Java enum ordinal。unknown ID fail closed。
@@ -494,7 +494,9 @@ ID 是 durable int，不使用 Java enum ordinal。unknown ID fail closed。
 ```
 
 keyed equality 对 raw bytes 做 unsigned lexicographic compare only for external-sort order；dedup equality 是 exact
-byte equality。tag 避免 empty key、null key 和 control identity 碰撞。encoded key hard limit 为 1 MiB；Kafka
+byte equality。tag 避免 empty key、decoded null key 和 control identity 碰撞。`0x02` remains required for strict
+decode/audit and old NTC2 rows，but current `kafka-log-cleaner-v1` drops null-key data exactly like stock `LogCleaner`
+before rewrite，so new compaction output cannot emit disposition 3。encoded key hard limit 为 1 MiB；Kafka
 config 必须更严格或相等。
 
 ### 8.5 Required metadata additions

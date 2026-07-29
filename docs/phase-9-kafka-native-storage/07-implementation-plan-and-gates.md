@@ -7,6 +7,7 @@
 > 2026-07-29 mandatory NTC2 deterministic 增量：product `b6b02f4` + fork `89b66ab03b` 闭合 exact binding-rooted、all-untrimmed-generation、`TOPIC_COMPACTED`-only pre-election gate；physical repair evidence is recorded in the next increment
 > 2026-07-29 mandatory NTC2 process 增量（覆盖上一行末尾）：product `0ae8ca9` + fork `768924da60` 的独立真实进程门完成 Object-WAL activated `__consumer_offsets` NTC2 delete/corrupt、fail-closed election、exact identity verification、root/index CAS repair、coverage `REPLACE` 与两次 ordinary re-election；M4/M5 剩余边界为 injected resolution failure、non-Object profile expansion、DeleteRecords boundary/stock oracle 与 final/upstream aggregate
 > 2026-07-29 retention/DeleteRecords 增量（覆盖上一行的 M5 open wording）：product `77480cb` + fork `bd9963c980` 增加独立 `phase9M5KafkaRetentionOracleCheck`，用 real stock `UnifiedLog.deleteOldSegments()` 对比 time/size/combined/HW/strict-equality/compact-only 结果；`f9DeleteRecordsBoundaryProcessIntegrationTest` 在真实 Object-WAL release broker 上要求 target `3/4/6/-1` 精确映射 low watermark `3/4/6/9`、latest 恒为 `9`、Fetch 首条 offset/value 一致并有 rooted NKC1。KF-RET-001/002/003/006 为 `PASSED_CURRENT_SOURCE`；stock `LogCleaner` differential、injected resolution failure、non-Object NTC2 profile expansion 与 final/upstream aggregate 仍 open
+> 2026-07-29 compaction oracle 增量（覆盖上一行的 `LogCleaner` open wording）：product `666bab1`/`08fe686` + fork `c4a0a2d1fa`/`bf8a2946e5` 增加 `phase9M5KafkaCompactionOracleCheck`，以真实 stock `Cleaner` 比较 keyed/tail/null/tombstone、committed/aborted/control、expired horizon 和 idempotent sparse-batch exact fingerprints；同时修复 null-key 误保留与 required marker 过早 horizon。`phase9M5CompactionCoreCheck` 依赖该任务，fork source lock 为 51 commits/124 files。KF-CMP-001/002/003/004 为 `PASSED_CURRENT_SOURCE`；OPEN/full-format、injected resolution failure、non-Object NTC2 与 final/upstream aggregate 仍 open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -620,7 +621,7 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@bd9963c980` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@bf8a2946e5` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
   compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
   controller activation scheduling commit、one durable feature/control commit、one aggregate Spotless alignment commit and one
@@ -632,8 +633,9 @@ coordinator/transaction/compaction remain M4/M5。
   local-replica-removal binding-preservation commit、one per-controller-epoch activation-reconciliation observability
   commit、one durable-log-start publication commit、one broker-epoch-ready recovery commit and one pre-trim checkpoint
   recovery/current-trim pruning commit、one mandatory internal-topic compacted-read coordinator gate commit、one
-  bridge-Spotless-only import-grouping commit、one maintenance capture-drift diagnostic commit and one stock-retention
-  differential-oracle commit。The
+  bridge-Spotless-only import-grouping commit、one maintenance capture-drift diagnostic commit、one stock-retention
+  differential-oracle commit、one stock-compaction differential-oracle commit and one isolated development-artifact
+  changing/zero-cache commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
@@ -654,7 +656,7 @@ coordinator/transaction/compaction remain M4/M5。
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the
-  fork branch/local+remote head/base ancestry/forty-nine-commit count/organization remote/one-hundred-twenty-two log-IO/bridge/recovery/
+  fork branch/local+remote head/base ancestry/fifty-one-commit count/organization remote/one-hundred-twenty-four log-IO/bridge/recovery/
   metadata-lifecycle/configuration/runtime-composition/retention/compaction
   plus stock-isolation/launcher/controller-runtime/feature-control blobs and markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
@@ -736,7 +738,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@bd9963c980` branch。
+`nereus/future9-native-kafka-storage@bf8a2946e5` branch。
 Product `7c25d2e` now adds the real two-broker completed-state half through
 `f9CoordinatorMigrationProcessIntegrationTest`。The first release JVM commits user data、one transaction and group offset
 2，then a second live JVM takes exact singleton ownership of the user partition、`__consumer_offsets-0` and
@@ -788,7 +790,7 @@ and the M4 final aggregate are still required before M4 completion。
 :nereus-kafka-adapter:f9CompactionIntegrationTest
 :nereus-kafka-adapter:f9DeleteRecordsBoundaryProcessIntegrationTest
 phase9M5KafkaRetentionOracleCheck
-Kafka fork: nereusF9CleanerOracleTest (stock LogCleaner compaction differential pending)
+phase9M5KafkaCompactionOracleCheck
 Kafka fork: nereusF9InternalTopicCompactionTest
 phase9M5Check
 phase9M5FinalCheck --rerun-tasks
@@ -815,7 +817,7 @@ enumeration；`378e9f8967` supplies the live virtual segment/config/index facts 
 retention suite and fork UnifiedLog/Partition/config regressions pass。This task deliberately does not use the
 `phase9M5Check` completion name：the later `phase9M5KafkaRetentionOracleCheck` and
 `f9DeleteRecordsBoundaryProcessIntegrationTest` close the retention differential and exact start/middle/end/HW mapping，
-but broader chaos evidence、compaction full stock-`LogCleaner` differential oracle and aggregate gates remain required。
+but broader chaos evidence、OPEN/full-format compaction expansion and aggregate gates remain required。
 Compaction production fork
 registration/concrete authority capture is now implemented separately by product `e18bf36` and fork `58342d9dca`。
 
@@ -908,8 +910,28 @@ The fork oracle uses fixed time and explicit `UnifiedLog.roll()`，so no filesys
 the expected boundary。The product process test invokes the stock CLI for every target，waits for its reported
 low watermark，then independently asks Admin for earliest/latest and performs a consumer Fetch。The forced fresh execution
 passes 64/64 tasks in 38s；the oracle passes through its dedicated product gate with fork Spotless/Checkstyle。Manifest rows
-KF-RET-001/002/003/006 are `PASSED_CURRENT_SOURCE`。The remaining M5 blocker is not “stock oracle” generically：it is the
-separate compaction differential against stock `LogCleaner` plus final aggregate/chaos coverage。
+KF-RET-001/002/003/006 are `PASSED_CURRENT_SOURCE`。
+
+Current stock compaction gate（product `666bab1`/`08fe686`，fork `c4a0a2d1fa`/`bf8a2946e5`）：
+
+```text
+phase9M5KafkaCompactionOracleCheck
+  publish = current 0.1.0-f9-dev modules
+  source lock = fork bf8a2946e5, 51 commits, 124 files
+  stock = UnifiedLog + Cleaner.buildOffsetMap + Cleaner.cleanSegments
+  compare = offsets/key/value/timestamp/compression/delete-horizon
+            + txn/control/producer-id/epoch/sequence/leader-epoch
+  cases = keyed/null/tombstone/tail
+          + committed/aborted/control
+          + expired tombstone/empty-marker horizons
+          + sparse idempotent GZIP batch
+```
+
+The oracle found and fixed two mismatches instead of encoding product behavior as expected output：stock drops null-key
+records during cleaning，and a required control marker does not receive a delete horizon until it becomes
+`DELETE_ELIGIBLE`。KF-CMP-001/002/003/004 are `PASSED_CURRENT_SOURCE`。Kafka does not clean past LSO，so OPEN
+crossing stays under product fail-closed tests and is not counted as stable-prefix stock differential evidence；full
+compression/header combinations、large randomized spill/restart and real process activation remain separate rows。
 
 `:nereus-kafka-adapter:f9CompactionPropertyTest` and `phase9M5CompactionCoreCheck` now add the first slice-4 partial
 gate。`nereus-materialization` owns immutable ranged decode/rewrite records rather than reusing the F4 one-entry/one-record
@@ -919,7 +941,7 @@ strict stock minimum-lag boundary，resuming at mandatory coverage end while fre
 SHA/base/index，and rewrites a selected value、transactional record or commit/abort marker to one round-trip-verified batch
 at its original absolute offset。The codec freezes its message-format digest and preserves compression unless the plan
 explicitly allows an uncompressed fallback。`KafkaCompactionStrategyV1` consumes full-horizon collector facts and decides
-latest/superseded keyed data、unique null-key retention、committed/aborted/open transactions and full-scan-proven
+latest/superseded keyed data、stock-compatible null-key drop、committed/aborted/open transactions and full-scan-proven
 tombstone/control-marker delete horizons，including first-pass horizon assignment and the later exact `now == horizon`
 boundary。`KafkaCompactionPassOneCollector`/`KafkaCompactionTwoPassExecutor` now provide a bounded dense two-pass reference：
 aborted/open data cannot become key winners，full/output fact SHA must reproduce，and retained records are rewritten and

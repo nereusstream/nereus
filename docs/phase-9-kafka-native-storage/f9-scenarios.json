@@ -2500,8 +2500,8 @@
     {
       "id": "KF-CMP-001",
       "milestone": "F9-M5",
-      "task": "phase9M5FinalCheck",
-      "testClass": "KafkaCompactionOraclePropertyTest",
+      "task": "phase9M5KafkaCompactionOracleCheck",
+      "testClass": "KafkaCompactionOracleTest",
       "testMethod": "scenarioKfCmp001",
       "scenario": "latest keyed value survives；older values removed at same offsets as oracle",
       "evidenceTier": [
@@ -2516,18 +2516,19 @@
       "gates": [
         "F9-M5"
       ],
-      "status": "PLANNED"
+      "status": "PASSED_CURRENT_SOURCE"
     },
     {
       "id": "KF-CMP-002",
       "milestone": "F9-M5",
-      "task": "phase9M5FinalCheck",
-      "testClass": "KafkaCompactionKeyEncodingTest",
+      "task": "phase9M5CompactionCoreCheck",
+      "testClass": "KafkaCompactionOracleTest",
       "testMethod": "scenarioKfCmp002",
-      "scenario": "empty key is keyed；null key is uniquely retained；encodings cannot collide",
+      "scenario": "empty key remains keyed；null key is dropped like stock cleaner；encodings cannot collide",
       "evidenceTier": [
         "D",
-        "M"
+        "M",
+        "K"
       ],
       "requiredServices": [],
       "sourceLocks": [
@@ -2537,13 +2538,13 @@
       "gates": [
         "F9-M5"
       ],
-      "status": "PLANNED"
+      "status": "PASSED_CURRENT_SOURCE"
     },
     {
       "id": "KF-CMP-003",
       "milestone": "F9-M5",
-      "task": "phase9M5FinalCheck",
-      "testClass": "KafkaCompactionOraclePropertyTest",
+      "task": "phase9M5KafkaCompactionOracleCheck",
+      "testClass": "KafkaCompactionOracleTest",
       "testMethod": "scenarioKfCmp003",
       "scenario": "tombstone retention/drop boundary matches Kafka delete-retention oracle",
       "evidenceTier": [
@@ -2558,13 +2559,13 @@
       "gates": [
         "F9-M5"
       ],
-      "status": "PLANNED"
+      "status": "PASSED_CURRENT_SOURCE"
     },
     {
       "id": "KF-CMP-004",
       "milestone": "F9-M5",
-      "task": "phase9M5FinalCheck",
-      "testClass": "KafkaCompactionHorizonTest",
+      "task": "phase9M5KafkaCompactionOracleCheck",
+      "testClass": "KafkaCompactionOracleTest",
       "testMethod": "scenarioKfCmp004",
       "scenario": "newer key in decision-horizon tail removes eligible older output record",
       "evidenceTier": [
@@ -2579,7 +2580,7 @@
       "gates": [
         "F9-M5"
       ],
-      "status": "PLANNED"
+      "status": "PASSED_CURRENT_SOURCE"
     },
     {
       "id": "KF-CMP-005",

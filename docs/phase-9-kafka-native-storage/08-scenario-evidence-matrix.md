@@ -8,6 +8,7 @@
 > 2026-07-29 mandatory NTC2 deterministic 增量：product `b6b02f4` + fork `89b66ab03b` add deterministic KF-TXN-016 evidence：all untrimmed activated generations are probed only through constrained `TOPIC_COMPACTED` reads before coordinator storage installation/election；same-view unavailability cancels/resigns open。Physical repair evidence is recorded in the next increment
 > 2026-07-29 mandatory NTC2 process 增量（覆盖上一行末尾）：product `0ae8ca9` + fork `768924da60` add real Object-WAL P/C/K evidence for KF-TXN-016：activated `__consumer_offsets` NTC2 physical deletion and byte corruption each block live handoff/election with no COMMITTED fallback；two exact bytes+metadata restorations pass identity verification、root/index CAS repair、coverage `REPLACE` and ordinary re-election。The row is `PASSED_CURRENT_SOURCE` for Object-WAL；non-Object profile/final aggregate coverage remains open
 > 2026-07-29 retention/DeleteRecords 增量：product `77480cb` + fork `bd9963c980` add stock `UnifiedLog.deleteOldSegments()` differential evidence for KF-RET-001/002/003 and real Object-WAL native target `3/4/6/-1` evidence for KF-RET-006。The four rows are `PASSED_CURRENT_SOURCE`；stock `LogCleaner` compaction differential and final aggregate remain separate open requirements
+> 2026-07-29 stock compaction oracle 增量（覆盖上一行的 compaction open wording）：product `666bab1`/`08fe686` + fork `c4a0a2d1fa`/`bf8a2946e5` add a real stock `Cleaner` stable-prefix oracle and the dedicated `phase9M5KafkaCompactionOracleCheck`。It compares exact survivor fingerprints across keyed/tail winners、stock null-key drop、tombstone/control-marker horizons、committed/aborted transactions and sparse idempotent GZIP batches；the oracle exposed and closed null-key over-retention and `RETAIN_REQUIRED` marker early-horizon drift。KF-CMP-001/002/003/004 are `PASSED_CURRENT_SOURCE`；OPEN-LSO crossing、full format matrix and final aggregate remain separate open requirements
 
 ## 1. Evidence tiers
 
@@ -645,14 +646,14 @@ the stock retention differential and remaining batch/HW mappings；KF-RET-001/00
 
 | ID | Scenario / assertion | Planned test owner | Tier | Gate |
 | --- | --- | --- | --- | --- |
-| KF-CMP-001 | latest keyed value survives；older values removed at same offsets as oracle | product `KafkaCompactionStrategyV1Test` + `KafkaCompactionTwoPassExecutorTest`（engine partial）；`KafkaCompactionOraclePropertyTest`（oracle pending） | M,K | M5 |
-| KF-CMP-002 | empty key is keyed；null key is uniquely retained；encodings cannot collide | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionStrategyV1Test`（decode/decision partial）；`KafkaCompactionKeyEncodingTest`（engine pending） | D,M | M5 |
-| KF-CMP-003 | tombstone retention/drop boundary matches Kafka delete-retention oracle | product `KafkaCompactionStrategyV1Test` + `KafkaCompactionPassOneCollectorTest`（first/later horizon partial）；`KafkaCompactionOraclePropertyTest`（oracle pending） | M,K | M5 |
-| KF-CMP-004 | newer key in decision-horizon tail removes eligible older output record | product `DefaultCommittedSourceSetResolverTest` + `KafkaCompactionSourceResolverTest` + `KafkaCompactionBatchSourceTest` + `KafkaCompactionPlannerTest` + `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionTwoPassExecutorTest` + `KafkaCompactionWinnerIndexTest` + `KafkaCompactionPartitionPassTest`（authoritative exact-source stream + spill winner + deterministic local-object full worker partial）；`KafkaCompactionHorizonTest`（append-race matrix pending） | D,M | M5 |
+| KF-CMP-001 | latest keyed value survives；older values removed at same offsets as oracle | fork `KafkaCompactionOracleTest` + product `phase9M5KafkaCompactionOracleCheck`（real stock `Cleaner` exact survivor fingerprint）；product strategy/two-pass tests | M,K | M5 |
+| KF-CMP-002 | empty key remains a normal keyed namespace；null-key data is dropped like stock cleaner；encodings cannot collide | fork `KafkaCompactionOracleTest` + product `phase9M5KafkaCompactionOracleCheck`（stock null-key drop）；product codec/strategy tests | D,M,K | M5 |
+| KF-CMP-003 | tombstone retention/drop boundary matches Kafka delete-retention oracle | fork `KafkaCompactionOracleTest` + product `phase9M5KafkaCompactionOracleCheck`（first/later tombstone and empty abort-marker horizons）；product strategy/pass-one tests | M,K | M5 |
+| KF-CMP-004 | newer key in decision-horizon tail removes eligible older output record | fork `KafkaCompactionOracleTest` + product `phase9M5KafkaCompactionOracleCheck`（tail winner exact fingerprint）；product exact-source/planner/winner/two-pass/full-pass tests | D,M,K | M5 |
 | KF-CMP-005 | append after frozen horizon can leave extra old record but never drops newest incorrectly | `KafkaCompactionHorizonTest` | D,M,C | M5 |
 | KF-CMP-006 | spill/no-spill/restart produce deterministic same NTC2 SHA/rows | product `KafkaCompactionWinnerIndexTest` + `KafkaCompactionStreamingExecutorTest` + `KafkaCompactionPartitionPassTest`（restart-recomputed winner、streaming KCRS→NTC2 SHA/strict-read、durable task-rooted pass partial）；`KafkaCompactionSpillPropertyTest`（large randomized worker takeover pending） | M,R,C | M5 |
 | KF-CMP-007 | all compression formats、headers、timestamps rewrite to equivalent valid records | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionRowMapperTest`（GZIP/header/timestamp/NTC2 partial）；`KafkaCompactionRewriteTest`（full matrix pending） | D,M,K | M5 |
-| KF-CMP-008 | idempotent/transactional/control/open/aborted traces match stock cleaner views | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionStrategyV1Test`（rewrite/decision partial）；`KafkaCompactionTransactionOracleTest`（stock trace pending） | M,K | M5 |
+| KF-CMP-008 | idempotent/transactional/control/open/aborted traces match stock cleaner views | fork `KafkaCompactionOracleTest` covers idempotent/committed/aborted/control-marker stable prefixes；product transaction tests cover OPEN fail-closed；`KafkaCompactionTransactionOracleTest`（OPEN stock trace pending） | M,K | M5 |
 | KF-CMP-009 | decode ratio/key/task limits abort without publication or lost source refs | product `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionTwoPassExecutorTest` + `KafkaCompactionWinnerIndexTest` + `KafkaCompactionRowSpoolTest` + `KafkaCompactionStreamingExecutorTest` + `KafkaCompactionPartitionPassTest`（bounded key/record/output limits、KCSR/KCRS cleanup and full-pass ownership partial）；`KafkaCompactionResourceLimitTest`（pressure/failure-injection matrix pending） | D,M,R | M5 |
 | KF-CMP-010 | generation commit before coverage CAS is not client-visible mandatory compaction | product `KafkaCompactionPublicationCoordinatorTest` + `KafkaActivatedGenerationSetResolverTest` + `KafkaCompactedFetchIntegrationTest` + `KafkaCompactionPartitionPassTest`（write/read-side、durable-output re-entry and full local-object pass deterministic proof；real-provider process restart pending） | R,C | M5 |
 | KF-CMP-011 | coverage CAS response loss reloads exact activation and never double-advances epoch | product `KafkaCompactionPublicationCoordinatorTest`（fresh response-loss + repeated durable recovery） + `KafkaCompactionPartitionPassTest`（single-pass publication/retirement composition） + `KafkaBindingTransitionTest` | R,P,C | M5 |
@@ -666,8 +667,8 @@ resolve/freeze exact sources or decide a key winner。`KafkaTopicCompactionCodec
 KF-CMP-002/007/008。It proves exact one-batch range/count validation、KCK2 empty-key/null-key/control separation、owned
 source SHA/base/index facts、GZIP key/value/header rewrite、transactional producer sequence preservation、abort-marker
 round trip and range/source-SHA/message-format drift rejection。`KafkaCompactionStrategyV1Test` adds deterministic partial
-KF-CMP-001/002/003/004/008 evidence for latest/older keyed decisions、unique null-key retention、aborted/open transaction
-handling and full-scan-proven tombstone/control-marker equality boundaries。
+KF-CMP-001/002/003/004/008 evidence for latest/older keyed decisions、stock-compatible null-key drop、aborted/open
+transaction handling and full-scan-proven tombstone/control-marker equality boundaries。
 `KafkaCompactionPassOneCollectorTest` now adds dense full/output fact SHA、aborted-winner
 exclusion、open-tail/crossing and first-pass horizon evidence；`KafkaCompactionTwoPassExecutorTest` replays real Kafka
 batches twice，verifies canonical exact source sets/targets、rejects byte-equivalent target re-resolution、emits sparse NTC2
@@ -717,8 +718,14 @@ late-bound to the exact product partition manager and is started/closed under ru
 `DefaultKafkaPartitionMaintenanceTest` and fork mapper/bridge/`NereusUnifiedLogFactoryTest`/`PartitionTest` now prove
 ACTIVE binding/source validation、bounded current-leader registration、partition-lock canonical capture and stock
 `CleanedTransactionMetadata` marker pre-scan。Provider fresh-process restart and broad stock `LogCleaner` differential
-comparison remain absent，so
-end-to-end rows remain `PLANNED`。The production-graph、durable-output and full-pass tests are deterministic local
+comparison used to remain absent。Fork `KafkaCompactionOracleTest` plus product
+`phase9M5KafkaCompactionOracleCheck` now compare exact stock/Nereus survivor fingerprints for four stable-prefix
+scenarios：keyed/tail winners、stock null-key drop、tombstone and control-marker horizons、committed/aborted transactions
+and sparse idempotent GZIP producer facts。This closes KF-CMP-001/002/003/004 as `PASSED_CURRENT_SOURCE` and caught two
+real semantic drifts：null-key records must be dropped，and only tombstones plus `DELETE_ELIGIBLE` control markers may
+introduce a delete horizon；`RETAIN_REQUIRED` markers must not。It deliberately does not present OPEN records beyond LSO
+to stock `Cleaner`，so the OPEN stock-trace portion of KF-CMP-008、full compression/header matrix and end-to-end rows
+remain `PLANNED`。The production-graph、durable-output and full-pass tests are deterministic local
 composition/restart evidence only；the real-provider fresh-process restart tier remains absent。
 
 ## 11. Configuration, activation, controller and operations

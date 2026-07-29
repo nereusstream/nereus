@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration、deterministic mandatory NTC2 admission and real Object-WAL NTC2 delete/corrupt + exact repair/re-election pass，while injected resolution cuts、non-Object NTC2 profile expansion、remaining retention boundaries、real compaction restart and stock cleaner differential remain in progress
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration、deterministic mandatory NTC2 admission and real Object-WAL NTC2 delete/corrupt + exact repair/re-election pass；stock `LogCleaner` differential now covers stable-prefix keyed/null/tombstone/transaction/control/idempotent semantics，while injected resolution cuts、non-Object NTC2 profile expansion、full compression/OPEN-boundary oracle and real compaction restart remain in progress
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -639,9 +639,8 @@ against a real `UnifiedLog.deleteOldSegments()` call：
 | compact-only | delete disabled | `0` |
 
 The dedicated product gate `phase9M5KafkaRetentionOracleCheck` publishes the exact `0.1.0-f9-dev` artifacts，checks the
-49-commit/122-file fork source lock，runs fork Spotless/Checkstyle and executes only this oracle。KF-RET-001/002/003 are
-therefore `PASSED_CURRENT_SOURCE`；this is a stock retention oracle，not the still-pending stock `LogCleaner` compaction
-differential。
+current fork source lock，runs fork Spotless/Checkstyle and executes only this oracle。KF-RET-001/002/003 are
+therefore `PASSED_CURRENT_SOURCE`；retention remains separate from the compaction oracle below。
 
 ### 9.3 Checkpoint-before-trim barrier
 
@@ -1418,8 +1417,9 @@ type/value、key/value/header order and bytes、partition leader epoch、transac
 record sequence；for commit/abort control records it round-trips the exact `EndTransactionMarker` meaning。Original
 compression is preserved，with uncompressed retry permitted only when the frozen context explicitly enables it。The output
 is decoded again and compared before its CRC32C is published。The codec also preserves an existing magic-v2 delete horizon；
-for a first retained tombstone/control pass it writes the plan-frozen `now + delete.retention.ms` horizon into the rewritten
-batch。Current tests cover empty-key/null-key/tombstone separation、GZIP value/header rewrite、transactional sequence、
+for a first retained tombstone，or a `DELETE_ELIGIBLE` empty transaction marker，it writes the plan-frozen
+`now + delete.retention.ms` horizon into the rewritten batch；`RETAIN_REQUIRED` control markers preserve an absent
+horizon。Current tests cover empty-key/null-key/tombstone separation、GZIP value/header rewrite、transactional sequence、
 abort marker/horizon preservation and range/SHA/message-format drift rejection。`KafkaCompactionRowMapper` then copies
 the exact bytes/CRC/source identity to NTC2 without reinterpretation；the NTC2 row contract requires a non-empty fetchable
 payload for tombstones as well as all other survivors。
@@ -1428,7 +1428,7 @@ payload for tombstones as well as all other survivors。
 
 `KafkaCompactionStrategyV1` ports/encapsulates the selected Kafka `LogCleaner` semantics，not a key-only shortcut：
 
-- null-key data is retained by unique offset；
+- null-key data is dropped，matching stock `LogCleaner.shouldRetainRecord` invalid-message behavior；
 - control records use unique semantic identity and are retained until transaction-marker deletion is safe；
 - a transactional data survivor retains transactional flag/producer facts；
 - aborted data and markers follow stock cleaner visibility/retention behavior；
@@ -1473,17 +1473,48 @@ preexisting and may drop it at equality。Therefore an absent/new horizon、part
 tombstone/marker；equality is the first delete-eligible instant for a preexisting horizon。`RETAIN_REQUIRED` markers never
 use the time condition。
 
-F9 deliberately represents a null-key data record as a unique offset identity and retains it；this is the compatibility
-contract required by this design rather than silently discarding an input that Nereus has already durably accepted。Empty
-keys remain normal keyed values and never collide with null-key/control identities。Changing this rule requires a strategy
-version bump and migration/differential evidence。
+F9 still represents a decoded null-key record with a unique tagged offset identity so decode、fact hashing、audit and old
+NTC2 rows remain unambiguous，but the current strategy returns `DROP_UNKEYED` before rewrite，matching stock cleaner。
+Empty keys remain normal keyed values and never collide with null-key/control identities。`RETAIN_UNKEYED` remains a
+durable NTC2 read disposition for backward compatibility；new stock-compatible plans do not emit it。
 
-Current tests prove latest/older keyed decisions、unique null-key retention、committed/aborted/open transaction handling、
+Current tests prove latest/older keyed decisions、stock-compatible null-key drop、committed/aborted/open transaction handling、
 tombstone and marker equality boundaries、first-pass horizon retention、missing full-scan proof fail-safe retention and
 fact-pair rejection。`KafkaCompactionPassOneCollectorTest` now supplies/proves these facts over a dense frozen horizon and
 re-proves the output prefix；`KafkaCompactionTwoPassExecutorTest` composes real Kafka decode、strategy、rewrite and NTC2
-mapping；`KafkaCompactionWinnerIndexTest` covers the production sorted spill and restart recomputation。The stock-cleaner
-differential oracle is still required before activation。
+mapping；`KafkaCompactionWinnerIndexTest` covers the production sorted spill and restart recomputation。
+`phase9M5KafkaCompactionOracleCheck` now publishes current product bytes and compares four real stock-cleaner traces，
+including exact producer/sequence/control metadata。OPEN crossing remains a product fail-closed test because Kafka does
+not clean beyond LSO；it is not claimed as stock stable-prefix differential evidence。
+
+### 10.6.1 Current stock `LogCleaner` differential
+
+Fork `c4a0a2d1fa` adds `KafkaCompactionOracleTest` and `KafkaCompactionOracleSupport` beside the stock log classes。
+Every scenario appends the exact same `MemoryRecords` bytes to a legal stock `UnifiedLog` through
+`appendAsFollower` and wraps those bytes as Nereus `ReadBatch`/`ExactSourceSet` inputs。The stock side calls
+`Cleaner.buildOffsetMap` over the frozen stable horizon and `Cleaner.cleanSegments` over only the explicitly rolled
+output coverage；the Nereus side calls `KafkaCompactionTwoPassExecutor.prepare(...).rewrite(...)` with the same output and
+decision ranges。The comparison sorts by logical offset and requires equality of：
+
+- key/value bytes、timestamp、compression and delete horizon；
+- transactional/control flags、producer id/epoch、record sequence and partition leader epoch；
+- survivor offsets，including sparse records rewritten from one idempotent source batch。
+
+The four deterministic traces are：
+
+1. keyed overwrite、null-key invalid-message drop、GZIP/NONE、first-pass tombstone horizon and a newer tail winner；
+2. committed data + commit marker、aborted data + abort marker and a newer non-transactional tail winner；
+3. preexisting equal-time tombstone and empty-abort-marker horizons，both deleted at `now == horizon`；
+4. a two-record idempotent GZIP batch whose first record is superseded，requiring the second record to retain exact
+   producer id/epoch and sequence `101`。
+
+The first executions exposed two real product mismatches。Product `666bab1` changes `UNKEYED` from
+`RETAIN_UNKEYED` to `DROP_UNKEYED`；the KCK2 null-key tag and NTC2 disposition remain readable compatibility values but
+are not emitted by new plans。The same commit changes `effectiveDeleteHorizon` so only tombstones and
+`DELETE_ELIGIBLE` markers receive a new `now + delete.retention.ms` value；`RETAIN_REQUIRED` markers preserve an absent
+horizon。Product `08fe686` adds `phase9M5KafkaCompactionOracleCheck` to `phase9M5CompactionCoreCheck` and locks fork
+`bf8a2946e5` at 51 commits/124 files。That fork head marks only isolated Nereus development modules changing with
+zero cache，so a gate cannot silently reuse an older fixed `0.1.0-f9-dev` artifact。
 
 Mandatory differential tests run the same bounded log/config through stock Kafka cleaner and F9 engine，then compare visible
 logical records for READ_UNCOMMITTED and READ_COMMITTED plus transaction metadata。Any deliberate difference requires a
