@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "52" ]] \
-    || fail "expected fifty-two reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "53" ]] \
+    || fail "expected fifty-three reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -223,7 +223,7 @@ b903540487b6553d4a1944b5f36e9567fc9262ba core/src/main/java/kafka/server/nereus/
 78193c0f5a29f572761da41588d0afb25a3c0017 core/src/main/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapper.java
 1970537a48ac13fd77c6bc32fd2bf1e99fb31670 core/src/main/java/kafka/server/nereus/NereusKafkaStorageClusterSnapshotProvider.java
 ae2387ee9d6b318eaf37f62840d8ca3ac44f4e9b core/src/main/scala/kafka/Kafka.scala
-d477c7485376ae62f82abcb8393c9582be8794df core/src/main/scala/kafka/cluster/Partition.scala
+041d7ee9e577bc53d45fd000b4d530b4e47ced91 core/src/main/scala/kafka/cluster/Partition.scala
 2f44ef68e7a275e175688f8caa87df90c042b8f6 core/src/main/scala/kafka/coordinator/transaction/TransactionMarkerChannelManager.scala
 69b47dc0c8441ec0e22408b6a7a4ea42e56a9d2b core/src/main/scala/kafka/log/LogManager.scala
 27cf63cf77c51cd5d1cdc9599629e8e6b644e93e core/src/main/scala/kafka/log/UnifiedLogFactory.scala
@@ -236,7 +236,7 @@ cfaf49737e0f7608560eedee4a496d9aae331b27 core/src/main/scala/kafka/server/Contro
 457e08ad6714dd972abdb92d9f7471bb258469b7 core/src/main/scala/kafka/server/KafkaConfig.scala
 d2a01927593f183e272995bef5177a314b959276 core/src/main/scala/kafka/server/KafkaRaftServer.scala
 3101bfd5f7f93db61c9da3cbe75af034e71d5455 core/src/main/scala/kafka/server/NereusKafkaConfigValidator.scala
-647af758ca065d8944bf4e7e03172028827db98e core/src/main/scala/kafka/server/ReplicaManager.scala
+d72b58c366e8e9f228636d1ff3c7c2579bfac1e7 core/src/main/scala/kafka/server/ReplicaManager.scala
 02ac193dbf5028903804126f73be86a1e87dc34b core/src/main/scala/kafka/tools/StorageTool.scala
 7a3674d0cb71daa8830ea1ef89273181733ba661 core/src/main/scala/kafka/server/metadata/AsyncTopicDeltaLifecycle.scala
 7c4da64c61aff4cefe9769764a9ff05306e5de73 core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala
@@ -273,7 +273,7 @@ d7f0b8cca7dec9cfa4de9a542c8eb1b3c3c9cfe5 core/src/test/java/kafka/server/nereus/
 ec32f2b8e23e9548a7a8b4e8bdb717a7949dc788 core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryBridgeTest.java
 0dad9ef15898372476787e354ce96ac2415a8a3c core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryTest.java
 676c053d9608eec99321f8d8dc08e265a9a4fcde core/src/test/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapperTest.java
-e06ff96da5853e2ab0afc1cbc3e4153b981f7b7d core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
+e7e5707c00b5f92da64583ee398b48c8f8a31b6b core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
 2827d460f295902e75076ad567587db182d11fd2 core/src/test/scala/unit/kafka/coordinator/transaction/TransactionMarkerChannelManagerTest.scala
 fa5e33215b9b9ae54e41a9d49e52785ffe994b63 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 3de59699c5ffa95d1b86ab12c2bbe3808fe162aa core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
@@ -457,6 +457,10 @@ grep -F -q 'leaderEpochAwareOffsetLookupPending.contains(leaderEpoch)' "$partiti
     || fail "Partition lost fail-closed lookup recovery routing"
 grep -F -q 'def beginLeaderEpochAwareOffsetLookup(expectedLeaderEpoch: Int)' "$partition" \
     || fail "Partition lost synchronous exact-epoch recovery preparation"
+grep -F -q 'onLeaderStatePublished: () => Unit = () => ()' "$partition" \
+    || fail "Partition lost in-lock leader publication preparation"
+grep -F -q 'onLeaderStatePublished()' "$partition" \
+    || fail "Partition no longer fences requests before releasing the leader state lock"
 grep -F -q 'def installNereusRecoveredState(expectedLeaderEpoch: Int,' "$partition" \
     || fail "Partition lost exact-epoch recovered-state publication"
 grep -F -q 'def currentNereusRecoveredState(expectedLeaderEpoch: Int)' "$partition" \
@@ -497,6 +501,8 @@ grep -F -q 'delayedRemoteListOffsetsPurgatory.checkAndComplete' "$replica_manage
     || fail "ReplicaManager lost async ListOffsets wakeup"
 grep -F -q 'onLeaderStatePublished: (Partition, Uuid, Int) => Unit' "$replica_manager" \
     || fail "ReplicaManager lost synchronous new-leader preparation callback"
+grep -F -q '() => onLeaderStatePublished(partition, info.topicId, info.partition.leaderEpoch)' "$replica_manager" \
+    || fail "ReplicaManager no longer passes new-leader preparation into the atomic Partition transition"
 grep -F -q 'storageAppendExecutor match {' "$replica_manager" \
     || fail "ReplicaManager lost optional storage append handoff routing"
 grep -F -q 'executor.validateRequest(entriesPerPartition.values)' "$replica_manager" \
@@ -914,4 +920,8 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; fifty-two commits, one hundred twenty-six log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"
+partition_test="$kafka_checkout/core/src/test/scala/unit/kafka/cluster/PartitionTest.scala"
+grep -F -q 'testLeaderPublicationFencesListOffsetsBeforeMakeLeaderReleasesStateLock' "$partition_test" \
+    || fail "Partition lost the deterministic in-lock leader publication regression"
+
+echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; fifty-three commits, one hundred twenty-six log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"
