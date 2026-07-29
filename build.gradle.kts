@@ -66,6 +66,8 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "phase9M5KafkaCompactionOracleCheck"
         || task == "phase9M5KafkaRetentionOracleCheck"
         || task == "phase9ChaosCheck"
+        || task == "phase9CompatibilityCheck"
+        || task == "phase9KafkaForkCompatibilityCheck"
         || task == "f9M6KafkaProcessIntegrationTest"
         || task == "f9CheckpointTrimRecoveryProcessIntegrationTest"
         || task == "f9DeleteRecordsBoundaryProcessIntegrationTest"
@@ -91,6 +93,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "f9BookKeeperWalSyncObjectProcessIntegrationTest"
         || task == "f9ObjectWalAsyncObjectProcessIntegrationTest"
         || task == "f9LeaderChurnChaosProcessIntegrationTest"
+        || task == "f9ClientCompatibilityProcessIntegrationTest"
         || task == "publishPhase9DevelopmentArtifacts"
 }
 check(!(pulsarDevelopmentGateRequested && kafkaDevelopmentGateRequested)) {
@@ -3155,6 +3158,35 @@ tasks.register<Exec>("phase9M6KafkaFeatureCoreCheck") {
     )
 }
 
+tasks.register<Exec>("phase9KafkaForkCompatibilityCheck") {
+    group = "verification"
+    description =
+        "Run current-fork ApiVersions, Produce, Fetch, Admin, consumer-group, and transaction compatibility suites."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":clients:test",
+        "--tests",
+        "org.apache.kafka.clients.NodeApiVersionsTest",
+        "--tests",
+        "org.apache.kafka.clients.producer.KafkaProducerTest.testOverwriteAcksAndRetriesForIdempotentProducers",
+        "--tests",
+        "org.apache.kafka.clients.consumer.KafkaConsumerTest.testPollReturnsRecords",
+        "--tests",
+        "org.apache.kafka.clients.admin.KafkaAdminClientTest.testCreateTopics",
+        "--tests",
+        "org.apache.kafka.clients.admin.KafkaAdminClientTest.testListOffsets",
+        ":core:test",
+        "--tests",
+        "kafka.api.TransactionsTest.testBasicTransactions",
+        "--tests",
+        "kafka.api.GroupCoordinatorIntegrationTest.testGroupCoordinatorPropagatesOffsetsTopicCompressionCodec",
+        "--rerun-tasks",
+    )
+}
+
 tasks.register("phase9M6KafkaFeatureCheck") {
     group = "verification"
     description = "Run the deterministic F9 Kafka durable feature and controller policy gate."
@@ -3353,4 +3385,14 @@ tasks.register("phase9ChaosCheck") {
     dependsOn(":nereus-kafka-adapter:f9ActivationTransportRecoveryProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9TrimResponseLossProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9TrimProfileMatrixProcessIntegrationTest")
+}
+
+tasks.register("phase9CompatibilityCheck") {
+    group = "verification"
+    description =
+        "Run the F9-M7 multi-version client process contract and current Kafka fork compatibility suites."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn("phase9SourceLockCheck")
+    dependsOn("phase9KafkaForkCompatibilityCheck")
+    dependsOn(":nereus-kafka-adapter:f9ClientCompatibilityProcessIntegrationTest")
 }

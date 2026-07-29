@@ -26,6 +26,18 @@ val f9BookKeeperFaultAgent by sourceSets.creating
 val f9ActivationFaultAgent by sourceSets.creating
 val f9TrimFaultAgent by sourceSets.creating
 val f9TransactionResolutionFaultAgent by sourceSets.creating
+val f9KafkaClient390Runtime by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+val f9KafkaClient401Runtime by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+val f9KafkaClient411Runtime by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
 
 configurations[f9ProviderIntegrationTest.implementationConfigurationName].extendsFrom(
     configurations.testImplementation.get(),
@@ -54,7 +66,34 @@ dependencies {
         f9TransactionResolutionFaultAgent.implementationConfigurationName,
         "net.bytebuddy:byte-buddy:1.17.7",
     )
+    add(f9KafkaClient390Runtime.name, "org.apache.kafka:kafka-clients:3.9.0")
+    add(f9KafkaClient401Runtime.name, "org.apache.kafka:kafka-clients:4.0.1")
+    add(f9KafkaClient411Runtime.name, "org.apache.kafka:kafka-clients:4.1.1")
 }
+
+val stageF9KafkaClient390Runtime =
+    tasks.register<Sync>("stageF9KafkaClient390Runtime") {
+        group = "build"
+        description = "Stage the exact kafka-clients 3.9.0 runtime for the F9 compatibility process gate."
+        from(f9KafkaClient390Runtime)
+        into(layout.buildDirectory.dir("f9-kafka-client-runtimes/3.9.0"))
+    }
+
+val stageF9KafkaClient401Runtime =
+    tasks.register<Sync>("stageF9KafkaClient401Runtime") {
+        group = "build"
+        description = "Stage the exact kafka-clients 4.0.1 runtime for the F9 compatibility process gate."
+        from(f9KafkaClient401Runtime)
+        into(layout.buildDirectory.dir("f9-kafka-client-runtimes/4.0.1"))
+    }
+
+val stageF9KafkaClient411Runtime =
+    tasks.register<Sync>("stageF9KafkaClient411Runtime") {
+        group = "build"
+        description = "Stage the exact kafka-clients 4.1.1 runtime for the F9 compatibility process gate."
+        from(f9KafkaClient411Runtime)
+        into(layout.buildDirectory.dir("f9-kafka-client-runtimes/4.1.1"))
+    }
 
 val f9BookKeeperFaultAgentJar =
     tasks.register<Jar>("f9BookKeeperFaultAgentJar") {
@@ -459,6 +498,56 @@ tasks.register<Test>("f9LeaderChurnChaosProcessIntegrationTest") {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
                 "scenarioKfScl006",
+        )
+    }
+}
+
+tasks.register<Test>("f9ClientCompatibilityProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Run kafka-clients 3.9.0, 4.0.1, 4.1.1, and fork-current 4.3 against one real Nereus broker."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(
+        stageF9KafkaClient390Runtime,
+        stageF9KafkaClient401Runtime,
+        stageF9KafkaClient411Runtime,
+    )
+    shouldRunAfter(tasks.named("f9LeaderChurnChaosProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.compatibility.probe.classes",
+        f9ProviderIntegrationTest.java.destinationDirectory.get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.compatibility.client.3.9.0.dir",
+        layout.buildDirectory.dir("f9-kafka-client-runtimes/3.9.0").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.compatibility.client.4.0.1.dir",
+        layout.buildDirectory.dir("f9-kafka-client-runtimes/4.0.1").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.compatibility.client.4.1.1.dir",
+        layout.buildDirectory.dir("f9-kafka-client-runtimes/4.1.1").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-client-compatibility-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "scenarioKfScl008",
         )
     }
 }

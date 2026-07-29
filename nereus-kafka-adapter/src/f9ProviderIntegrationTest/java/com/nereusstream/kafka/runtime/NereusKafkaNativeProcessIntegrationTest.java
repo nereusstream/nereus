@@ -474,6 +474,113 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     @Test
+    @Timeout(value = 8, unit = TimeUnit.MINUTES)
+    void scenarioKfScl008() throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-client-compatibility-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path config = root.resolve("compatibility-server.properties");
+        Path formatLog = root.resolve("compatibility-format.log");
+        Path serverLog = root.resolve("compatibility-server.log");
+        List<String> supportedVersions = List.of(
+                "3.9.0",
+                "4.0.1",
+                "4.1.1",
+                "4.3.0-SNAPSHOT");
+        List<Path> clientLogs = supportedVersions.stream()
+                .map(version -> root.resolve(
+                        "compatibility-client-"
+                                + version.replaceAll("[^A-Za-z0-9]+", "-")
+                                + ".log"))
+                .toList();
+        clearCompatibilityEvidence(clientLogs);
+        String bucket = "nereus-kafka-compat-" + UUID.randomUUID();
+        int brokerPort = freePort();
+        int controllerPort = differentFreePort(brokerPort);
+        String bootstrapServers = "127.0.0.1:" + brokerPort;
+
+        createBucket(bucket);
+        writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                root.resolve("compatibility-kafka-log"),
+                root.resolve("compatibility-metadata-log"),
+                root.resolve("compatibility-nereus-cache"));
+        Process format = start(
+                List.of(
+                        formatScript.toString(),
+                        "format",
+                        "--cluster-id",
+                        org.apache.kafka.common.Uuid.randomUuid().toString(),
+                        "--config",
+                        config.toString(),
+                        "--feature",
+                        "nereus.storage.version=1"),
+                kafkaHome,
+                formatLog);
+        try {
+            int formatExit = await(
+                    format,
+                    PROCESS_TIMEOUT,
+                    "Kafka compatibility storage format",
+                    formatLog);
+            assertThat(formatExit)
+                    .withFailMessage(() -> "storage format failed:\n" + readLog(formatLog))
+                    .isZero();
+            Path probeClasses = requiredCompatibilityProbeClasses();
+            List<ClientCompatibilityRuntime> runtimes = List.of(
+                    new ClientCompatibilityRuntime(
+                            "3.9.0",
+                            requiredCompatibilityClientDirectory("3.9.0")),
+                    new ClientCompatibilityRuntime(
+                            "4.0.1",
+                            requiredCompatibilityClientDirectory("4.0.1")),
+                    new ClientCompatibilityRuntime(
+                            "4.1.1",
+                            requiredCompatibilityClientDirectory("4.1.1")),
+                    new ClientCompatibilityRuntime(
+                            "4.3.0-SNAPSHOT",
+                            kafkaHome.resolve("libs")));
+            runBroker(
+                    startScript,
+                    kafkaHome,
+                    config,
+                    formatLog,
+                    serverLog,
+                    bootstrapServers,
+                    () -> {
+                        for (int index = 0; index < runtimes.size(); index++) {
+                            ClientCompatibilityRuntime runtime = runtimes.get(index);
+                            runCompatibilityProbe(
+                                    runtime,
+                                    probeClasses,
+                                    bootstrapServers,
+                                    clientLogs.get(index));
+                        }
+                    });
+        } catch (Exception | AssertionError failure) {
+            try {
+                preserveFailureEvidence(config, formatLog, serverLog);
+                preserveAdditionalFailureEvidence(clientLogs.toArray(Path[]::new));
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            throw failure;
+        }
+
+        preserveCompatibilitySuccessEvidence(supportedVersions, clientLogs);
+        assertThat(objectCount(bucket))
+                .as("every supported client version must persist user and coordinator state")
+                .isPositive();
+    }
+
+    @Test
     @Timeout(value = 4, unit = TimeUnit.MINUTES)
     void deleteRecordsPublishesCheckpointAndRecoversVirtualSegmentsAfterForcedRestart()
             throws Exception {
@@ -9522,6 +9629,124 @@ class NereusKafkaNativeProcessIntegrationTest {
         return process.exitValue();
     }
 
+    private static Path requiredCompatibilityProbeClasses() {
+        String configured =
+                System.getProperty("nereus.kafka.compatibility.probe.classes");
+        assertThat(configured)
+                .as("nereus.kafka.compatibility.probe.classes")
+                .isNotBlank();
+        Path classes = Path.of(configured).toAbsolutePath().normalize();
+        assertThat(classes)
+                .as("compiled compatibility probe classes")
+                .exists()
+                .isDirectory();
+        assertThat(classes.resolve(
+                        "com/nereusstream/kafka/runtime/KafkaClientCompatibilityProbe.class"))
+                .as("standalone compatibility probe class")
+                .exists()
+                .isRegularFile();
+        return classes;
+    }
+
+    private static Path requiredCompatibilityClientDirectory(
+            String version
+    ) {
+        String property =
+                "nereus.kafka.compatibility.client."
+                        + version
+                        + ".dir";
+        String configured = System.getProperty(property);
+        assertThat(configured)
+                .as(property)
+                .isNotBlank();
+        Path directory =
+                Path.of(configured)
+                        .toAbsolutePath()
+                        .normalize();
+        assertThat(directory)
+                .as("staged kafka-clients " + version + " runtime")
+                .exists()
+                .isDirectory();
+        return directory;
+    }
+
+    private static void runCompatibilityProbe(
+            ClientCompatibilityRuntime runtime,
+            Path probeClasses,
+            String bootstrapServers,
+            Path clientLog
+    ) throws Exception {
+        List<Path> jars;
+        try (var candidates = Files.list(runtime.libraryDirectory())) {
+            jars = candidates
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(".jar"))
+                    .sorted()
+                    .toList();
+        }
+        assertThat(jars)
+                .as("runtime jars for kafka-clients " + runtime.version())
+                .isNotEmpty();
+        List<Path> kafkaClientJars = jars.stream()
+                .filter(path -> path.getFileName().toString().startsWith("kafka-clients-"))
+                .toList();
+        assertThat(kafkaClientJars)
+                .as("exactly one kafka-clients JAR for " + runtime.version())
+                .singleElement()
+                .satisfies(path -> assertThat(path.getFileName().toString())
+                        .isEqualTo("kafka-clients-" + runtime.version() + ".jar"));
+        String classpath =
+                java.util.stream.Stream.concat(
+                                java.util.stream.Stream.of(probeClasses),
+                                jars.stream())
+                        .map(Path::toString)
+                        .collect(java.util.stream.Collectors.joining(
+                                java.io.File.pathSeparator));
+        String identity =
+                runtime.version().replaceAll("[^A-Za-z0-9]+", "-")
+                        + "-"
+                        + UUID.randomUUID().toString().substring(0, 8);
+        Path javaExecutable = Path.of(
+                System.getProperty("java.home"),
+                "bin",
+                "java");
+        Process probe = start(
+                List.of(
+                        javaExecutable.toString(),
+                        "-Xms64m",
+                        "-Xmx256m",
+                        "-cp",
+                        classpath,
+                        KafkaClientCompatibilityProbe.class.getName(),
+                        runtime.version(),
+                        bootstrapServers,
+                        identity),
+                probeClasses,
+                clientLog);
+        int exit = await(
+                probe,
+                Duration.ofSeconds(120),
+                "kafka-clients " + runtime.version() + " compatibility probe",
+                clientLog);
+        String output = readLog(clientLog);
+        assertThat(exit)
+                .withFailMessage(() -> "compatibility probe failed:\n" + output)
+                .isZero();
+        assertThat(output.lines()
+                        .filter(line -> line.startsWith("COMPATIBILITY_PASS "))
+                        .count())
+                .as("one terminal compatibility marker for " + runtime.version())
+                .isEqualTo(1L);
+        assertThat(output)
+                .contains(
+                        "COMPATIBILITY_PASS version="
+                                + runtime.version()
+                                + " operations=admin,produce,fetch,group,transaction")
+                .contains(
+                        "earliest=0 latest=5 committedGroupOffset=1"
+                                + " visibleOffsets=0,1");
+    }
+
     private static Path requiredKafkaCheckout() {
         String configured = System.getProperty("nereus.kafka.fork.checkout");
         assertThat(configured)
@@ -9850,6 +10075,21 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private record ClientCompatibilityRuntime(
+            String version,
+            Path libraryDirectory
+    ) {
+        private ClientCompatibilityRuntime {
+            if (version == null || version.isBlank()) {
+                throw new IllegalArgumentException(
+                        "compatibility client version must be non-blank");
+            }
+            libraryDirectory = Objects.requireNonNull(
+                    libraryDirectory,
+                    "libraryDirectory");
+        }
+    }
+
     private static Path executable(Path path) {
         assertThat(path).exists().isExecutable();
         return path;
@@ -9896,6 +10136,73 @@ class NereusKafkaNativeProcessIntegrationTest {
         } catch (IOException failure) {
             throw new AssertionError(
                     "failed to preserve additional Kafka process evidence under "
+                            + target,
+                    failure);
+        }
+    }
+
+    private static void clearCompatibilityEvidence(
+            List<Path> clientLogs
+    ) throws IOException {
+        String configured = System.getProperty("nereus.kafka.process.evidence.dir");
+        if (configured == null || configured.isBlank()) {
+            return;
+        }
+        Path target = Path.of(configured).toAbsolutePath().normalize();
+        Files.deleteIfExists(target.resolve("compatibility-report.json"));
+        for (Path clientLog : clientLogs) {
+            Files.deleteIfExists(target.resolve(clientLog.getFileName()));
+        }
+    }
+
+    private static void preserveCompatibilitySuccessEvidence(
+            List<String> supportedVersions,
+            List<Path> clientLogs
+    ) {
+        assertThat(supportedVersions)
+                .as("supported compatibility versions")
+                .hasSameSizeAs(clientLogs);
+        String configured = System.getProperty("nereus.kafka.process.evidence.dir");
+        assertThat(configured)
+                .as("nereus.kafka.process.evidence.dir")
+                .isNotBlank();
+        Path target = Path.of(configured).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(target);
+            List<String> clients = new ArrayList<>();
+            for (int index = 0; index < supportedVersions.size(); index++) {
+                String version = supportedVersions.get(index);
+                Path log = clientLogs.get(index);
+                String output = readLog(log);
+                assertThat(output)
+                        .contains(
+                                "COMPATIBILITY_PASS version="
+                                        + version
+                                        + " operations=admin,produce,fetch,group,transaction");
+                copyIfPresent(log, target.resolve(log.getFileName()));
+                clients.add(
+                        "    {\"version\":\""
+                                + version
+                                + "\",\"status\":\"PASS\","
+                                + "\"admin\":true,\"produce\":true,\"fetch\":true,"
+                                + "\"group\":true,\"transaction\":true}");
+            }
+            String report =
+                    "{\n"
+                            + "  \"schemaVersion\":1,\n"
+                            + "  \"scenarioId\":\"KF-SCL-008\",\n"
+                            + "  \"brokerVersion\":\"4.3.0-SNAPSHOT\",\n"
+                            + "  \"clients\":[\n"
+                            + String.join(",\n", clients)
+                            + "\n  ]\n"
+                            + "}\n";
+            Files.writeString(
+                    target.resolve("compatibility-report.json"),
+                    report,
+                    StandardCharsets.UTF_8);
+        } catch (IOException failure) {
+            throw new AssertionError(
+                    "failed to preserve successful compatibility evidence under "
                             + target,
                     failure);
         }
