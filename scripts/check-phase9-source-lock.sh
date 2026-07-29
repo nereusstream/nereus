@@ -54,7 +54,7 @@ f4e35b83ffeb0fb630a9b45893f2f9630608dc3e nereus-materialization/src/main/java/co
 d1715b79b3080483e6ffe8389922840e89eda42d nereus-materialization/src/main/java/com/nereusstream/materialization/DefaultMaterializationPlanner.java
 32ef63f4979fb1af4b4e00acd69e56e58a4eddc9 nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperPrimaryWalRuntime.java
 988fe111e021d7d9d660abe301fe9d8ff54b0872 nereus-kafka-adapter/src/main/java/com/nereusstream/kafka/runtime/NereusKafkaBookKeeperWalRuntimeContext.java
-13a766aa9773bcbc4f34b32719c2218bc70bad08 nereus-kafka-adapter/src/main/java/com/nereusstream/kafka/runtime/NereusKafkaObjectWalRuntimeFactory.java
+4db59dd402d53aacdc5eedc47b2b498d33ae5f95 nereus-kafka-adapter/src/main/java/com/nereusstream/kafka/runtime/NereusKafkaObjectWalRuntimeFactory.java
 cd53d97ee4a632a9057f165bcad91db1f53381c7 nereus-kafka-adapter/src/main/java/com/nereusstream/kafka/partition/DefaultKafkaPartitionStorage.java
 LOCKS
 
