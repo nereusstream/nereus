@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "49" ]] \
-    || fail "expected forty-nine reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "51" ]] \
+    || fail "expected fifty-one reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -120,6 +120,8 @@ core/src/main/scala/kafka/server/storage/ControllerStorageRuntime.scala
 core/src/main/scala/kafka/server/storage/ControllerStorageRuntimeContext.scala
 core/src/main/scala/kafka/server/storage/ControllerStorageRuntimeFactory.scala
 core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
+core/src/test/java/kafka/log/nereus/KafkaCompactionOracleSupport.java
+core/src/test/java/kafka/log/nereus/KafkaCompactionOracleTest.java
 core/src/test/java/kafka/log/nereus/KafkaRetentionOracleTest.java
 core/src/test/java/kafka/log/nereus/NereusCanonicalLogStateTest.java
 core/src/test/java/kafka/log/nereus/NereusKafkaRecoveryStateCodecTest.java
@@ -179,7 +181,7 @@ storage/src/test/java/org/apache/kafka/storage/internals/log/ProducerStateManage
 FILES
 )"
 [[ "$actual_changes" == "$expected_changes" ]] \
-    || fail "fork change set differs from the reviewed one-hundred-twenty-two-file log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control slice"
+    || fail "fork change set differs from the reviewed one-hundred-twenty-four-file log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control slice"
 
 while read -r expected path; do
     [[ -n "$expected" ]] || continue
@@ -188,8 +190,8 @@ while read -r expected path; do
         || fail "fork source drifted: $path expected $expected, got $actual"
 done <<'LOCKS'
 f5e0be83cf17defd199e750f07aab49bf8c3be58 bin/nereus-kafka-server-start.sh
-ddc38222187b684512cf07bceea780b699584264 build.gradle
-84ba36fe0b421f0520538a774aa092c5a937f505 checkstyle/import-control-core.xml
+4bc4416f1f6e68803f3da92b7c00f4790493b775 build.gradle
+e58baa88535aa8396f4e0ce74557b08c8f5ec84c checkstyle/import-control-core.xml
 24ac0f4760d3bd0e979e52880c6a62b07423543d core/src/main/java/kafka/log/nereus/NereusCanonicalLogState.java
 60dbfb45a00f3c007c624ea31c1aca32ea49a8b2 core/src/main/java/kafka/log/nereus/NereusKafkaExceptionMapper.java
 12b515a689c3219e320e3480df7d341aeba78ef5 core/src/main/java/kafka/log/nereus/NereusKafkaRecoveredState.java
@@ -253,6 +255,8 @@ d73e74019d8769f2ac04175c36eb77430e052cfd core/src/main/scala/kafka/server/storag
 bcc5ec81f637a1a473d33e2f03267cf15ef85c60 core/src/main/scala/kafka/server/storage/ControllerStorageRuntimeContext.scala
 21200a7a039f5bcf495547ad1b94d8976702ce86 core/src/main/scala/kafka/server/storage/ControllerStorageRuntimeFactory.scala
 744983df6ae684f9b2e0d73a749d5c2b9caa861e core/src/test/java/kafka/log/nereus/NereusCanonicalLogStateTest.java
+b422c4730bb57ff183f59e9aa8692648597f2359 core/src/test/java/kafka/log/nereus/KafkaCompactionOracleSupport.java
+d9693dba5b6e234aabc313b969433df02645f21d core/src/test/java/kafka/log/nereus/KafkaCompactionOracleTest.java
 a00c3174138b3e0438a23ac25d1b48d73f81efd5 core/src/test/java/kafka/log/nereus/KafkaRetentionOracleTest.java
 f81ec4137daa9e9fff7b7262733ded7998c86eba core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
 32357c8f6e084244bfc79a77c96df513a69be4fd core/src/test/java/kafka/log/nereus/NereusKafkaRecoveryStateCodecTest.java
@@ -906,4 +910,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; forty-nine commits, one hundred twenty-two log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"
+echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; fifty-one commits, one hundred twenty-four log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"
