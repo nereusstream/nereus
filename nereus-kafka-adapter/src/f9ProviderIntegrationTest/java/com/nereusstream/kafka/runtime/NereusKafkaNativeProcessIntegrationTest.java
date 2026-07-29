@@ -1437,6 +1437,379 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     @Test
+    @Timeout(value = 8, unit = TimeUnit.MINUTES)
+    void scenarioKfScl006() throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome =
+                extractReleaseDistribution(
+                        kafkaCheckout,
+                        root.resolve("kafka-leader-churn-distribution"));
+        Path formatScript =
+                executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript =
+                executable(
+                        kafkaHome.resolve(
+                                "bin/nereus-kafka-server-start.sh"));
+        Path[] configs = new Path[3];
+        Path[] formatLogs = new Path[3];
+        Path[] serverLogs = new Path[3];
+        int[] brokerPorts = new int[3];
+        List<Integer> allocatedPorts = new ArrayList<>();
+        for (int index = 0; index < 3; index++) {
+            int nodeId = index + 1;
+            configs[index] =
+                    root.resolve(
+                            "leader-churn-node-"
+                                    + nodeId
+                                    + ".properties");
+            formatLogs[index] =
+                    root.resolve(
+                            "leader-churn-node-"
+                                    + nodeId
+                                    + "-format.log");
+            serverLogs[index] =
+                    root.resolve(
+                            "leader-churn-node-"
+                                    + nodeId
+                                    + "-server.log");
+            brokerPorts[index] =
+                    differentFreePort(
+                            allocatedPorts.stream()
+                                    .mapToInt(Integer::intValue)
+                                    .toArray());
+            allocatedPorts.add(brokerPorts[index]);
+        }
+        int controllerPort =
+                differentFreePort(
+                        allocatedPorts.stream()
+                                .mapToInt(Integer::intValue)
+                                .toArray());
+        List<String> bootstraps =
+                List.of(
+                        "127.0.0.1:" + brokerPorts[0],
+                        "127.0.0.1:" + brokerPorts[1],
+                        "127.0.0.1:" + brokerPorts[2]);
+        String clusterBootstrap = String.join(",", bootstraps);
+        String bucket =
+                "nereus-kafka-churn-" + UUID.randomUUID();
+        String topic =
+                "leader-churn-" + UUID.randomUUID();
+        String nereusCluster =
+                "f9-leader-churn-" + UUID.randomUUID();
+        String kafkaClusterId =
+                org.apache.kafka.common.Uuid.randomUuid().toString();
+        createBucket(bucket);
+        for (int index = 0; index < 3; index++) {
+            int nodeId = index + 1;
+            writeConfiguration(
+                    configs[index],
+                    brokerPorts[index],
+                    controllerPort,
+                    bucket,
+                    root.resolve(
+                            "leader-churn-node-"
+                                    + nodeId
+                                    + "-log"),
+                    root.resolve(
+                            "leader-churn-node-"
+                                    + nodeId
+                                    + "-metadata"),
+                    root.resolve(
+                            "leader-churn-node-"
+                                    + nodeId
+                                    + "-cache"),
+                    "OBJECT_WAL_SYNC_OBJECT",
+                    null,
+                    nodeId,
+                    index == 0,
+                    nereusCluster);
+            formatStorage(
+                    formatScript,
+                    kafkaHome,
+                    configs[index],
+                    formatLogs[index],
+                    kafkaClusterId);
+        }
+
+        TopicPartition partition =
+                new TopicPartition(topic, 0);
+        Process[] brokers = new Process[3];
+        Throwable failure = null;
+        try {
+            for (int index = 0; index < brokers.length; index++) {
+                brokers[index] =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        configs[index].toString()),
+                                kafkaHome,
+                                serverLogs[index]);
+            }
+            for (int index = 0; index < brokers.length; index++) {
+                awaitBroker(
+                        bootstraps.get(index),
+                        brokers[index],
+                        serverLogs[index]);
+            }
+            List<Process> brokerProcesses = List.of(brokers);
+            awaitClusterBrokers(
+                    clusterBootstrap,
+                    List.of(1, 2, 3),
+                    brokerProcesses,
+                    serverLogs);
+
+            try (Admin admin =
+                    Admin.create(
+                            longRunningAdminProperties(
+                                    clusterBootstrap))) {
+                admin.createTopics(
+                                List.of(
+                                        new NewTopic(
+                                                topic,
+                                                Map.of(
+                                                        0,
+                                                        List.of(1)))))
+                        .all()
+                        .get(
+                                CLIENT_TIMEOUT.toSeconds(),
+                                TimeUnit.SECONDS);
+            }
+            byte[] initialValue =
+                    "leader-churn-0"
+                            .getBytes(StandardCharsets.UTF_8);
+            RecordMetadata initial =
+                    produce(
+                            bootstraps.getFirst(),
+                            topic,
+                            "leader-churn-key-0"
+                                    .getBytes(StandardCharsets.UTF_8),
+                            initialValue);
+            assertThat(initial.offset()).isZero();
+            KafkaPartitionId partitionId =
+                    kafkaPartitionId(
+                            clusterBootstrap,
+                            partition,
+                            topic);
+
+            OxiaClientConfiguration oxia =
+                    oxiaConfiguration();
+            Clock clock = Clock.systemUTC();
+            try (SharedOxiaClientRuntime shared =
+                            SharedOxiaClientRuntime.connect(
+                                    oxia,
+                                    clock);
+                    OxiaJavaClientMetadataStore metadata =
+                            OxiaJavaClientMetadataStore
+                                    .usingSharedRuntime(
+                                            oxia,
+                                            shared,
+                                            clock);
+                    OxiaJavaKafkaPartitionMetadataStore partitions =
+                            OxiaJavaKafkaPartitionMetadataStore
+                                    .usingSharedRuntime(
+                                            oxia,
+                                            shared,
+                                            nereusCluster,
+                                            partitionId
+                                                    .kafkaClusterId());
+                    Admin admin =
+                            Admin.create(
+                                    longRunningAdminProperties(
+                                            clusterBootstrap))) {
+                LeaderChurnEvidence current =
+                        awaitLeaderChurnEvidence(
+                                metadata,
+                                partitions,
+                                nereusCluster,
+                                partitionId,
+                                1,
+                                1,
+                                brokerProcesses,
+                                serverLogs);
+                int currentLeader = 1;
+                long nextOffset = 1;
+                int[] targets = {2, 3, 1, 2, 3, 1};
+                for (int round = 0;
+                        round < targets.length;
+                        round++) {
+                    int targetLeader = targets[round];
+                    int staleLeader = currentLeader;
+                    admin.alterPartitionReassignments(
+                                    Map.of(
+                                            partition,
+                                            Optional.of(
+                                                    new NewPartitionReassignment(
+                                                            List.of(
+                                                                    targetLeader)))))
+                            .all()
+                            .get(
+                                    CLIENT_TIMEOUT.toSeconds(),
+                                    TimeUnit.SECONDS);
+                    awaitPartitionLeader(
+                            admin,
+                            partition,
+                            targetLeader,
+                            brokerProcesses,
+                            serverLogs);
+                    assertThat(
+                                    admin.listPartitionReassignments(
+                                                    Set.of(
+                                                            partition))
+                                            .reassignments()
+                                            .get(
+                                                    CLIENT_TIMEOUT
+                                                            .toSeconds(),
+                                                    TimeUnit.SECONDS))
+                            .as(
+                                    "round "
+                                            + round
+                                            + " must not retain a stock catch-up reassignment")
+                            .isEmpty();
+
+                    LeaderChurnEvidence claimed =
+                            awaitLeaderChurnEvidence(
+                                    metadata,
+                                    partitions,
+                                    nereusCluster,
+                                    partitionId,
+                                    targetLeader,
+                                    nextOffset,
+                                    brokerProcesses,
+                                    serverLogs);
+                    assertThat(claimed.leaderEpoch())
+                            .as(
+                                    "KRaft leader epoch must advance on round "
+                                            + round)
+                            .isGreaterThan(
+                                    current.leaderEpoch());
+                    assertThat(claimed.bindingEpoch())
+                            .as(
+                                    "binding observation must advance on round "
+                                            + round)
+                            .isGreaterThan(
+                                    current.bindingEpoch());
+                    assertThat(claimed.appendSessionEpoch())
+                            .as(
+                                    "append session must be preempted on round "
+                                            + round)
+                            .isGreaterThan(
+                                    current.appendSessionEpoch());
+                    assertThat(claimed.fencingToken())
+                            .as(
+                                    "new leader must own a distinct fencing token on round "
+                                            + round)
+                            .isNotEqualTo(
+                                    current.fencingToken());
+                    assertThat(
+                                    brokers[
+                                                    staleLeader
+                                                            - 1]
+                                            .isAlive())
+                            .as(
+                                    "stale broker "
+                                            + staleLeader
+                                            + " remains live during round "
+                                            + round)
+                            .isTrue();
+
+                    byte[] value =
+                            ("leader-churn-"
+                                            + (round + 1))
+                                    .getBytes(
+                                            StandardCharsets.UTF_8);
+                    RecordMetadata appended =
+                            produce(
+                                    bootstraps.get(
+                                            staleLeader - 1),
+                                    topic,
+                                    ("leader-churn-key-"
+                                                    + (round + 1))
+                                            .getBytes(
+                                                    StandardCharsets.UTF_8),
+                                    value);
+                    assertThat(appended.offset())
+                            .isEqualTo(nextOffset);
+                    nextOffset++;
+                    LeaderChurnEvidence committed =
+                            awaitLeaderChurnEvidence(
+                                    metadata,
+                                    partitions,
+                                    nereusCluster,
+                                    partitionId,
+                                    targetLeader,
+                                    nextOffset,
+                                    brokerProcesses,
+                                    serverLogs);
+                    assertThat(committed.fencingToken())
+                            .as(
+                                    "stale-term bootstrap must not replace the current durable authority")
+                            .isEqualTo(
+                                    claimed.fencingToken());
+                    assertThat(committed.commitVersion())
+                            .isGreaterThan(
+                                    current.commitVersion());
+                    ConsumerRecord<byte[], byte[]> recovered =
+                            fetch(
+                                    bootstraps.get(
+                                            targetLeader - 1),
+                                    partition,
+                                    appended.offset(),
+                                    serverLogs[
+                                            targetLeader - 1]);
+                    assertThat(recovered.value())
+                            .isEqualTo(value);
+                    assertOffsets(
+                            admin,
+                            partition,
+                            0,
+                            nextOffset);
+                    current = committed;
+                    currentLeader = targetLeader;
+                }
+                assertProcessesAlive(
+                        brokerProcesses,
+                        serverLogs);
+                assertThat(objectCount(bucket))
+                        .isPositive();
+            }
+        } catch (Throwable operationFailure) {
+            failure = operationFailure;
+        }
+        for (int index = brokers.length - 1;
+                index >= 0;
+                index--) {
+            Process broker = brokers[index];
+            if (broker == null
+                    || !broker.isAlive()) {
+                continue;
+            }
+            try {
+                stopBroker(
+                        broker,
+                        serverLogs[index]);
+            } catch (Throwable shutdownFailure) {
+                failure =
+                        mergeFailure(
+                                failure,
+                                shutdownFailure);
+            }
+        }
+        if (failure != null) {
+            try {
+                preserveLeaderChurnFailureEvidence(
+                        configs,
+                        formatLogs,
+                        serverLogs);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(
+                        evidenceFailure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    @Test
     @Timeout(value = 5, unit = TimeUnit.MINUTES)
     void twoReleaseProcessesMigrateRecoveredGroupAndTransactionCoordinators()
             throws Exception {
@@ -6399,6 +6772,97 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private static LeaderChurnEvidence awaitLeaderChurnEvidence(
+            OxiaJavaClientMetadataStore metadata,
+            OxiaJavaKafkaPartitionMetadataStore partitions,
+            String nereusCluster,
+            KafkaPartitionId partitionId,
+            int expectedLeaderId,
+            long expectedStableEndOffset,
+            List<Process> brokers,
+            Path... brokerLogs
+    ) {
+        long deadline =
+                System.nanoTime()
+                        + CLIENT_TIMEOUT.toNanos();
+        Throwable lastFailure = null;
+        while (System.nanoTime() < deadline) {
+            assertProcessesAlive(
+                    brokers,
+                    brokerLogs);
+            try {
+                var binding =
+                        partitions
+                                .get(partitionId)
+                                .join()
+                                .orElseThrow();
+                var root = binding.value();
+                StableStreamHeadSnapshot head =
+                        metadata
+                                .getStableStreamHeadSnapshot(
+                                        nereusCluster,
+                                        new StreamId(
+                                                root.streamId()))
+                                .join();
+                var acquired =
+                        head.appendSession()
+                                .orElseThrow();
+                var authority =
+                        acquired.authority()
+                                .orElseThrow();
+                if (root.observedLeaderId()
+                                == expectedLeaderId
+                        && root.observedLeaderEpoch() >= 0
+                        && root.observedBrokerEpoch() >= 0
+                        && head.committedEndOffset()
+                                == expectedStableEndOffset
+                        && authority.authorityType()
+                                .equals(
+                                        "kafka-partition-leader-v1")
+                        && authority.authorityId()
+                                .equals(
+                                        partitionId
+                                                .canonicalIdentity())
+                        && authority.ownerId()
+                                .equals(
+                                        Integer.toString(
+                                                expectedLeaderId))
+                        && authority.authorityEpoch()
+                                == root.observedLeaderEpoch()
+                        && authority.ownerEpoch()
+                                == root.observedBrokerEpoch()) {
+                    return new LeaderChurnEvidence(
+                            expectedLeaderId,
+                            root.bindingEpoch(),
+                            root.observedLeaderEpoch(),
+                            root.observedBrokerEpoch(),
+                            acquired.session().epoch(),
+                            acquired.session().fencingToken(),
+                            head.commitVersion(),
+                            head.committedEndOffset());
+                }
+                lastFailure =
+                        new AssertionError(
+                                "expected leader/end "
+                                        + expectedLeaderId
+                                        + "/"
+                                        + expectedStableEndOffset
+                                        + " but observed binding "
+                                        + root
+                                        + " and durable head "
+                                        + head);
+            } catch (Throwable observationFailure) {
+                lastFailure = observationFailure;
+            }
+            pauseForProviderState(
+                    "leader-churn durable authority");
+        }
+        throw new AssertionError(
+                "leader-churn durable authority did not converge:\n"
+                        + joinedLogs(brokerLogs),
+                lastFailure);
+    }
+
     private static KafkaCheckpointReferenceRecord awaitTrimmedCheckpoint(
             String nereusCluster,
             KafkaPartitionId partitionId,
@@ -8764,13 +9228,28 @@ class NereusKafkaNativeProcessIntegrationTest {
             Path brokerOneLog,
             Path brokerTwoLog
     ) throws Exception {
+        awaitPartitionLeader(
+                admin,
+                partition,
+                expectedLeaderId,
+                List.of(brokerOne, brokerTwo),
+                brokerOneLog,
+                brokerTwoLog);
+    }
+
+    private static void awaitPartitionLeader(
+            Admin admin,
+            TopicPartition partition,
+            int expectedLeaderId,
+            List<Process> brokers,
+            Path... brokerLogs
+    ) throws Exception {
         long deadline = System.nanoTime() + CLIENT_TIMEOUT.toNanos();
         Throwable lastFailure = null;
         while (System.nanoTime() < deadline) {
             assertProcessesAlive(
-                    List.of(brokerOne, brokerTwo),
-                    brokerOneLog,
-                    brokerTwoLog);
+                    brokers,
+                    brokerLogs);
             try {
                 var description = admin.describeTopics(
                                 List.of(partition.topic()))
@@ -8813,7 +9292,7 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
         throw new AssertionError(
                 "partition did not complete the Nereus shared-storage handoff:\n"
-                        + joinedLogs(brokerOneLog, brokerTwoLog),
+                        + joinedLogs(brokerLogs),
                 lastFailure);
     }
 
@@ -9349,6 +9828,54 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private static void preserveLeaderChurnFailureEvidence(
+            Path[] configs,
+            Path[] formatLogs,
+            Path[] serverLogs
+    ) {
+        String configured =
+                System.getProperty(
+                        "nereus.kafka.process.evidence.dir");
+        if (configured == null
+                || configured.isBlank()) {
+            return;
+        }
+        Path target =
+                Path.of(configured)
+                        .toAbsolutePath()
+                        .normalize();
+        try {
+            Files.createDirectories(target);
+            for (int index = 0;
+                    index < configs.length;
+                    index++) {
+                int nodeId = index + 1;
+                String prefix =
+                        "leader-churn-node-" + nodeId;
+                copyIfPresent(
+                        configs[index],
+                        target.resolve(
+                                prefix
+                                        + ".properties"));
+                copyIfPresent(
+                        formatLogs[index],
+                        target.resolve(
+                                prefix
+                                        + "-format.log"));
+                copyIfPresent(
+                        serverLogs[index],
+                        target.resolve(
+                                prefix
+                                        + "-server.log"));
+            }
+        } catch (IOException failure) {
+            throw new AssertionError(
+                    "failed to preserve leader-churn Kafka process evidence under "
+                            + target,
+                    failure);
+        }
+    }
+
     private static void
             preserveMultiControllerFailureEvidence(
                     Path[] configs,
@@ -9686,6 +10213,21 @@ class NereusKafkaNativeProcessIntegrationTest {
         Files.deleteIfExists(target.resolve("multi-broker-one-server.log"));
         Files.deleteIfExists(target.resolve("multi-broker-two-server.log"));
         for (int nodeId = 1; nodeId <= 3; nodeId++) {
+            Files.deleteIfExists(
+                    target.resolve(
+                            "leader-churn-node-"
+                                    + nodeId
+                                    + ".properties"));
+            Files.deleteIfExists(
+                    target.resolve(
+                            "leader-churn-node-"
+                                    + nodeId
+                                    + "-format.log"));
+            Files.deleteIfExists(
+                    target.resolve(
+                            "leader-churn-node-"
+                                    + nodeId
+                                    + "-server.log"));
             Files.deleteIfExists(
                     target.resolve(
                             "multi-controller-node-"
@@ -10578,6 +11120,17 @@ class NereusKafkaNativeProcessIntegrationTest {
             String reservationId,
             long ledgerId,
             long entryId) {
+    }
+
+    private record LeaderChurnEvidence(
+            int leaderId,
+            long bindingEpoch,
+            int leaderEpoch,
+            long brokerEpoch,
+            long appendSessionEpoch,
+            String fencingToken,
+            long commitVersion,
+            long stableEndOffset) {
     }
 
     private record TrimStateEvidence(

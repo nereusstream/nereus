@@ -434,6 +434,35 @@ tasks.register<Test>("f9MultiBrokerTakeoverProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9LeaderChurnChaosProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Run three live release brokers through repeated RF1 leader churn and durable authority fencing."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9MultiBrokerTakeoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-leader-churn-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "scenarioKfScl006",
+        )
+    }
+}
+
 tasks.register<Test>("f9CoordinatorMigrationProcessIntegrationTest") {
     group = "verification"
     description =

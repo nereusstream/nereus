@@ -65,6 +65,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task.startsWith("phase9M6Kafka")
         || task == "phase9M5KafkaCompactionOracleCheck"
         || task == "phase9M5KafkaRetentionOracleCheck"
+        || task == "phase9ChaosCheck"
         || task == "f9M6KafkaProcessIntegrationTest"
         || task == "f9CheckpointTrimRecoveryProcessIntegrationTest"
         || task == "f9DeleteRecordsBoundaryProcessIntegrationTest"
@@ -89,6 +90,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "f9BookKeeperWalAsyncObjectProcessIntegrationTest"
         || task == "f9BookKeeperWalSyncObjectProcessIntegrationTest"
         || task == "f9ObjectWalAsyncObjectProcessIntegrationTest"
+        || task == "f9LeaderChurnChaosProcessIntegrationTest"
         || task == "publishPhase9DevelopmentArtifacts"
 }
 check(!(pulsarDevelopmentGateRequested && kafkaDevelopmentGateRequested)) {
@@ -177,6 +179,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "f9BookKeeperWalAsyncObjectProcessIntegrationTest",
         "f9BookKeeperWalSyncObjectProcessIntegrationTest",
         "f9ObjectWalAsyncObjectProcessIntegrationTest",
+        "f9LeaderChurnChaosProcessIntegrationTest",
     ),
     ":nereus-pulsar-adapter" to setOf(
         "f4M4IntegrationTest",
@@ -3338,4 +3341,13 @@ tasks.register("phase9ScaleCheck") {
     dependsOn(":nereus-kafka-adapter:f9PartitionScaleTest")
     dependsOn(":nereus-kafka-adapter:f9IoConcurrencyStressTest")
     dependsOn(":nereus-kafka-adapter:f9MaterializationScaleTest")
+}
+
+tasks.register("phase9ChaosCheck") {
+    group = "verification"
+    description =
+        "Run the implemented F9-M7 repeated leader-churn and stale-authority process boundary."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn("phase9SourceLockCheck")
+    dependsOn(":nereus-kafka-adapter:f9LeaderChurnChaosProcessIntegrationTest")
 }
