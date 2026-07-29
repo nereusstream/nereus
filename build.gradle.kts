@@ -67,6 +67,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "phase9M5KafkaRetentionOracleCheck"
         || task == "phase9ChaosCheck"
         || task == "phase9CompatibilityCheck"
+        || task == "phase9PerformanceCheck"
         || task == "phase9KafkaForkCompatibilityCheck"
         || task == "f9M6KafkaProcessIntegrationTest"
         || task == "f9CheckpointTrimRecoveryProcessIntegrationTest"
@@ -94,6 +95,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "f9ObjectWalAsyncObjectProcessIntegrationTest"
         || task == "f9LeaderChurnChaosProcessIntegrationTest"
         || task == "f9ClientCompatibilityProcessIntegrationTest"
+        || task == "f9PerformanceProfileProcessIntegrationTest"
         || task == "publishPhase9DevelopmentArtifacts"
 }
 check(!(pulsarDevelopmentGateRequested && kafkaDevelopmentGateRequested)) {
@@ -3395,4 +3397,13 @@ tasks.register("phase9CompatibilityCheck") {
     dependsOn("phase9SourceLockCheck")
     dependsOn("phase9KafkaForkCompatibilityCheck")
     dependsOn(":nereus-kafka-adapter:f9ClientCompatibilityProcessIntegrationTest")
+}
+
+tasks.register("phase9PerformanceCheck") {
+    group = "verification"
+    description =
+        "Run the F9-M7 observation-only five-profile performance and fresh-cache recovery evidence gate."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn("phase9SourceLockCheck")
+    dependsOn(":nereus-kafka-adapter:f9PerformanceProfileProcessIntegrationTest")
 }

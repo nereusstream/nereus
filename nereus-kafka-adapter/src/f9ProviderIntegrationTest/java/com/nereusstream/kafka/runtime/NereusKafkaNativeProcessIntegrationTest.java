@@ -128,6 +128,14 @@ class NereusKafkaNativeProcessIntegrationTest {
             DockerImageName.parse("ghcr.io/shopify/toxiproxy:2.12.0");
     private static final Duration PROCESS_TIMEOUT = Duration.ofSeconds(90);
     private static final Duration CLIENT_TIMEOUT = Duration.ofSeconds(60);
+    private static final int PERFORMANCE_WARMUP_RECORDS = 8;
+    private static final int PERFORMANCE_SAMPLED_RECORDS = 32;
+    private static final int PERFORMANCE_VALUE_BYTES = 4096;
+    private static final int PERFORMANCE_APPEND_THREADS = 2;
+    private static final int PERFORMANCE_APPEND_QUEUE_CAPACITY = 32;
+    private static final int PERFORMANCE_FETCH_THREADS = 8;
+    private static final int PERFORMANCE_FETCH_QUEUE_CAPACITY = 32;
+    private static final long PERFORMANCE_INFLIGHT_BYTES = 128L * 1024 * 1024;
     private static final String GROUP_METADATA_TOPIC = "__consumer_offsets";
     private static final String TRANSACTION_STATE_TOPIC = "__transaction_state";
 
@@ -578,6 +586,106 @@ class NereusKafkaNativeProcessIntegrationTest {
         assertThat(objectCount(bucket))
                 .as("every supported client version must persist user and coordinator state")
                 .isPositive();
+    }
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.MINUTES)
+    void scenarioKfScl009() throws Exception {
+        clearFailureEvidence();
+        clearPerformanceEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-performance-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        int zooKeeperPort = freePort();
+        String metadataServiceUri =
+                "zk+longhierarchical://127.0.0.1:" + zooKeeperPort + "/ledgers";
+        List<PerformanceProfileDefinition> definitions = List.of(
+                new PerformanceProfileDefinition(
+                        "OBJECT_WAL_SYNC_OBJECT",
+                        "object-sync",
+                        0),
+                new PerformanceProfileDefinition(
+                        "OBJECT_WAL_ASYNC_OBJECT",
+                        "object-async",
+                        0),
+                new PerformanceProfileDefinition(
+                        "BOOKKEEPER_WAL_ONLY",
+                        "bookkeeper-only",
+                        41),
+                new PerformanceProfileDefinition(
+                        "BOOKKEEPER_WAL_ASYNC_OBJECT",
+                        "bookkeeper-async",
+                        42),
+                new PerformanceProfileDefinition(
+                        "BOOKKEEPER_WAL_SYNC_OBJECT",
+                        "bookkeeper-sync",
+                        43));
+        List<PerformanceProfileResult> results = new ArrayList<>();
+        List<Path> evidenceFiles = new ArrayList<>();
+
+        try (LocalBookKeeper ignored = startBookKeeper(zooKeeperPort)) {
+            for (PerformanceProfileDefinition definition : definitions) {
+                BookKeeperProcessConfiguration bookKeeper = null;
+                if (definition.bookKeeper()) {
+                    Path passwordFile =
+                            root.resolve(definition.fixtureToken() + "-performance-password.bin");
+                    Files.write(
+                            passwordFile,
+                            ("f9-" + definition.fixtureToken() + "-performance-password")
+                                    .getBytes(StandardCharsets.UTF_8));
+                    bookKeeper = bookKeeperProcessConfiguration(
+                            metadataServiceUri,
+                            definition.fixtureToken() + "-performance",
+                            passwordFile,
+                            definition.authoritySeed(),
+                            1);
+                    seedBookKeeperAuthority(
+                            oxiaConfiguration(),
+                            bookKeeperWalConfiguration(
+                                    bookKeeper,
+                                    definition.storageProfile()
+                                            .equals("BOOKKEEPER_WAL_ASYNC_OBJECT")),
+                            bookKeeper,
+                            Clock.systemUTC());
+                }
+                PerformanceProfileResult result = runPerformanceProfile(
+                        formatScript,
+                        startScript,
+                        kafkaHome,
+                        definition,
+                        bookKeeper,
+                        evidenceFiles);
+                results.add(result);
+                System.out.println(
+                        "PERFORMANCE_PROFILE_PASS profile="
+                                + result.profile()
+                                + " produceRecordsPerSecond="
+                                + decimal(result.produce().recordsPerSecond())
+                                + " fetchRecordsPerSecond="
+                                + decimal(result.fetch().recordsPerSecond())
+                                + " recoveryReadyMillis="
+                                + result.recovery().startupReadyMillis());
+            }
+        } catch (Exception | AssertionError failure) {
+            try {
+                preserveAdditionalFailureEvidence(evidenceFiles.toArray(Path[]::new));
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            throw failure;
+        }
+
+        assertThat(results.stream().map(PerformanceProfileResult::profile).toList())
+                .containsExactly(
+                        "OBJECT_WAL_SYNC_OBJECT",
+                        "OBJECT_WAL_ASYNC_OBJECT",
+                        "BOOKKEEPER_WAL_ONLY",
+                        "BOOKKEEPER_WAL_ASYNC_OBJECT",
+                        "BOOKKEEPER_WAL_SYNC_OBJECT");
+        preservePerformanceSuccessEvidence(results, evidenceFiles);
     }
 
     @Test
@@ -9629,6 +9737,525 @@ class NereusKafkaNativeProcessIntegrationTest {
         return process.exitValue();
     }
 
+    private PerformanceProfileResult runPerformanceProfile(
+            Path formatScript,
+            Path startScript,
+            Path kafkaHome,
+            PerformanceProfileDefinition definition,
+            BookKeeperProcessConfiguration bookKeeper,
+            List<Path> evidenceFiles
+    ) throws Exception {
+        String token = definition.fixtureToken();
+        Path config = root.resolve(token + "-performance.properties");
+        Path formatLog = root.resolve(token + "-performance-format.log");
+        Path firstServerLog = root.resolve(token + "-performance-first.log");
+        Path recoveryServerLog = root.resolve(token + "-performance-recovery.log");
+        Path firstCache = root.resolve(token + "-performance-cache-first");
+        Path recoveryCache = root.resolve(token + "-performance-cache-recovery");
+        evidenceFiles.add(config);
+        evidenceFiles.add(formatLog);
+        evidenceFiles.add(firstServerLog);
+        evidenceFiles.add(recoveryServerLog);
+        String bucket =
+                "nereus-f9-perf-"
+                        + token
+                        + "-"
+                        + UUID.randomUUID().toString().substring(0, 12);
+        String topic = "f9-performance-" + token + "-" + UUID.randomUUID();
+        int brokerPort = freePort();
+        int controllerPort = differentFreePort(brokerPort);
+        String bootstrapServers = "127.0.0.1:" + brokerPort;
+        String nereusCluster = "f9-performance-" + token + "-" + UUID.randomUUID();
+        int totalRecords = Math.addExact(
+                PERFORMANCE_WARMUP_RECORDS,
+                PERFORMANCE_SAMPLED_RECORDS);
+
+        createBucket(bucket);
+        writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                root.resolve(token + "-performance-kafka-log"),
+                root.resolve(token + "-performance-metadata-log"),
+                firstCache,
+                definition.storageProfile(),
+                bookKeeper,
+                1,
+                true,
+                nereusCluster);
+        overrideConfiguration(
+                config,
+                Map.of(
+                        "nereus.kafka.storage.append.executor.threads",
+                        Integer.toString(PERFORMANCE_APPEND_THREADS),
+                        "nereus.kafka.storage.append.executor.queue.capacity",
+                        Integer.toString(PERFORMANCE_APPEND_QUEUE_CAPACITY),
+                        "nereus.kafka.storage.append.inflight.bytes",
+                        Long.toString(PERFORMANCE_INFLIGHT_BYTES),
+                        "nereus.kafka.storage.fetch.executor.threads",
+                        Integer.toString(PERFORMANCE_FETCH_THREADS),
+                        "nereus.kafka.storage.fetch.executor.queue.capacity",
+                        Integer.toString(PERFORMANCE_FETCH_QUEUE_CAPACITY),
+                        "nereus.kafka.storage.fetch.inflight.bytes",
+                        Long.toString(PERFORMANCE_INFLIGHT_BYTES)));
+        formatStorage(formatScript, kafkaHome, config, formatLog);
+        TopicPartition partition = new TopicPartition(topic, 0);
+        AtomicReference<ProfileWorkloadPerformance> workload = new AtomicReference<>();
+        runBrokerWithProcess(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                firstServerLog,
+                bootstrapServers,
+                StopMode.NORMAL,
+                broker -> {
+                    try (Admin admin = Admin.create(longRunningAdminProperties(bootstrapServers))) {
+                        admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1)))
+                                .all()
+                                .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                        ProducePerformance produce = measureProducePerformance(
+                                bootstrapServers,
+                                topic,
+                                definition.storageProfile());
+                        FetchPerformance fetch = measureCommittedFetchPerformance(
+                                bootstrapServers,
+                                partition,
+                                definition.storageProfile(),
+                                totalRecords);
+                        assertOffsets(admin, partition, 0, totalRecords);
+                        workload.set(
+                                new ProfileWorkloadPerformance(
+                                        produce,
+                                        fetch,
+                                        processResourceSnapshot(broker)));
+                    }
+                });
+        assertThat(workload.get())
+                .as("performance workload sample for " + definition.storageProfile())
+                .isNotNull();
+
+        prepareIdentityOnlyRecoveryCache(firstCache, recoveryCache);
+        overrideConfiguration(
+                config,
+                Map.of(
+                        "nereus.kafka.storage.cache.dir",
+                        recoveryCache.toString()));
+        AtomicReference<RecoveryPerformance> recovery = new AtomicReference<>();
+        long recoveryStartedNanos = System.nanoTime();
+        runBrokerWithProcess(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                recoveryServerLog,
+                bootstrapServers,
+                StopMode.NORMAL,
+                broker -> {
+                    long startupReadyMillis = positiveMillis(
+                            System.nanoTime() - recoveryStartedNanos);
+                    long firstFetchStartedNanos = System.nanoTime();
+                    ConsumerRecord<byte[], byte[]> recovered = fetch(
+                            bootstrapServers,
+                            partition,
+                            0L,
+                            "read_committed",
+                            recoveryServerLog);
+                    long firstFetchMicros = positiveMicros(
+                            System.nanoTime() - firstFetchStartedNanos);
+                    assertThat(recovered.offset()).isZero();
+                    assertThat(recovered.value())
+                            .isEqualTo(performanceValue(definition.storageProfile(), 0));
+                    RecordMetadata continued = produce(
+                            bootstrapServers,
+                            topic,
+                            performanceKey(definition.storageProfile(), totalRecords),
+                            performanceValue(definition.storageProfile(), totalRecords));
+                    assertThat(continued.offset()).isEqualTo(totalRecords);
+                    try (Admin admin =
+                            Admin.create(longRunningAdminProperties(bootstrapServers))) {
+                        assertOffsets(admin, partition, 0, totalRecords + 1L);
+                    }
+                    recovery.set(
+                            new RecoveryPerformance(
+                                    startupReadyMillis,
+                                    firstFetchMicros,
+                                    totalRecords,
+                                    totalRecords + 1L,
+                                    true,
+                                    processResourceSnapshot(broker)));
+                });
+        assertThat(recovery.get())
+                .as("fresh-process recovery sample for " + definition.storageProfile())
+                .isNotNull();
+        assertThat(Files.isDirectory(recoveryCache))
+                .as("fresh recovery cache for " + definition.storageProfile())
+                .isTrue();
+
+        ProfileWorkloadPerformance measured = workload.get();
+        return new PerformanceProfileResult(
+                definition.storageProfile(),
+                "PASS",
+                measured.produce(),
+                measured.fetch(),
+                recovery.get(),
+                measured.resource());
+    }
+
+    private static void prepareIdentityOnlyRecoveryCache(
+            Path firstCache,
+            Path recoveryCache
+    ) throws IOException {
+        Path relativeIdentity =
+                Path.of("1", "partition-logs", "meta.properties");
+        Path sourceIdentity = firstCache.resolve(relativeIdentity);
+        Path targetIdentity = recoveryCache.resolve(relativeIdentity);
+        assertThat(sourceIdentity)
+                .as("formatted KRaft directory identity")
+                .exists()
+                .isRegularFile();
+        assertThat(recoveryCache)
+                .as("unused recovery cache root")
+                .doesNotExist();
+        Files.createDirectories(targetIdentity.getParent());
+        Files.copy(
+                sourceIdentity,
+                targetIdentity,
+                StandardCopyOption.REPLACE_EXISTING);
+        try (var files = Files.walk(recoveryCache)) {
+            assertThat(files.filter(Files::isRegularFile).toList())
+                    .as("identity-only recovery cache files")
+                    .containsExactly(targetIdentity);
+        }
+    }
+
+    private static ProducePerformance measureProducePerformance(
+            String bootstrapServers,
+            String topic,
+            String profile
+    ) throws Exception {
+        Properties properties = producerProperties(bootstrapServers);
+        properties.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "f9-performance-" + profile);
+        properties.setProperty(ProducerConfig.LINGER_MS_CONFIG, "0");
+        properties.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "none");
+        List<Long> latencyNanos = new ArrayList<>(PERFORMANCE_SAMPLED_RECORDS);
+        try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(properties)) {
+            for (int index = 0; index < PERFORMANCE_WARMUP_RECORDS; index++) {
+                RecordMetadata metadata = producer.send(
+                                new ProducerRecord<>(
+                                        topic,
+                                        0,
+                                        performanceKey(profile, index),
+                                        performanceValue(profile, index)))
+                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                assertThat(metadata.offset()).isEqualTo(index);
+            }
+            long startedNanos = System.nanoTime();
+            for (int sample = 0; sample < PERFORMANCE_SAMPLED_RECORDS; sample++) {
+                int index = PERFORMANCE_WARMUP_RECORDS + sample;
+                long acknowledgementStartedNanos = System.nanoTime();
+                RecordMetadata metadata = producer.send(
+                                new ProducerRecord<>(
+                                        topic,
+                                        0,
+                                        performanceKey(profile, index),
+                                        performanceValue(profile, index)))
+                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                latencyNanos.add(System.nanoTime() - acknowledgementStartedNanos);
+                assertThat(metadata.offset()).isEqualTo(index);
+            }
+            long elapsedNanos = System.nanoTime() - startedNanos;
+            assertThat(elapsedNanos).isPositive();
+            LatencyPercentiles latency = latencyPercentiles(latencyNanos);
+            long sampledBytes = Math.multiplyExact(
+                    PERFORMANCE_SAMPLED_RECORDS,
+                    PERFORMANCE_VALUE_BYTES);
+            return new ProducePerformance(
+                    PERFORMANCE_WARMUP_RECORDS,
+                    PERFORMANCE_SAMPLED_RECORDS,
+                    sampledBytes,
+                    elapsedNanos,
+                    rate(PERFORMANCE_SAMPLED_RECORDS, elapsedNanos),
+                    rate(sampledBytes, elapsedNanos),
+                    latency);
+        }
+    }
+
+    private static FetchPerformance measureCommittedFetchPerformance(
+            String bootstrapServers,
+            TopicPartition partition,
+            String profile,
+            int expectedRecords
+    ) {
+        Properties properties = consumerProperties(
+                bootstrapServers,
+                "f9-performance-fetch-" + profile + "-" + UUID.randomUUID());
+        properties.setProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "8");
+        List<Long> nonEmptyPollLatencyNanos = new ArrayList<>();
+        long startedNanos = System.nanoTime();
+        long firstRecordNanos = -1L;
+        int observedRecords = 0;
+        long observedBytes = 0L;
+        try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
+            consumer.assign(List.of(partition));
+            consumer.seek(partition, 0L);
+            long deadline = System.nanoTime() + CLIENT_TIMEOUT.toNanos();
+            while (observedRecords < expectedRecords && System.nanoTime() < deadline) {
+                long pollStartedNanos = System.nanoTime();
+                ConsumerRecords<byte[], byte[]> records =
+                        consumer.poll(Duration.ofMillis(250));
+                long pollElapsedNanos = System.nanoTime() - pollStartedNanos;
+                if (!records.isEmpty()) {
+                    nonEmptyPollLatencyNanos.add(pollElapsedNanos);
+                    if (firstRecordNanos < 0L) {
+                        firstRecordNanos = System.nanoTime() - startedNanos;
+                    }
+                }
+                for (ConsumerRecord<byte[], byte[]> record : records.records(partition)) {
+                    assertThat(record.offset()).isEqualTo(observedRecords);
+                    assertThat(record.key())
+                            .isEqualTo(performanceKey(profile, observedRecords));
+                    assertThat(record.value())
+                            .isEqualTo(performanceValue(profile, observedRecords));
+                    observedRecords++;
+                    observedBytes = Math.addExact(observedBytes, record.value().length);
+                }
+            }
+        }
+        long elapsedNanos = System.nanoTime() - startedNanos;
+        assertThat(observedRecords)
+                .as("complete committed Fetch sample for " + profile)
+                .isEqualTo(expectedRecords);
+        assertThat(observedBytes)
+                .isEqualTo(Math.multiplyExact(expectedRecords, PERFORMANCE_VALUE_BYTES));
+        assertThat(firstRecordNanos).isPositive();
+        assertThat(nonEmptyPollLatencyNanos).isNotEmpty();
+        return new FetchPerformance(
+                observedRecords,
+                observedBytes,
+                elapsedNanos,
+                rate(observedRecords, elapsedNanos),
+                rate(observedBytes, elapsedNanos),
+                positiveMicros(firstRecordNanos),
+                latencyPercentiles(nonEmptyPollLatencyNanos));
+    }
+
+    private static ProcessResourceSnapshot processResourceSnapshot(
+            Process broker
+    ) throws Exception {
+        assertThat(broker.isAlive()).as("broker resource sample").isTrue();
+        ProcessHandle brokerJvm = brokerJavaProcess(broker);
+        long cpuMillis = brokerJvm.info()
+                .totalCpuDuration()
+                .map(Duration::toMillis)
+                .filter(value -> value > 0)
+                .orElseGet(() -> processCpuMillis(brokerJvm.pid()));
+        String rssOutput = processCommandOutput(
+                List.of(
+                        "ps",
+                        "-o",
+                        "rss=",
+                        "-p",
+                        Long.toString(brokerJvm.pid())),
+                Duration.ofSeconds(10));
+        long rssKiB;
+        try {
+            rssKiB = Long.parseLong(rssOutput.trim());
+        } catch (NumberFormatException failure) {
+            throw new AssertionError(
+                    "cannot parse broker RSS from: " + rssOutput,
+                    failure);
+        }
+        Path jcmd = Path.of(System.getProperty("java.home"), "bin", "jcmd");
+        assertThat(jcmd).exists().isRegularFile();
+        String counters = processCommandOutput(
+                List.of(
+                        jcmd.toString(),
+                        Long.toString(brokerJvm.pid()),
+                        "PerfCounter.print"),
+                Duration.ofSeconds(15));
+        int liveThreads = counters.lines()
+                .filter(line -> line.startsWith("java.threads.live="))
+                .map(line -> line.substring(line.indexOf('=') + 1).trim())
+                .mapToInt(Integer::parseInt)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(
+                        "java.threads.live is absent from jcmd PerfCounter.print"));
+        assertThat(rssKiB).isPositive();
+        assertThat(liveThreads).isPositive();
+        return new ProcessResourceSnapshot(
+                rssKiB,
+                cpuMillis,
+                liveThreads,
+                PERFORMANCE_APPEND_THREADS,
+                PERFORMANCE_APPEND_QUEUE_CAPACITY,
+                PERFORMANCE_INFLIGHT_BYTES,
+                PERFORMANCE_FETCH_THREADS,
+                PERFORMANCE_FETCH_QUEUE_CAPACITY,
+                PERFORMANCE_INFLIGHT_BYTES);
+    }
+
+    private static ProcessHandle brokerJavaProcess(Process launcher) {
+        List<ProcessHandle> candidates = java.util.stream.Stream.concat(
+                        java.util.stream.Stream.of(launcher.toHandle()),
+                        launcher.descendants())
+                .filter(ProcessHandle::isAlive)
+                .filter(handle -> handle.info()
+                        .command()
+                        .map(command -> Path.of(command)
+                                .getFileName()
+                                .toString()
+                                .equals("java"))
+                        .orElse(false))
+                .toList();
+        assertThat(candidates)
+                .as("one live Java broker process below launcher " + launcher.pid())
+                .singleElement();
+        return candidates.get(0);
+    }
+
+    private static long processCpuMillis(long pid) {
+        try {
+            String cpuTime = processCommandOutput(
+                    List.of(
+                            "ps",
+                            "-o",
+                            "time=",
+                            "-p",
+                            Long.toString(pid)),
+                    Duration.ofSeconds(10));
+            String exact = cpuTime.trim();
+            long days = 0L;
+            int daySeparator = exact.indexOf('-');
+            if (daySeparator >= 0) {
+                days = Long.parseLong(exact.substring(0, daySeparator));
+                exact = exact.substring(daySeparator + 1);
+            }
+            String[] fields = exact.split(":");
+            if (fields.length < 2 || fields.length > 3) {
+                throw new IllegalArgumentException(
+                        "unexpected CPU time field count: " + exact);
+            }
+            double seconds = Double.parseDouble(fields[fields.length - 1]);
+            long minutes = Long.parseLong(fields[fields.length - 2]);
+            long hours = fields.length == 3
+                    ? Long.parseLong(fields[0])
+                    : 0L;
+            long millis = Math.round(
+                    (((days * 24L + hours) * 60L + minutes) * 60.0d
+                            + seconds)
+                        * 1000.0d);
+            if (millis <= 0) {
+                throw new IllegalArgumentException(
+                        "non-positive CPU time: " + cpuTime);
+            }
+            return millis;
+        } catch (Exception failure) {
+            throw new AssertionError(
+                    "broker total CPU duration is unavailable for pid " + pid,
+                    failure);
+        }
+    }
+
+    private static String processCommandOutput(
+            List<String> command,
+            Duration timeout
+    ) throws Exception {
+        Process process = new ProcessBuilder(command)
+                .redirectErrorStream(true)
+                .start();
+        var output = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            try {
+                return new String(
+                        process.getInputStream().readAllBytes(),
+                        StandardCharsets.UTF_8);
+            } catch (IOException failure) {
+                throw new java.io.UncheckedIOException(failure);
+            }
+        });
+        if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+            process.destroyForcibly();
+            throw new AssertionError(
+                    "process inspection timed out: " + String.join(" ", command));
+        }
+        String text = output.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        assertThat(process.exitValue())
+                .withFailMessage(
+                        "process inspection failed: "
+                                + String.join(" ", command)
+                                + "\n"
+                                + text)
+                .isZero();
+        return text;
+    }
+
+    private static LatencyPercentiles latencyPercentiles(
+            List<Long> samplesNanos
+    ) {
+        assertThat(samplesNanos).isNotEmpty();
+        List<Long> sorted = samplesNanos.stream().sorted().toList();
+        return new LatencyPercentiles(
+                percentileMicros(sorted, 0.50),
+                percentileMicros(sorted, 0.95),
+                percentileMicros(sorted, 0.99),
+                positiveMicros(sorted.get(sorted.size() - 1)));
+    }
+
+    private static long percentileMicros(
+            List<Long> sortedNanos,
+            double quantile
+    ) {
+        int index = Math.max(
+                0,
+                (int) Math.ceil(quantile * sortedNanos.size()) - 1);
+        return positiveMicros(sortedNanos.get(index));
+    }
+
+    private static long positiveMicros(long elapsedNanos) {
+        return Math.max(1L, TimeUnit.NANOSECONDS.toMicros(elapsedNanos));
+    }
+
+    private static long positiveMillis(long elapsedNanos) {
+        return Math.max(1L, TimeUnit.NANOSECONDS.toMillis(elapsedNanos));
+    }
+
+    private static double rate(long units, long elapsedNanos) {
+        assertThat(units).isPositive();
+        assertThat(elapsedNanos).isPositive();
+        return units * 1_000_000_000.0d / elapsedNanos;
+    }
+
+    private static byte[] performanceKey(
+            String profile,
+            int record
+    ) {
+        return ("f9-performance-key-" + profile + "-" + record)
+                .getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static byte[] performanceValue(
+            String profile,
+            int record
+    ) {
+        byte[] value = new byte[PERFORMANCE_VALUE_BYTES];
+        java.util.Arrays.fill(value, (byte) (record & 0x7f));
+        byte[] identity = ("f9-performance-value-" + profile + "-" + record)
+                .getBytes(StandardCharsets.UTF_8);
+        System.arraycopy(
+                identity,
+                0,
+                value,
+                0,
+                Math.min(identity.length, value.length));
+        return value;
+    }
+
+    private static String decimal(double value) {
+        assertThat(value).isFinite().isPositive();
+        return String.format(java.util.Locale.ROOT, "%.3f", value);
+    }
+
     private static Path requiredCompatibilityProbeClasses() {
         String configured =
                 System.getProperty("nereus.kafka.compatibility.probe.classes");
@@ -10206,6 +10833,207 @@ class NereusKafkaNativeProcessIntegrationTest {
                             + target,
                     failure);
         }
+    }
+
+    private static void clearPerformanceEvidence() throws IOException {
+        String configured = System.getProperty("nereus.kafka.process.evidence.dir");
+        if (configured == null || configured.isBlank()) {
+            return;
+        }
+        Path target = Path.of(configured).toAbsolutePath().normalize();
+        Files.deleteIfExists(target.resolve("performance-report.json"));
+        for (String token :
+                List.of(
+                        "object-sync",
+                        "object-async",
+                        "bookkeeper-only",
+                        "bookkeeper-async",
+                        "bookkeeper-sync")) {
+            Files.deleteIfExists(
+                    target.resolve(token + "-performance.properties"));
+            Files.deleteIfExists(
+                    target.resolve(token + "-performance-format.log"));
+            Files.deleteIfExists(
+                    target.resolve(token + "-performance-first.log"));
+            Files.deleteIfExists(
+                    target.resolve(token + "-performance-recovery.log"));
+        }
+    }
+
+    private static void preservePerformanceSuccessEvidence(
+            List<PerformanceProfileResult> results,
+            List<Path> evidenceFiles
+    ) {
+        assertThat(results)
+                .as("complete five-profile performance evidence")
+                .hasSize(5)
+                .allSatisfy(result -> {
+                    assertThat(result.status()).isEqualTo("PASS");
+                    assertThat(result.produce().sampledRecords())
+                            .isEqualTo(PERFORMANCE_SAMPLED_RECORDS);
+                    assertThat(result.fetch().records())
+                            .isEqualTo(
+                                    PERFORMANCE_WARMUP_RECORDS
+                                            + PERFORMANCE_SAMPLED_RECORDS);
+                    assertThat(result.recovery().identityOnlyCachePrepared())
+                            .isTrue();
+                });
+        String configured = System.getProperty("nereus.kafka.process.evidence.dir");
+        assertThat(configured)
+                .as("nereus.kafka.process.evidence.dir")
+                .isNotBlank();
+        Path target = Path.of(configured).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(target);
+            for (Path evidence : evidenceFiles) {
+                copyIfPresent(evidence, target.resolve(evidence.getFileName()));
+            }
+            List<String> profiles = results.stream()
+                    .map(NereusKafkaNativeProcessIntegrationTest::performanceProfileJson)
+                    .toList();
+            String report =
+                    "{\n"
+                            + "  \"schemaVersion\":1,\n"
+                            + "  \"scenarioId\":\"KF-SCL-009\",\n"
+                            + "  \"thresholdPolicy\":\"OBSERVATION_ONLY\",\n"
+                            + "  \"sampled\":true,\n"
+                            + "  \"environment\":{"
+                            + "\"osName\":\""
+                            + jsonString(System.getProperty("os.name"))
+                            + "\",\"osArch\":\""
+                            + jsonString(System.getProperty("os.arch"))
+                            + "\",\"javaVersion\":\""
+                            + jsonString(System.getProperty("java.version"))
+                            + "\",\"availableProcessors\":"
+                            + Runtime.getRuntime().availableProcessors()
+                            + "},\n"
+                            + "  \"workload\":{"
+                            + "\"warmupRecords\":"
+                            + PERFORMANCE_WARMUP_RECORDS
+                            + ",\"sampledRecords\":"
+                            + PERFORMANCE_SAMPLED_RECORDS
+                            + ",\"valueBytes\":"
+                            + PERFORMANCE_VALUE_BYTES
+                            + ",\"acknowledgementMode\":\"all\","
+                            + "\"fetchIsolation\":\"read_committed\","
+                            + "\"recoveryCache\":"
+                            + "\"empty-content-preserved-directory-identity\"},\n"
+                            + "  \"profiles\":[\n"
+                            + String.join(",\n", profiles)
+                            + "\n  ]\n"
+                            + "}\n";
+            Files.writeString(
+                    target.resolve("performance-report.json"),
+                    report,
+                    StandardCharsets.UTF_8);
+        } catch (IOException failure) {
+            throw new AssertionError(
+                    "failed to preserve successful performance evidence under "
+                            + target,
+                    failure);
+        }
+    }
+
+    private static String performanceProfileJson(
+            PerformanceProfileResult result
+    ) {
+        ProducePerformance produce = result.produce();
+        FetchPerformance fetch = result.fetch();
+        RecoveryPerformance recovery = result.recovery();
+        return "    {\"profile\":\""
+                + result.profile()
+                + "\",\"status\":\""
+                + result.status()
+                + "\","
+                + "\"produce\":{"
+                + "\"warmupRecords\":"
+                + produce.warmupRecords()
+                + ",\"sampledRecords\":"
+                + produce.sampledRecords()
+                + ",\"sampledBytes\":"
+                + produce.sampledBytes()
+                + ",\"elapsedNanos\":"
+                + produce.elapsedNanos()
+                + ",\"recordsPerSecond\":"
+                + decimal(produce.recordsPerSecond())
+                + ",\"bytesPerSecond\":"
+                + decimal(produce.bytesPerSecond())
+                + ",\"ackLatencyMicros\":"
+                + latencyJson(produce.ackLatency())
+                + "},"
+                + "\"fetch\":{"
+                + "\"records\":"
+                + fetch.records()
+                + ",\"bytes\":"
+                + fetch.bytes()
+                + ",\"elapsedNanos\":"
+                + fetch.elapsedNanos()
+                + ",\"recordsPerSecond\":"
+                + decimal(fetch.recordsPerSecond())
+                + ",\"bytesPerSecond\":"
+                + decimal(fetch.bytesPerSecond())
+                + ",\"firstRecordMicros\":"
+                + fetch.firstRecordMicros()
+                + ",\"nonEmptyPollLatencyMicros\":"
+                + latencyJson(fetch.nonEmptyPollLatency())
+                + "},"
+                + "\"recovery\":{"
+                + "\"startupReadyMillis\":"
+                + recovery.startupReadyMillis()
+                + ",\"firstFetchMicros\":"
+                + recovery.firstFetchMicros()
+                + ",\"recoveredLatestOffset\":"
+                + recovery.recoveredLatestOffset()
+                + ",\"continuedLatestOffset\":"
+                + recovery.continuedLatestOffset()
+                + ",\"identityOnlyCachePrepared\":"
+                + recovery.identityOnlyCachePrepared()
+                + ",\"resource\":"
+                + resourceJson(recovery.resource())
+                + "},"
+                + "\"resource\":"
+                + resourceJson(result.resource())
+                + "}";
+    }
+
+    private static String latencyJson(LatencyPercentiles latency) {
+        return "{\"p50\":"
+                + latency.p50Micros()
+                + ",\"p95\":"
+                + latency.p95Micros()
+                + ",\"p99\":"
+                + latency.p99Micros()
+                + ",\"max\":"
+                + latency.maxMicros()
+                + "}";
+    }
+
+    private static String resourceJson(ProcessResourceSnapshot resource) {
+        return "{\"rssKiB\":"
+                + resource.rssKiB()
+                + ",\"cpuMillis\":"
+                + resource.cpuMillis()
+                + ",\"liveJavaThreads\":"
+                + resource.liveJavaThreads()
+                + ",\"appendExecutorThreads\":"
+                + resource.appendExecutorThreads()
+                + ",\"appendQueueCapacity\":"
+                + resource.appendQueueCapacity()
+                + ",\"appendInflightBytes\":"
+                + resource.appendInflightBytes()
+                + ",\"fetchExecutorThreads\":"
+                + resource.fetchExecutorThreads()
+                + ",\"fetchQueueCapacity\":"
+                + resource.fetchQueueCapacity()
+                + ",\"fetchInflightBytes\":"
+                + resource.fetchInflightBytes()
+                + "}";
+    }
+
+    private static String jsonString(String value) {
+        return Objects.requireNonNull(value, "JSON string")
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"");
     }
 
     private static void preserveMultiBrokerFailureEvidence(
@@ -11511,6 +12339,186 @@ class NereusKafkaNativeProcessIntegrationTest {
             }
             return "CONTROLLER://127.0.0.1:"
                     + controllerPort;
+        }
+    }
+
+    private record PerformanceProfileDefinition(
+            String storageProfile,
+            String fixtureToken,
+            int authoritySeed) {
+
+        private PerformanceProfileDefinition {
+            if (storageProfile == null || storageProfile.isBlank()) {
+                throw new IllegalArgumentException(
+                        "performance storageProfile must be non-blank");
+            }
+            if (fixtureToken == null || fixtureToken.isBlank()) {
+                throw new IllegalArgumentException(
+                        "performance fixtureToken must be non-blank");
+            }
+            if (storageProfile.startsWith("BOOKKEEPER_WAL_")
+                    != (authoritySeed > 0)) {
+                throw new IllegalArgumentException(
+                        "BookKeeper performance profiles require a positive authority seed");
+            }
+        }
+
+        private boolean bookKeeper() {
+            return storageProfile.startsWith("BOOKKEEPER_WAL_");
+        }
+    }
+
+    private record LatencyPercentiles(
+            long p50Micros,
+            long p95Micros,
+            long p99Micros,
+            long maxMicros) {
+
+        private LatencyPercentiles {
+            if (p50Micros <= 0
+                    || p95Micros < p50Micros
+                    || p99Micros < p95Micros
+                    || maxMicros < p99Micros) {
+                throw new IllegalArgumentException(
+                        "performance latency percentiles must be positive and monotonic");
+            }
+        }
+    }
+
+    private record ProducePerformance(
+            int warmupRecords,
+            int sampledRecords,
+            long sampledBytes,
+            long elapsedNanos,
+            double recordsPerSecond,
+            double bytesPerSecond,
+            LatencyPercentiles ackLatency) {
+
+        private ProducePerformance {
+            if (warmupRecords <= 0
+                    || sampledRecords <= 0
+                    || sampledBytes <= 0
+                    || elapsedNanos <= 0
+                    || !Double.isFinite(recordsPerSecond)
+                    || recordsPerSecond <= 0
+                    || !Double.isFinite(bytesPerSecond)
+                    || bytesPerSecond <= 0) {
+                throw new IllegalArgumentException(
+                        "Produce performance sample must be complete and positive");
+            }
+            Objects.requireNonNull(ackLatency, "ackLatency");
+        }
+    }
+
+    private record FetchPerformance(
+            int records,
+            long bytes,
+            long elapsedNanos,
+            double recordsPerSecond,
+            double bytesPerSecond,
+            long firstRecordMicros,
+            LatencyPercentiles nonEmptyPollLatency) {
+
+        private FetchPerformance {
+            if (records <= 0
+                    || bytes <= 0
+                    || elapsedNanos <= 0
+                    || !Double.isFinite(recordsPerSecond)
+                    || recordsPerSecond <= 0
+                    || !Double.isFinite(bytesPerSecond)
+                    || bytesPerSecond <= 0
+                    || firstRecordMicros <= 0) {
+                throw new IllegalArgumentException(
+                        "Fetch performance sample must be complete and positive");
+            }
+            Objects.requireNonNull(
+                    nonEmptyPollLatency,
+                    "nonEmptyPollLatency");
+        }
+    }
+
+    private record ProcessResourceSnapshot(
+            long rssKiB,
+            long cpuMillis,
+            int liveJavaThreads,
+            int appendExecutorThreads,
+            int appendQueueCapacity,
+            long appendInflightBytes,
+            int fetchExecutorThreads,
+            int fetchQueueCapacity,
+            long fetchInflightBytes) {
+
+        private ProcessResourceSnapshot {
+            if (rssKiB <= 0
+                    || cpuMillis <= 0
+                    || liveJavaThreads <= 0
+                    || appendExecutorThreads <= 0
+                    || appendQueueCapacity <= 0
+                    || appendInflightBytes <= 0
+                    || fetchExecutorThreads <= 0
+                    || fetchQueueCapacity <= 0
+                    || fetchInflightBytes <= 0) {
+                throw new IllegalArgumentException(
+                        "process resource sample must be complete and positive");
+            }
+        }
+    }
+
+    private record RecoveryPerformance(
+            long startupReadyMillis,
+            long firstFetchMicros,
+            long recoveredLatestOffset,
+            long continuedLatestOffset,
+            boolean identityOnlyCachePrepared,
+            ProcessResourceSnapshot resource) {
+
+        private RecoveryPerformance {
+            if (startupReadyMillis <= 0
+                    || firstFetchMicros <= 0
+                    || recoveredLatestOffset <= 0
+                    || continuedLatestOffset
+                        != recoveredLatestOffset + 1
+                    || !identityOnlyCachePrepared) {
+                throw new IllegalArgumentException(
+                        "recovery performance sample must be complete and contiguous");
+            }
+            Objects.requireNonNull(resource, "resource");
+        }
+    }
+
+    private record ProfileWorkloadPerformance(
+            ProducePerformance produce,
+            FetchPerformance fetch,
+            ProcessResourceSnapshot resource) {
+
+        private ProfileWorkloadPerformance {
+            Objects.requireNonNull(produce, "produce");
+            Objects.requireNonNull(fetch, "fetch");
+            Objects.requireNonNull(resource, "resource");
+        }
+    }
+
+    private record PerformanceProfileResult(
+            String profile,
+            String status,
+            ProducePerformance produce,
+            FetchPerformance fetch,
+            RecoveryPerformance recovery,
+            ProcessResourceSnapshot resource) {
+
+        private PerformanceProfileResult {
+            if (profile == null || profile.isBlank()) {
+                throw new IllegalArgumentException(
+                        "performance profile must be non-blank");
+            }
+            if (!"PASS".equals(status)) {
+                throw new IllegalArgumentException(
+                        "performance profile status must be PASS");
+            }
+            Objects.requireNonNull(produce, "produce");
+            Objects.requireNonNull(fetch, "fetch");
+            Objects.requireNonNull(recovery, "recovery");
+            Objects.requireNonNull(resource, "resource");
         }
     }
 

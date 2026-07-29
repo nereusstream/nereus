@@ -552,6 +552,36 @@ tasks.register<Test>("f9ClientCompatibilityProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9PerformanceProfileProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Record observation-only Produce, Fetch, fresh-cache recovery, and resource baselines for all five profiles."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9ClientCompatibilityProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-performance-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "scenarioKfScl009",
+        )
+    }
+}
+
 tasks.register<Test>("f9CoordinatorMigrationProcessIntegrationTest") {
     group = "verification"
     description =
