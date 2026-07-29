@@ -2226,10 +2226,10 @@
     {
       "id": "KF-TXN-016",
       "milestone": "F9-M5",
-      "task": "f9MandatoryInternalTopicNtc2ProcessIntegrationTest",
+      "task": "f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest",
       "testClass": "NereusKafkaNativeProcessIntegrationTest",
       "testMethod": "scenarioKfTxn016",
-      "scenario": "mandatory internal-topic NTC2 unavailable blocks coordinator election，no full-source fallback",
+      "scenario": "all five storage profiles block mandatory internal-topic election on deleted/corrupt NTC2 until exact repair，with no full-source fallback",
       "evidenceTier": [
         "P",
         "C",
@@ -2238,7 +2238,8 @@
       "requiredServices": [
         "kraft",
         "oxia",
-        "object-store"
+        "object-store",
+        "bookkeeper"
       ],
       "sourceLocks": [
         "nereus",

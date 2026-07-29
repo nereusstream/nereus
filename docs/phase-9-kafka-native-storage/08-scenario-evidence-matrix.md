@@ -6,11 +6,12 @@
 > 2026-07-29 增量：product `7c25d2e` adds a live two-release-process completed-state migration slice for KF-TXN-011/012/013；ongoing/aborted transaction takeover、mandatory internal-topic NTC2 and final aggregate remain open
 > 2026-07-29 ongoing transaction 增量：product `efe782d` adds bidirectional live OPEN-state COMMIT/ABORT migration evidence for KF-TXN-007/012/014；injected transaction-resolution failure、mandatory NTC2、profile expansion and final aggregate remain open
 > 2026-07-29 mandatory NTC2 deterministic 增量：product `b6b02f4` + fork `89b66ab03b` add deterministic KF-TXN-016 evidence：all untrimmed activated generations are probed only through constrained `TOPIC_COMPACTED` reads before coordinator storage installation/election；same-view unavailability cancels/resigns open。Physical repair evidence is recorded in the next increment
-> 2026-07-29 mandatory NTC2 process 增量（覆盖上一行末尾）：product `0ae8ca9` + fork `768924da60` add real Object-WAL P/C/K evidence for KF-TXN-016：activated `__consumer_offsets` NTC2 physical deletion and byte corruption each block live handoff/election with no COMMITTED fallback；two exact bytes+metadata restorations pass identity verification、root/index CAS repair、coverage `REPLACE` and ordinary re-election。The row is `PASSED_CURRENT_SOURCE` for Object-WAL；non-Object profile/final aggregate coverage remains open
+> 2026-07-29 mandatory NTC2 process 增量（覆盖上一行末尾）：product `0ae8ca9` + fork `768924da60` add real Object-WAL P/C/K evidence for KF-TXN-016：activated `__consumer_offsets` NTC2 physical deletion and byte corruption each block live handoff/election with no COMMITTED fallback；two exact bytes+metadata restorations pass identity verification、root/index CAS repair、coverage `REPLACE` and ordinary re-election。This increment initially covered Object sync；the later `4676c12` line closes the remaining profile matrix
 > 2026-07-29 retention/DeleteRecords 增量：product `77480cb` + fork `bd9963c980` add stock `UnifiedLog.deleteOldSegments()` differential evidence for KF-RET-001/002/003 and real Object-WAL native target `3/4/6/-1` evidence for KF-RET-006。The four rows are `PASSED_CURRENT_SOURCE`；stock `LogCleaner` compaction differential and final aggregate remain separate open requirements
 > 2026-07-29 stock compaction oracle 增量（覆盖上一行的 compaction open wording）：product `666bab1`/`08fe686` + fork `c4a0a2d1fa`/`bf8a2946e5` add a real stock `Cleaner` stable-prefix oracle and the dedicated `phase9M5KafkaCompactionOracleCheck`。It compares exact survivor fingerprints across keyed/tail winners、stock null-key drop、tombstone/control-marker horizons、committed/aborted transactions and sparse idempotent GZIP batches；the oracle exposed and closed null-key over-retention and `RETAIN_REQUIRED` marker early-horizon drift。KF-CMP-001/002/003/004 are `PASSED_CURRENT_SOURCE`；OPEN-LSO crossing、full format matrix and final aggregate remain separate open requirements
 > 2026-07-29 transaction-resolution cut 增量：product `04e661e` + fork `1e3783458b` add real Object-WAL P/C evidence for KF-TXN-008。A test-only append-boundary agent cuts the user-partition owner before provider invocation and after durable provider completion but before caller completion；fresh release processes must converge LSO/READ_COMMITTED, skip aborted data and reuse the same transactional ID。The fork keeps markers for metadata-existing `leader=-1` partitions in the unknown-broker retry queue。KF-TXN-008 is `PASSED_CURRENT_SOURCE`；non-Object profile/final aggregate coverage remains open
 > 2026-07-29 transaction-resolution profile 增量：product `2d7091d` adds `f9TransactionResolutionProfileMatrixProcessIntegrationTest` for Object async and all three BookKeeper profiles；together with the original Object-sync task it executes both durable cuts across all five profiles。The run also exposed and closed released-handle false backpressure in `BookKeeperLedgerHandleCache` while retaining bounded rejection for active leases。The matrix passes 66/66 tasks in 6m28s；full BookKeeper tests + Object-sync regression + 146/146 manifest pass 78/78 tasks in 1m40s。KF-TXN-008 now has five-profile P/C/K current-source evidence；only the final aggregate remains open
+> 2026-07-29 mandatory NTC2 五 profile 增量：product `4676c12` extends KF-TXN-016 with `f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest` for Object async and BookKeeper WAL-only/async/sync；together with the fresh Object-sync gate this executes delete/fail-closed/repair and corruption/fail-closed/repair across all five profiles。WAL-only compaction uses projection-free L0 authority without inventing an F4 registration；KCP1 keeps the historical logical `planId` while compressing only an extended decision-source payload under 60 KiB persisted、1 MiB decoded and 4096-source hard limits。The fresh four-profile matrix passes 64/64 tasks in 5m34s and the Object-sync gate passes 73/73 tasks in 1m29s。KF-TXN-016 now has five-profile P/C/K current-source evidence；only the final aggregate remains open
 
 ## 1. Evidence tiers
 
@@ -311,8 +312,7 @@ or completes the durable state before broker `[4]` completes native IO。
 KF-OPS-006/007 are `PASSED_CURRENT_SOURCE` deterministic evidence；the process gates add real cold-restart/takeover partial evidence to
 KF-META-009、KF-APP-005/006、KF-FET-001/006/007/009、KF-TXN-007/011/012/013/014 and
 KF-OPS-003/009/013/017，but those rows remain `PLANNED` where live preemption、timestamp/leader-epoch、
-remaining provider-profile matrix、checkpoint/virtual-segment、non-Object NTC2 fault/repair coverage、
-activation-cut/chaos or aggregate requirements are still absent。
+checkpoint/virtual-segment、activation-cut/chaos or aggregate requirements are still absent。
 ACTIVE steady-state、all six readiness-create/PREPARED-create/ACTIVE-CAS store-publication takeovers and all four initial
 snapshot-proof/capability-aggregation takeovers are now present；actual Oxia transport reset/same-controller-epoch recovery
 is also present。
@@ -546,9 +546,10 @@ hash。Markdown/JSON ID sets must match。
 | KF-TXN-013 | group commit/rebalance/restart/takeover works with native internal topic | product `f9M6KafkaProcessIntegrationTest`（group commit/rebalance/fresh-JVM resume P/K）+ `f9CoordinatorMigrationProcessIntegrationTest`（old broker live、group partition handoff、offset 2 reload、resume/commit 4 P/K current slice）；BookKeeper/profile/final aggregate pending | P,K | M4 |
 | KF-TXN-014 | ongoing transaction coordinator failover resolves from internal topic | product `f9M6KafkaProcessIntegrationTest`（stable open transaction + forced process exit + fresh-JVM abort/next commit P/K partial）+ `f9OngoingTransactionMigrationProcessIntegrationTest`（both brokers live、OPEN COMMIT `[1] -> [2]`、OPEN ABORT `[2] -> [1]`、same-ID continuation P/K current slice）+ both transaction-resolution tasks（all-five-profile data-owner death during marker resolution + same-ID continuation P/C current slice）；coordinator-profile/final aggregate pending | P,K | M4 |
 | KF-TXN-015 | group offset lag does not protect user-topic retention；client observes normal reset/out-of-range | `KafkaGroupRetentionIndependenceTest` | R,P,K | M5 |
-| KF-TXN-016 | mandatory internal-topic NTC2 unavailable blocks coordinator election，no full-source fallback | product deterministic `KafkaInternalTopicNoResurrectionTest` + real `f9MandatoryInternalTopicNtc2ProcessIntegrationTest` delete/corrupt/two exact-repair cycles；fork `NereusListOffsetsLifecycleTest` + `NereusTopicDeltaLifecycleTest`/`BrokerMetadataPublisherTest` ready/election ordering（Object-WAL P/C/K current-source pass；profile/final aggregate pending） | P,C,K | M5 |
+| KF-TXN-016 | mandatory internal-topic NTC2 unavailable blocks coordinator election，no full-source fallback | product deterministic `KafkaInternalTopicNoResurrectionTest` + real `f9MandatoryInternalTopicNtc2ProcessIntegrationTest` and `f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest` delete/corrupt/two exact-repair cycles；fork `NereusListOffsetsLifecycleTest` + `NereusTopicDeltaLifecycleTest`/`BrokerMetadataPublisherTest` ready/election ordering（all-five-profile P/C/K current-source pass；final aggregate pending） | P,C,K | M5 |
 
-Current mandatory-NTC2 evidence（product deterministic base `b6b02f4`、repair/process `0ae8ca9`；functional fork
+Current mandatory-NTC2 evidence（product deterministic base `b6b02f4`、repair/process `0ae8ca9`、five-profile
+matrix `4676c12`；functional fork
 `89b66ab03b`；published locked head `768924da60`）：the product loads the exact binding、caps planning at activated coverage end、resolves the binding digest to
 one gap-free `GenerationReadConstraint` and probes every untrimmed identity with
 `TOPIC_COMPACTED + maxRecords=1 + maxBytes=1` under the open deadline。A later generation failure is not hidden by an
@@ -557,7 +558,8 @@ coordinator topics before installing recovered storage/lookup。Failure leaves z
 pending epoch and calls manager resign，so the ready callback and coordinator `onElection` remain absent。The full
 `f9CompactionPropertyTest` and `phase9M3KafkaForkBridgeCheck` pass。
 
-The real gate starts two live release brokers over one KRaft identity、real Oxia and LocalStack。Broker 1 compacts
+The two real gates start two live release brokers over one KRaft identity、real Oxia and LocalStack；the profile matrix also
+starts one real ZooKeeper/two-bookie authority for the three BookKeeper profiles。Broker 1 compacts
 `__consumer_offsets-0` and commits group offset `1`；the harness discovers physical NTC2 keys by reversing
 `S3ObjectKeyMapper` and snapshots bytes、user metadata、content type and provider CRC。It then executes:
 
@@ -572,9 +574,28 @@ On each failure, durable read handling quarantines the exact physical root and g
 index version/SHA needed to resolve the old binding digest。On each later open, the repair authority verifies HEAD
 length/CRC/ETag plus full-read CRC/content SHA，CAS reactivates the same root/index，recomputes the current wrapper-set digest
 and activates the same coverage with `REPLACE` and a higher activation epoch。The following probe remains constrained to
-that new `TOPIC_COMPACTED` set；the coordinator is elected only after ordinary reassignment completes。Fresh task execution
-passes 73/73 outer tasks in 1m39s and the nested fork release build passes 166/166 actionable tasks。KF-TXN-016 is
-`PASSED_CURRENT_SOURCE` for Object-WAL P/C/K；Object async/BookKeeper profile and final aggregate evidence remain open。
+that new `TOPIC_COMPACTED` set；the coordinator is elected only after ordinary reassignment completes。
+
+The profile matrix repeats both damage/repair cycles for
+`OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT` and
+`BOOKKEEPER_WAL_SYNC_OBJECT`。Together with the original `OBJECT_WAL_SYNC_OBJECT` task this is ten real damage/repair
+scenarios across five profiles。WAL-only must keep its object bucket empty before compaction publication and therefore uses
+`KAFKA_TOPIC_COMPACTION` authority rooted in the ACTIVE/SEALED L0 snapshot；the absence of an F4 materialization registration
+is required, not tolerated generally。Its derived `TOPIC_COMPACTED` positive generation is admitted without weakening the
+COMMITTED-view rule that WAL-only cannot contain a higher generation。BookKeeper primary ranges are added to the same
+`MaterializationSourceProtectionRegistry` used during the two-pass read.
+
+For long BookKeeper decision horizons, ordinary EXS1 remains capped at 64 KiB/128 sources。Only the enclosing KCP1 codec may
+request extended EXS1 at 1 MiB/4096 sources and raw-deflate it behind the versioned `KCS1` header；the complete stored KCP1
+still cannot exceed 60 KiB。Decode rejects bad version、declared length、dictionary、truncation、trailing compressed bytes and
+over-limit expansion。The `kcp1-*` identity hashes the uncompressed logical EXS1 form, so all previously legal plan IDs and
+legacy raw KCP1 bytes remain unchanged；compression implementation details cannot change plan identity。
+
+The fresh four-profile task passes 64/64 outer tasks in 5m34s；its JUnit report records one 310.612-second test with zero
+failures。A following fresh Object-sync run passes 73/73 tasks in 1m29s。The affected core/materialization/Kafka-adapter full
+unit suites pass together, and the codec regression independently proves ordinary EXS1 rejection、extended compressed
+round-trip and legacy raw byte preservation。KF-TXN-016 is `PASSED_CURRENT_SOURCE` for all-five-profile P/C/K；only the
+final aggregate remains open。
 
 Current coordinator-migration evidence（product `7c25d2e`；fork `1cbe8b65a8`）：
 `f9CoordinatorMigrationProcessIntegrationTest` starts node 1 combined controller/broker and node 2 broker-only over one

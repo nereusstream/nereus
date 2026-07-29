@@ -9,6 +9,7 @@
 > 2026-07-29 compaction oracle 增量：fork `c4a0a2d1fa` 新增真实 `KafkaCompactionOracleTest`/support，直接调用 stock `Cleaner.buildOffsetMap/cleanSegments` 并与当前 Nereus 两遍执行器比较 exact record/batch fingerprints；fork `bf8a2946e5` 又把隔离 `0.1.0-f9-dev` modules 标记 changing/zero-cache，保证产品门禁消费刚发布字节。当前 published/source-locked head 是 `bf8a2946e5`
 > 2026-07-29 transaction-marker retry 增量：fork `1e3783458b` 修复 stock `TransactionMarkerChannelManager` 对 existing-but-leaderless partition 的误判。`metadataCache.contains(topicPartition)` 为 true 但 leader endpoint 暂不可用时，marker 进入 `Node.noNode` unknown-broker queue 并随 metadata 更新重试；只有 partition 已不在 metadata 时才完成 skip。新增 focused unit test 与 product `f9TransactionResolutionCutProcessIntegrationTest` 均通过；当前 published/source-locked head 是 `1e3783458b`
 > 2026-07-29 transaction-marker profile 验证增量：product `2d7091d` 复用同一 published fork head，将 before/after-provider process cuts 扩展到 Object async 与全部三种 BookKeeper profile；连同 Object sync 共十个真实场景。该扩展不需要新的 Kafka fork patch，且 52-commit/126-file source lock 保持通过
+> 2026-07-29 mandatory NTC2 profile 验证增量：product `4676c12` 同样不需要新的 fork patch；它将 delete/corrupt/fail-closed/exact-repair/re-election 扩展到 Object async 与三种 BookKeeper profile，连同 fresh Object-sync gate 共五 profile、十个场景。当前 published/source-locked fork head 仍是 `1e3783458b`
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -363,10 +364,11 @@ then reads the pre-handoff transactional record at offset 1 and the post-handoff
 at visible offset 3 and commits offset 4，with final earliest/latest `0/5`。Fresh task execution passes 73/73 actionable
 tasks in 1m07s，and the unchanged cold-restart plus ordinary data-takeover gates pass 74/74 tasks in 1m50s。The task is
 aggregated by `phase9M6KafkaProcessCheck`；ongoing/aborted transaction coordinator takeover is covered by the following
-process gate，and product `b6b02f4` + fork `89b66ab03b` cover deterministic mandatory NTC2 admission。Injected
-transaction-resolution failure、non-Object mandatory-NTC2 profile expansion and full M4 upstream/final gates remain
-separate requirements；the real Object-WAL deletion/corruption + repair/re-election slice is covered by
-`f9MandatoryInternalTopicNtc2ProcessIntegrationTest`。
+process gate，and product `b6b02f4` + fork `89b66ab03b` cover deterministic mandatory NTC2 admission。The real
+five-profile deletion/corruption + repair/re-election slice is covered by
+`f9MandatoryInternalTopicNtc2ProcessIntegrationTest` and
+`f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest`。Full M4 upstream/final gates remain separate
+requirements。
 
 `f9OngoingTransactionMigrationProcessIntegrationTest` closes the adjacent live OPEN-state slice without a fork change。
 The first producer keeps data offset 0 uncommitted while one Admin request moves the user partition and

@@ -1,6 +1,7 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration、all-five-profile before/after-provider abort-marker process cuts、deterministic mandatory NTC2 admission and real Object-WAL NTC2 delete/corrupt + exact repair/re-election pass；stock `LogCleaner` differential now covers stable-prefix keyed/null/tombstone/transaction/control/idempotent semantics，while non-Object NTC2 profile expansion、full compression/OPEN-boundary oracle and real compaction restart remain in progress
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration、all-five-profile before/after-provider abort-marker process cuts、deterministic mandatory NTC2 admission and all-five-profile NTC2 delete/corrupt + exact repair/re-election pass；stock `LogCleaner` differential now covers stable-prefix keyed/null/tombstone/transaction/control/idempotent semantics，while full compression/OPEN-boundary oracle and real compaction restart remain in progress
+> 2026-07-29 mandatory NTC2 五 profile 增量：product `4676c12` adds Object async and BookKeeper WAL-only/async/sync delete/corrupt/repair process coverage；together with the fresh Object-sync gate, KF-TXN-016 now has five-profile P/C/K current-source evidence。WAL-only compaction is rooted in projection-free L0 authority without an F4 registration，and extended KCP1 decision sets use bounded compressed persistence without changing legacy logical plan IDs
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -346,10 +347,13 @@ mapping and snapshotted with bytes/user metadata/content type/provider CRC。Wit
 4. restores the exact snapshots a second time，moves back and reloads committed offset `1` again。
 
 Both brokers stay alive throughout。Each failed open quarantines the exact root/index before coordinator election；each
-repair is followed by an ordinary reassignment rather than a test-only election callback。Fresh execution passes 73/73
-outer tasks in 1m39s after the fork release build passes 166/166 actionable tasks。KF-TXN-016 is therefore
-`PASSED_CURRENT_SOURCE` for Object-WAL P/C/K；Object async/BookKeeper profile expansion and the F9 final aggregate remain
-separate gates。
+repair is followed by an ordinary reassignment rather than a test-only election callback。Product `4676c12` factors this
+exact scenario into one profile runner and adds
+`remainingStorageProfilesBlockInternalTopicElectionUntilNtc2Repair` for `OBJECT_WAL_ASYNC_OBJECT` and all three
+BookKeeper profiles。Together with the original Object-sync task this executes ten real damage/repair scenarios across all
+five profiles。The fresh profile matrix passes 64/64 tasks in 5m34s and the following Object-sync run passes 73/73 tasks in
+1m29s。KF-TXN-016 is therefore `PASSED_CURRENT_SOURCE` for all-five-profile P/C/K；the F9 final aggregate remains a
+separate gate。
 
 Local fork commit `032974067c` adds deterministic ordering evidence at the stock seams：both group and transaction
 coordinator elections remain absent until `AsyncTopicDeltaLifecycle` reports the exact leader ready，and the
@@ -1063,14 +1067,36 @@ Protocol-neutral `ExactSourceSet`/`ExactSourceSetVerifier` now canonicalize a ga
 batch in both passes to match the frozen range、generation/commit version、target identity、payload/schema/projection and
 per-source count/byte accounting。`KafkaCompactionTwoPassExecutor` additionally requires the output source set to be the
 exact prefix of the decision source set，so re-resolution to byte-equivalent alternate targets fails closed。
-`ExactSourceSetCodecV1` now provides a strict bounded `EXS1` image containing every canonical physical target and accounting
-field。`KafkaCompactionPlan`/`KafkaCompactionPlanCodecV1` link the exact output `MaterializationTask` to the full decision
-horizon and freeze binding version、LSO/HW、config/mandatory-coverage facts、transaction/marker snapshot、resource caps and
-all strategy/key/rewrite/message-format identities in a deterministic `kcp1-*` id。Round trip is byte-stable；digest、
-target、enum、length、trailing-byte or task-link drift fails closed，and both durable images are capped at 64 KiB before any
-metadata write。`KafkaCompactionPlanRecordMapper` wraps at most 60 KiB of KCP1 in a SHA-verified
-`KafkaCompactionPlanRecord`；`KafkaCompactionPlanMetadataStore` persists it under the partition keyspace with immutable
-create/idempotent reread/exact-version delete semantics，and rejects a same-ID byte conflict。
+`ExactSourceSetCodecV1` provides a strict bounded `EXS1` image containing every canonical physical target and accounting
+field。Its ordinary public form remains capped at 64 KiB and `MaterializationPolicy.MAX_SOURCE_RANGES`（128）；callers cannot
+raise those defaults。The overload accepting explicit limits is still hard-capped at 1 MiB/4096 sources and is reserved for
+an enclosing codec that supplies its own durable bound。
+
+`KafkaCompactionPlan`/`KafkaCompactionPlanCodecV1` link the exact output `MaterializationTask` to the full decision horizon
+and freeze binding version、LSO/HW、config/mandatory-coverage facts、transaction/marker snapshot、resource caps and all
+strategy/key/rewrite/message-format identities in a deterministic `kcp1-*` id。The plan ID hashes the uncompressed logical
+EXS1 body under the extended hard bounds；therefore every previously legal raw KCP1 keeps the exact historical ID and
+compression-library output cannot change logical identity。
+
+Persistence chooses one of two decision-source encodings：
+
+```text
+legacy raw EXS1:
+  keep byte-for-byte when planId matches the historical raw canonical body
+
+extended KCS1:
+  int32 magic = 0x4b435331
+  uint16 version = 1
+  int32 declaredRawLength (1..1 MiB)
+  raw-deflate(EXS1, nowrap=true, BEST_COMPRESSION)
+```
+
+KCS1 decode rejects unknown version、empty compressed body、invalid declared length、dictionary requirement、truncation、
+no-progress inflation、expanded length mismatch and trailing compressed bytes before invoking extended EXS1 decode。The
+complete persisted KCP1 is still capped at 60 KiB；there is no zip-bomb path from the metadata record to an unbounded
+allocation。`KafkaCompactionPlanRecordMapper` wraps that payload in a SHA-verified `KafkaCompactionPlanRecord`；
+`KafkaCompactionPlanMetadataStore` persists it under the partition keyspace with immutable create/idempotent reread/
+exact-version delete semantics，and rejects a same-ID byte conflict。
 
 `DefaultCommittedSourceSetResolver` now resolves the decision range from the authoritative COMMITTED generation index：
 
@@ -1096,13 +1122,27 @@ farther edge end and canonical UTF-8 index key。
 
 The paginated scan is deliberately not called a snapshot transaction。After selection，every source is reread by
 `(stream, COMMITTED, offsetEnd, generation)` and compared byte-for-byte with its index version/SHA/physical target/accounting。
-The resolver reloads stream and registration authority，requires ACTIVE/SEALED object-materialization profile、matching
-projection and retained bounds，and allows only append-only head/hint progress that cannot change the frozen range。Source
-removal、profile/policy/projection drift or trim entering coverage fails closed。`KafkaCompactionSourceResolver` additionally
-requires KAFKA_RECORD_BATCH sources，derives the output set as an exact prefix ending at `outputCoverage.endOffset` and creates
-the deterministic `TOPIC_KEY_COMPACTION` task。Its mutation guard revalidates this source/head proof before the caller's
-binding/leader guard；`MaterializationTaskStore` then performs its own exact per-generation checks immediately before task
-mutation。A range-only `Candidate` is therefore still not publication authorization。
+The resolver reloads stream authority and normally requires an ACTIVE/SEALED object-materialization profile、matching
+direct/projection registration and retained bounds。`MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION` adds exactly
+one exception：`BOOKKEEPER_WAL_ONLY` must have no F4 materialization registration and no projection；its authority comes from
+the matching L0 stream snapshot and exact BookKeeper generation-zero sources。The normal `DIRECT_STREAM` and
+`PROJECTION_REQUIRED` modes still reject an absent registration，and any registration present for WAL-only compaction is an
+invariant violation。
+
+Source removal、profile/policy/projection drift or trim entering coverage fails closed。`KafkaCompactionSourceResolver`
+additionally requires KAFKA_RECORD_BATCH sources，derives the output set as an exact prefix ending at
+`outputCoverage.endOffset` and creates the deterministic `TOPIC_KEY_COMPACTION` task。Its mutation guard revalidates this
+source/head proof before the caller's binding/leader guard；`DefaultGenerationCommitter` admits registration-free publication
+only when the task is exactly `TOPIC_COMPACTED + TOPIC_KEY_COMPACTION + BOOKKEEPER_WAL_ONLY`，derives the
+`LiveStreamSubject` identity from L0 profile and rejects any projection hint。`KafkaGenerationProtocolActivationGuard`
+revalidates the same ACTIVE/SEALED profile、stream identity and policy version before/after readiness proof。A range-only
+`Candidate` is therefore still not publication authorization。
+
+`KafkaCompactionProductionRuntimeFactory` registers the Object source-protection adapter plus every primary provider's
+`MaterializationSourceProtectionAdapter` in one `MaterializationSourceProtectionRegistry`。BookKeeper ranges are therefore
+protected for both passes just like object slices。`GenerationReadResolver` permits positive generations for
+`TOPIC_COMPACTED` even under WAL-only because that is a derived object view；the unchanged COMMITTED-view branch continues
+to reject a higher generation for primary-WAL-only profiles。
 
 ### 10.4 Two-pass algorithm
 

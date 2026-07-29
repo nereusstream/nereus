@@ -5,11 +5,12 @@
 > 2026-07-29 coordinator migration 增量：`f9CoordinatorMigrationProcessIntegrationTest` 已在两个 live release brokers 闭合 completed group/transaction internal-topic state 的 `[1] -> [2]` recovery/continuation；仍 open 的 M4 coordinator 边界缩小为 ongoing/aborted transaction takeover、mandatory NTC2 与 final/upstream aggregate
 > 2026-07-29 ongoing transaction migration 增量：product `efe782d` 的独立 process gate 已闭合 Object-WAL OPEN transaction 跨双向 coordinator handoff 的 COMMIT/ABORT、LSO、same-ID continuation 与 READ_COMMITTED filtering；仍 open 的 M4 coordinator 边界缩小为 injected resolution failure、mandatory NTC2、profile expansion 与 final/upstream aggregate
 > 2026-07-29 mandatory NTC2 deterministic 增量：product `b6b02f4` + fork `89b66ab03b` 闭合 exact binding-rooted、all-untrimmed-generation、`TOPIC_COMPACTED`-only pre-election gate；physical repair evidence is recorded in the next increment
-> 2026-07-29 mandatory NTC2 process 增量（覆盖上一行末尾）：product `0ae8ca9` + fork `768924da60` 的独立真实进程门完成 Object-WAL activated `__consumer_offsets` NTC2 delete/corrupt、fail-closed election、exact identity verification、root/index CAS repair、coverage `REPLACE` 与两次 ordinary re-election；M4/M5 剩余边界为 injected resolution failure、non-Object profile expansion、DeleteRecords boundary/stock oracle 与 final/upstream aggregate
-> 2026-07-29 retention/DeleteRecords 增量（覆盖上一行的 M5 open wording）：product `77480cb` + fork `bd9963c980` 增加独立 `phase9M5KafkaRetentionOracleCheck`，用 real stock `UnifiedLog.deleteOldSegments()` 对比 time/size/combined/HW/strict-equality/compact-only 结果；`f9DeleteRecordsBoundaryProcessIntegrationTest` 在真实 Object-WAL release broker 上要求 target `3/4/6/-1` 精确映射 low watermark `3/4/6/9`、latest 恒为 `9`、Fetch 首条 offset/value 一致并有 rooted NKC1。KF-RET-001/002/003/006 为 `PASSED_CURRENT_SOURCE`；stock `LogCleaner` differential、injected resolution failure、non-Object NTC2 profile expansion 与 final/upstream aggregate 仍 open
-> 2026-07-29 compaction oracle 增量（覆盖上一行的 `LogCleaner` open wording）：product `666bab1`/`08fe686` + fork `c4a0a2d1fa`/`bf8a2946e5` 增加 `phase9M5KafkaCompactionOracleCheck`，以真实 stock `Cleaner` 比较 keyed/tail/null/tombstone、committed/aborted/control、expired horizon 和 idempotent sparse-batch exact fingerprints；同时修复 null-key 误保留与 required marker 过早 horizon。`phase9M5CompactionCoreCheck` 依赖该任务，fork source lock 为 51 commits/124 files。KF-CMP-001/002/003/004 为 `PASSED_CURRENT_SOURCE`；OPEN/full-format、injected resolution failure、non-Object NTC2 与 final/upstream aggregate 仍 open
+> 2026-07-29 mandatory NTC2 process 增量（覆盖上一行末尾）：product `0ae8ca9` + fork `768924da60` 的独立真实进程门完成 Object-WAL activated `__consumer_offsets` NTC2 delete/corrupt、fail-closed election、exact identity verification、root/index CAS repair、coverage `REPLACE` 与两次 ordinary re-election；本增量当时未覆盖的 profile matrix 由后续 `4676c12` 闭合
+> 2026-07-29 retention/DeleteRecords 增量（覆盖上一行的 M5 open wording）：product `77480cb` + fork `bd9963c980` 增加独立 `phase9M5KafkaRetentionOracleCheck`，用 real stock `UnifiedLog.deleteOldSegments()` 对比 time/size/combined/HW/strict-equality/compact-only 结果；`f9DeleteRecordsBoundaryProcessIntegrationTest` 在真实 Object-WAL release broker 上要求 target `3/4/6/-1` 精确映射 low watermark `3/4/6/9`、latest 恒为 `9`、Fetch 首条 offset/value 一致并有 rooted NKC1。KF-RET-001/002/003/006 为 `PASSED_CURRENT_SOURCE`；stock `LogCleaner` differential、injected resolution failure 与 final/upstream aggregate 仍 open
+> 2026-07-29 compaction oracle 增量（覆盖上一行的 `LogCleaner` open wording）：product `666bab1`/`08fe686` + fork `c4a0a2d1fa`/`bf8a2946e5` 增加 `phase9M5KafkaCompactionOracleCheck`，以真实 stock `Cleaner` 比较 keyed/tail/null/tombstone、committed/aborted/control、expired horizon 和 idempotent sparse-batch exact fingerprints；同时修复 null-key 误保留与 required marker 过早 horizon。`phase9M5CompactionCoreCheck` 依赖该任务，fork source lock 为 51 commits/124 files。KF-CMP-001/002/003/004 为 `PASSED_CURRENT_SOURCE`；OPEN/full-format、injected resolution failure 与 final/upstream aggregate 仍 open
 > 2026-07-29 transaction-resolution cut 增量：product `04e661e` 增加 `f9TransactionResolutionCutProcessIntegrationTest` 和 test-only marker completion agent，fork `1e3783458b` 修复 existing-but-leaderless transaction marker 的 retry routing。双 release broker before/after-provider 强杀、fresh recovery、LSO/READ_COMMITTED 与 same-ID continuation 强制重放通过；门禁进入 `phase9M6KafkaProcessCheck`，source lock 更新为 52 commits/126 files。KF-TXN-008 为 `PASSED_CURRENT_SOURCE`；non-Object profile 与 final/upstream aggregate仍 open
 > 2026-07-29 transaction-resolution profile 增量：product `2d7091d` 增加 `f9TransactionResolutionProfileMatrixProcessIntegrationTest`，以同一 fault seam 覆盖 Object async 与 BookKeeper WAL-only/async/sync 的 before/after-provider cuts；加上原 Object-sync gate 共五 profile、十个真实 release-process 场景。矩阵同时暴露并修复 released BookKeeper read handle 不能在容量压力下 LRU 淘汰的问题；所有 handle 仍被 lease 时保持 `BACKPRESSURE_REJECTED`。矩阵 66/66 tasks、6m28s，BookKeeper 全量单测 + Object-sync gate + manifest 联合回归 78/78 tasks、1m40s。KF-TXN-008 profile requirement closed；final/upstream aggregate remains open
+> 2026-07-29 mandatory NTC2 profile 增量：product `4676c12` 增加 `f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest`，与原 Object-sync gate 合计五 profile、十个 delete/corrupt/fail-closed/exact-repair/re-election 场景。WAL-only 使用 registration-free、projection-free L0 authority；extended KCP1 只压缩 persisted decision-source bytes 并保持旧 planId/raw compatibility。矩阵 64/64 tasks、5m34s，Object-sync 73/73 tasks、1m29s。KF-TXN-016 profile requirement closed；final/upstream aggregate remains open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -781,9 +782,23 @@ same-key byte corruption and a second exact restoration。Both failure legs keep
 repair legs reload committed offset `1` through ordinary reassignment。The task is aggregated by M6 and passes from a clean
 release build against fork `768924da60`。
 
+Product `4676c12` factors that gate into a profile runner and adds
+`f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest` for Object async and BookKeeper WAL-only/async/sync。
+BookKeeper profiles share one real ZooKeeper/two-bookie service but use exact profile-specific authority；each scenario has
+its own Kafka/Nereus cluster and object namespace。The WAL-only branch must not create a materialization registration；
+compaction source resolution、Generation commit and activation proof are instead revalidated from its ACTIVE/SEALED L0
+snapshot，while ordinary direct/projection materialization keeps registration mandatory。The compaction runtime installs
+Object plus BookKeeper source-protection adapters and the derived TOPIC_COMPACTED reader admits its positive generation
+without weakening the COMMITTED WAL-only invariant。
+
+The same increment keeps ordinary EXS1 at 64 KiB/128 sources and permits extended EXS1 only inside KCP1 under 1 MiB/4096
+hard bounds。KCP1 persists an over-limit decision set as versioned KCS1 raw-deflate but computes `kcp1-*` from the
+uncompressed logical body；old legal IDs and raw bytes remain unchanged，and malformed/truncated/trailing/over-expanded
+compressed input fails closed。The four-profile task passes 64/64 tasks in 5m34s；the fresh Object-sync task passes 73/73
+tasks in 1m29s。
+
 The transaction tasks deliberately do not use the `phase9M4Check` completion name；publication snapshot/object round trip、
-non-Object mandatory-NTC2 profile coverage、upstream focused suites
-and the M4 final aggregate are still required before M4 completion。
+upstream focused suites and the M4 final aggregate are still required before M4 completion。
 
 ## 9. F9-M5 — Retention and compaction
 
@@ -1138,9 +1153,9 @@ before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store
 transport reset/same-epoch retry are also covered；the initial snapshot-proof/capability-aggregation four-cut matrix is
 covered as well；the native checkpoint/virtual-segment trim/restart slice、completed coordinator migration and live OPEN
 Object-WAL COMMIT/ABORT migration are covered；the mandatory internal-topic NTC2 deterministic product/fork gate and real
-Object-WAL delete/corrupt + exact repair/re-election gate are covered；the transaction-marker before/after-provider
+five-profile delete/corrupt + exact repair/re-election gates are covered；the transaction-marker before/after-provider
 process-cut gate now covers all five storage profiles and the existing-but-leaderless retry fix is covered；priority
-budgets、non-Object NTC2 profile expansion and broader chaos remain open。
+budgets and broader chaos remain open。
 
 ### Tasks
 
@@ -1157,6 +1172,8 @@ phase9M6CheckpointQuarantineCheck
 :nereus-kafka-adapter:f9OngoingTransactionMigrationProcessIntegrationTest
 :nereus-kafka-adapter:f9TransactionResolutionCutProcessIntegrationTest
 :nereus-kafka-adapter:f9TransactionResolutionProfileMatrixProcessIntegrationTest
+:nereus-kafka-adapter:f9MandatoryInternalTopicNtc2ProcessIntegrationTest
+:nereus-kafka-adapter:f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest
 :nereus-kafka-adapter:f9MultiControllerFailoverProcessIntegrationTest
 :nereus-kafka-adapter:f9ActivationCutFailoverProcessIntegrationTest
 :nereus-kafka-adapter:f9ActivationProofCutFailoverProcessIntegrationTest
