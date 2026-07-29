@@ -40,6 +40,7 @@ import eu.rekawek.toxiproxy.model.ToxicDirection;
 import io.oxia.testcontainers.OxiaContainer;
 import java.io.IOException;
 import java.io.Writer;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -3663,6 +3664,26 @@ class NereusKafkaNativeProcessIntegrationTest {
             Path activationAgent,
             ActivationControllerCut cut
     ) throws Exception {
+        try (PortReservationGroup portReservations =
+                new PortReservationGroup()) {
+            runActivationControllerCutWithReservedPorts(
+                    kafkaHome,
+                    formatScript,
+                    startScript,
+                    activationAgent,
+                    cut,
+                    portReservations);
+        }
+    }
+
+    private void runActivationControllerCutWithReservedPorts(
+            Path kafkaHome,
+            Path formatScript,
+            Path startScript,
+            Path activationAgent,
+            ActivationControllerCut cut,
+            PortReservationGroup portReservations
+    ) throws Exception {
         int processCount = 4;
         int controllerCount = 3;
         String prefix =
@@ -3672,7 +3693,6 @@ class NereusKafkaNativeProcessIntegrationTest {
         Path[] serverLogs = new Path[processCount];
         int[] brokerPorts = new int[processCount];
         int[] controllerPorts = new int[processCount];
-        List<Integer> allocatedPorts = new ArrayList<>();
         for (int index = 0;
                 index < processCount;
                 index++) {
@@ -3696,19 +3716,9 @@ class NereusKafkaNativeProcessIntegrationTest {
                                     + nodeId
                                     + "-server.log");
             brokerPorts[index] =
-                    differentFreePort(
-                            allocatedPorts.stream()
-                                    .mapToInt(Integer::intValue)
-                                    .toArray());
-            allocatedPorts.add(
-                    brokerPorts[index]);
+                    portReservations.reserve();
             controllerPorts[index] =
-                    differentFreePort(
-                            allocatedPorts.stream()
-                                    .mapToInt(Integer::intValue)
-                                    .toArray());
-            allocatedPorts.add(
-                    controllerPorts[index]);
+                    portReservations.reserve();
         }
         String controllerQuorumVoters =
                 "1@127.0.0.1:"
@@ -3832,6 +3842,8 @@ class NereusKafkaNativeProcessIntegrationTest {
             for (int index = 0;
                     index < controllerCount;
                     index++) {
+                portReservations.release(
+                        controllerPorts[index]);
                 nodes[index] =
                         start(
                                 List.of(
@@ -3874,6 +3886,8 @@ class NereusKafkaNativeProcessIntegrationTest {
             Files.createFile(
                     markers[gatedControllerIndex]
                             .arm());
+            portReservations.release(
+                    brokerPorts[3]);
             nodes[3] =
                     start(
                             List.of(
@@ -9818,6 +9832,60 @@ class NereusKafkaNativeProcessIntegrationTest {
             }
         } while (conflict);
         return candidate;
+    }
+
+    private static final class PortReservationGroup implements AutoCloseable {
+        private final Map<Integer, ServerSocket> reservations =
+                new java.util.LinkedHashMap<>();
+
+        private int reserve() throws IOException {
+            ServerSocket socket = new ServerSocket();
+            boolean retained = false;
+            try {
+                socket.setReuseAddress(false);
+                socket.bind(
+                        new InetSocketAddress(
+                                "127.0.0.1",
+                                0));
+                int port = socket.getLocalPort();
+                reservations.put(port, socket);
+                retained = true;
+                return port;
+            } finally {
+                if (!retained) {
+                    socket.close();
+                }
+            }
+        }
+
+        private void release(int port) throws IOException {
+            ServerSocket socket = reservations.remove(port);
+            if (socket == null) {
+                throw new IllegalStateException(
+                        "port " + port + " is not reserved");
+            }
+            socket.close();
+        }
+
+        @Override
+        public void close() throws IOException {
+            IOException failure = null;
+            for (ServerSocket socket : reservations.values()) {
+                try {
+                    socket.close();
+                } catch (IOException closeFailure) {
+                    if (failure == null) {
+                        failure = closeFailure;
+                    } else {
+                        failure.addSuppressed(closeFailure);
+                    }
+                }
+            }
+            reservations.clear();
+            if (failure != null) {
+                throw failure;
+            }
+        }
     }
 
     private static void createBucket(String bucket) {
