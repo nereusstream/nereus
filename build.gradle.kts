@@ -65,6 +65,8 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task.startsWith("phase9M6Kafka")
         || task == "f9M6KafkaProcessIntegrationTest"
         || task == "f9CheckpointTrimRecoveryProcessIntegrationTest"
+        || task == "f9TrimResponseLossProcessIntegrationTest"
+        || task == "f9TrimProfileMatrixProcessIntegrationTest"
         || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
         || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
         || task == "f9MultiControllerFailoverProcessIntegrationTest"
@@ -144,6 +146,8 @@ val dockerBackedSubprojectTasks = mapOf(
         "f9BookKeeperLedgerDeletionProviderIntegrationTest",
         "f9M6KafkaProcessIntegrationTest",
         "f9CheckpointTrimRecoveryProcessIntegrationTest",
+        "f9TrimResponseLossProcessIntegrationTest",
+        "f9TrimProfileMatrixProcessIntegrationTest",
         "f9MultiBrokerTakeoverProcessIntegrationTest",
         "f9MultiControllerFailoverProcessIntegrationTest",
         "f9ActivationCutFailoverProcessIntegrationTest",
@@ -3106,6 +3110,8 @@ tasks.register("phase9M6KafkaProcessCheck") {
         "Run real Oxia + LocalStack + BookKeeper cold-restart, broker/controller takeover, and in-flight fencing acceptance."
     dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9CheckpointTrimRecoveryProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9TrimResponseLossProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9TrimProfileMatrixProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiControllerFailoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9ActivationCutFailoverProcessIntegrationTest")
@@ -3124,6 +3130,7 @@ tasks.register("phase9M6KafkaBookKeeperProcessCheck") {
     group = "verification"
     description =
         "Run focused real BookKeeper three-profile cold-restart, deletion, live-takeover, and in-flight fencing gates."
+    dependsOn(":nereus-kafka-adapter:f9TrimProfileMatrixProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperProfileTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperInFlightTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")

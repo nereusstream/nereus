@@ -24,6 +24,7 @@ val f9ProviderIntegrationTest by sourceSets.creating {
 
 val f9BookKeeperFaultAgent by sourceSets.creating
 val f9ActivationFaultAgent by sourceSets.creating
+val f9TrimFaultAgent by sourceSets.creating
 
 configurations[f9ProviderIntegrationTest.implementationConfigurationName].extendsFrom(
     configurations.testImplementation.get(),
@@ -47,6 +48,7 @@ dependencies {
     add(f9ProviderIntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
     add(f9BookKeeperFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
     add(f9ActivationFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
+    add(f9TrimFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
 }
 
 val f9BookKeeperFaultAgentJar =
@@ -85,6 +87,27 @@ val f9ActivationFaultAgentJar =
         from(f9ActivationFaultAgent.output)
         from({
             configurations[f9ActivationFaultAgent.runtimeClasspathConfigurationName]
+                .map { dependency ->
+                    if (dependency.isDirectory) dependency else zipTree(dependency)
+                }
+        })
+    }
+
+val f9TrimFaultAgentJar =
+    tasks.register<Jar>("f9TrimFaultAgentJar") {
+        group = "build"
+        description =
+            "Build the test-only Java agent that withholds one provider-applied stream-trim completion."
+        archiveFileName.set("nereus-f9-trim-fault-agent.jar")
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        manifest {
+            attributes[
+                "Premain-Class"
+            ] = "com.nereusstream.kafka.testing.agent.TrimCompletionLossAgent"
+        }
+        from(f9TrimFaultAgent.output)
+        from({
+            configurations[f9TrimFaultAgent.runtimeClasspathConfigurationName]
                 .map { dependency ->
                     if (dependency.isDirectory) dependency else zipTree(dependency)
                 }
@@ -258,12 +281,81 @@ tasks.register<Test>("f9CheckpointTrimRecoveryProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9TrimResponseLossProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Lose one provider-applied trim response, kill the broker, and prove fresh-process DeleteRecords convergence."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9TrimFaultAgentJar)
+    shouldRunAfter(tasks.named("f9CheckpointTrimRecoveryProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.trim.fault.agent",
+        layout.buildDirectory.file("libs/nereus-f9-trim-fault-agent.jar").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-trim-response-loss-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "trimResponseLossConvergesAfterForcedRestartWithoutRepeatingTrim",
+        )
+    }
+}
+
+tasks.register<Test>("f9TrimProfileMatrixProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Prove trim response-loss recovery for Object async and all three BookKeeper storage profiles."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9TrimFaultAgentJar)
+    shouldRunAfter(tasks.named("f9TrimResponseLossProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.trim.fault.agent",
+        layout.buildDirectory.file("libs/nereus-f9-trim-fault-agent.jar").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-trim-profile-matrix-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "remainingStorageProfilesConvergeAfterTrimResponseLoss",
+        )
+    }
+}
+
 tasks.register<Test>("f9MultiBrokerTakeoverProcessIntegrationTest") {
     group = "verification"
     description =
         "Run two release Kafka processes through a live RF1 shared-storage leader reassignment."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
-    shouldRunAfter(tasks.named("f9CheckpointTrimRecoveryProcessIntegrationTest"))
+    shouldRunAfter(tasks.named("f9TrimProfileMatrixProcessIntegrationTest"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
     classpath = f9ProviderIntegrationTest.runtimeClasspath
     systemProperty(

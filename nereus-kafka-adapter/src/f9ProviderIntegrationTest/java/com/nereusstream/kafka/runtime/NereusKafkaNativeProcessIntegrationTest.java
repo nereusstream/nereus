@@ -3,6 +3,7 @@ package com.nereusstream.kafka.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nereusstream.api.StableStreamHeadSnapshot;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
 import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceProvisioningCoordinator;
@@ -666,6 +667,383 @@ class NereusKafkaNativeProcessIntegrationTest {
                                 initialRecordCount + 1L,
                                 restartServerLog,
                                 Duration.ofSeconds(30));
+                    }
+                });
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.MINUTES)
+    void trimResponseLossConvergesAfterForcedRestartWithoutRepeatingTrim()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path trimFaultAgent = requiredTrimFaultAgent();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-trim-loss-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path deleteRecordsScript =
+                executable(kafkaHome.resolve("bin/kafka-delete-records.sh"));
+        runTrimResponseLossProfile(
+                kafkaHome,
+                formatScript,
+                startScript,
+                deleteRecordsScript,
+                trimFaultAgent,
+                new TrimResponseLossProfile(
+                        "OBJECT_WAL_SYNC_OBJECT",
+                        "trim-loss-object-sync",
+                        20),
+                null);
+    }
+
+    @Test
+    @Timeout(value = 12, unit = TimeUnit.MINUTES)
+    void remainingStorageProfilesConvergeAfterTrimResponseLoss()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path trimFaultAgent = requiredTrimFaultAgent();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-trim-profile-matrix-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path deleteRecordsScript =
+                executable(kafkaHome.resolve("bin/kafka-delete-records.sh"));
+
+        runTrimResponseLossProfile(
+                kafkaHome,
+                formatScript,
+                startScript,
+                deleteRecordsScript,
+                trimFaultAgent,
+                new TrimResponseLossProfile(
+                        "OBJECT_WAL_ASYNC_OBJECT",
+                        "trim-loss-object-async",
+                        21),
+                null);
+
+        int zooKeeperPort = freePort();
+        String metadataServiceUri =
+                "zk+longhierarchical://127.0.0.1:"
+                        + zooKeeperPort
+                        + "/ledgers";
+        try (LocalBookKeeper ignored = startBookKeeper(zooKeeperPort)) {
+            for (TrimResponseLossProfile profile :
+                    List.of(
+                            new TrimResponseLossProfile(
+                                    "BOOKKEEPER_WAL_ONLY",
+                                    "trim-loss-bookkeeper-only",
+                                    22),
+                            new TrimResponseLossProfile(
+                                    "BOOKKEEPER_WAL_ASYNC_OBJECT",
+                                    "trim-loss-bookkeeper-async",
+                                    23),
+                            new TrimResponseLossProfile(
+                                    "BOOKKEEPER_WAL_SYNC_OBJECT",
+                                    "trim-loss-bookkeeper-sync",
+                                    24))) {
+                runTrimResponseLossProfile(
+                        kafkaHome,
+                        formatScript,
+                        startScript,
+                        deleteRecordsScript,
+                        trimFaultAgent,
+                        profile,
+                        metadataServiceUri);
+            }
+        }
+    }
+
+    private void runTrimResponseLossProfile(
+            Path kafkaHome,
+            Path formatScript,
+            Path startScript,
+            Path deleteRecordsScript,
+            Path trimFaultAgent,
+            TrimResponseLossProfile profile,
+            String metadataServiceUri
+    ) throws Exception {
+        String fixtureToken = profile.fixtureToken();
+        Path config = root.resolve(fixtureToken + "-server.properties");
+        Path formatLog = root.resolve(fixtureToken + "-format.log");
+        Path firstServerLog = root.resolve(fixtureToken + "-first-server.log");
+        Path restartServerLog = root.resolve(fixtureToken + "-restart-server.log");
+        Path firstDeleteOffsets = root.resolve(fixtureToken + "-first-offsets.json");
+        Path firstDeleteLog = root.resolve(fixtureToken + "-first-delete.log");
+        Path retryDeleteOffsets = root.resolve(fixtureToken + "-retry-offsets.json");
+        Path retryDeleteLog = root.resolve(fixtureToken + "-retry-delete.log");
+        Path agentArm = root.resolve(fixtureToken + "-agent-arm");
+        Path agentCaptured = root.resolve(fixtureToken + "-agent-captured");
+        Path agentApplied = root.resolve(fixtureToken + "-agent-applied");
+        Path agentInstalled = root.resolve(fixtureToken + "-agent-installed");
+        String bucket =
+                "n-trim-"
+                        + profile.authoritySeed()
+                        + "-"
+                        + UUID.randomUUID();
+        String topic = fixtureToken + "-process-" + UUID.randomUUID();
+        int brokerPort = freePort();
+        int controllerPort = differentFreePort(brokerPort);
+        String bootstrapServers = "127.0.0.1:" + brokerPort;
+        BookKeeperProcessConfiguration bookKeeper = null;
+        if (profile.storageProfile().startsWith("BOOKKEEPER_WAL_")) {
+            if (metadataServiceUri == null
+                    || metadataServiceUri.isBlank()) {
+                throw new IllegalArgumentException(
+                        "BookKeeper trim profile requires a metadata service URI");
+            }
+            Path passwordFile =
+                    root.resolve(fixtureToken + "-password.bin");
+            Files.write(
+                    passwordFile,
+                    ("f9-" + fixtureToken + "-process-password")
+                            .getBytes(StandardCharsets.UTF_8));
+            bookKeeper =
+                    bookKeeperProcessConfiguration(
+                            metadataServiceUri,
+                            fixtureToken,
+                            passwordFile,
+                            profile.authoritySeed(),
+                            1);
+            seedBookKeeperAuthority(
+                    oxiaConfiguration(),
+                    bookKeeperWalConfiguration(
+                            bookKeeper,
+                            profile.storageProfile()
+                                    .equals(
+                                            "BOOKKEEPER_WAL_ASYNC_OBJECT")),
+                    bookKeeper,
+                    Clock.systemUTC());
+        } else if (metadataServiceUri != null) {
+            throw new IllegalArgumentException(
+                    "Object-WAL trim profile cannot accept BookKeeper metadata");
+        }
+        String nereusCluster = writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                root.resolve(fixtureToken + "-kafka-log"),
+                root.resolve(fixtureToken + "-metadata-log"),
+                root.resolve(fixtureToken + "-cache"),
+                profile.storageProfile(),
+                bookKeeper);
+        overrideConfiguration(
+                config,
+                Map.of(
+                        "nereus.kafka.storage.session.ttl.ms",
+                        "90000",
+                        "nereus.kafka.storage.session.renew.interval.ms",
+                        "30000"));
+
+        createBucket(bucket);
+        formatStorage(formatScript, kafkaHome, config, formatLog);
+
+        TopicPartition partition = new TopicPartition(topic, 0);
+        int initialRecordCount = 6;
+        long trimmedOffset = 3;
+        List<byte[]> values = new ArrayList<>(initialRecordCount);
+        for (int offset = 0; offset < initialRecordCount; offset++) {
+            byte[] value = new byte[600 * 1024];
+            java.util.Arrays.fill(value, (byte) (offset + 1));
+            values.add(value);
+        }
+        AtomicReference<KafkaPartitionId> durablePartition = new AtomicReference<>();
+        AtomicReference<Process> firstDeletion = new AtomicReference<>();
+        AtomicReference<TrimStateEvidence> appliedTrim = new AtomicReference<>();
+        String agentOptions =
+                trimFaultAgentOptions(
+                        trimFaultAgent,
+                        trimmedOffset,
+                        agentArm,
+                        agentCaptured,
+                        agentApplied,
+                        agentInstalled);
+
+        try {
+            runBrokerWithProcess(
+                    startScript,
+                    kafkaHome,
+                    config,
+                    formatLog,
+                    firstServerLog,
+                    bootstrapServers,
+                    StopMode.FORCE,
+                    broker -> {
+                        awaitMarker(
+                                agentInstalled,
+                                broker,
+                                firstServerLog,
+                                Duration.ofSeconds(30));
+                        try (Admin admin =
+                                Admin.create(checkpointAdminProperties(bootstrapServers))) {
+                            NewTopic created = new NewTopic(topic, 1, (short) 1);
+                            created.configs(Map.of(
+                                    "cleanup.policy", "delete",
+                                    "segment.bytes", "1048576"));
+                            admin.createTopics(List.of(created))
+                                    .all()
+                                    .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                            for (int offset = 0; offset < initialRecordCount; offset++) {
+                                RecordMetadata produced = produce(
+                                        bootstrapServers,
+                                        topic,
+                                        ("trim-loss-key-" + offset)
+                                                .getBytes(StandardCharsets.UTF_8),
+                                        values.get(offset));
+                                assertThat(produced.offset()).isEqualTo(offset);
+                            }
+                            assertOffsets(admin, partition, 0, initialRecordCount);
+
+                            KafkaPartitionId partitionId = kafkaPartitionId(
+                                    bootstrapServers,
+                                    partition,
+                                    topic);
+                            durablePartition.set(partitionId);
+                            Files.createFile(agentArm);
+                            Process deletion = startNativeDeleteRecords(
+                                    deleteRecordsScript,
+                                    kafkaHome,
+                                    bootstrapServers,
+                                    partition,
+                                    trimmedOffset,
+                                    firstDeleteOffsets,
+                                    firstDeleteLog);
+                            firstDeletion.set(deletion);
+                            assertThat(awaitMarker(
+                                            agentApplied,
+                                            broker,
+                                            firstServerLog,
+                                            Duration.ofSeconds(45))
+                                            .strip())
+                                    .isEqualTo(Long.toString(trimmedOffset));
+                            assertThat(Files.exists(agentCaptured)).isTrue();
+                            assertThat(deletion.isAlive())
+                                    .as("DeleteRecords must still await the lost trim completion")
+                                    .isTrue();
+                            appliedTrim.set(
+                                    awaitAppliedTrimResponseLoss(
+                                            nereusCluster,
+                                            partitionId,
+                                            0,
+                                            trimmedOffset,
+                                            initialRecordCount,
+                                            firstServerLog,
+                                            Duration.ofSeconds(30)));
+                        }
+                    },
+                    Map.of("KAFKA_OPTS", agentOptions));
+        } finally {
+            Process deletion = firstDeletion.get();
+            if (deletion != null && deletion.isAlive()) {
+                deletion.destroyForcibly();
+                deletion.waitFor(10, TimeUnit.SECONDS);
+            }
+        }
+
+        assertThat(durablePartition.get()).isNotNull();
+        assertThat(appliedTrim.get()).isNotNull();
+        assertThat(appliedTrim.get().head().trimOffset()).isEqualTo(trimmedOffset);
+        assertThat(appliedTrim.get().observedLogStartOffset()).isZero();
+
+        runBrokerWithProcess(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                restartServerLog,
+                bootstrapServers,
+                StopMode.NORMAL,
+                broker -> {
+                    try (Admin admin =
+                            Admin.create(checkpointAdminProperties(bootstrapServers))) {
+                        assertOffsets(
+                                admin,
+                                partition,
+                                trimmedOffset,
+                                initialRecordCount);
+                        assertThat(fetch(
+                                                bootstrapServers,
+                                                partition,
+                                                trimmedOffset,
+                                                restartServerLog)
+                                        .value())
+                                .isEqualTo(values.get((int) trimmedOffset));
+                        KafkaCheckpointReferenceRecord checkpoint =
+                                awaitTrimmedCheckpoint(
+                                        nereusCluster,
+                                        durablePartition.get(),
+                                        0,
+                                        trimmedOffset,
+                                        initialRecordCount,
+                                        restartServerLog,
+                                        Duration.ofSeconds(30));
+                        TrimStateEvidence beforeRetry =
+                                loadTrimState(
+                                        nereusCluster,
+                                        durablePartition.get());
+                        Set<String> checkpointObjectsBeforeRetry =
+                                checkpointObjectKeys(bucket);
+
+                        Process retry = startNativeDeleteRecords(
+                                deleteRecordsScript,
+                                kafkaHome,
+                                bootstrapServers,
+                                partition,
+                                trimmedOffset,
+                                retryDeleteOffsets,
+                                retryDeleteLog);
+                        try {
+                            awaitNativeDeleteRecords(
+                                    retry,
+                                    partition,
+                                    trimmedOffset,
+                                    retryDeleteLog,
+                                    broker,
+                                    restartServerLog);
+                        } finally {
+                            if (retry.isAlive()) {
+                                retry.destroyForcibly();
+                                retry.waitFor(10, TimeUnit.SECONDS);
+                            }
+                        }
+
+                        TrimStateEvidence afterRetry =
+                                loadTrimState(
+                                        nereusCluster,
+                                        durablePartition.get());
+                        assertNoRepeatedTrim(
+                                beforeRetry,
+                                afterRetry,
+                                checkpoint);
+                        assertThat(checkpointObjectKeys(bucket))
+                                .as("idempotent retry must not publish another checkpoint object")
+                                .containsExactlyInAnyOrderElementsOf(
+                                        checkpointObjectsBeforeRetry);
+
+                        byte[] appendedValue = new byte[600 * 1024];
+                        java.util.Arrays.fill(appendedValue, (byte) 7);
+                        RecordMetadata appended = produce(
+                                bootstrapServers,
+                                topic,
+                                "trim-loss-key-6".getBytes(StandardCharsets.UTF_8),
+                                appendedValue);
+                        assertThat(appended.offset()).isEqualTo(initialRecordCount);
+                        assertThat(fetch(
+                                                bootstrapServers,
+                                                partition,
+                                                initialRecordCount,
+                                                restartServerLog)
+                                        .value())
+                                .isEqualTo(appendedValue);
+                        assertOffsets(
+                                admin,
+                                partition,
+                                trimmedOffset,
+                                initialRecordCount + 1L);
                     }
                 });
     }
@@ -4429,6 +4807,148 @@ class NereusKafkaNativeProcessIntegrationTest {
                 lastFailure);
     }
 
+    private static TrimStateEvidence awaitAppliedTrimResponseLoss(
+            String nereusCluster,
+            KafkaPartitionId partitionId,
+            long checkpointLogStartOffset,
+            long durableTrimOffset,
+            long stableEndOffset,
+            Path serverLog,
+            Duration timeout
+    ) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        Throwable lastFailure = null;
+        while (System.nanoTime() < deadline) {
+            try {
+                TrimStateEvidence evidence =
+                        loadTrimState(
+                                nereusCluster,
+                                partitionId);
+                Optional<KafkaCheckpointReferenceRecord> checkpoint =
+                        evidence.checkpoints().stream()
+                                .filter(reference ->
+                                        reference.checkpointOffset()
+                                                        == stableEndOffset
+                                                && reference
+                                                                .logStartOffsetAtCheckpoint()
+                                                        == checkpointLogStartOffset)
+                                .findFirst();
+                if (checkpoint.isPresent()
+                        && evidence.head().trimOffset()
+                                == durableTrimOffset
+                        && evidence.head().committedEndOffset()
+                                == stableEndOffset
+                        && evidence.observedLogStartOffset()
+                                == checkpointLogStartOffset
+                        && evidence.observedStableEndOffset()
+                                >= checkpoint.orElseThrow()
+                                        .checkpointOffset()
+                        && evidence.observedStableEndOffset()
+                                <= stableEndOffset) {
+                    return evidence;
+                }
+                lastFailure =
+                        new AssertionError(
+                                "expected provider-applied/caller-unobserved trim "
+                                        + durableTrimOffset
+                                        + " with checkpoint window "
+                                        + checkpointLogStartOffset
+                                        + "/"
+                                        + stableEndOffset
+                                        + " but observed "
+                                        + evidence);
+            } catch (Throwable failure) {
+                lastFailure = failure;
+            }
+            pauseForProviderState(
+                    "provider-applied trim response loss");
+        }
+        throw new AssertionError(
+                "Kafka provider-applied trim response loss did not converge before the deadline:\n"
+                        + readLog(serverLog),
+                lastFailure);
+    }
+
+    private static TrimStateEvidence loadTrimState(
+            String nereusCluster,
+            KafkaPartitionId partitionId
+    ) {
+        OxiaClientConfiguration oxia = oxiaConfiguration();
+        Clock clock = Clock.systemUTC();
+        try (SharedOxiaClientRuntime shared =
+                        SharedOxiaClientRuntime.connect(
+                                oxia,
+                                clock);
+                OxiaJavaClientMetadataStore metadata =
+                        OxiaJavaClientMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        shared,
+                                        clock);
+                OxiaJavaKafkaPartitionMetadataStore partitions =
+                        OxiaJavaKafkaPartitionMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        shared,
+                                        nereusCluster,
+                                        partitionId
+                                                .kafkaClusterId())) {
+            var binding =
+                    partitions.get(partitionId)
+                            .join()
+                            .orElseThrow(
+                                    () ->
+                                            new AssertionError(
+                                                    "Kafka binding disappeared while reading trim state"));
+            var value = binding.value();
+            StableStreamHeadSnapshot head =
+                    metadata.getStableStreamHeadSnapshot(
+                                    nereusCluster,
+                                    new StreamId(
+                                            value.streamId()))
+                            .join();
+            return new TrimStateEvidence(
+                    head,
+                    binding.metadataVersion(),
+                    value.observedLogStartOffset(),
+                    value.observedStableEndOffset(),
+                    List.copyOf(
+                            value.checkpointReferences()));
+        }
+    }
+
+    private static void assertNoRepeatedTrim(
+            TrimStateEvidence before,
+            TrimStateEvidence after,
+            KafkaCheckpointReferenceRecord checkpoint
+    ) {
+        assertThat(after.head().trimOffset())
+                .isEqualTo(before.head().trimOffset());
+        assertThat(after.head().committedEndOffset())
+                .isEqualTo(before.head().committedEndOffset());
+        assertThat(after.head().cumulativeSize())
+                .isEqualTo(before.head().cumulativeSize());
+        assertThat(after.head().commitVersion())
+                .isEqualTo(before.head().commitVersion());
+        assertThat(after.head().lastCommitId())
+                .isEqualTo(before.head().lastCommitId());
+        assertThat(after.head().metadataVersion())
+                .as("idempotent DeleteRecords retry must not issue another stream-head trim CAS")
+                .isEqualTo(before.head().metadataVersion());
+        assertThat(after.head().durableHeadSha256())
+                .isEqualTo(before.head().durableHeadSha256());
+        assertThat(after.bindingMetadataVersion())
+                .as("idempotent retry must not rewrite the binding")
+                .isEqualTo(before.bindingMetadataVersion());
+        assertThat(after.observedLogStartOffset())
+                .isEqualTo(before.observedLogStartOffset());
+        assertThat(after.observedStableEndOffset())
+                .isEqualTo(before.observedStableEndOffset());
+        assertThat(after.checkpoints())
+                .containsExactlyElementsOf(before.checkpoints())
+                .contains(checkpoint);
+    }
+
     private static StreamId awaitPartitionStreamId(
             OxiaJavaKafkaPartitionMetadataStore partitions,
             KafkaPartitionId partitionId,
@@ -5401,10 +5921,34 @@ class NereusKafkaNativeProcessIntegrationTest {
             StopMode stopMode,
             BrokerProcessAssertions assertions
     ) throws Exception {
+        runBrokerWithProcess(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                serverLog,
+                bootstrapServers,
+                stopMode,
+                assertions,
+                Map.of());
+    }
+
+    private static void runBrokerWithProcess(
+            Path startScript,
+            Path kafkaHome,
+            Path config,
+            Path formatLog,
+            Path serverLog,
+            String bootstrapServers,
+            StopMode stopMode,
+            BrokerProcessAssertions assertions,
+            Map<String, String> environmentOverrides
+    ) throws Exception {
         Process broker = start(
                 List.of(startScript.toString(), config.toString()),
                 kafkaHome,
-                serverLog);
+                serverLog,
+                environmentOverrides);
         Throwable failure = null;
         try {
             awaitBroker(bootstrapServers, broker, serverLog);
@@ -6414,6 +6958,24 @@ class NereusKafkaNativeProcessIntegrationTest {
         return agent;
     }
 
+    private static Path requiredTrimFaultAgent() {
+        String configured =
+                System.getProperty(
+                        "nereus.kafka.trim.fault.agent");
+        assertThat(configured)
+                .as("nereus.kafka.trim.fault.agent")
+                .isNotBlank();
+        Path agent =
+                Path.of(configured)
+                        .toAbsolutePath()
+                        .normalize();
+        assertThat(agent)
+                .as("configured trim fault-agent JAR")
+                .exists()
+                .isRegularFile();
+        return agent;
+    }
+
     private static String activationFaultAgentOptions(
             Path agent,
             ActivationControllerCut cut,
@@ -6505,6 +7067,57 @@ class NereusKafkaNativeProcessIntegrationTest {
                 + release
                 + ",installed="
                 + installed;
+    }
+
+    private static String trimFaultAgentOptions(
+            Path agent,
+            long target,
+            Path arm,
+            Path captured,
+            Path applied,
+            Path installed
+    ) {
+        Map<String, String> arguments =
+                Map.of(
+                        "target",
+                        Long.toString(target),
+                        "arm",
+                        arm.toString(),
+                        "captured",
+                        captured.toString(),
+                        "applied",
+                        applied.toString(),
+                        "installed",
+                        installed.toString());
+        arguments.forEach(
+                (name, value) ->
+                        assertThat(value)
+                                .as(
+                                        "trim fault-agent "
+                                                + name
+                                                + " argument")
+                                .doesNotContain(
+                                        ",",
+                                        "="));
+        assertThat(agent.toString())
+                .as("trim fault-agent JAR path")
+                .doesNotContain(" ");
+        return "-javaagent:"
+                + agent
+                + "="
+                + arguments.entrySet()
+                        .stream()
+                        .sorted(
+                                Map.Entry
+                                        .comparingByKey())
+                        .map(
+                                entry ->
+                                        entry.getKey()
+                                                + "="
+                                                + entry.getValue())
+                        .collect(
+                                java.util.stream.Collectors
+                                        .joining(","));
     }
 
     private static Path extractReleaseDistribution(
@@ -7153,6 +7766,37 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private static Set<String> checkpointObjectKeys(
+            String bucket
+    ) {
+        try (S3AsyncClient admin = s3Client()) {
+            Set<String> keys = new java.util.HashSet<>();
+            String continuationToken = null;
+            do {
+                var response =
+                        admin.listObjectsV2(
+                                        ListObjectsV2Request.builder()
+                                                .bucket(bucket)
+                                                .continuationToken(
+                                                        continuationToken)
+                                                .build())
+                                .join();
+                response.contents().stream()
+                        .map(value -> value.key())
+                        .filter(value ->
+                                value.contains(
+                                        "/kafka/checkpoints/v1/"))
+                        .filter(value -> value.endsWith(".nkc"))
+                        .forEach(keys::add);
+                continuationToken =
+                        response.isTruncated()
+                                ? response.nextContinuationToken()
+                                : null;
+            } while (continuationToken != null);
+            return Set.copyOf(keys);
+        }
+    }
+
     private static Set<String> walObjectKeys(String bucket) {
         try (S3AsyncClient admin = s3Client()) {
             return admin.listObjectsV2(
@@ -7595,6 +8239,30 @@ class NereusKafkaNativeProcessIntegrationTest {
             String reservationId,
             long ledgerId,
             long entryId) {
+    }
+
+    private record TrimStateEvidence(
+            StableStreamHeadSnapshot head,
+            long bindingMetadataVersion,
+            long observedLogStartOffset,
+            long observedStableEndOffset,
+            List<KafkaCheckpointReferenceRecord> checkpoints) {
+    }
+
+    private record TrimResponseLossProfile(
+            String storageProfile,
+            String fixtureToken,
+            int authoritySeed) {
+        private TrimResponseLossProfile {
+            if (storageProfile == null
+                    || storageProfile.isBlank()
+                    || fixtureToken == null
+                    || fixtureToken.isBlank()
+                    || authoritySeed <= 0) {
+                throw new IllegalArgumentException(
+                        "invalid trim response-loss profile");
+            }
+        }
     }
 
     private record ControllerQuorumEvidence(
