@@ -23,6 +23,11 @@
 > distinct fencing tokens、empty reassignments and exact old-bootstrap/new-authority continuation。Fresh root rerun passes
 > 75/75 tasks in 59s；the owner reports one test、zero skipped、zero failures in 37.373s。KF-SCL-006 moves to
 > `IMPLEMENTED_NOT_RUN`；KF-SCL-007..010 remain `PLANNED`
+> 2026-07-30 M7 provider-chaos slice：product `main@d6c1de0` expands `phase9ChaosCheck` with canonical
+> `scenarioKfScl007` plus the Object-sync and remaining-four-profile trim response-loss owners。The gate covers actual
+> Oxia transport reset、fresh controller/broker recovery and provider-applied/caller-unobserved trim across Object
+> sync/async and BookKeeper WAL-only/async/sync。Fresh root rerun passes 80/80 tasks in 5m26s；four process suites report
+> zero skipped and zero failures。KF-SCL-007 moves to `IMPLEMENTED_NOT_RUN`；KF-SCL-008..010 remain `PLANNED`
 
 ## 1. Evidence tiers
 
@@ -796,7 +801,7 @@ composition/restart evidence only；the real-provider fresh-process restart tier
 | KF-SCL-004 | ranged count near Integer.MAX_VALUE uses checked metadata math without per-record allocation | product `KafkaRangedCountLimitTest.scenarioKfScl004` through `phase9ScaleCheck`（one physical byte/`Integer.MAX_VALUE` records and checked next-record/offset overflow；focused current-source pass，final aggregate pending） | D,M | M7 |
 | KF-SCL-005 | 128-source/million-record NCP2/NTC2 task respects memory/spill/source protection | product `KafkaMaterializationScaleIntegrationTest.scenarioKfScl005` through `phase9ScaleCheck`（128 sources/1,048,576 records/2,048 survivors/64 KiB winner budget/positive spill/256 source closes/zero staging leak；focused current-source pass，final aggregate pending） | R,C | M7 |
 | KF-SCL-006 | repeated leader churn across three brokers never accepts stale-term write/publication | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl006` through `phase9ChaosCheck`（three live release brokers、six `1→2→3→1→2→3→1` RF1 handoffs、monotonic leader/binding/session authority、distinct token、old-bootstrap exact continuation；focused current-source pass，final aggregate pending） | P,C | M7 |
-| KF-SCL-007 | Oxia/Object/BK/network response-loss matrix converges after fresh process restart | `KafkaProviderChaosIntegrationTest` | P,C | M7 |
+| KF-SCL-007 | Oxia/Object/BK/network response-loss matrix converges after fresh process restart | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl007` through `phase9ChaosCheck`，combined with `f9TrimResponseLossProcessIntegrationTest` and `f9TrimProfileMatrixProcessIntegrationTest`（actual Oxia reset + fresh controller/broker；provider-applied trim response loss/no-repeat across Object sync/async and all three BookKeeper profiles；focused current-source pass，final aggregate pending） | P,C | M7 |
 | KF-SCL-008 | supported Kafka client/protocol versions pass Produce/Fetch/group/txn/admin compatibility | `KafkaClientCompatibilitySuite` | P,K | M7 |
 | KF-SCL-009 | performance report records per-profile latency/throughput/recovery/resource baselines without skipped samples | `KafkaNativePerformanceGate` | P,A | M7 |
 | KF-SCL-010 | clean `phase9FinalCheck --rerun-tasks` maps every Markdown/JSON ID to one passing result and exact sources | `Phase9EvidenceAggregatorTest` | A | M7 |

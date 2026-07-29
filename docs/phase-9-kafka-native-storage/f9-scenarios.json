@@ -3436,8 +3436,8 @@
     {
       "id": "KF-SCL-007",
       "milestone": "F9-M7",
-      "task": "phase9M7FinalCheck",
-      "testClass": "KafkaProviderChaosIntegrationTest",
+      "task": "phase9ChaosCheck",
+      "testClass": "NereusKafkaNativeProcessIntegrationTest",
       "testMethod": "scenarioKfScl007",
       "scenario": "Oxia/Object/BK/network response-loss matrix converges after fresh process restart",
       "evidenceTier": [
@@ -3457,7 +3457,7 @@
       "gates": [
         "F9-M7"
       ],
-      "status": "PLANNED"
+      "status": "IMPLEMENTED_NOT_RUN"
     },
     {
       "id": "KF-SCL-008",

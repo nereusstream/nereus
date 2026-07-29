@@ -1,5 +1,13 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
+> 2026-07-30 M7 provider-chaos slice：product `main@d6c1de0` makes `scenarioKfScl007` the canonical actual-Oxia-network
+> and fresh-controller/broker restart owner，and expands `phase9ChaosCheck` with Object sync/async plus BookKeeper
+> WAL-only/async/sync provider-applied trim response-loss recovery。The Oxia path proves activation retry after a real
+> Toxiproxy reset and exact offsets `0/2` across fresh processes；the five profile paths prove same-target no-repeat trim
+> and continued IO after caller-unobserved completion。Fresh root rerun passes 80/80 tasks in 5m26s；all four process
+> tests report zero skipped and zero failures。KF-SCL-007 is `IMPLEMENTED_NOT_RUN` until final aggregation；
+> KF-SCL-008..010 remain open
+
 > 2026-07-30 M7 leader-chaos slice：product `main@d9f8ccf` adds `scenarioKfScl006` and root
 > `phase9ChaosCheck`。Three real release brokers complete six RF1 handoffs `1→2→3→1→2→3→1` with every previous owner
 > left alive；each handoff advances the KRaft/binding/append-session authority，changes the fencing token，leaves no

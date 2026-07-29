@@ -1,5 +1,15 @@
 # Nereus
 
+F9 current-source provider-chaos update（2026-07-30）：product `main@d6c1de0` extends
+`NereusKafkaNativeProcessIntegrationTest.scenarioKfScl007` and expands root `phase9ChaosCheck` into the complete
+Oxia/Object/BookKeeper response-loss matrix。The canonical owner performs an actual Toxiproxy connection reset during
+first activation，recovers the same controller epoch，then starts a fresh controller and broker from the same durable
+state and proves offsets `0/2` around the restart。The same root gate also injects provider-applied/caller-unobserved trim
+completion for Object sync/async and BookKeeper WAL-only/async/sync，forces fresh-process recovery and rejects a repeated
+physical trim before continuing IO。Fresh `phase9ChaosCheck --rerun-tasks` passes 80/80 tasks in 5m26s；all four process
+owners report zero skipped and zero failures。KF-SCL-007 is `IMPLEMENTED_NOT_RUN` until the final aggregate；
+compatibility、performance reporting and the evidence aggregator remain open。
+
 F9 current-source leader-chaos update（2026-07-30）：product `main@d9f8ccf` adds
 `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl006` and root `phase9ChaosCheck`。Three live release brokers
 execute six RF1 handoffs `1→2→3→1→2→3→1` while every previous owner remains alive。Each round requires monotonic KRaft

@@ -1,5 +1,13 @@
 # Future 9 — Native Kafka Shared-Storage Integration
 
+> 2026-07-30 F9-M7 provider-chaos slice：product `main@d6c1de0` makes
+> `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl007` the canonical Oxia network/fresh-process owner and expands
+> `phase9ChaosCheck` with Object sync/async plus BookKeeper WAL-only/async/sync trim response-loss tasks。The Oxia cut
+> resets the real transport during activation，recovers，then restarts both controller and broker from durable state；
+> each provider cut loses the caller completion after the trim has applied and requires a fresh process to converge
+> without repeating the physical trim。Fresh root rerun passes 80/80 tasks in 5m26s with four tests、zero skipped and zero
+> failures。SCL007 is `IMPLEMENTED_NOT_RUN`；SCL008–010 and the clean final aggregate remain open
+
 > 2026-07-30 F9-M7 leader-chaos slice：product `main@d9f8ccf` adds canonical
 > `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl006` behind `phase9ChaosCheck`。Three live release brokers run
 > six RF1 transitions `1→2→3→1→2→3→1`；each round requires a higher KRaft leader epoch、higher Oxia binding epoch、

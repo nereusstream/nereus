@@ -23,6 +23,10 @@
 > KRaft/binding/session authority、new fencing tokens、no residual reassignment and one exact continuation append
 > bootstrapped through the previous owner on every round。Fresh root rerun passes 75/75 tasks in 59s。SCL006 is
 > `IMPLEMENTED_NOT_RUN` until final aggregation；provider/network chaos and SCL007–010 remain open
+> 2026-07-30 M7 provider-chaos slice（覆盖上一行的 provider/network open wording）：product `main@d6c1de0` makes
+> `scenarioKfScl007` the canonical actual-Oxia-network/fresh-process owner and composes Object sync/async plus all three
+> BookKeeper profiles in `phase9ChaosCheck`。Fresh root rerun passes 80/80 tasks in 5m26s with no skipped/failed tests。
+> SCL007 is `IMPLEMENTED_NOT_RUN` until final aggregation；SCL008–010 remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -1338,6 +1342,41 @@ Fresh `./gradlew phase9ChaosCheck --rerun-tasks` passes 75/75 tasks in 59s；the
 zero skipped、zero failures in 37.373s。The root gate includes the manifest/product/fork source locks and the isolated
 F9 development artifact/release build。This closes the focused repeated-leader slice only；the provider/network
 response-loss matrix required by KF-SCL-007 remains separate。
+
+### Implemented provider/network response-loss slice at `main@d6c1de0`
+
+`phase9ChaosCheck` now additionally owns KF-SCL-007 through one canonical Oxia-network owner and two existing
+provider-response-loss owners：
+
+- `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl007` starts a dedicated real KRaft controller、one release
+  broker、real Oxia behind Toxiproxy and LocalStack Object storage。It resets the live Oxia connection during first
+  activation and requires typed retry to recover in the same controller epoch；
+- after recovery，the canonical test creates a topic and proves offset `0` through Produce/Fetch/ListOffsets，normally
+  stops the broker，kills the controller，starts a fresh controller against the same metadata directory and requires a
+  higher controller leader epoch，then starts a fresh broker against the same log/cache directories；
+- the fresh processes must reconcile the existing ACTIVE activation，Fetch the original offset `0`，commit offset `1`
+  and expose exact earliest/latest offsets `0/2`；
+- `f9TrimResponseLossProcessIntegrationTest` arms the real Object-sync provider after the trim has durably applied but
+  before the completion reaches the broker，kills the blocked broker and requires a fresh process to recover the exact
+  checkpoint/head without repeating the same physical trim；
+- `f9TrimProfileMatrixProcessIntegrationTest` executes the same caller-unobserved completion/fresh-process/no-repeat
+  contract for Object async、BookKeeper WAL-only、BookKeeper async-object and BookKeeper sync-object。Together with the
+  Object-sync owner，all five executable profiles are covered；
+- every provider path continues Produce/Fetch/ListOffsets after recovery；the WAL-only path also requires no materialized
+  Object side effect，while the materializing profiles retain their exact profile-specific evidence。
+
+Fresh `./gradlew phase9ChaosCheck --rerun-tasks` passes 80/80 executed tasks in 5m26s。The four JUnit suites report：
+
+| Task owner | Test | Suite time | Result |
+| --- | --- | ---: | --- |
+| `f9LeaderChurnChaosProcessIntegrationTest` | `scenarioKfScl006` | 36.301s | 1 test，0 skipped，0 failures |
+| `f9ActivationTransportRecoveryProcessIntegrationTest` | `scenarioKfScl007` | 49.242s | 1 test，0 skipped，0 failures |
+| `f9TrimResponseLossProcessIntegrationTest` | `trimResponseLossConvergesAfterForcedRestartWithoutRepeatingTrim` | 41.417s | 1 test，0 skipped，0 failures |
+| `f9TrimProfileMatrixProcessIntegrationTest` | `remainingStorageProfilesConvergeAfterTrimResponseLoss` | 182.545s | 1 test，0 skipped，0 failures |
+
+The root gate still owns the manifest/product/fork source locks and isolated release build。KF-SCL-007 therefore moves
+from `PLANNED` to `IMPLEMENTED_NOT_RUN`：the focused P/C evidence is current，but compatibility、performance、the
+146-scenario evidence aggregator and the clean M7/final aggregate have not yet run。
 
 ## 12. Gate implementation in Gradle
 
