@@ -18,6 +18,11 @@
 > calls，1,000 admitted Produce+Fetch operations under bounded executors，near-`Integer.MAX_VALUE` ranged metadata and
 > 128 exact sources/1,048,576 records through the production two-pass NTC2 executor。This is focused implementation
 > evidence，so those rows are `IMPLEMENTED_NOT_RUN` until the clean final aggregate；SCL006–010 remain open
+> 2026-07-30 M7 leader-chaos slice：product `main@d9f8ccf` implements canonical `scenarioKfScl006` behind
+> `phase9ChaosCheck`。Three live release brokers run six RF1 handoffs `1→2→3→1→2→3→1`，requiring monotonic
+> KRaft/binding/session authority、new fencing tokens、no residual reassignment and one exact continuation append
+> bootstrapped through the previous owner on every round。Fresh root rerun passes 75/75 tasks in 59s。SCL006 is
+> `IMPLEMENTED_NOT_RUN` until final aggregation；provider/network chaos and SCL007–010 remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -1312,6 +1317,27 @@ through `DockerIntegrationGateService`。The fresh command
 `./gradlew phase9ScaleCheck --rerun-tasks` passes 36/36 tasks in 29s with five tests、zero skipped and zero failures。
 This does not satisfy the required leader/provider chaos、client/upstream compatibility、performance report or final
 evidence aggregation，therefore KF-SCL-001..005 remain below release status as `IMPLEMENTED_NOT_RUN`。
+
+### Implemented repeated leader-churn slice at `main@d9f8ccf`
+
+`phase9ChaosCheck` currently owns KF-SCL-006 through
+`NereusKafkaNativeProcessIntegrationTest.scenarioKfScl006`：
+
+- three real Kafka release JVMs share one KRaft controller、real Oxia authority and LocalStack Object-WAL；
+- one RF1 topic executes six live handoffs `1→2→3→1→2→3→1` without stopping any previous owner；
+- after each handoff，Admin must observe exact leader/replicas/ISR `[target]` and an empty reassignment set；
+- the authoritative binding must publish the target broker with a strictly higher KRaft leader epoch and binding epoch；
+- the durable stream head must preempt the previous append session，increase its session epoch，replace the fencing token
+  and bind `authorityEpoch/ownerId/ownerEpoch` exactly to the binding's leader/broker term；
+- the test constructs the next producer with only the previous owner in `bootstrap.servers`。Kafka metadata routing may
+  discover the new leader，but the old process is forbidden from republishing its stale term：after the append，the
+  durable head must retain the claimed new fencing token and advance by exactly one commit/offset；
+- Fetch from the target owner and ListOffsets from the cluster must expose the exact continuous range after every round。
+
+Fresh `./gradlew phase9ChaosCheck --rerun-tasks` passes 75/75 tasks in 59s；the canonical test itself reports one test，
+zero skipped、zero failures in 37.373s。The root gate includes the manifest/product/fork source locks and the isolated
+F9 development artifact/release build。This closes the focused repeated-leader slice only；the provider/network
+response-loss matrix required by KF-SCL-007 remains separate。
 
 ## 12. Gate implementation in Gradle
 

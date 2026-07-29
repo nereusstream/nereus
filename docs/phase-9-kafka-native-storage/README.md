@@ -1,5 +1,12 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
+> 2026-07-30 M7 leader-chaos slice：product `main@d9f8ccf` adds `scenarioKfScl006` and root
+> `phase9ChaosCheck`。Three real release brokers complete six RF1 handoffs `1→2→3→1→2→3→1` with every previous owner
+> left alive；each handoff advances the KRaft/binding/append-session authority，changes the fencing token，leaves no
+> reassignment，and preserves contiguous Produce/Fetch/ListOffsets under the new durable head even when the client is
+> bootstrapped only through the stale broker。Fresh root rerun passes 75/75 tasks in 59s。KF-SCL-006 is
+> `IMPLEMENTED_NOT_RUN` until final aggregation；KF-SCL-007..010 remain open
+
 > 2026-07-30 M7 scale slice：product `main@bbe0881` adds root `phase9ScaleCheck` plus five canonical owners for
 > KF-SCL-001..005。A fresh `phase9ScaleCheck --rerun-tasks` passes 36/36 executed tasks in 29s，covering exact
 > 16,384-binding/64-shard real-Oxia reconnect，10,000 open partition managers and 64-way maintenance bound，1,000

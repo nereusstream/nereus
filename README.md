@@ -1,5 +1,13 @@
 # Nereus
 
+F9 current-source leader-chaos update（2026-07-30）：product `main@d9f8ccf` adds
+`NereusKafkaNativeProcessIntegrationTest.scenarioKfScl006` and root `phase9ChaosCheck`。Three live release brokers
+execute six RF1 handoffs `1→2→3→1→2→3→1` while every previous owner remains alive。Each round requires monotonic KRaft
+leader、Oxia binding and Nereus append-session epochs，a new fencing token，no residual stock reassignment，and exact
+durable-head authority on the new broker；the next Produce is bootstrapped only through the stale broker address and must
+still commit one contiguous offset under the new authority。Fresh `phase9ChaosCheck --rerun-tasks` passes 75/75 tasks in
+59s。KF-SCL-006 is `IMPLEMENTED_NOT_RUN` until the final aggregate；provider/network matrix chaos remains open。
+
 F9 current-source scale update（2026-07-30）：product `main@bbe0881` implements the first five M7 scale owners and
 the root `phase9ScaleCheck`。A fresh `--rerun-tasks` execution passes 36/36 tasks in 29s，covering 16,384 real-Oxia
 bindings distributed exactly across 64 registry shards and reloaded after a full client-runtime reconnect；10,000

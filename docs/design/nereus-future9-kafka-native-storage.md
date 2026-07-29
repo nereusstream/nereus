@@ -1,5 +1,13 @@
 # Future 9 — Native Kafka Shared-Storage Integration
 
+> 2026-07-30 F9-M7 leader-chaos slice：product `main@d9f8ccf` adds canonical
+> `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl006` behind `phase9ChaosCheck`。Three live release brokers run
+> six RF1 transitions `1→2→3→1→2→3→1`；each round requires a higher KRaft leader epoch、higher Oxia binding epoch、
+> preempted Nereus append-session epoch/token、empty reassignment state and a durable head whose external authority is the
+> new broker。A Produce bootstrapped only through the still-live stale broker must extend the new authority by exactly one
+> offset。Fresh root rerun passes 75/75 tasks in 59s。SCL006 is `IMPLEMENTED_NOT_RUN`；provider/network chaos and
+> SCL007–010 remain open
+
 > 2026-07-30 F9-M7 scale slice：product `main@bbe0881` adds the executable
 > `phase9ScaleCheck` and five canonical owners `scenarioKfScl001`–`scenarioKfScl005`。Fresh
 > `phase9ScaleCheck --rerun-tasks` passes 36/36 executed tasks in 29s：16,384 real-Oxia bindings/64 shards/full runtime

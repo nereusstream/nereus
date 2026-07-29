@@ -3410,8 +3410,8 @@
     {
       "id": "KF-SCL-006",
       "milestone": "F9-M7",
-      "task": "phase9M7FinalCheck",
-      "testClass": "KafkaLeaderChurnChaosTest",
+      "task": "phase9ChaosCheck",
+      "testClass": "NereusKafkaNativeProcessIntegrationTest",
       "testMethod": "scenarioKfScl006",
       "scenario": "repeated leader churn across three brokers never accepts stale-term write/publication",
       "evidenceTier": [
@@ -3431,7 +3431,7 @@
       "gates": [
         "F9-M7"
       ],
-      "status": "PLANNED"
+      "status": "IMPLEMENTED_NOT_RUN"
     },
     {
       "id": "KF-SCL-007",
