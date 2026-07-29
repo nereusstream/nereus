@@ -730,6 +730,14 @@ reuse the same transactional ID。The first cut exposed a fork gap：an existing
 `leader=-1` was treated as deleted。`TransactionMarkerChannelManager` now routes that marker through `Node.noNode` to its
 unknown-broker retry queue when `metadataCache.contains(topicPartition)` is true，and skips only metadata-absent
 partitions。The focused fork unit test and the forced 66/66-task product rerun pass。
+Product `2d7091d` keeps that fork/source lock unchanged and expands the same process cut to all five canonical storage
+profiles。Object async and BookKeeper WAL-only/async/sync run both sides of the provider boundary；the existing Object-sync
+task remains the fast slice。Each BookKeeper profile/cut receives an independent deterministic ledger-id namespace，
+WAL-only must leave ObjectStore empty，and every materializing profile must publish an object。The first matrix run found a
+product-only handle-cache gap：released entries were not capacity-evictable before their idle deadline。The cache now
+evicts released LRU entries while preserving backpressure if all entries are leased。The full profile matrix passes 66/66
+tasks in 6m28s；full BookKeeper tests、the Object-sync process regression and 146/146 manifest validation pass together at
+78/78 tasks in 1m40s。
 
 The same published head and
 `f9MultiControllerFailoverProcessIntegrationTest` now close the ACTIVE steady-state controller-kill subset of the

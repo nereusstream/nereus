@@ -8,6 +8,7 @@
 > 2026-07-29 retention oracle 增量：fork `bd9963c980` 新增 `KafkaRetentionOracleTest`，用合法 stock `UnifiedLog`、显式 `roll()` 的四段布局与固定 `MockTime`，逐项比较 Nereus planner candidate/selected count 和 stock `deleteOldSegments()`/logStart；覆盖 time、size、combined、HW cap、strict time equality 与 compact-only。最终 published/source-locked fork head 是 `bd9963c980`
 > 2026-07-29 compaction oracle 增量：fork `c4a0a2d1fa` 新增真实 `KafkaCompactionOracleTest`/support，直接调用 stock `Cleaner.buildOffsetMap/cleanSegments` 并与当前 Nereus 两遍执行器比较 exact record/batch fingerprints；fork `bf8a2946e5` 又把隔离 `0.1.0-f9-dev` modules 标记 changing/zero-cache，保证产品门禁消费刚发布字节。当前 published/source-locked head 是 `bf8a2946e5`
 > 2026-07-29 transaction-marker retry 增量：fork `1e3783458b` 修复 stock `TransactionMarkerChannelManager` 对 existing-but-leaderless partition 的误判。`metadataCache.contains(topicPartition)` 为 true 但 leader endpoint 暂不可用时，marker 进入 `Node.noNode` unknown-broker queue 并随 metadata 更新重试；只有 partition 已不在 metadata 时才完成 skip。新增 focused unit test 与 product `f9TransactionResolutionCutProcessIntegrationTest` 均通过；当前 published/source-locked head 是 `1e3783458b`
+> 2026-07-29 transaction-marker profile 验证增量：product `2d7091d` 复用同一 published fork head，将 before/after-provider process cuts 扩展到 Object async 与全部三种 BookKeeper profile；连同 Object sync 共十个真实场景。该扩展不需要新的 Kafka fork patch，且 52-commit/126-file source lock 保持通过
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 

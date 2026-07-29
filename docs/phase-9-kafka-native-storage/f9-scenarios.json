@@ -2016,7 +2016,7 @@
     {
       "id": "KF-TXN-008",
       "milestone": "F9-M4",
-      "task": "f9TransactionResolutionCutProcessIntegrationTest",
+      "task": "phase9M6KafkaProcessCheck",
       "testClass": "NereusKafkaNativeProcessIntegrationTest",
       "testMethod": "scenarioKfTxn008",
       "scenario": "crash after transactional data/marker commit before derived update replays correctly",
@@ -2027,7 +2027,8 @@
       "requiredServices": [
         "kraft",
         "oxia",
-        "object-store"
+        "object-store",
+        "bookkeeper"
       ],
       "sourceLocks": [
         "nereus",

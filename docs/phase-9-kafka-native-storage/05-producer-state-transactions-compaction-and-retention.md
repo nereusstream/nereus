@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration、before/after-provider abort-marker process cuts、deterministic mandatory NTC2 admission and real Object-WAL NTC2 delete/corrupt + exact repair/re-election pass；stock `LogCleaner` differential now covers stable-prefix keyed/null/tombstone/transaction/control/idempotent semantics，while non-Object transaction/NTC2 profile expansion、full compression/OPEN-boundary oracle and real compaction restart remain in progress
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration、all-five-profile before/after-provider abort-marker process cuts、deterministic mandatory NTC2 admission and real Object-WAL NTC2 delete/corrupt + exact repair/re-election pass；stock `LogCleaner` differential now covers stable-prefix keyed/null/tombstone/transaction/control/idempotent semantics，while non-Object NTC2 profile expansion、full compression/OPEN-boundary oracle and real compaction restart remain in progress
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -1784,8 +1784,24 @@ metadataCache.getPartitionLeaderEndpoint(topicPartition, listenerName)
 leader。Only a partition absent from metadata is skipped。The new
 `TransactionMarkerChannelManagerTest.shouldSaveForLaterWhenExistingPartitionHasNoLeader` passes with the focused fork
 suite。The product process gate then passes both cuts，and the final forced `--rerun-tasks` execution runs 66/66 tasks in
-1m30s。This is Object-WAL P/C evidence for KF-TXN-008 and an injected-resolution slice for KF-TXN-007/014；non-Object
-profiles and the final aggregate remain separate requirements。
+1m30s。This is Object-WAL P/C evidence for KF-TXN-008 and an injected-resolution slice for KF-TXN-007/014。
+
+Product `2d7091d` closes the profile part of that requirement without changing the fault seam。The original task remains
+the fast `OBJECT_WAL_SYNC_OBJECT` gate；new
+`f9TransactionResolutionProfileMatrixProcessIntegrationTest` repeats both cuts for
+`OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT` and
+`BOOKKEEPER_WAL_SYNC_OBJECT`。Together they execute ten release-process scenarios。Every BookKeeper cut derives a distinct
+ledger-id authority seed from `(profileSeed * 2) + cutOffset`，so before/after-provider fixtures never reuse or revoke each
+other's namespace。WAL-only requires zero objects；the other four profiles await a positive materialized-object count。
+
+The first real matrix run exposed a production capacity bug in `BookKeeperLedgerHandleCache`。With a two-handle bound，
+two completed/released ledger handles remained cached until their one-hour idle deadline；opening a third recovery ledger
+returned retriable `BACKPRESSURE_REJECTED` even though neither old handle had an active lease。The cache now evicts the
+least-recently-used released entry until one handle/byte slot is available，but still rejects when every cached entry is
+referenced。Focused tests lock both branches。The complete profile matrix then passes 66/66 tasks in 6m28s；a second fresh
+invocation combines the complete BookKeeper test suite、the Object-sync process gate and 146/146 manifest validation and
+passes 78/78 tasks in 1m40s。KF-TXN-008 therefore has current-source P/C/K evidence across all five profiles；the final M4
+aggregate remains a separate requirement。
 
 ## 16. Test plan
 
@@ -1807,8 +1823,9 @@ profiles and the final aggregate remain separate requirements。
 - corrupt mandatory internal-topic NTC2 fails election without COMMITTED fallback。
 
 Current executable subset：the first two bullets now include completed-state and live OPEN COMMIT/ABORT migration across two
-release brokers plus before/after-provider abort-marker process cuts；Object-WAL mandatory internal-topic
-compaction/no-resurrection is also covered。Non-Object profile expansion and the final aggregate remain open。
+release brokers plus before/after-provider abort-marker process cuts across all five storage profiles；Object-WAL mandatory
+internal-topic compaction/no-resurrection is also covered。Non-Object mandatory-NTC2 expansion and the final aggregate
+remain open。
 
 ### 16.3 Retention/DeleteRecords
 

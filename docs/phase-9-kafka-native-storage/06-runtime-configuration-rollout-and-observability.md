@@ -9,6 +9,7 @@
 > 2026-07-29 retention/DeleteRecords 增量：product `77480cb` + fork `bd9963c980` 已通过 stock UnifiedLog retention differential 和真实 Object-WAL native DeleteRecords start/middle/end/HW process gate；该增量当时锁定 49 commits/122 files，任务、evidence directory 与 M6 process aggregate 已接线。该结果关闭 KF-RET-001/002/003/006 current-source evidence；stock `LogCleaner` differential 由下一行的后续增量补齐，non-Object NTC2、injected transaction-resolution 和 final rollout aggregate 仍 open
 > 2026-07-29 compaction oracle 增量：product `666bab1`/`08fe686` + fork `c4a0a2d1fa`/`bf8a2946e5` 已通过真实 stock `Cleaner` stable-prefix differential；新门禁先发布当前 `0.1.0-f9-dev`，再校验 51-commit/124-file source lock，并依赖 fork changing/zero-cache 只刷新隔离 Nereus modules。KF-CMP-001/002/003/004 现为 `PASSED_CURRENT_SOURCE`；OPEN-LSO boundary、full compression/header matrix、non-Object NTC2、injected transaction-resolution 与 final rollout aggregate 仍 open
 > 2026-07-29 transaction-resolution cut 增量：product `04e661e` 的独立 release-process gate 使用 test-only agent 在真实 marker append 的 provider 前/后制造 caller-uncertain completion，并强杀/重启当前 user-partition owner；fork `1e3783458b` 保证 existing-but-leaderless partition 的 marker 留在 unknown-broker retry queue。当前 source lock 为 52 commits/126 files；Object-WAL KF-TXN-008 已通过，non-Object profile 与 final rollout aggregate 仍 open
+> 2026-07-29 transaction-resolution profile 增量：product `2d7091d` 将同一进程切点扩展到 Object async 和 BookKeeper WAL-only/async/sync；与 Object sync 合计五 profile、十个 before/after-provider 场景。BookKeeper fixture 为每个 cut 分配独立 ledger-id namespace，并锁定 WAL-only/object-materialization invariants。真实矩阵发现并修复 released read handle 不能在容量压力下 LRU 淘汰造成的 false backpressure；所有 handle 在用时仍 fail closed。矩阵 66/66 tasks、6m28s，联合回归 78/78 tasks、1m40s；KF-TXN-008 profile rollout evidence closed，final aggregate remains open
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -770,9 +771,9 @@ Object-WAL mandatory-NTC2 delete/corrupt + repair/re-election are covered by the
 admission half is product `b6b02f4` + fork `89b66ab03b`，and the physical repair half is product `0ae8ca9` + fork
 `768924da60`。Product `77480cb` + fork `bd9963c980` additionally close the stock retention oracle and native
 DeleteRecords start/middle/end/HW mapping；product `666bab1`/`08fe686` + fork `c4a0a2d1fa`/`bf8a2946e5`
-close the stable-prefix stock `LogCleaner` differential and its exact current-artifact gate。Injected
-transaction-resolution cuts、non-Object NTC2 profile expansion、OPEN/full-format compaction expansion、remaining chaos and
-complete rollout evidence 尚未闭合，
+close the stable-prefix stock `LogCleaner` differential and its exact current-artifact gate。All-five-profile
+transaction-resolution cuts are closed by product `2d7091d` against the unchanged fork `1e3783458b`；non-Object NTC2
+profile expansion、OPEN/full-format compaction expansion、remaining chaos and complete rollout evidence 尚未闭合，
 所以整个路径仍不能用于 production rollout readiness。
 
 The selected shell is not a durability shortcut：`NereusUnifiedLogFactory` uses only
