@@ -4,6 +4,7 @@
 > 规则：一个 requirement 至少一个稳定 ID；release report 必须给每个 ID 一个实际执行结果
 > 当前 F9-M1/M2 implementation 与 direct real-service gates 已通过；F9-M3 codec、bounded Produce 与 whole-request async Fetch、M4 transaction、M5 virtual-log/DeleteRecords/periodic-retention rows have deterministic partial evidence；native DeleteRecords checkpoint-before-trim + forced-restart recovery adds one R/P/C/K slice；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 milestone rows 暂不升级为 final-gated
 > 2026-07-29 增量：product `7c25d2e` adds a live two-release-process completed-state migration slice for KF-TXN-011/012/013；ongoing/aborted transaction takeover、mandatory internal-topic NTC2 and final aggregate remain open
+> 2026-07-29 ongoing transaction 增量：product `efe782d` adds bidirectional live OPEN-state COMMIT/ABORT migration evidence for KF-TXN-007/012/014；injected transaction-resolution failure、mandatory NTC2、profile expansion and final aggregate remain open
 
 ## 1. Evidence tiers
 
@@ -519,14 +520,14 @@ hash。Markdown/JSON ID sets must match。
 | KF-TXN-004 | producer expiration and checkpoint-before-trim preserve subsequent validation | `KafkaProducerTrimIntegrationTest` | R,K | M4/M5 |
 | KF-TXN-005 | open transaction crossing checkpoint restores first unstable offset/LSO | fork `NereusProducerStateManagerTest`/`NereusKafkaRecoveryStateCodecTest`（D partial）；`KafkaTransactionRecoveryIntegrationTest`（R/P pending） | R,P | M4 |
 | KF-TXN-006 | commit marker stable append advances LSO in stock order | fork `NereusUnifiedLogFactoryTest`（abort-marker stock order D/K partial）；`KafkaTransactionRecoveryIntegrationTest`（R pending） | R,K | M4 |
-| KF-TXN-007 | abort marker builds exact aborted index and read-committed filtering | fork `NereusProducerStateManagerTest`/`NereusUnifiedLogFactoryTest`（D/K partial）+ product `NereusKafkaNativeProcessIntegrationTest`（forced-exit abort/read-committed R/K partial；BookKeeper profile pending）；`KafkaTransactionRecoveryIntegrationTest` | R,K | M4 |
+| KF-TXN-007 | abort marker builds exact aborted index and read-committed filtering | fork `NereusProducerStateManagerTest`/`NereusUnifiedLogFactoryTest`（D/K partial）+ product `f9M6KafkaProcessIntegrationTest`（forced-exit abort/read-committed R/K partial）+ `f9OngoingTransactionMigrationProcessIntegrationTest`（live reverse-handoff ABORT marker/LSO/read-committed skip P/K current slice；injected failure/profile pending）；`KafkaTransactionRecoveryIntegrationTest` | R,K | M4 |
 | KF-TXN-008 | crash after transactional data/marker commit before derived update replays correctly | `KafkaTransactionProcessCutIntegrationTest` | P,C | M4 |
 | KF-TXN-009 | transaction spanning virtual segments/checkpoint/takeover remains atomic to consumers | `KafkaTransactionProcessCutIntegrationTest` | P,K | M4 |
 | KF-TXN-010 | transaction verification guard survives async executor handoff without request-thread local use | fork `ReplicaManagerTest.testStorageAppendExecutorPreservesTransactionGuardAndMarkerVersion`（D/K partial；R pending） | D,R,K | M4 |
 | KF-TXN-011 | `__consumer_offsets` opens/replays before group coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady`（D partial）+ product `f9M6KafkaProcessIntegrationTest`（single-node restart R/P）+ `f9CoordinatorMigrationProcessIntegrationTest`（live `[1] -> [2]` internal-topic recovery before group-offset service P/K current slice；failure cut pending） | P,C | M4 |
-| KF-TXN-012 | `__transaction_state` opens/replays before transaction coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady` + `NereusTopicDeltaLifecycleTest.testLeaderCallbackWaitsForExactRecoveredStorageInstallation`（D partial）+ product `f9M6KafkaProcessIntegrationTest`（single-node restart R/P）+ `f9CoordinatorMigrationProcessIntegrationTest`（live completed-state `[1] -> [2]` recovery before same-ID continuation P/K current slice；failure cut pending） | P,C | M4 |
+| KF-TXN-012 | `__transaction_state` opens/replays before transaction coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady` + `NereusTopicDeltaLifecycleTest.testLeaderCallbackWaitsForExactRecoveredStorageInstallation`（D partial）+ product `f9M6KafkaProcessIntegrationTest`（single-node restart R/P）+ `f9CoordinatorMigrationProcessIntegrationTest`（live completed-state `[1] -> [2]` P/K）+ `f9OngoingTransactionMigrationProcessIntegrationTest`（OPEN state bidirectional recovery before EndTxn P/K current slice；failure cut pending） | P,C | M4 |
 | KF-TXN-013 | group commit/rebalance/restart/takeover works with native internal topic | product `f9M6KafkaProcessIntegrationTest`（group commit/rebalance/fresh-JVM resume P/K）+ `f9CoordinatorMigrationProcessIntegrationTest`（old broker live、group partition handoff、offset 2 reload、resume/commit 4 P/K current slice）；BookKeeper/profile/final aggregate pending | P,K | M4 |
-| KF-TXN-014 | ongoing transaction coordinator failover resolves from internal topic | product `f9M6KafkaProcessIntegrationTest`（stable open transaction + forced process exit + fresh-JVM abort/next commit P/K partial）+ `f9CoordinatorMigrationProcessIntegrationTest`（completed transactional ID live migration only）；ongoing multi-broker/profile cut pending | P,K | M4 |
+| KF-TXN-014 | ongoing transaction coordinator failover resolves from internal topic | product `f9M6KafkaProcessIntegrationTest`（stable open transaction + forced process exit + fresh-JVM abort/next commit P/K partial）+ `f9OngoingTransactionMigrationProcessIntegrationTest`（both brokers live、OPEN COMMIT `[1] -> [2]`、OPEN ABORT `[2] -> [1]`、same-ID continuation P/K current slice）；injected failure/BookKeeper/profile pending | P,K | M4 |
 | KF-TXN-015 | group offset lag does not protect user-topic retention；client observes normal reset/out-of-range | `KafkaGroupRetentionIndependenceTest` | R,P,K | M5 |
 | KF-TXN-016 | mandatory internal-topic NTC2 unavailable blocks coordinator election，no full-source fallback | `KafkaInternalTopicNoResurrectionTest` | P,C,K | M5 |
 
@@ -538,7 +539,18 @@ to `[2]`；the gate waits all three exact leader/replicas/ISR states and empty r
 Only then may group offset 2 reload and the same transactional ID commit data/marker 3/4；READ_COMMITTED and the same group
 must continue at visible offset 3 with final earliest/latest `0/5`。Fresh task passes 73/73 actionable tasks in 1m07s；
 related cold-restart/takeover regressions pass 74/74 in 1m50s。Rows remain `PLANNED` because their C cuts、
-ongoing/aborted transaction path、profile/upstream coverage and final aggregate are incomplete。
+profile/upstream coverage and final aggregate are incomplete。
+
+Current ongoing-transaction migration evidence（product `efe782d`；fork `1cbe8b65a8`）：
+`f9OngoingTransactionMigrationProcessIntegrationTest` uses the same two-live-release topology but moves user +
+`__transaction_state-0` in both directions while the transaction is OPEN。Transaction A holds LSO 0 at data offset 0，
+migrates `[1] -> [2]` and commits marker 1 through the recovered coordinator；same ID A continues at data/marker 2/3。
+Transaction B holds LSO 4 at data offset 4，migrates `[2] -> [1]` and aborts marker 5；the gate waits for asynchronous marker
+completion to release LSO 6，then same ID B commits data/marker 6/7。READ_COMMITTED seek 4 must return offset 6 and final
+earliest/latest/end is `0/8/8`。Both JVMs stay alive，each handoff requires exact singleton leader/replicas/ISR and empty
+reassignment，and failure preserves both configs/logs。Fresh task passes 64/64 actionable tasks in 47s with a 32.753s
+JUnit case。Rows remain `PLANNED` because injected marker/EndTxn loss、mandatory NTC2、BookKeeper/profile and final aggregate
+evidence are incomplete。
 
 Implementation note（2026-07-24）：the product-side `KafkaProducerStatePropertyTest` now covers the canonical-format and
 sequence-wrap portions of KF-TXN-002/003 with a frozen digest and 200 deterministic randomized round trips。Both rows remain

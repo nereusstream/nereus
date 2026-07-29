@@ -4,6 +4,7 @@
 > 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：真实 two-release-process Object-WAL/KRaft singleton reassignment、旧 owner resignation、committed recovery 与 new leader continuation 已通过；三 release JVM + Toxiproxy + `jcmd` + `SIGSTOP/SIGCONT` gate 又闭合了 Object-WAL already-dispatched old append 的 P/C 切点，并证明 stale append 在 guarded upload 前被新 session fence、WAL key 集与 durable LEO 不变；stock ZooKeeper + two-bookie + two Kafka release-process gate 闭合 `BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_SYNC_OBJECT` 的 post-handoff recovery/continuation 与 profile object invariants；test-only Byte Buddy agent gate further holds one real Bookie-acked write before `WRITING -> DURABLE`，proves exact physical-entry presence、new-leader `ABANDONED`/`SEALED` recovery、stale completion fencing and final LEO `2`；three combined broker/controller release JVMs with three static voters now prove ACTIVE-state controller kill/failover、per-epoch Nereus activation reconciliation and native IO continuity；a second three-dedicated-controller/one-broker gate now covers before-provider and after-provider cuts for readiness create、PREPARED create and ACTIVE CAS，kills the exact controller and proves higher-epoch recovery plus native IO；a third gate on the same role-separated topology closes both sides of the initial snapshot proof and capability aggregation；the Oxia-proxied dedicated-controller/broker gate proves actual transport reset normalization and same-controller-epoch recovery；native DeleteRecords now also publishes NKC1 before trim、survives forced process death、hydrates the pre-trim checkpoint window、applies the current durable trim and rebuilds virtual segments before continuing native IO；a second Object-WAL process gate loses the successful provider completion before binding/local publication，forces broker death，then proves fresh-process convergence and a same-target no-op without another trim CAS/checkpoint object；remaining open items are transaction/internal-topic coordinator migration and broader BookKeeper/all-profile chaos
 > 2026-07-29 trim matrix 增量（覆盖上两行的 response-loss open wording）：Object sync/async 与 BookKeeper WAL-only/async/sync 五档均已通过 provider-applied/caller-unobserved trim、forced restart、same-target no-repeat 与 continued IO；仍 open 的是 transaction/internal-topic coordinator migration、batch middle/end/HW、stock oracle 与 broader chaos
 > 2026-07-29 coordinator migration 增量（覆盖上两行的 coordinator open wording）：product `7c25d2e` 在 fork `1cbe8b65a8` 上以两个真实 release JVM 原子迁移 user、`__consumer_offsets-0`、`__transaction_state-0` 到 broker 2，旧 broker 保持存活；group offset 和 completed transactional-ID state 在 recovered-storage-ready 后恢复并继续提交。Ongoing/aborted coordinator takeover、mandatory internal-topic NTC2 failure、batch middle/end/HW、stock oracle 与 broader chaos 仍 open
+> 2026-07-29 ongoing transaction migration 增量（覆盖上一行的 ongoing/aborted open wording）：product `efe782d` 新增 `f9OngoingTransactionMigrationProcessIntegrationTest`，在两个 live Object-WAL release brokers 间来回迁移 user 与 `__transaction_state-0`；两个 OPEN transaction 分别跨 handoff COMMIT/ABORT，LSO 收敛、same-ID continuation 与 READ_COMMITTED aborted filtering 均通过。Injected abort-resolution failure、mandatory NTC2、BookKeeper/profile expansion、batch middle/end/HW、stock oracle 与 final aggregate 仍 open
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
@@ -127,9 +128,9 @@ exact recovered storage ready callback 后才发生。codec/replay/factory/shell
 焦点测试已通过；这些 commit 现均包含在远端 F9 branch。真实单节点进程门现已覆盖 committed transaction 与
 consumer-group offset 的 fresh-JVM 内部主题恢复，并覆盖 stable open transaction 后强制进程退出、fresh-JVM
 ABORT resolution 与 read-committed filtering；真实 checkpoint publication、multi-broker live takeover、
-BookKeeper/profile matrix 和 completed coordinator migration 已有真实进程证据；ongoing/aborted transaction
-coordinator takeover、mandatory NTC2 unavailable、checkpoint cut 与完整 M4 aggregate 仍未完成，因此不能声明
-M4 完成。
+BookKeeper/profile matrix、completed coordinator migration 和 Object-WAL ongoing transaction bidirectional
+COMMIT/ABORT migration 已有真实进程证据；injected abort-resolution failure、mandatory NTC2 unavailable、checkpoint
+cut 与完整 M4 aggregate 仍未完成，因此不能声明 M4 完成。
 Section 3 现由 Kafka-artifact-neutral `KafkaLeaderEpochState` 与 `KafkaLeaderEpochStateCodecV1` 实现：
 leader epoch/start offset 双严格递增，只有首条可低于 logStart 作为 carried-forward range，所有 start 均不超过
 stable end，末条可等于 stable end 表达当前空 epoch；required/version/flags、unsigned count、truncation、
@@ -501,6 +502,27 @@ Fresh task 通过 73/73 actionable tasks、1m07s，JUnit process case 为 31.829
 通过。该 task 已进入 `phase9M6KafkaProcessCheck`，为 KF-TXN-011/012/013 提供 completed-state P/K takeover
 slice；它不声称 ongoing/aborted transaction coordinator takeover、mandatory internal-topic NTC2
 no-resurrection 或 M4 final aggregate 已完成。
+
+`:nereus-kafka-adapter:f9OngoingTransactionMigrationProcessIntegrationTest --rerun-tasks` 在 product `efe782d` 与同一
+fork head 上复用两个始终存活的 release JVM，但把 coordinator cut 推进到 OPEN state。该测试使用独立 user
+partition 和 `__transaction_state-0`，并执行两个相反方向的迁移：
+
+1. broker 1 写入 transactional data offset 0，确认 READ_COMMITTED end/LSO 仍为 0；
+2. 一个 Admin map 将 user 与 transaction-state partitions 一起从 `[1]` 迁到 `[2]`，两个 partition 均须达到
+   `leader=2, replicas=[2], ISR=[2]` 且 reassignment 为空；
+3. 原 producer 通过迁移后的 coordinator COMMIT，marker 落在 offset 1；同一 transactional ID 重新初始化后提交
+   data/marker offsets 2/3，READ_COMMITTED end 收敛到 4；
+4. broker 2 再写一个 OPEN transaction data offset 4，确认 LSO 保持 4，然后将两个 partition 一起迁回 `[1]`；
+5. 原 producer 跨反向迁移 ABORT；测试等待异步 marker offset 5 使 READ_COMMITTED end 收敛到 6，而不是假设
+   `abortTransaction()` 与 marker append 同步；
+6. 同一 aborted transactional ID 重新初始化并提交 data/marker offsets 6/7；从 offset 4 的 READ_COMMITTED
+   Fetch 必须直接返回 offset 6，最终 earliest/latest 与 READ_COMMITTED end 为 `0/8`。
+
+每次 handoff 都同时验证两个 JVM 存活、exact singleton ownership 和 ObjectStore 非空。Task 独占
+`build/f9-kafka-ongoing-transaction-evidence`，已进入 `phase9M6KafkaProcessCheck`；fresh execution 为 64/64
+actionable tasks、47s，JUnit case 32.753s；completed coordinator + ordinary takeover 回归为 74/74 tasks、1m30s。
+该 slice 为 KF-TXN-007/012/014 提供 Object-WAL P/K 证据，但不替代 marker/EndTxn response-loss、进程 kill、
+BookKeeper/profile、mandatory NTC2 或 M4 final aggregate。
 
 BookKeeper post-handoff 由独立
 `:nereus-kafka-adapter:f9BookKeeperProfileTakeoverProcessIntegrationTest --rerun-tasks` 覆盖：同一个 stock

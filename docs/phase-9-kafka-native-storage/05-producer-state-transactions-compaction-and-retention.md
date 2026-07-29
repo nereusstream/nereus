@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration also passes，while ongoing/aborted coordinator、remaining retention boundaries、real compaction restart and stock cleaner differential remain in progress
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration and Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration pass，while injected resolution cuts、mandatory NTC2、remaining retention boundaries、real compaction restart and stock cleaner differential remain in progress
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -1512,9 +1512,42 @@ partition storage，after which stock coordinator replay consumes those bytes。
 delete either shared binding while the old broker stays live。Fresh execution passes 73/73 actionable tasks in 1m07s；the
 baseline cold-restart and ordinary data-handoff regressions pass together at 74/74 in 1m50s。
 
-This is intentionally a completed-state cut。It does not replace the still-required tests for an ongoing transaction during
-coordinator handoff、abort-resolution failure cuts、BookKeeper/profile migration、mandatory internal-topic NTC2 unavailable
-or upstream coordinator suites。
+This is intentionally a completed-state cut；the next gate covers OPEN state。Abort-resolution failure cuts、
+BookKeeper/profile migration、mandatory internal-topic NTC2 unavailable and upstream coordinator suites remain required。
+
+### 15.2 Current ongoing-transaction migration evidence
+
+Product `efe782d` registers `f9OngoingTransactionMigrationProcessIntegrationTest` as a direct
+`phase9M6KafkaProcessCheck` dependency。It deliberately moves the data and coordinator truth together so no successful
+EndTxn can be explained by a coordinator that never changed owner：
+
+```text
+node 1:
+  begin txn A -> data=0, LSO=0
+  reassign user + __transaction_state-0 [1] -> [2]
+  commit txn A through recovered coordinator -> COMMIT=1, LSO=2
+  same txn ID A -> data=2, COMMIT=3, LSO=4
+
+node 2:
+  begin txn B -> data=4, LSO=4
+  reassign user + __transaction_state-0 [2] -> [1]
+  abort txn B through recovered coordinator -> ABORT=5, LSO=6
+
+node 1:
+  same txn ID B -> data=6, COMMIT=7
+  READ_COMMITTED seek(4) -> offset 6
+  earliest/latest/read-committed-end = 0/8/8
+```
+
+For each direction the Admin request contains both partitions，and completion requires exact singleton
+leader/replicas/ISR、empty reassignment and both release JVMs alive。The original `KafkaProducer` object performs
+`commitTransaction()` or `abortTransaction()` after handoff，which exercises stock coordinator discovery/retry rather than
+constructing a new producer before resolving the OPEN transaction。The ABORT assertion uses eventual LSO convergence：
+EndTxn completion may precede the asynchronous WriteTxnMarkers append，so the harness keeps checking broker liveness and
+captures both configs/logs if offset 6 does not arrive under `CLIENT_TIMEOUT`。Fresh execution passes 64/64 tasks in 47s
+with a 32.753s JUnit case；the adjacent completed coordinator and ordinary handoff regressions pass 74/74 tasks in 1m30s。
+This is Object-WAL P/K evidence for KF-TXN-007/012/014，not injected marker response-loss、broker death during resolution、
+BookKeeper/profile or mandatory-NTC2 evidence。
 
 ## 16. Test plan
 
@@ -1535,8 +1568,9 @@ or upstream coordinator suites。
 - `__transaction_state` coordinator failover and ongoing transaction；
 - corrupt mandatory internal-topic NTC2 fails election without COMMITTED fallback。
 
-Current executable subset：the first two bullets now include real completed-state live migration across two release brokers；
-ongoing/aborted transaction and internal-topic compaction/no-resurrection cuts remain open。
+Current executable subset：the first two bullets now include completed-state and live OPEN COMMIT/ABORT migration across two
+release brokers；injected resolution failure、profile expansion and internal-topic compaction/no-resurrection cuts remain
+open。
 
 ### 16.3 Retention/DeleteRecords
 

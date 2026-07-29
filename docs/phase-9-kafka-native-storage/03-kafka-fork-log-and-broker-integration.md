@@ -3,6 +3,7 @@
 > 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart、BookKeeper WAL-only/async/sync cold-restart、BookKeeper three-profile two-process post-handoff、BookKeeper provider-applied cut、real-Oxia two-runtime Object-WAL live takeover、three-voter ACTIVE controller failover、the complete six-way readiness/PREPARED/ACTIVE store-publication gates and four-way initial-proof gates 均通过；extended kill/chaos gates remain open
 > 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：fork `1cbe8b65a8` 与 product process gates 已通过 two-release-process Object-WAL/KRaft singleton live reassignment、already-dispatched Object/BookKeeper append cuts、three-profile post-handoff、multi-controller activation/store/proof/transport cuts；同一 published fork 又闭合 native DeleteRecords 的 durable log-start publication、broker-epoch-ready recovery 和 pre-trim NKC1 hydration，product `f9CheckpointTrimRecoveryProcessIntegrationTest` 证明 forced restart 后按当前 trim 重建 virtual segments 并继续 native IO；两个 trim-response-loss tasks 又在全部五种 profile 证明 provider-applied/caller-unobserved trim 的 fresh-process convergence 与同目标 no-op；remaining gaps are transaction/internal-topic coordinator migration、remaining DeleteRecords boundaries and broader chaos
 > 2026-07-29 coordinator migration 增量：product `7c25d2e` 在 fork `1cbe8b65a8` 上原子迁移 user、`__consumer_offsets-0`、`__transaction_state-0` 到 live broker 2，completed group/transaction coordinator state 恢复并继续提交；remaining coordinator gaps narrow to ongoing/aborted transaction takeover and mandatory internal-topic NTC2 failure
+> 2026-07-29 ongoing transaction migration 增量：product `efe782d` 在同一 fork 上让两个 OPEN transactions 分别跨 `[1] -> [2]` 与 `[2] -> [1]` user/transaction-state handoff COMMIT/ABORT，证明 LSO、same-ID continuation 与 READ_COMMITTED filtering；remaining gaps narrow to injected resolution failures、mandatory NTC2、profile expansion and final aggregate
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -358,6 +359,16 @@ at visible offset 3 and commits offset 4，with final earliest/latest `0/5`。Fr
 tasks in 1m07s，and the unchanged cold-restart plus ordinary data-takeover gates pass 74/74 tasks in 1m50s。The task is
 aggregated by `phase9M6KafkaProcessCheck`；ongoing/aborted transaction coordinator takeover、mandatory NTC2 unavailability
 and full M4 upstream/final gates remain separate requirements。
+
+`f9OngoingTransactionMigrationProcessIntegrationTest` closes the adjacent live OPEN-state slice without a fork change。
+The first producer keeps data offset 0 uncommitted while one Admin request moves the user partition and
+`__transaction_state-0` from `[1]` to `[2]`；LSO must remain 0 until that original producer commits through the new coordinator and marker offset 1
+becomes visible。Reinitializing the same ID then commits data/marker 2/3。The reverse half opens data offset 4 on broker 2，
+moves both partitions back to `[1]` while both processes remain alive，and aborts through broker 1's recovered coordinator。
+Because Kafka completes EndTxn before all marker appends necessarily become visible，the gate waits under the shared client
+deadline for READ_COMMITTED end to converge from 4 to 6；it then reuses the aborted ID for data/marker 6/7 and requires a
+READ_COMMITTED fetch from 4 to skip to 6。Every handoff requires exact leader/replicas/ISR and no ongoing reassignment；
+final earliest/latest is `0/8`。The task passes 64/64 actionable tasks in 47s and is part of the M6 process aggregate。
 
 `f9BookKeeperProfileTakeoverProcessIntegrationTest` supplies the independent BookKeeper post-handoff matrix without a new
 fork seam。One stock ZooKeeper long-hierarchical metadata service and two real Bookies host three isolated authorities，
@@ -1084,8 +1095,8 @@ separate `f9InFlightTakeoverProcessIntegrationTest` supplies the release-process
 the BookKeeper three-profile post-handoff matrix and common provider-applied C cut also pass；ACTIVE-state multi-controller
 kill failover、the complete six-way readiness-create/PREPARED-create/ACTIVE-CAS store-publication takeover、the four-way
 initial snapshot-proof/capability-aggregation takeover and actual Oxia transport-reset recovery now pass separately，while
-completed coordinator migration and checkpoint/trim recovery now pass separately；ongoing/aborted coordinator and broader
-checkpoint/chaos variants remain open。
+completed and live OPEN Object-WAL coordinator migration plus checkpoint/trim recovery now pass separately；injected
+transaction-resolution、profile and broader checkpoint/chaos variants remain open。
 真实 combined-node
 KRaft/Oxia/S3 process baseline 已通过；
 同节点 fresh-JVM cold restart 也已通过；独立 BookKeeper WAL-only/async/sync release-distribution

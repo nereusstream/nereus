@@ -3,6 +3,7 @@
 > 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss、release-process physical-deletion/fresh-JVM NCP2 fallback、Object/BookKeeper process takeover cuts、real-Oxia two-runtime Object-WAL live leader takeover、ACTIVE-state three-voter controller failover、the complete six-way readiness/PREPARED/ACTIVE store-publication cuts、four-way initial proof cuts and all-five-profile trim-response-loss forced restart are implemented；remaining M4 internal-topic cuts、DeleteRecords boundary/oracle work and inherited final gates remain open
 > 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton takeover、Object/BookKeeper in-flight cuts、three-profile handoff、ACTIVE multi-controller failover、activation store/proof cuts 与 Oxia transport recovery 已进入 M6 process aggregate；`f9CheckpointTrimRecoveryProcessIntegrationTest` 闭合 native DeleteRecords -> rooted NKC1 -> durable trim -> forced restart -> pre-trim checkpoint hydration/current-trim pruning -> continued IO；`f9TrimResponseLossProcessIntegrationTest` 与 `f9TrimProfileMatrixProcessIntegrationTest` 又在五种 profile 闭合 provider-applied/caller-unobserved -> forced restart -> same-target no-op/no-repeat；仍 open 的 takeover 边界是 coordinator/internal topics 与更广 chaos
 > 2026-07-29 coordinator migration 增量：`f9CoordinatorMigrationProcessIntegrationTest` 已在两个 live release brokers 闭合 completed group/transaction internal-topic state 的 `[1] -> [2]` recovery/continuation；仍 open 的 M4 coordinator 边界缩小为 ongoing/aborted transaction takeover、mandatory NTC2 与 final/upstream aggregate
+> 2026-07-29 ongoing transaction migration 增量：product `efe782d` 的独立 process gate 已闭合 Object-WAL OPEN transaction 跨双向 coordinator handoff 的 COMMIT/ABORT、LSO、same-ID continuation 与 READ_COMMITTED filtering；仍 open 的 M4 coordinator 边界缩小为 injected resolution failure、mandatory NTC2、profile expansion 与 final/upstream aggregate
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -737,9 +738,17 @@ reassignment，the old JVM must remain alive，the group must reload offset 2，
 data/marker 3/4，READ_COMMITTED must preserve both values and the group must resume at visible offset 3。Fresh execution
 passes 73/73 actionable tasks in 1m07s；related cold-restart/takeover gates pass 74/74 in 1m50s。
 
+Product `efe782d` adds the OPEN-state half as
+`f9OngoingTransactionMigrationProcessIntegrationTest`。Transaction A writes offset 0 on node 1 and holds LSO at 0 while
+user + `__transaction_state-0` move `[1] -> [2]`；the original producer commits through the recovered coordinator and the
+same ID continues at data/marker 2/3。Transaction B writes offset 4 on node 2 and holds LSO at 4 while both partitions move
+`[2] -> [1]`；the original producer aborts through node 1，the harness waits for marker-driven LSO 6，then reuses that ID for
+data/marker 6/7 and requires READ_COMMITTED seek 4 to return 6。Both JVMs remain alive and every handoff requires exact
+singleton ownership plus empty reassignment。Fresh execution passes 64/64 tasks in 47s；the task is aggregated by M6。
+
 The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、
-ongoing/aborted transaction coordinator takeover、mandatory internal-topic NTC2 failure、BookKeeper/profile coverage、
-upstream focused suites and the M4 final aggregate are still required before M4 completion。
+injected marker/EndTxn failure、mandatory internal-topic NTC2 failure、BookKeeper/profile coverage、upstream focused suites
+and the M4 final aggregate are still required before M4 completion。
 
 ## 9. F9-M5 — Retention and compaction
 
@@ -1046,9 +1055,9 @@ recovery/continuation、already-dispatched append cut and BookKeeper three-profi
 the common BookKeeper provider-applied C cut、ACTIVE-state multi-controller kill/reconciliation、the complete
 before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store-publication matrix and actual Oxia
 transport reset/same-epoch retry are also covered；the initial snapshot-proof/capability-aggregation four-cut matrix is
-covered as well；the native checkpoint/virtual-segment trim/restart slice and completed group/transaction coordinator
-migration are covered；priority budgets、ongoing/aborted coordinator cuts、mandatory internal-topic NTC2 and broader chaos
-remain open。
+covered as well；the native checkpoint/virtual-segment trim/restart slice、completed coordinator migration and live OPEN
+Object-WAL COMMIT/ABORT migration are covered；priority budgets、injected resolution cuts、mandatory internal-topic NTC2、
+profile expansion and broader chaos remain open。
 
 ### Tasks
 
@@ -1062,6 +1071,7 @@ phase9M6KafkaFeatureCheck
 phase9M6CheckpointQuarantineCheck
 :nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest
 :nereus-kafka-adapter:f9CoordinatorMigrationProcessIntegrationTest
+:nereus-kafka-adapter:f9OngoingTransactionMigrationProcessIntegrationTest
 :nereus-kafka-adapter:f9MultiControllerFailoverProcessIntegrationTest
 :nereus-kafka-adapter:f9ActivationCutFailoverProcessIntegrationTest
 :nereus-kafka-adapter:f9ActivationProofCutFailoverProcessIntegrationTest

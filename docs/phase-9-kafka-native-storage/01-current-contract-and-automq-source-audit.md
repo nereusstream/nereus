@@ -660,7 +660,17 @@ completed transactional ID on node 1，then atomically reassigns the user partit
 reinitializes the same transactional ID and commits data/marker offsets 3/4；READ_COMMITTED sees both committed values and
 the same group resumes at visible offset 3 and commits offset 4，with final earliest/latest `0/5`。Fresh execution passes
 73/73 actionable tasks in 1m07s；the related baseline/takeover rerun passes 74/74 in 1m50s。This is completed-state
-internal-topic P/K takeover evidence，not an ongoing/aborted coordinator cut or mandatory-NTC2 proof。
+internal-topic P/K takeover evidence；the following gate covers the live OPEN-state path separately。
+
+Product `efe782d` adds `f9OngoingTransactionMigrationProcessIntegrationTest` on the same published fork and Object-WAL
+topology。It opens a transaction on broker 1 at data offset 0，holds LSO/read-committed end at 0，then moves the user
+partition and `__transaction_state-0` together to broker 2 while both processes stay alive。The original producer commits
+through the migrated coordinator，the COMMIT marker occupies offset 1 and the same transactional ID continues at data/marker
+2/3。A second OPEN transaction starts at data offset 4 on broker 2；the two partitions move back to broker 1，the original
+producer aborts through the reverse-migrated coordinator and the asynchronous ABORT marker releases LSO at offset 6。The
+same aborted transactional ID then commits data/marker 6/7；READ_COMMITTED from 4 skips directly to 6 and final
+earliest/latest is `0/8`。Both handoffs require exact singleton leader/replicas/ISR and an empty reassignment map。Fresh
+execution passes 64/64 tasks in 47s；mandatory NTC2、injected marker/EndTxn failure and non-Object profiles remain open。
 
 `f9InFlightTakeoverProcessIntegrationTest` adds the C cut with an independent controller JVM、a Toxiproxy-held
 single-attempt Produce、`jcmd` proof of `NereusUnifiedLog.appendStable` waiting on the provider future and a broker-1
@@ -679,8 +689,9 @@ without changing production code：a test-only Java agent allows the real Bookie
 committing offset 1。Resuming broker 1 releases the delayed future but its stale metadata CAS cannot publish；LEO remains 2
 and WAL-only publishes no Object bytes。Fresh execution passes 66/66 actionable tasks in 1m30s。Because this cut precedes
 `DURABLE` and the profile-specific materialization branch，the same production boundary is shared by WAL-only、async and
-sync；the prior three-profile P matrix supplies the profile-specific half。Transaction/internal-topic coordinator migration
-for completed state is covered by the gate above；ongoing/aborted coordinator cuts and broader chaos remain open。The native
+sync；the prior three-profile P matrix supplies the profile-specific half。Completed and live OPEN Object-WAL
+transaction/internal-topic coordinator migration are covered by the gates above；injected resolution cuts、profile expansion
+and broader chaos remain open。The native
 checkpoint/virtual-segment trim/restart subset is now covered separately by
 `f9CheckpointTrimRecoveryProcessIntegrationTest`：stock DeleteRecords publishes a rooted NKC1、advances durable trim，
 survives forced broker death，hydrates the checkpoint under its captured pre-trim window，prunes canonical state to the

@@ -123,7 +123,7 @@ record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHol
 interfaces、an explicit native-storage launcher and a stock-owned controller metadata-publisher/runtime seam。Its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The SSH-published fork head is
-`nereus/future9-native-kafka-storage@80445853a3`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
+`nereus/future9-native-kafka-storage@1cbe8b65a8`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
 controller factories through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。The controller runtime now coalesces
 metadata/leadership callbacks、runs first activation only while locally current、retries only retriable product failures and
 cancels scheduled retry on leadership loss；activation scheduling additionally waits for finalized
@@ -153,8 +153,13 @@ matrix、the four-way initial snapshot-proof/capability-aggregation matrix and a
 reset/retry。`f9CoordinatorMigrationProcessIntegrationTest` now also keeps broker 1 alive while atomically moving the user
 partition、`__consumer_offsets-0` and `__transaction_state-0` to broker 2，then recovers group offset 2、reuses the same
 transactional ID for data/marker offsets 3/4、resumes the group at visible offset 3 and ends at earliest/latest `0/5`。
-Ongoing/aborted transaction takeover、mandatory internal-topic NTC2 failure、remaining DeleteRecords boundaries and wider
-chaos evidence remain future work，so this is not yet a production-rollout claim.
+`f9OngoingTransactionMigrationProcessIntegrationTest` further holds an OPEN transaction while moving the user partition
+and `__transaction_state-0` in one Admin request from broker 1 to broker 2，commits through the migrated coordinator，then opens a
+second transaction and moves both partitions back to broker 1 before aborting。The gate requires exact singleton
+leader/replicas/ISR on every handoff、both JVMs alive、LSO convergence `0 -> 2 -> 4 -> 6 -> 8`，same-ID continuation after
+both outcomes and `read_committed` skipping the aborted data。Mandatory internal-topic NTC2 failure、injected
+abort-resolution cuts、BookKeeper/profile expansion、remaining DeleteRecords boundaries and wider chaos evidence remain
+future work，so this is not yet a production-rollout claim.
 
 ## Current Phase
 
