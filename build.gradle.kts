@@ -3346,8 +3346,11 @@ tasks.register("phase9ScaleCheck") {
 tasks.register("phase9ChaosCheck") {
     group = "verification"
     description =
-        "Run the implemented F9-M7 repeated leader-churn and stale-authority process boundary."
+        "Run the implemented F9-M7 leader-churn and Oxia/Object/BookKeeper response-loss matrix."
     dependsOn("checkPhase9ScenarioManifest")
     dependsOn("phase9SourceLockCheck")
     dependsOn(":nereus-kafka-adapter:f9LeaderChurnChaosProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9ActivationTransportRecoveryProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9TrimResponseLossProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9TrimProfileMatrixProcessIntegrationTest")
 }

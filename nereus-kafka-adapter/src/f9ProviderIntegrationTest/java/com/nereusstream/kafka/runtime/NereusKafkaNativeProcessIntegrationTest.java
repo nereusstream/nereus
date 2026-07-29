@@ -3672,7 +3672,7 @@ class NereusKafkaNativeProcessIntegrationTest {
 
     @Test
     @Timeout(value = 6, unit = TimeUnit.MINUTES)
-    void controllerRetriesActualOxiaTransportFailureDuringFirstActivation()
+    void scenarioKfScl007()
             throws Exception {
         clearFailureEvidence();
         Path kafkaCheckout = requiredKafkaCheckout();
@@ -3707,6 +3707,12 @@ class NereusKafkaNativeProcessIntegrationTest {
         Path brokerServerLog =
                 root.resolve(
                         "activation-transport-broker-server.log");
+        Path controllerRestartLog =
+                root.resolve(
+                        "activation-transport-controller-restart.log");
+        Path brokerRestartLog =
+                root.resolve(
+                        "activation-transport-broker-restart.log");
         int controllerBrokerPort = freePort();
         int controllerPort =
                 differentFreePort(
@@ -3826,6 +3832,7 @@ class NereusKafkaNativeProcessIntegrationTest {
             Process controller = null;
             Process broker = null;
             boolean toxicInstalled = false;
+            boolean restarted = false;
             Throwable failure = null;
             try {
                 controller =
@@ -3951,6 +3958,104 @@ class NereusKafkaNativeProcessIntegrationTest {
                                 objectCount(
                                         bucket))
                         .isPositive();
+
+                stopBroker(
+                        broker,
+                        brokerServerLog);
+                broker = null;
+                killBroker(
+                        controller,
+                        controllerServerLog);
+                controller = null;
+                restarted = true;
+                controller =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        controllerConfig.toString()),
+                                kafkaHome,
+                                controllerRestartLog);
+                ControllerQuorumEvidence
+                        restartedControllerQuorum =
+                                awaitControllerQuorum(
+                                        controllerAdminProperties(
+                                                controllerBootstrap),
+                                        List.of(1),
+                                        -1,
+                                        controllerQuorum
+                                                .leaderEpoch(),
+                                        List.of(
+                                                controller),
+                                        controllerRestartLog);
+                broker =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        brokerConfig.toString()),
+                                kafkaHome,
+                                brokerRestartLog);
+                awaitBroker(
+                        brokerBootstrap,
+                        broker,
+                        brokerRestartLog);
+                awaitControllerActivationReconciliation(
+                        controller,
+                        controllerRestartLog,
+                        restartedControllerQuorum);
+                awaitActiveActivation(
+                        nereusCluster,
+                        kafkaClusterId,
+                        List.of(2),
+                        new Path[] {
+                                controllerRestartLog,
+                                brokerRestartLog
+                        },
+                        Duration.ofSeconds(45));
+                assertThat(
+                                fetch(
+                                                brokerBootstrap,
+                                                partition,
+                                                0,
+                                                brokerRestartLog)
+                                        .value())
+                        .as(
+                                "fresh processes must recover the append committed after Oxia transport restoration")
+                        .isEqualTo(value);
+                byte[] restartedValue =
+                        "activation-transport-restarted"
+                                .getBytes(
+                                        StandardCharsets.UTF_8);
+                RecordMetadata restartedProduce =
+                        produce(
+                                brokerBootstrap,
+                                topic,
+                                "transport-restart-key"
+                                        .getBytes(
+                                                StandardCharsets.UTF_8),
+                                restartedValue);
+                assertThat(
+                                restartedProduce
+                                        .offset())
+                        .isEqualTo(1L);
+                assertThat(
+                                fetch(
+                                                brokerBootstrap,
+                                                partition,
+                                                1,
+                                                brokerRestartLog)
+                                        .value())
+                        .isEqualTo(
+                                restartedValue);
+                try (Admin admin =
+                        Admin.create(
+                                adminProperties(
+                                        brokerBootstrap))) {
+                    assertOffsets(
+                            admin,
+                            partition,
+                            0,
+                            2);
+                }
             } catch (Throwable operationFailure) {
                 failure = operationFailure;
             }
@@ -3971,8 +4076,12 @@ class NereusKafkaNativeProcessIntegrationTest {
                     broker
             };
             Path[] serverLogs = {
-                    controllerServerLog,
-                    brokerServerLog
+                    restarted
+                            ? controllerRestartLog
+                            : controllerServerLog,
+                    restarted
+                            ? brokerRestartLog
+                            : brokerServerLog
             };
             for (int index = processes.length - 1;
                     index >= 0;
@@ -4006,6 +4115,11 @@ class NereusKafkaNativeProcessIntegrationTest {
                                     brokerFormatLog
                             },
                             serverLogs);
+                    preserveAdditionalFailureEvidence(
+                            controllerServerLog,
+                            brokerServerLog,
+                            controllerRestartLog,
+                            brokerRestartLog);
                 } catch (AssertionError evidenceFailure) {
                     failure.addSuppressed(
                             evidenceFailure);

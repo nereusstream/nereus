@@ -756,7 +756,7 @@ tasks.register<Test>("f9ActivationTransportRecoveryProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "controllerRetriesActualOxiaTransportFailureDuringFirstActivation",
+                "scenarioKfScl007",
         )
     }
 }
