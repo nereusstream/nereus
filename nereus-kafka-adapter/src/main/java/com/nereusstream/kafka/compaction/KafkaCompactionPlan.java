@@ -111,22 +111,21 @@ public record KafkaCompactionPlan(
             });
     compatibility.requireCurrent();
 
-    String expectedId =
-        KafkaCompactionPlanCodecV1.planIdFor(
-            streamId,
-            materializationTaskId,
-            bindingMetadataVersion,
-            lastStableOffset,
-            highWatermark,
-            candidate,
-            decisionSources,
-            outputSourceCount,
-            outputSourceSetSha256,
-            materializationPolicySha256,
-            passOneSnapshot,
-            compatibility);
     this.planId = requireText(planId, "planId");
-    if (!this.planId.equals(expectedId)) {
+    if (!KafkaCompactionPlanCodecV1.matchesPlanId(
+        this.planId,
+        streamId,
+        materializationTaskId,
+        bindingMetadataVersion,
+        lastStableOffset,
+        highWatermark,
+        candidate,
+        decisionSources,
+        outputSourceCount,
+        outputSourceSetSha256,
+        materializationPolicySha256,
+        passOneSnapshot,
+        compatibility)) {
       throw new IllegalArgumentException("Kafka compaction planId is not canonical");
     }
   }

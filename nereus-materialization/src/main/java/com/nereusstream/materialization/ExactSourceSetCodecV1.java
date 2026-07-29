@@ -28,6 +28,8 @@ import java.util.Optional;
 /** Strict canonical binary codec for a durable exact source-set snapshot. */
 public final class ExactSourceSetCodecV1 {
     public static final int MAX_ENCODED_BYTES = 64 << 10;
+    public static final int MAX_EXTENDED_ENCODED_BYTES = 1 << 20;
+    public static final int MAX_EXTENDED_SOURCE_RANGES = 4_096;
 
     private static final int MAGIC = 0x45585331; // EXS1
     private static final int VERSION = 1;
@@ -45,7 +47,29 @@ public final class ExactSourceSetCodecV1 {
     }
 
     public byte[] encode(ExactSourceSet sourceSet) {
+        return encode(
+                sourceSet,
+                MAX_ENCODED_BYTES,
+                MaterializationPolicy.MAX_SOURCE_RANGES);
+    }
+
+    /**
+     * Encodes the same EXS1 canonical form under a caller-owned enclosing-record budget.
+     *
+     * <p>The extended form is reserved for codecs that immediately apply their own bounded
+     * durable representation, such as compressed Kafka compaction plans. It does not raise the
+     * ordinary F4 source-set limit.
+     */
+    public byte[] encode(
+            ExactSourceSet sourceSet,
+            int maximumEncodedBytes,
+            int maximumSourceRanges) {
         ExactSourceSet exact = Objects.requireNonNull(sourceSet, "sourceSet");
+        requireExtendedLimits(maximumEncodedBytes, maximumSourceRanges);
+        if (exact.sources().size() > maximumSourceRanges) {
+            throw new IllegalArgumentException(
+                    "exact source-set source count exceeds its caller limit");
+        }
         try {
             Writer writer = new Writer();
             writer.intValue(MAGIC);
@@ -59,8 +83,14 @@ public final class ExactSourceSetCodecV1 {
                 writeSource(writer, source);
             }
             byte[] encoded = writer.bytes();
-            if (encoded.length > MAX_ENCODED_BYTES) {
-                throw new IllegalArgumentException("exact source-set encoding exceeds its byte limit");
+            if (encoded.length > maximumEncodedBytes) {
+                throw new IllegalArgumentException(
+                        "exact source-set encoding exceeds its byte limit"
+                                + " [encodedBytes="
+                                + encoded.length
+                                + ", sourceCount="
+                                + exact.sources().size()
+                                + "]");
             }
             return encoded;
         } catch (IOException failure) {
@@ -69,8 +99,20 @@ public final class ExactSourceSetCodecV1 {
     }
 
     public ExactSourceSet decode(byte[] bytes) {
+        return decode(
+                bytes,
+                MAX_ENCODED_BYTES,
+                MaterializationPolicy.MAX_SOURCE_RANGES);
+    }
+
+    /** Decodes the extended EXS1 form under the same caller-owned bounds used to encode it. */
+    public ExactSourceSet decode(
+            byte[] bytes,
+            int maximumEncodedBytes,
+            int maximumSourceRanges) {
+        requireExtendedLimits(maximumEncodedBytes, maximumSourceRanges);
         byte[] exact = Objects.requireNonNull(bytes, "bytes").clone();
-        if (exact.length == 0 || exact.length > MAX_ENCODED_BYTES) {
+        if (exact.length == 0 || exact.length > maximumEncodedBytes) {
             throw malformed("exact source-set payload has an invalid length", null);
         }
         try {
@@ -85,7 +127,7 @@ public final class ExactSourceSetCodecV1 {
             int sourceCount =
                     reader.count(
                             "sourceCount",
-                            MaterializationPolicy.MAX_SOURCE_RANGES,
+                            maximumSourceRanges,
                             Long.BYTES * 12);
             if (sourceCount == 0) {
                 throw malformed("exact source-set source count cannot be zero", null);
@@ -102,6 +144,17 @@ public final class ExactSourceSetCodecV1 {
                 throw failure;
             }
             throw malformed("invalid exact source-set fields", failure);
+        }
+    }
+
+    private static void requireExtendedLimits(
+            int maximumEncodedBytes, int maximumSourceRanges) {
+        if (maximumEncodedBytes <= 0
+                || maximumEncodedBytes > MAX_EXTENDED_ENCODED_BYTES
+                || maximumSourceRanges <= 0
+                || maximumSourceRanges > MAX_EXTENDED_SOURCE_RANGES) {
+            throw new IllegalArgumentException(
+                    "extended exact source-set limits are outside hard codec bounds");
         }
     }
 

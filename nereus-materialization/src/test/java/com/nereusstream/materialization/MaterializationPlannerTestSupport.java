@@ -522,7 +522,10 @@ final class MaterializationPlannerTestSupport {
         boolean direct =
                 authorityMode
                         == MaterializationStreamAuthorityMode
-                                .DIRECT_STREAM;
+                                .DIRECT_STREAM
+                        || authorityMode
+                                == MaterializationStreamAuthorityMode
+                                        .KAFKA_TOPIC_COMPACTION;
         MaterializationStreamRegistrationRecord record = new MaterializationStreamRegistrationRecord(
                 1,
                 STREAM.value(),

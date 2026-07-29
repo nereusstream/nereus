@@ -224,11 +224,9 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
                         (snapshot, registration) ->
                                 new Authority(
                                         Objects.requireNonNull(snapshot, "stream snapshot"),
-                                        registration.orElseThrow(
-                                                () ->
-                                                        condition(
-                                                                "materialization stream"
-                                                                    + " registration is absent"))));
+                                        Objects.requireNonNull(
+                                                registration,
+                                                "materialization stream registration")));
     }
 
     private ExactSourceSet selectExactSourceSet(
@@ -321,7 +319,10 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
             StreamId streamId, OffsetRange coverage, Authority authority) {
         StreamMetadataSnapshot snapshot = authority.snapshot();
         if (!snapshot.metadata().streamId().equals(streamId.value())
-                || !authority.registration().value().streamId().equals(streamId.value())) {
+                || authority
+                        .registration()
+                        .filter(value -> !value.value().streamId().equals(streamId.value()))
+                        .isPresent()) {
             throw invariant("COMMITTED source authority belongs to another stream", null);
         }
         StreamState state;
@@ -336,9 +337,7 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
         if (state != StreamState.ACTIVE && state != StreamState.SEALED) {
             throw condition("stream state does not admit COMMITTED source resolution");
         }
-        if (!profile.objectMaterializationEnabled()
-                || !authority.registration().value().storageProfile().equals(profile.name())
-                || !matchesAuthorityMode(streamId, profile, authority)) {
+        if (!matchesAuthorityMode(streamId, profile, authority)) {
             throw condition(
                     "materialization registration no longer matches stream profile/projection");
         }
@@ -352,17 +351,31 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
 
     private boolean matchesAuthorityMode(
             StreamId streamId, StorageProfile profile, Authority authority) {
+        if (authorityMode == MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION
+                && profile == StorageProfile.BOOKKEEPER_WAL_ONLY) {
+            return authority.registration().isEmpty()
+                    && authority.effectiveProjection().isEmpty();
+        }
+        VersionedMaterializationStreamRegistration registration =
+                authority
+                        .registration()
+                        .orElseThrow(
+                                () ->
+                                        condition(
+                                                "materialization stream registration is absent"));
+        if (!profile.objectMaterializationEnabled()
+                || !registration.value().storageProfile().equals(profile.name())) {
+            return false;
+        }
         if (authorityMode == MaterializationStreamAuthorityMode.PROJECTION_REQUIRED) {
             return authority.effectiveProjection().isPresent();
         }
         return authority.effectiveProjection().isEmpty()
-                && authority
-                        .registration()
+                && registration
                         .value()
                         .projectionRef()
                         .equals(DirectMaterializationStreamAuthority.encodedProjectionRef())
-                && authority
-                        .registration()
+                && registration
                         .value()
                         .projectionIdentitySha256()
                         .equals(
@@ -374,8 +387,6 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
     private static void requireStableAuthority(
             CommittedSourceSetResolution expected, Authority current) {
         StreamMetadataSnapshot previous = expected.streamSnapshot();
-        var previousRegistration = expected.registration().value();
-        var currentRegistration = current.registration().value();
         long sourceCommitVersion =
                 expected.sourceSet()
                         .sources()
@@ -384,18 +395,27 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
         if (!previous.metadata().profile().equals(current.snapshot().metadata().profile())
                 || previous.metadata().policyVersion()
                         != current.snapshot().metadata().policyVersion()
-                || !previousRegistration.streamId().equals(currentRegistration.streamId())
-                || !previousRegistration.projectionRef().equals(currentRegistration.projectionRef())
-                || !previousRegistration
-                        .projectionIdentitySha256()
-                        .equals(currentRegistration.projectionIdentitySha256())
-                || !previousRegistration
-                        .storageProfile()
-                        .equals(currentRegistration.storageProfile())
+                || !sameRegistrationAuthority(expected.registration(), current.registration())
                 || current.snapshot().committedEnd().commitVersion() < sourceCommitVersion) {
             throw condition(
                     "COMMITTED source stream or registration authority changed during resolution");
         }
+    }
+
+    private static boolean sameRegistrationAuthority(
+            Optional<VersionedMaterializationStreamRegistration> previous,
+            Optional<VersionedMaterializationStreamRegistration> current) {
+        if (previous.isEmpty() || current.isEmpty()) {
+            return previous.isEmpty() == current.isEmpty();
+        }
+        var previousValue = previous.orElseThrow().value();
+        var currentValue = current.orElseThrow().value();
+        return previousValue.streamId().equals(currentValue.streamId())
+                && previousValue.projectionRef().equals(currentValue.projectionRef())
+                && previousValue
+                        .projectionIdentitySha256()
+                        .equals(currentValue.projectionIdentitySha256())
+                && previousValue.storageProfile().equals(currentValue.storageProfile());
     }
 
     private static int comparePath(Path left, Path right) {
@@ -457,12 +477,17 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
 
     private record Authority(
             StreamMetadataSnapshot snapshot,
-            VersionedMaterializationStreamRegistration registration,
+            Optional<VersionedMaterializationStreamRegistration> registration,
             Optional<ProjectionRef> effectiveProjection) {
         private Authority(
                 StreamMetadataSnapshot snapshot,
-                VersionedMaterializationStreamRegistration registration) {
-            this(snapshot, registration, decodeProjection(registration.value().projectionRef()));
+                Optional<VersionedMaterializationStreamRegistration> registration) {
+            this(
+                    snapshot,
+                    registration,
+                    registration
+                            .map(value -> decodeProjection(value.value().projectionRef()))
+                            .orElseGet(Optional::empty));
         }
 
         private static Optional<ProjectionRef> decodeProjection(String encoded) {

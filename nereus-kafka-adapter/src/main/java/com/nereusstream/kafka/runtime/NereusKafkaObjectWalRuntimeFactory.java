@@ -691,6 +691,12 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                         constructedResources,
                         "kafka-compaction-staging-files",
                         stagingFiles));
+                List<MaterializationSourceProvider> compactionSources =
+                        bookKeeperRuntime == null
+                                ? List.of()
+                                : List.of(
+                                        bookKeeperRuntime
+                                                .materializationSourceProvider());
                 backgroundServiceFactories.add(
                         partitions -> KafkaCompactionProductionRuntimeFactory.create(
                                 compaction,
@@ -705,6 +711,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                                 protections,
                                 readPins,
                                 readers,
+                                compactionSources,
                                 objectStore,
                                 stagingFiles,
                                 exactActivationVerifier,

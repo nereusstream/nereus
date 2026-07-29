@@ -2567,16 +2567,90 @@ class NereusKafkaNativeProcessIntegrationTest {
                 root.resolve("kafka-mandatory-ntc2-distribution"));
         Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
         Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
-        Path brokerOneConfig = root.resolve("mandatory-ntc2-one.properties");
-        Path brokerTwoConfig = root.resolve("mandatory-ntc2-two.properties");
-        Path brokerOneFormatLog = root.resolve("mandatory-ntc2-one-format.log");
-        Path brokerTwoFormatLog = root.resolve("mandatory-ntc2-two-format.log");
-        Path brokerOneServerLog = root.resolve("mandatory-ntc2-one-server.log");
-        Path brokerTwoServerLog = root.resolve("mandatory-ntc2-two-server.log");
-        String bucket = "nereus-ntc2-" + UUID.randomUUID();
-        String topic = "process-mandatory-ntc2-" + UUID.randomUUID();
-        String groupId = "process-mandatory-ntc2-group-" + UUID.randomUUID();
-        String nereusCluster = "f9-process-mandatory-ntc2-" + UUID.randomUUID();
+        runMandatoryInternalTopicNtc2Profile(
+                kafkaHome,
+                formatScript,
+                startScript,
+                new MandatoryNtc2Profile(
+                        "OBJECT_WAL_SYNC_OBJECT",
+                        "mandatory-ntc2-object-sync",
+                        40),
+                null);
+    }
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.MINUTES)
+    void remainingStorageProfilesBlockInternalTopicElectionUntilNtc2Repair()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-mandatory-ntc2-profile-matrix-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        runMandatoryInternalTopicNtc2Profile(
+                kafkaHome,
+                formatScript,
+                startScript,
+                new MandatoryNtc2Profile(
+                        "OBJECT_WAL_ASYNC_OBJECT",
+                        "mandatory-ntc2-object-async",
+                        41),
+                null);
+
+        int zooKeeperPort = freePort();
+        String metadataServiceUri =
+                "zk+longhierarchical://127.0.0.1:"
+                        + zooKeeperPort
+                        + "/ledgers";
+        try (LocalBookKeeper ignored = startBookKeeper(zooKeeperPort)) {
+            for (MandatoryNtc2Profile profile :
+                    List.of(
+                            new MandatoryNtc2Profile(
+                                    "BOOKKEEPER_WAL_ONLY",
+                                    "mandatory-ntc2-bookkeeper-only",
+                                    42),
+                            new MandatoryNtc2Profile(
+                                    "BOOKKEEPER_WAL_ASYNC_OBJECT",
+                                    "mandatory-ntc2-bookkeeper-async",
+                                    43),
+                            new MandatoryNtc2Profile(
+                                    "BOOKKEEPER_WAL_SYNC_OBJECT",
+                                    "mandatory-ntc2-bookkeeper-sync",
+                                    44))) {
+                runMandatoryInternalTopicNtc2Profile(
+                        kafkaHome,
+                        formatScript,
+                        startScript,
+                        profile,
+                        metadataServiceUri);
+            }
+        }
+    }
+
+    private void runMandatoryInternalTopicNtc2Profile(
+            Path kafkaHome,
+            Path formatScript,
+            Path startScript,
+            MandatoryNtc2Profile profile,
+            String metadataServiceUri
+    ) throws Exception {
+        String fixtureToken = profile.fixtureToken();
+        Path brokerOneConfig = root.resolve(fixtureToken + "-one.properties");
+        Path brokerTwoConfig = root.resolve(fixtureToken + "-two.properties");
+        Path brokerOneFormatLog = root.resolve(fixtureToken + "-one-format.log");
+        Path brokerTwoFormatLog = root.resolve(fixtureToken + "-two-format.log");
+        Path brokerOneServerLog = root.resolve(fixtureToken + "-one-server.log");
+        Path brokerTwoServerLog = root.resolve(fixtureToken + "-two-server.log");
+        String bucket =
+                "n-f9-ntc2-"
+                        + profile.authoritySeed()
+                        + "-"
+                        + UUID.randomUUID().toString().substring(0, 12);
+        String topic = fixtureToken + "-" + UUID.randomUUID();
+        String groupId = fixtureToken + "-group-" + UUID.randomUUID();
+        String nereusCluster = "f9-" + fixtureToken + "-" + UUID.randomUUID();
         String kafkaClusterId = org.apache.kafka.common.Uuid.randomUuid().toString();
         int brokerOnePort = freePort();
         int controllerPort = differentFreePort(brokerOnePort);
@@ -2584,6 +2658,36 @@ class NereusKafkaNativeProcessIntegrationTest {
         String brokerOneBootstrap = "127.0.0.1:" + brokerOnePort;
         String brokerTwoBootstrap = "127.0.0.1:" + brokerTwoPort;
         String clusterBootstrap = brokerOneBootstrap + "," + brokerTwoBootstrap;
+        BookKeeperProcessConfiguration bookKeeper = null;
+        if (profile.storageProfile().startsWith("BOOKKEEPER_WAL_")) {
+            if (metadataServiceUri == null || metadataServiceUri.isBlank()) {
+                throw new IllegalArgumentException(
+                        "BookKeeper mandatory-NTC2 profile requires metadata");
+            }
+            Path passwordFile = root.resolve(fixtureToken + "-password.bin");
+            Files.write(
+                    passwordFile,
+                    ("f9-" + fixtureToken + "-process-password")
+                            .getBytes(StandardCharsets.UTF_8));
+            bookKeeper =
+                    bookKeeperProcessConfiguration(
+                            metadataServiceUri,
+                            fixtureToken,
+                            passwordFile,
+                            profile.authoritySeed(),
+                            2);
+            seedBookKeeperAuthority(
+                    oxiaConfiguration(),
+                    bookKeeperWalConfiguration(
+                            bookKeeper,
+                            profile.storageProfile()
+                                    .equals("BOOKKEEPER_WAL_ASYNC_OBJECT")),
+                    bookKeeper,
+                    Clock.systemUTC());
+        } else if (metadataServiceUri != null) {
+            throw new IllegalArgumentException(
+                    "Object-WAL mandatory-NTC2 profile cannot accept BookKeeper metadata");
+        }
 
         createBucket(bucket);
         writeConfiguration(
@@ -2591,11 +2695,11 @@ class NereusKafkaNativeProcessIntegrationTest {
                 brokerOnePort,
                 controllerPort,
                 bucket,
-                root.resolve("mandatory-ntc2-one-log"),
-                root.resolve("mandatory-ntc2-one-metadata"),
-                root.resolve("mandatory-ntc2-one-cache"),
-                "OBJECT_WAL_SYNC_OBJECT",
-                null,
+                root.resolve(fixtureToken + "-one-log"),
+                root.resolve(fixtureToken + "-one-metadata"),
+                root.resolve(fixtureToken + "-one-cache"),
+                profile.storageProfile(),
+                bookKeeper,
                 1,
                 true,
                 nereusCluster);
@@ -2604,11 +2708,11 @@ class NereusKafkaNativeProcessIntegrationTest {
                 brokerTwoPort,
                 controllerPort,
                 bucket,
-                root.resolve("mandatory-ntc2-two-log"),
-                root.resolve("mandatory-ntc2-two-metadata"),
-                root.resolve("mandatory-ntc2-two-cache"),
-                "OBJECT_WAL_SYNC_OBJECT",
-                null,
+                root.resolve(fixtureToken + "-two-log"),
+                root.resolve(fixtureToken + "-two-metadata"),
+                root.resolve(fixtureToken + "-two-cache"),
+                profile.storageProfile(),
+                bookKeeper,
                 2,
                 false,
                 nereusCluster);
@@ -10439,6 +10543,22 @@ class NereusKafkaNativeProcessIntegrationTest {
                     || authoritySeed <= 0) {
                 throw new IllegalArgumentException(
                         "invalid transaction-resolution profile");
+            }
+        }
+    }
+
+    private record MandatoryNtc2Profile(
+            String storageProfile,
+            String fixtureToken,
+            int authoritySeed) {
+        private MandatoryNtc2Profile {
+            if (storageProfile == null
+                    || storageProfile.isBlank()
+                    || fixtureToken == null
+                    || fixtureToken.isBlank()
+                    || authoritySeed <= 0) {
+                throw new IllegalArgumentException(
+                        "invalid mandatory-NTC2 profile");
             }
         }
     }

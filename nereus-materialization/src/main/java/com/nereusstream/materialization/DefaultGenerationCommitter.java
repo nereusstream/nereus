@@ -367,21 +367,12 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                             () -> generationStore.getStreamRegistration(cluster, task.streamId()),
                             "load materialization stream registration")
                     .thenCompose(
-                            optional -> {
-                                VersionedMaterializationStreamRegistration registration =
-                                        optional.orElseThrow(
-                                                () ->
-                                                        condition(
-                                                                "materialization stream"
-                                                                    + " registration is absent"));
-                                AdmissionSubject subject = validateRegistration(registration);
-                                return loadSnapshot()
-                                        .thenApply(
-                                                snapshot -> {
-                                                    validateSnapshot(snapshot, subject.profile());
-                                                    return subject;
-                                                });
-                            })
+                            registration ->
+                                    loadSnapshot()
+                                            .thenApply(
+                                                    snapshot ->
+                                                            validateAuthority(
+                                                                    registration, snapshot)))
                     .thenCompose(
                             subject ->
                                     deadline.bound(
@@ -1308,7 +1299,9 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 throw invariant(
                         "materialization registration projection identity is malformed", failure);
             }
-            if (authorityMode == MaterializationStreamAuthorityMode.DIRECT_STREAM) {
+            if (authorityMode == MaterializationStreamAuthorityMode.DIRECT_STREAM
+                    || authorityMode
+                            == MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION) {
                 Checksum expectedIdentity =
                         DirectMaterializationStreamAuthority.identitySha256(
                                 task.streamId(), profile);
@@ -1353,6 +1346,64 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                             projection,
                             new Checksum(ChecksumType.SHA256, value.projectionIdentitySha256()));
             return new AdmissionSubject(profile, subject);
+        }
+
+        private AdmissionSubject validateAuthority(
+                Optional<VersionedMaterializationStreamRegistration> registration,
+                StreamMetadataSnapshot snapshot) {
+            Objects.requireNonNull(registration, "registration");
+            StorageProfile snapshotProfile = snapshotProfile(snapshot);
+            if (authorityMode == MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION) {
+                if (task.view() != ReadView.TOPIC_COMPACTED
+                        || task.taskKind() != TaskKind.TOPIC_KEY_COMPACTION) {
+                    throw new IllegalArgumentException(
+                            "Kafka topic-compaction authority admits only topic-key compaction");
+                }
+                if (snapshotProfile == StorageProfile.BOOKKEEPER_WAL_ONLY) {
+                    if (registration.isPresent()) {
+                        throw invariant(
+                                "BookKeeper WAL-only Kafka compaction must not use a"
+                                    + " materialization stream registration");
+                    }
+                    requireProjectionFreeAuthority();
+                    validateSnapshot(snapshot, snapshotProfile);
+                    return new AdmissionSubject(
+                            snapshotProfile,
+                            new LiveStreamSubject(
+                                    task.streamId(),
+                                    DirectMaterializationStreamAuthority.identitySha256(
+                                            task.streamId(), snapshotProfile)));
+                }
+            }
+            AdmissionSubject subject =
+                    validateRegistration(
+                            registration.orElseThrow(
+                                    () ->
+                                            condition(
+                                                    "materialization stream registration is"
+                                                        + " absent")));
+            validateSnapshot(snapshot, subject.profile());
+            return subject;
+        }
+
+        private void requireProjectionFreeAuthority() {
+            if (output.projectionRef().isPresent()
+                    || task.sources().stream()
+                            .anyMatch(source -> source.projectionRef().isPresent())) {
+                throw invariant(
+                        "direct-stream generation publication contains projection authority");
+            }
+        }
+
+        private StorageProfile snapshotProfile(StreamMetadataSnapshot snapshot) {
+            if (!snapshot.metadata().streamId().equals(task.streamId().value())) {
+                throw invariant("stream snapshot belongs to another stream");
+            }
+            try {
+                return StorageProfile.valueOf(snapshot.metadata().profile()).canonical();
+            } catch (IllegalArgumentException failure) {
+                throw invariant("stream snapshot contains an unknown profile", failure);
+            }
         }
 
         private void validateSnapshot(

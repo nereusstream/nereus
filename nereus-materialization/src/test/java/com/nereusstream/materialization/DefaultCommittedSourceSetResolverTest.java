@@ -249,6 +249,57 @@ class DefaultCommittedSourceSetResolverTest {
                         "materialization registration no longer matches stream profile/projection");
     }
 
+    @Test
+    void kafkaCompactionModeRootsWalOnlySourcesInL0WithoutARegistration() {
+        List<VersionedGenerationCandidate> candidates =
+                List.of(
+                        MaterializationPlannerTestSupport.kafkaZero(
+                                "/index/kafka-source-2", 0, 2, 0, 100, 2),
+                        MaterializationPlannerTestSupport.kafkaZero(
+                                "/index/kafka-source-4", 2, 4, 100, 100, 4));
+        GenerationMetadataStore generations =
+                withoutRegistration(
+                        MaterializationPlannerTestSupport.generationStore(
+                                candidates,
+                                List.of(),
+                                null,
+                                StorageProfile.BOOKKEEPER_WAL_ONLY,
+                                MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION));
+        OxiaMetadataStore l0 =
+                MaterializationPlannerTestSupport.l0Store(
+                        MaterializationPlannerTestSupport.snapshot(
+                                0, 4, StorageProfile.BOOKKEEPER_WAL_ONLY));
+        DefaultCommittedSourceSetResolver resolver =
+                new DefaultCommittedSourceSetResolver(
+                        CLUSTER,
+                        l0,
+                        generations,
+                        2,
+                        MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION);
+
+        CommittedSourceSetResolution resolution =
+                resolver.resolve(STREAM, new OffsetRange(0, 4)).join();
+
+        assertThat(resolution.registration()).isEmpty();
+        assertThat(resolution.sourceSet().sources())
+                .allSatisfy(source -> assertThat(source.projectionRef()).isEmpty());
+        resolver.revalidate(resolution).join();
+
+        DefaultCommittedSourceSetResolver ordinaryDirectStream =
+                new DefaultCommittedSourceSetResolver(
+                        CLUSTER,
+                        l0,
+                        generations,
+                        2,
+                        MaterializationStreamAuthorityMode.DIRECT_STREAM);
+        assertThatThrownBy(
+                        () ->
+                                ordinaryDirectStream
+                                        .resolve(STREAM, new OffsetRange(0, 4))
+                                        .join())
+                .hasRootCauseMessage("materialization stream registration is absent");
+    }
+
     private static VersionedMaterializationStreamRegistration directRegistration() {
         StorageProfile profile = StorageProfile.OBJECT_WAL_SYNC_OBJECT;
         long metadataVersion = 7;
@@ -285,6 +336,34 @@ class DefaultCommittedSourceSetResolverTest {
                             if (method.getDeclaringClass() == Object.class) {
                                 return switch (method.getName()) {
                                     case "toString" -> "direct-registration-generation-store";
+                                    case "hashCode" -> System.identityHashCode(proxy);
+                                    case "equals" -> proxy == args[0];
+                                    default ->
+                                            throw new UnsupportedOperationException(
+                                                    method.getName());
+                                };
+                            }
+                            try {
+                                return method.invoke(delegate, args);
+                            } catch (InvocationTargetException failure) {
+                                throw failure.getCause();
+                            }
+                        });
+    }
+
+    private static GenerationMetadataStore withoutRegistration(
+            GenerationMetadataStore delegate) {
+        return (GenerationMetadataStore)
+                Proxy.newProxyInstance(
+                        GenerationMetadataStore.class.getClassLoader(),
+                        new Class<?>[] {GenerationMetadataStore.class},
+                        (proxy, method, args) -> {
+                            if (method.getName().equals("getStreamRegistration")) {
+                                return CompletableFuture.completedFuture(Optional.empty());
+                            }
+                            if (method.getDeclaringClass() == Object.class) {
+                                return switch (method.getName()) {
+                                    case "toString" -> "absent-registration-generation-store";
                                     case "hashCode" -> System.identityHashCode(proxy);
                                     case "equals" -> proxy == args[0];
                                     default ->

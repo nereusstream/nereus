@@ -34,6 +34,7 @@ import com.nereusstream.kafka.compaction.KafkaCompactionPassOneCollector.Snapsho
 import com.nereusstream.kafka.compaction.KafkaCompactionPlanner.Candidate;
 import com.nereusstream.kafka.compaction.KafkaCompactionPlanner.Policy;
 import com.nereusstream.materialization.ExactSourceSet;
+import com.nereusstream.materialization.ExactSourceSetCodecV1;
 import com.nereusstream.materialization.MaterializationPolicy;
 import com.nereusstream.materialization.MaterializationPolicyFactory;
 import com.nereusstream.materialization.MaterializationTask;
@@ -123,6 +124,62 @@ class KafkaCompactionPlanCodecV1Test {
         .hasMessageContaining("differs");
   }
 
+  @Test
+  void compressesAnExtendedDecisionSetWithoutRaisingTheOrdinaryExs1Limit() {
+    KafkaCompactionPlan plan = extendedDecisionPlan();
+
+    assertThatThrownBy(() -> new ExactSourceSetCodecV1().encode(plan.decisionSources()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("byte limit");
+
+    byte[] encoded = codec.encode(plan);
+
+    assertThat(encoded).hasSizeLessThanOrEqualTo(KafkaCompactionPlanCodecV1.MAX_ENCODED_BYTES);
+    assertThat(codec.decode(encoded)).isEqualTo(plan);
+    assertThat(codec.encode(codec.decode(encoded))).isEqualTo(encoded);
+  }
+
+  @Test
+  void preservesLegacyRawKcp1BytesAcrossDecodeAndReencode() {
+    Fixture fixture = fixture("UNCOMPRESSED");
+    KafkaCompactionPlan current = fixture.plan();
+    String legacyPlanId =
+        KafkaCompactionPlanCodecV1.legacyPlanIdFor(
+            current.streamId(),
+            current.materializationTaskId(),
+            current.bindingMetadataVersion(),
+            current.lastStableOffset(),
+            current.highWatermark(),
+            current.candidate(),
+            current.decisionSources(),
+            current.outputSourceCount(),
+            current.outputSourceSetSha256(),
+            current.materializationPolicySha256(),
+            current.passOneSnapshot(),
+            current.compatibility());
+    assertThat(current.planId()).isEqualTo(legacyPlanId);
+    KafkaCompactionPlan legacy =
+        new KafkaCompactionPlan(
+            legacyPlanId,
+            current.streamId(),
+            current.materializationTaskId(),
+            current.bindingMetadataVersion(),
+            current.lastStableOffset(),
+            current.highWatermark(),
+            current.candidate(),
+            current.decisionSources(),
+            current.outputSourceCount(),
+            current.outputSourceSetSha256(),
+            current.materializationPolicySha256(),
+            current.passOneSnapshot(),
+            current.compatibility());
+
+    byte[] encoded = codec.encode(legacy);
+
+    assertThat(codec.decode(encoded)).isEqualTo(legacy);
+    assertThat(codec.encode(codec.decode(encoded))).isEqualTo(encoded);
+  }
+
   static Fixture fixture(String compression) {
     ReadBatch output =
         readBatch(
@@ -188,6 +245,108 @@ class KafkaCompactionPlanCodecV1Test {
     KafkaCompactionPlan plan =
         KafkaCompactionPlan.create(outputTask, 17, 2, 3, candidate, decisionSources, snapshot);
     return new Fixture(outputTask, plan);
+  }
+
+  private static KafkaCompactionPlan extendedDecisionPlan() {
+    ArrayList<ReadBatch> batches = new ArrayList<>();
+    for (int offset = 0; offset < 80; offset++) {
+      batches.add(
+          readBatch(
+              new OffsetRange(offset, offset + 1L),
+              bytes(
+                  MemoryRecords.withRecords(
+                      offset,
+                      Compression.NONE,
+                      new SimpleRecord(
+                          ("k-" + offset).getBytes(),
+                          ("v-" + offset).getBytes()))),
+              "extended-plan-" + offset));
+    }
+    ExactSourceSet compact = sourceSet(batches);
+    ArrayList<SourceGeneration> expanded = new ArrayList<>();
+    for (int index = 0; index < compact.sources().size(); index++) {
+      SourceGeneration source = compact.sources().get(index);
+      expanded.add(
+          new SourceGeneration(
+              source.view(),
+              source.range(),
+              source.generation(),
+              source.commitVersion(),
+              "test/f9-compaction-plan/extended/"
+                  + String.format("%03d-", index)
+                  + "x".repeat(1_024),
+              source.indexMetadataVersion(),
+              source.indexRecordSha256(),
+              source.readTarget(),
+              source.targetIdentitySha256(),
+              source.materializationPolicySha256(),
+              source.payloadFormat(),
+              source.projectionRef(),
+              source.recordCount(),
+              source.entryCount(),
+              source.logicalBytes(),
+              source.schemaRefs(),
+              source.cumulativeSizeAtStart(),
+              source.cumulativeSizeAtEnd()));
+    }
+    ExactSourceSet decisionSources =
+        ExactSourceSet.create(
+            ReadView.COMMITTED, new OffsetRange(0, expanded.size()), expanded);
+    MaterializationPolicy policy =
+        MaterializationPolicyFactory.kafkaTopicCompacted(
+            new TopicCompactionSpec(
+                KafkaCompactionStrategyV1.STRATEGY_ID,
+                KafkaCompactionStrategyV1.STRATEGY_VERSION,
+                "KCK2"),
+            2,
+            128,
+            1_048_576,
+            1 << 20,
+            1_024,
+            "ZSTD");
+    MaterializationTask outputTask =
+        MaterializationTask.create(
+            new StreamId("stream-extended-compaction-plan"),
+            new OffsetRange(0, 1),
+            List.of(expanded.get(0)),
+            policy);
+    Policy plannerPolicy =
+        new Policy(
+            11,
+            new Checksum(ChecksumType.SHA256, "e".repeat(64)),
+            0,
+            10_000,
+            100,
+            LogConfigHistoryEntry.CLEANUP_COMPACT_FLAG);
+    Candidate candidate =
+        new Candidate(
+            outputTask.coverage(),
+            decisionSources.coverage(),
+            1,
+            plannerPolicy,
+            Optional.empty(),
+            1_000);
+    Snapshot snapshot =
+        new Snapshot(
+            candidate.outputCoverage(),
+            candidate.decisionHorizon(),
+            decisionSources.coverage().endOffset(),
+            candidate.evaluatedAtMillis(),
+            plannerPolicy.deleteRetentionMs(),
+            1_000,
+            1 << 20,
+            1 << 20,
+            List.of(),
+            List.of(),
+            List.of());
+    return KafkaCompactionPlan.create(
+        outputTask,
+        17,
+        decisionSources.coverage().endOffset(),
+        decisionSources.coverage().endOffset(),
+        candidate,
+        decisionSources,
+        snapshot);
   }
 
   private static ExactSourceSet sourceSet(List<ReadBatch> batches) {

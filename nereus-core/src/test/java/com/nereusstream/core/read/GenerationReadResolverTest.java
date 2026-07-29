@@ -184,6 +184,42 @@ class GenerationReadResolverTest {
     }
 
     @Test
+    void bookKeeperWalOnlyAdmitsHigherGenerationInTopicCompactedView() {
+        GenerationStoreState store = new GenerationStoreState(List.of(
+                higher(
+                        2,
+                        GenerationLifecycle.COMMITTED,
+                        "NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2",
+                        ReadView.TOPIC_COMPACTED)));
+        GenerationReadResolver resolver = new GenerationReadResolver(
+                CLUSTER,
+                l0Store(StorageProfile.BOOKKEEPER_WAL_ONLY),
+                store.proxy(),
+                GenerationIndexValidator.phase15Targets(),
+                new ReadTargetReaderRegistry(List.of(
+                        new NoopReader(ReadTargetReaderRegistryTest.key(
+                                ObjectType.STREAM_COMPACTED_OBJECT,
+                                "NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2")))),
+                GenerationReadResolverTest::identity,
+                new TestPinManager(),
+                1_000,
+                CLOCK,
+                Runnable::run);
+
+        PinnedResolvedRange selected = resolver.resolve(
+                        STREAM,
+                        0,
+                        ReadView.TOPIC_COMPACTED,
+                        Duration.ofSeconds(5))
+                .join()
+                .orElseThrow();
+
+        assertThat(selected.resolvedRange().generation()).isEqualTo(2);
+        assertThat(selected.candidate().view()).isEqualTo(ReadView.TOPIC_COMPACTED);
+        selected.release().join();
+    }
+
+    @Test
     void staleHigherCandidateAtPinTimeFallsBackOnlyWithinCommittedView() {
         VersionedGenerationCandidate zero = generationZero(1);
         VersionedGenerationCandidate higher = higher(

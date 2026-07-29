@@ -29,8 +29,12 @@ import com.nereusstream.materialization.DefaultCommittedSourceSetResolver;
 import com.nereusstream.materialization.DefaultExactSourceRangeReader;
 import com.nereusstream.materialization.DefaultGenerationCommitter;
 import com.nereusstream.materialization.DefaultMaterializationOutputVerifier;
+import com.nereusstream.materialization.MaterializationSourceProtectionAdapter;
+import com.nereusstream.materialization.MaterializationSourceProtectionRegistry;
+import com.nereusstream.materialization.MaterializationSourceProvider;
 import com.nereusstream.materialization.MaterializationStreamAuthorityMode;
 import com.nereusstream.materialization.MaterializationTaskStore;
+import com.nereusstream.materialization.ObjectMaterializationSourceProtectionAdapter;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaCompactionPlanMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
@@ -43,6 +47,8 @@ import com.nereusstream.objectstore.compacted.ParquetRangedCompactedObjectReader
 import com.nereusstream.objectstore.compacted.RangedCompactedObjectVerifier;
 import com.nereusstream.objectstore.staging.StagingFileManager;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
@@ -64,6 +70,7 @@ public final class KafkaCompactionProductionRuntimeFactory {
       ObjectProtectionManager protections,
       ObjectReadPinManager readPins,
       ReadTargetReaderRegistry readers,
+      List<MaterializationSourceProvider> additionalPrimarySources,
       ObjectStore objectStore,
       StagingFileManager stagingFiles,
       KafkaStorageActivationVerifier activationVerifier,
@@ -90,6 +97,10 @@ public final class KafkaCompactionProductionRuntimeFactory {
         Objects.requireNonNull(protections, "protections");
     ObjectReadPinManager exactReadPins = Objects.requireNonNull(readPins, "readPins");
     ReadTargetReaderRegistry exactReaders = Objects.requireNonNull(readers, "readers");
+    List<MaterializationSourceProvider> exactAdditionalSources =
+        List.copyOf(
+            Objects.requireNonNull(
+                additionalPrimarySources, "additionalPrimarySources"));
     ObjectStore exactObjectStore = Objects.requireNonNull(objectStore, "objectStore");
     StagingFileManager exactStaging = Objects.requireNonNull(stagingFiles, "stagingFiles");
     KafkaStorageActivationVerifier exactActivation =
@@ -108,7 +119,7 @@ public final class KafkaCompactionProductionRuntimeFactory {
             exactL0,
             exactGenerations,
             configuration.metadataScanPageSize(),
-            MaterializationStreamAuthorityMode.DIRECT_STREAM);
+            MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION);
     KafkaCompactionSourceResolver sourceResolver =
         new KafkaCompactionSourceResolver(committedSources);
     MetadataPhysicalObjectIdentityResolver identities =
@@ -156,12 +167,20 @@ public final class KafkaCompactionProductionRuntimeFactory {
             exactGenerations,
             exactPhysical,
             exactProtections,
+            sourceProtections(
+                identities,
+                exactProtections,
+                exactAdditionalSources),
             new KafkaGenerationProtocolActivationGuard(
-                exactCluster, exactGenerations, exactActivation, exactClock),
+                exactCluster,
+                exactGenerations,
+                exactL0,
+                exactActivation,
+                exactClock),
             new DefaultMaterializationOutputVerifier(
                 exactObjectStore,
                 new KafkaCompactionMaterializationFormatVerifier(objectVerifier)),
-            MaterializationStreamAuthorityMode.DIRECT_STREAM,
+            MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION,
             configuration.generationOperationTimeout(),
             exactScheduler,
             exactClock);
@@ -211,6 +230,20 @@ public final class KafkaCompactionProductionRuntimeFactory {
         configuration.maxPartitionsPerPass(),
         exactScheduler,
         exactCallbacks);
+  }
+
+  private static MaterializationSourceProtectionRegistry sourceProtections(
+      MetadataPhysicalObjectIdentityResolver identities,
+      ObjectProtectionManager protections,
+      List<MaterializationSourceProvider> additionalSources) {
+    List<MaterializationSourceProtectionAdapter<?>> adapters = new ArrayList<>();
+    adapters.add(
+        new ObjectMaterializationSourceProtectionAdapter(
+            identities, protections));
+    additionalSources.stream()
+        .map(MaterializationSourceProvider::protectionAdapter)
+        .forEach(adapters::add);
+    return new MaterializationSourceProtectionRegistry(adapters);
   }
 
   private static String requireText(String value, String field) {

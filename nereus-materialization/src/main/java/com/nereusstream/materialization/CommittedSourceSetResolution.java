@@ -6,13 +6,20 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.VersionedMaterializationStreamRegistration;
 import java.util.Objects;
+import java.util.Optional;
 
-/** Exact source set plus the stream/registration authority observed while resolving it. */
+/**
+ * Exact source set plus the stream authority observed while resolving it.
+ *
+ * <p>The registration is absent only for Kafka topic compaction over
+ * {@code BOOKKEEPER_WAL_ONLY}; that profile deliberately has no object-materialization stream
+ * registration.
+ */
 public record CommittedSourceSetResolution(
         StreamId streamId,
         ExactSourceSet sourceSet,
         StreamMetadataSnapshot streamSnapshot,
-        VersionedMaterializationStreamRegistration registration) {
+        Optional<VersionedMaterializationStreamRegistration> registration) {
     public CommittedSourceSetResolution {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(sourceSet, "sourceSet");
@@ -20,7 +27,9 @@ public record CommittedSourceSetResolution(
         Objects.requireNonNull(registration, "registration");
         if (sourceSet.view() != ReadView.COMMITTED
                 || !streamSnapshot.metadata().streamId().equals(streamId.value())
-                || !registration.value().streamId().equals(streamId.value())
+                || registration
+                        .filter(value -> !value.value().streamId().equals(streamId.value()))
+                        .isPresent()
                 || sourceSet.coverage().startOffset() < streamSnapshot.trim().trimOffset()
                 || sourceSet.coverage().endOffset()
                         > streamSnapshot.committedEnd().committedEndOffset()

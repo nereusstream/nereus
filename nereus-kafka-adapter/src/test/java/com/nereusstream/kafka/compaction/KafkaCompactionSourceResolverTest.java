@@ -190,11 +190,12 @@ class KafkaCompactionSourceResolverTest {
         streamId,
         sourceSet,
         snapshot,
-        new VersionedMaterializationStreamRegistration(
-            "/registration/" + streamId.value(),
-            registration,
-            metadataVersion,
-            new Checksum(ChecksumType.SHA256, "b".repeat(64))));
+        Optional.of(
+            new VersionedMaterializationStreamRegistration(
+                "/registration/" + streamId.value(),
+                registration,
+                metadataVersion,
+                new Checksum(ChecksumType.SHA256, "b".repeat(64)))));
   }
 
   private static final class FakeCommittedSources implements CommittedSourceSetResolver {

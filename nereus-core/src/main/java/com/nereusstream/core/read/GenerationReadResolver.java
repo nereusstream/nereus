@@ -189,7 +189,8 @@ public final class GenerationReadResolver {
                             view,
                             snapshot,
                             wrappers,
-                            profile.objectMaterializationEnabled(),
+                            view != ReadView.COMMITTED
+                                    || profile.objectMaterializationEnabled(),
                             constraint))
                     .thenCompose(candidates -> {
                         List<GenerationReadCandidate> admitted = candidates.stream()

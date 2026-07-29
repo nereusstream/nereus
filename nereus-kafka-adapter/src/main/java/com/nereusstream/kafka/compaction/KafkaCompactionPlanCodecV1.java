@@ -40,6 +40,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.zip.DataFormatException;
+import java.util.zip.Deflater;
+import java.util.zip.Inflater;
 
 /** Strict restart-safe V1 codec for {@link KafkaCompactionPlan}. */
 public final class KafkaCompactionPlanCodecV1 {
@@ -51,6 +54,8 @@ public final class KafkaCompactionPlanCodecV1 {
   private static final int VERSION = 1;
   private static final int MAX_STRING_BYTES = 65_535;
   private static final String IDENTITY_DOMAIN = "NEREUS_KAFKA_COMPACTION_PLAN_V1";
+  private static final int COMPRESSED_SOURCE_MAGIC = 0x4b435331; // KCS1
+  private static final int COMPRESSED_SOURCE_VERSION = 1;
 
   private final ExactSourceSetCodecV1 sourceSetCodec;
 
@@ -69,7 +74,7 @@ public final class KafkaCompactionPlanCodecV1 {
       writer.intValue(MAGIC);
       writer.shortValue(VERSION);
       writer.text(exact.planId());
-      writer.raw(canonicalBody(exact));
+      writer.raw(canonicalBody(exact, sourceEncoding(exact)));
       byte[] encoded = writer.bytes();
       if (encoded.length > MAX_ENCODED_BYTES) {
         throw new IllegalArgumentException("Kafka compaction plan exceeds its byte limit");
@@ -101,8 +106,8 @@ public final class KafkaCompactionPlanCodecV1 {
       long highWatermark = reader.longValue("highWatermark");
       Candidate candidate = readCandidate(reader);
       ExactSourceSet decisionSources =
-          sourceSetCodec.decode(
-              reader.byteArray("decisionSources", ExactSourceSetCodecV1.MAX_ENCODED_BYTES));
+          decodeDecisionSources(
+              reader.byteArray("decisionSources", MAX_ENCODED_BYTES));
       int outputSourceCount = reader.intValue("outputSourceCount");
       Checksum outputSourceSetSha256 = reader.checksum("outputSourceSetSha256");
       Checksum materializationPolicySha256 = reader.checksum("materializationPolicySha256");
@@ -160,7 +165,8 @@ public final class KafkaCompactionPlanCodecV1 {
               outputSourceSetSha256,
               materializationPolicySha256,
               snapshot,
-              compatibility);
+              compatibility,
+              DecisionSourceEncoding.IDENTITY_RAW_EXTENDED);
       return "kcp1-" + DeterministicIds.stableHashBytes(body);
     } catch (IOException failure) {
       throw new IllegalStateException("in-memory Kafka compaction plan identity failed", failure);
@@ -168,6 +174,11 @@ public final class KafkaCompactionPlanCodecV1 {
   }
 
   private byte[] canonicalBody(KafkaCompactionPlan plan) throws IOException {
+    return canonicalBody(plan, sourceEncoding(plan));
+  }
+
+  private byte[] canonicalBody(
+      KafkaCompactionPlan plan, DecisionSourceEncoding sourceEncoding) throws IOException {
     return canonicalBody(
         plan.streamId(),
         plan.materializationTaskId(),
@@ -180,7 +191,8 @@ public final class KafkaCompactionPlanCodecV1 {
         plan.outputSourceSetSha256(),
         plan.materializationPolicySha256(),
         plan.passOneSnapshot(),
-        plan.compatibility());
+        plan.compatibility(),
+        sourceEncoding);
   }
 
   private byte[] canonicalBody(
@@ -195,7 +207,8 @@ public final class KafkaCompactionPlanCodecV1 {
       Checksum outputSourceSetSha256,
       Checksum materializationPolicySha256,
       Snapshot snapshot,
-      Compatibility compatibility)
+      Compatibility compatibility,
+      DecisionSourceEncoding sourceEncoding)
       throws IOException {
     Writer writer = new Writer();
     writer.text(IDENTITY_DOMAIN);
@@ -206,14 +219,247 @@ public final class KafkaCompactionPlanCodecV1 {
     writer.longValue(highWatermark);
     writeCandidate(writer, Objects.requireNonNull(candidate, "candidate"));
     writer.byteArray(
-        sourceSetCodec.encode(Objects.requireNonNull(decisionSources, "decisionSources")),
-        ExactSourceSetCodecV1.MAX_ENCODED_BYTES);
+        encodeDecisionSources(
+            Objects.requireNonNull(decisionSources, "decisionSources"),
+            Objects.requireNonNull(sourceEncoding, "sourceEncoding")),
+        sourceEncoding == DecisionSourceEncoding.IDENTITY_RAW_EXTENDED
+            ? ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES
+            : MAX_ENCODED_BYTES);
     writer.intValue(outputSourceCount);
     writer.checksum(outputSourceSetSha256);
     writer.checksum(materializationPolicySha256);
     writeSnapshot(writer, Objects.requireNonNull(snapshot, "snapshot"));
     writeCompatibility(writer, Objects.requireNonNull(compatibility, "compatibility"));
     return writer.bytes();
+  }
+
+  static boolean matchesPlanId(
+      String planId,
+      StreamId streamId,
+      String materializationTaskId,
+      long bindingMetadataVersion,
+      long lastStableOffset,
+      long highWatermark,
+      Candidate candidate,
+      ExactSourceSet decisionSources,
+      int outputSourceCount,
+      Checksum outputSourceSetSha256,
+      Checksum materializationPolicySha256,
+      Snapshot snapshot,
+      Compatibility compatibility) {
+    String exact = Objects.requireNonNull(planId, "planId");
+    if (exact.equals(
+        planIdFor(
+            streamId,
+            materializationTaskId,
+            bindingMetadataVersion,
+            lastStableOffset,
+            highWatermark,
+            candidate,
+            decisionSources,
+            outputSourceCount,
+            outputSourceSetSha256,
+            materializationPolicySha256,
+            snapshot,
+            compatibility))) {
+      return true;
+    }
+    try {
+      return exact.equals(
+          legacyPlanIdFor(
+              streamId,
+              materializationTaskId,
+              bindingMetadataVersion,
+              lastStableOffset,
+              highWatermark,
+              candidate,
+              decisionSources,
+              outputSourceCount,
+              outputSourceSetSha256,
+              materializationPolicySha256,
+              snapshot,
+              compatibility));
+    } catch (IllegalArgumentException legacyEncodingUnavailable) {
+      return false;
+    }
+  }
+
+  static String legacyPlanIdFor(
+      StreamId streamId,
+      String materializationTaskId,
+      long bindingMetadataVersion,
+      long lastStableOffset,
+      long highWatermark,
+      Candidate candidate,
+      ExactSourceSet decisionSources,
+      int outputSourceCount,
+      Checksum outputSourceSetSha256,
+      Checksum materializationPolicySha256,
+      Snapshot snapshot,
+      Compatibility compatibility) {
+    KafkaCompactionPlanCodecV1 codec = new KafkaCompactionPlanCodecV1();
+    try {
+      byte[] body =
+          codec.canonicalBody(
+              streamId,
+              materializationTaskId,
+              bindingMetadataVersion,
+              lastStableOffset,
+              highWatermark,
+              candidate,
+              decisionSources,
+              outputSourceCount,
+              outputSourceSetSha256,
+              materializationPolicySha256,
+              snapshot,
+              compatibility,
+              DecisionSourceEncoding.LEGACY_RAW);
+      return "kcp1-" + DeterministicIds.stableHashBytes(body);
+    } catch (IOException failure) {
+      throw new IllegalStateException(
+          "in-memory legacy Kafka compaction plan identity failed", failure);
+    }
+  }
+
+  private DecisionSourceEncoding sourceEncoding(KafkaCompactionPlan plan) {
+    try {
+      String legacy =
+          legacyPlanIdFor(
+              plan.streamId(),
+              plan.materializationTaskId(),
+              plan.bindingMetadataVersion(),
+              plan.lastStableOffset(),
+              plan.highWatermark(),
+              plan.candidate(),
+              plan.decisionSources(),
+              plan.outputSourceCount(),
+              plan.outputSourceSetSha256(),
+              plan.materializationPolicySha256(),
+              plan.passOneSnapshot(),
+              plan.compatibility());
+      if (plan.planId().equals(legacy)) {
+        return DecisionSourceEncoding.LEGACY_RAW;
+      }
+    } catch (IllegalArgumentException legacyEncodingUnavailable) {
+      // Extended source sets have no legal legacy representation.
+    }
+    return DecisionSourceEncoding.COMPRESSED;
+  }
+
+  private byte[] encodeDecisionSources(
+      ExactSourceSet decisionSources, DecisionSourceEncoding sourceEncoding) {
+    if (sourceEncoding == DecisionSourceEncoding.LEGACY_RAW) {
+      return sourceSetCodec.encode(decisionSources);
+    }
+    if (sourceEncoding == DecisionSourceEncoding.IDENTITY_RAW_EXTENDED) {
+      return sourceSetCodec.encode(
+          decisionSources,
+          ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES,
+          ExactSourceSetCodecV1.MAX_EXTENDED_SOURCE_RANGES);
+    }
+    byte[] raw =
+        sourceSetCodec.encode(
+            decisionSources,
+            ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES,
+            ExactSourceSetCodecV1.MAX_EXTENDED_SOURCE_RANGES);
+    Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION, true);
+    try {
+      deflater.setInput(raw);
+      deflater.finish();
+      ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+      byte[] buffer = new byte[8 << 10];
+      while (!deflater.finished()) {
+        int written = deflater.deflate(buffer);
+        if (written <= 0) {
+          throw new IllegalStateException(
+              "deterministic decision source-set compression made no progress");
+        }
+        compressed.write(buffer, 0, written);
+        if (compressed.size() + Integer.BYTES + Short.BYTES + Integer.BYTES
+            > MAX_ENCODED_BYTES) {
+          throw new IllegalArgumentException(
+              "compressed decision source-set exceeds the Kafka plan byte limit");
+        }
+      }
+      ByteArrayOutputStream payload = new ByteArrayOutputStream();
+      DataOutputStream output = new DataOutputStream(payload);
+      output.writeInt(COMPRESSED_SOURCE_MAGIC);
+      output.writeShort(COMPRESSED_SOURCE_VERSION);
+      output.writeInt(raw.length);
+      compressed.writeTo(output);
+      output.flush();
+      return payload.toByteArray();
+    } catch (IOException failure) {
+      throw new IllegalStateException(
+          "in-memory decision source-set compression failed", failure);
+    } finally {
+      deflater.end();
+    }
+  }
+
+  private ExactSourceSet decodeDecisionSources(byte[] payload) {
+    byte[] exact = Objects.requireNonNull(payload, "decision source-set payload");
+    int headerBytes = Integer.BYTES + Short.BYTES + Integer.BYTES;
+    if (exact.length < headerBytes
+        || ByteBuffer.wrap(exact).order(ByteOrder.BIG_ENDIAN).getInt()
+            != COMPRESSED_SOURCE_MAGIC) {
+      return sourceSetCodec.decode(exact);
+    }
+    ByteBuffer header = ByteBuffer.wrap(exact).order(ByteOrder.BIG_ENDIAN);
+    header.getInt();
+    int version = Short.toUnsignedInt(header.getShort());
+    int expectedRawBytes = header.getInt();
+    if (version != COMPRESSED_SOURCE_VERSION
+        || expectedRawBytes <= 0
+        || expectedRawBytes > ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES
+        || !header.hasRemaining()) {
+      throw new IllegalArgumentException(
+          "malformed compressed decision source-set header");
+    }
+    byte[] compressed = new byte[header.remaining()];
+    header.get(compressed);
+    Inflater inflater = new Inflater(true);
+    try {
+      inflater.setInput(compressed);
+      ByteArrayOutputStream raw = new ByteArrayOutputStream(expectedRawBytes);
+      byte[] buffer = new byte[8 << 10];
+      while (!inflater.finished()) {
+        int written = inflater.inflate(buffer);
+        if (written > 0) {
+          raw.write(buffer, 0, written);
+          if (raw.size() > expectedRawBytes) {
+            throw new IllegalArgumentException(
+                "compressed decision source-set exceeds its declared length");
+          }
+          continue;
+        }
+        if (inflater.needsDictionary() || inflater.needsInput()) {
+          throw new IllegalArgumentException(
+              "compressed decision source-set is truncated or requires a dictionary");
+        }
+        throw new IllegalArgumentException(
+            "compressed decision source-set decompression made no progress");
+      }
+      if (raw.size() != expectedRawBytes || inflater.getRemaining() != 0) {
+        throw new IllegalArgumentException(
+            "compressed decision source-set length or trailing bytes changed");
+      }
+      return sourceSetCodec.decode(
+          raw.toByteArray(),
+          ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES,
+          ExactSourceSetCodecV1.MAX_EXTENDED_SOURCE_RANGES);
+    } catch (DataFormatException failure) {
+      throw new IllegalArgumentException(
+          "compressed decision source-set payload is malformed", failure);
+    } finally {
+      inflater.end();
+    }
+  }
+
+  private enum DecisionSourceEncoding {
+    LEGACY_RAW,
+    IDENTITY_RAW_EXTENDED,
+    COMPRESSED
   }
 
   private static void writeCandidate(Writer writer, Candidate candidate) throws IOException {

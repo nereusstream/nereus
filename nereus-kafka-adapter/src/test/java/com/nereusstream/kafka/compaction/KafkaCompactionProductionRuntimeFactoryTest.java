@@ -107,6 +107,7 @@ class KafkaCompactionProductionRuntimeFactoryTest {
               proxy(ObjectProtectionManager.class),
               proxy(ObjectReadPinManager.class),
               new ReadTargetReaderRegistry(List.of()),
+              List.of(),
               proxy(ObjectStore.class),
               staging,
               activationVerifier,
