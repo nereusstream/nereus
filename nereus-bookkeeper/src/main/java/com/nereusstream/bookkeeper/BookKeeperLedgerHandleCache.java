@@ -70,6 +70,7 @@ public final class BookKeeperLedgerHandleCache implements AutoCloseable {
             evicted = evictIdle(now);
             selected = entries.get(key);
             if (selected == null) {
+                evicted.addAll(evictReleasedForCapacity());
                 if (entries.size() >= maxHandles
                         || Math.multiplyExact((long) (entries.size() + 1), estimatedBytesPerHandle)
                                 > maxEstimatedBytes) {
@@ -114,6 +115,33 @@ public final class BookKeeperLedgerHandleCache implements AutoCloseable {
                         || candidate.opening.isCancelled() ? null : candidate.opening.getNow(null);
                 if (completed != null) handles.add(completed);
                 else candidate.opening.thenCompose(ReadHandle::closeAsync);
+            }
+        }
+        return handles;
+    }
+
+    private List<ReadHandle> evictReleasedForCapacity() {
+        List<ReadHandle> handles = new ArrayList<>();
+        while (entries.size() >= maxHandles
+                || Math.multiplyExact(
+                                (long) (entries.size() + 1),
+                                estimatedBytesPerHandle)
+                        > maxEstimatedBytes) {
+            Entry candidate = entries.values().stream()
+                    .filter(entry -> entry.references == 0)
+                    .min(Comparator.comparingLong(entry -> entry.lastAccessNanos))
+                    .orElse(null);
+            if (candidate == null) {
+                break;
+            }
+            if (entries.remove(candidate.key, candidate)) {
+                ReadHandle completed = candidate.opening.isCompletedExceptionally()
+                        || candidate.opening.isCancelled() ? null : candidate.opening.getNow(null);
+                if (completed != null) {
+                    handles.add(completed);
+                } else {
+                    candidate.opening.thenCompose(ReadHandle::closeAsync);
+                }
             }
         }
         return handles;

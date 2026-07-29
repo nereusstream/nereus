@@ -2062,13 +2062,89 @@ class NereusKafkaNativeProcessIntegrationTest {
         Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
         Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
         Path faultAgent = requiredTransactionResolutionFaultAgent();
+        TransactionResolutionProfile profile =
+                new TransactionResolutionProfile(
+                        "OBJECT_WAL_SYNC_OBJECT",
+                        "object-sync",
+                        30,
+                        true);
         for (TransactionMarkerCut cut : TransactionMarkerCut.values()) {
             runTransactionMarkerProcessCut(
                     cut,
                     kafkaHome,
                     formatScript,
                     startScript,
-                    faultAgent);
+                    faultAgent,
+                    profile,
+                    null);
+        }
+    }
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.MINUTES)
+    void remainingStorageProfilesRecoverAcrossTransactionMarkerProcessCuts()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve(
+                        "kafka-transaction-resolution-profile-matrix-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path faultAgent = requiredTransactionResolutionFaultAgent();
+
+        TransactionResolutionProfile objectAsync =
+                new TransactionResolutionProfile(
+                        "OBJECT_WAL_ASYNC_OBJECT",
+                        "object-async",
+                        31,
+                        true);
+        for (TransactionMarkerCut cut : TransactionMarkerCut.values()) {
+            runTransactionMarkerProcessCut(
+                    cut,
+                    kafkaHome,
+                    formatScript,
+                    startScript,
+                    faultAgent,
+                    objectAsync,
+                    null);
+        }
+
+        int zooKeeperPort = freePort();
+        String metadataServiceUri =
+                "zk+longhierarchical://127.0.0.1:"
+                        + zooKeeperPort
+                        + "/ledgers";
+        try (LocalBookKeeper ignored = startBookKeeper(zooKeeperPort)) {
+            for (TransactionResolutionProfile profile :
+                    List.of(
+                            new TransactionResolutionProfile(
+                                    "BOOKKEEPER_WAL_ONLY",
+                                    "bookkeeper-only",
+                                    32,
+                                    false),
+                            new TransactionResolutionProfile(
+                                    "BOOKKEEPER_WAL_ASYNC_OBJECT",
+                                    "bookkeeper-async",
+                                    33,
+                                    true),
+                            new TransactionResolutionProfile(
+                                    "BOOKKEEPER_WAL_SYNC_OBJECT",
+                                    "bookkeeper-sync",
+                                    34,
+                                    true))) {
+                for (TransactionMarkerCut cut : TransactionMarkerCut.values()) {
+                    runTransactionMarkerProcessCut(
+                            cut,
+                            kafkaHome,
+                            formatScript,
+                            startScript,
+                            faultAgent,
+                            profile,
+                            metadataServiceUri);
+                }
+            }
         }
     }
 
@@ -2077,9 +2153,11 @@ class NereusKafkaNativeProcessIntegrationTest {
             Path kafkaHome,
             Path formatScript,
             Path startScript,
-            Path faultAgent
+            Path faultAgent,
+            TransactionResolutionProfile profile,
+            String metadataServiceUri
     ) throws Exception {
-        String slug = cut.slug();
+        String slug = profile.fixtureToken() + "-" + cut.slug();
         Path brokerOneConfig = root.resolve(slug + "-one.properties");
         Path brokerTwoConfig = root.resolve(slug + "-two.properties");
         Path brokerOneFormatLog = root.resolve(slug + "-one-format.log");
@@ -2094,8 +2172,10 @@ class NereusKafkaNativeProcessIntegrationTest {
         Path agentFailure = root.resolve(slug + "-agent-failure");
         Path agentInstalled = root.resolve(slug + "-agent-installed");
         String bucket =
-                "nereus-f9-"
-                        + slug
+                "n-f9-tx-"
+                        + profile.authoritySeed()
+                        + "-"
+                        + (cut == TransactionMarkerCut.BEFORE_PROVIDER ? "b" : "a")
                         + "-"
                         + UUID.randomUUID().toString().substring(0, 12);
         String topic = "process-" + slug + "-" + UUID.randomUUID();
@@ -2108,6 +2188,38 @@ class NereusKafkaNativeProcessIntegrationTest {
         String brokerOneBootstrap = "127.0.0.1:" + brokerOnePort;
         String brokerTwoBootstrap = "127.0.0.1:" + brokerTwoPort;
         String clusterBootstrap = brokerOneBootstrap + "," + brokerTwoBootstrap;
+        BookKeeperProcessConfiguration bookKeeper = null;
+        if (profile.storageProfile().startsWith("BOOKKEEPER_WAL_")) {
+            if (metadataServiceUri == null || metadataServiceUri.isBlank()) {
+                throw new IllegalArgumentException(
+                        "BookKeeper transaction-resolution profile requires metadata");
+            }
+            Path passwordFile = root.resolve(slug + "-password.bin");
+            Files.write(
+                    passwordFile,
+                    ("f9-" + slug + "-process-password")
+                            .getBytes(StandardCharsets.UTF_8));
+            bookKeeper =
+                    bookKeeperProcessConfiguration(
+                            metadataServiceUri,
+                            slug,
+                            passwordFile,
+                            transactionResolutionBookKeeperAuthoritySeed(
+                                    profile,
+                                    cut),
+                            2);
+            seedBookKeeperAuthority(
+                    oxiaConfiguration(),
+                    bookKeeperWalConfiguration(
+                            bookKeeper,
+                            profile.storageProfile()
+                                    .equals("BOOKKEEPER_WAL_ASYNC_OBJECT")),
+                    bookKeeper,
+                    Clock.systemUTC());
+        } else if (metadataServiceUri != null) {
+            throw new IllegalArgumentException(
+                    "Object-WAL transaction-resolution profile cannot accept BookKeeper metadata");
+        }
 
         createBucket(bucket);
         writeConfiguration(
@@ -2118,8 +2230,8 @@ class NereusKafkaNativeProcessIntegrationTest {
                 root.resolve(slug + "-one-log"),
                 root.resolve(slug + "-one-metadata"),
                 root.resolve(slug + "-one-cache"),
-                "OBJECT_WAL_SYNC_OBJECT",
-                null,
+                profile.storageProfile(),
+                bookKeeper,
                 1,
                 true,
                 nereusCluster);
@@ -2131,8 +2243,8 @@ class NereusKafkaNativeProcessIntegrationTest {
                 root.resolve(slug + "-two-log"),
                 root.resolve(slug + "-two-metadata"),
                 root.resolve(slug + "-two-cache"),
-                "OBJECT_WAL_SYNC_OBJECT",
-                null,
+                profile.storageProfile(),
+                bookKeeper,
                 2,
                 false,
                 nereusCluster);
@@ -2370,9 +2482,9 @@ class NereusKafkaNativeProcessIntegrationTest {
                     List.of(brokerOne, recoveredBroker),
                     brokerOneServerLog,
                     brokerTwoRecoveryLog);
-            assertThat(objectCount(bucket))
-                    .as("the transaction-resolution cut must remain Object-WAL backed")
-                    .isPositive();
+            assertTransactionResolutionProfileObjects(
+                    profile,
+                    bucket);
         } catch (Throwable operationFailure) {
             failure = operationFailure;
         }
@@ -2416,6 +2528,32 @@ class NereusKafkaNativeProcessIntegrationTest {
             }
             rethrow(failure);
         }
+    }
+
+    private static void assertTransactionResolutionProfileObjects(
+            TransactionResolutionProfile profile,
+            String bucket
+    ) throws InterruptedException {
+        if (profile.requireMaterializedObject()) {
+            awaitPositiveObjectCount(bucket);
+            return;
+        }
+        assertThat(objectCount(bucket))
+                .as(
+                        profile.storageProfile()
+                                + " transaction-resolution cut must remain BookKeeper-only")
+                .isZero();
+    }
+
+    private static int transactionResolutionBookKeeperAuthoritySeed(
+            TransactionResolutionProfile profile,
+            TransactionMarkerCut cut
+    ) {
+        int cutOffset =
+                cut == TransactionMarkerCut.BEFORE_PROVIDER ? 0 : 1;
+        return Math.addExact(
+                Math.multiplyExact(profile.authoritySeed(), 2),
+                cutOffset);
     }
 
     @Test
@@ -10284,6 +10422,23 @@ class NereusKafkaNativeProcessIntegrationTest {
                     || authoritySeed <= 0) {
                 throw new IllegalArgumentException(
                         "invalid trim response-loss profile");
+            }
+        }
+    }
+
+    private record TransactionResolutionProfile(
+            String storageProfile,
+            String fixtureToken,
+            int authoritySeed,
+            boolean requireMaterializedObject) {
+        private TransactionResolutionProfile {
+            if (storageProfile == null
+                    || storageProfile.isBlank()
+                    || fixtureToken == null
+                    || fixtureToken.isBlank()
+                    || authoritySeed <= 0) {
+                throw new IllegalArgumentException(
+                        "invalid transaction-resolution profile");
             }
         }
     }

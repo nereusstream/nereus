@@ -533,13 +533,56 @@ tasks.register<Test>("f9TransactionResolutionCutProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9TransactionResolutionProfileMatrixProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Repeat both durable transaction-marker process cuts for Object async and all three BookKeeper profiles."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9TransactionResolutionFaultAgentJar)
+    shouldRunAfter(tasks.named("f9TransactionResolutionCutProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.transaction.resolution.fault.agent",
+        layout.buildDirectory
+            .file("libs/nereus-f9-transaction-resolution-fault-agent.jar")
+            .get()
+            .asFile
+            .absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory
+            .dir("f9-kafka-transaction-resolution-profile-matrix-evidence")
+            .get()
+            .asFile
+            .absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "remainingStorageProfilesRecoverAcrossTransactionMarkerProcessCuts",
+        )
+    }
+}
+
 tasks.register<Test>("f9MandatoryInternalTopicNtc2ProcessIntegrationTest") {
     group = "verification"
     description =
         "Delete and corrupt activated internal-topic NTC2 objects, prove coordinator election fails closed, " +
             "then restore the exact bytes and prove ordinary re-election."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
-    shouldRunAfter(tasks.named("f9TransactionResolutionCutProcessIntegrationTest"))
+    shouldRunAfter(tasks.named("f9TransactionResolutionProfileMatrixProcessIntegrationTest"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
     classpath = f9ProviderIntegrationTest.runtimeClasspath
     systemProperty(
