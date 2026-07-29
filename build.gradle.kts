@@ -142,6 +142,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "f4OxiaIntegrationTest",
         "f9ActivationOxiaIntegrationTest",
         "f9OxiaIntegrationTest",
+        "f9BindingScaleOxiaIntegrationTest",
     ),
     ":nereus-object-store" to setOf(
         "s3IntegrationTest",
@@ -3324,4 +3325,17 @@ tasks.register("phase9M6CheckpointQuarantineCheck") {
     dependsOn(":nereus-metadata-oxia:f9MetadataTest")
     dependsOn(":nereus-metadata-oxia:f9OxiaIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9CheckpointQuarantineTest")
+}
+
+tasks.register("phase9ScaleCheck") {
+    group = "verification"
+    description =
+        "Run the F9-M7 binding, partition, IO, ranged-count, and materialization scale boundaries."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn("phase9SourceLockCheck")
+    dependsOn(":nereus-api:f9RangedCountLimitTest")
+    dependsOn(":nereus-metadata-oxia:f9BindingScaleOxiaIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9PartitionScaleTest")
+    dependsOn(":nereus-kafka-adapter:f9IoConcurrencyStressTest")
+    dependsOn(":nereus-kafka-adapter:f9MaterializationScaleTest")
 }

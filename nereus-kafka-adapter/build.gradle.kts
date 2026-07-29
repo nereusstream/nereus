@@ -1018,6 +1018,50 @@ tasks.register<Test>("f9RetentionTest") {
     }
 }
 
+tasks.register<Test>("f9PartitionScaleTest") {
+    group = "verification"
+    description =
+        "Run the F9-M7 10,000-partition open, bounded checkpoint scheduling, and close gate."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxHeapSize = "1g"
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.retention.KafkaPartitionScaleIntegrationTest",
+        )
+    }
+}
+
+tasks.register<Test>("f9IoConcurrencyStressTest") {
+    group = "verification"
+    description =
+        "Run the F9-M7 1,000-operation Produce/Fetch queue, byte, thread, and progress gate."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.KafkaIoConcurrencyStressTest",
+        )
+    }
+}
+
+tasks.register<Test>("f9MaterializationScaleTest") {
+    group = "verification"
+    description =
+        "Run the F9-M7 128-source, 1,048,576-record bounded NTC2 spill and source-protection gate."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxHeapSize = "1g"
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.compaction.KafkaMaterializationScaleIntegrationTest",
+        )
+    }
+}
+
 tasks.register<Test>("f9CheckpointQuarantineTest") {
     group = "verification"
     description = "Run durable F9 NKC1 quarantine, audit, fallback-order, and restart-skip contracts."

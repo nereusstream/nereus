@@ -120,6 +120,22 @@ tasks.register<Test>("f9OxiaIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9BindingScaleOxiaIntegrationTest") {
+    group = "verification"
+    description =
+        "Run the F9-M7 16,384-binding, 64-shard pagination and reconnect gate against real Oxia."
+    testClassesDirs = oxiaIntegrationTest.output.classesDirs
+    classpath = oxiaIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("f9OxiaIntegrationTest"))
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.KafkaBindingScaleIntegrationTest",
+        )
+    }
+}
+
 tasks.register<Test>("f9ActivationOxiaIntegrationTest") {
     group = "verification"
     description = "Run the F9-M6 Kafka activation/capability/readiness CAS gate against real Oxia."
