@@ -13,6 +13,11 @@
 > 2026-07-29 transaction-resolution profile 增量：product `2d7091d` adds `f9TransactionResolutionProfileMatrixProcessIntegrationTest` for Object async and all three BookKeeper profiles；together with the original Object-sync task it executes both durable cuts across all five profiles。The run also exposed and closed released-handle false backpressure in `BookKeeperLedgerHandleCache` while retaining bounded rejection for active leases。The matrix passes 66/66 tasks in 6m28s；full BookKeeper tests + Object-sync regression + 146/146 manifest pass 78/78 tasks in 1m40s。KF-TXN-008 now has five-profile P/C/K current-source evidence；only the final aggregate remains open
 > 2026-07-29 mandatory NTC2 五 profile 增量：product `4676c12` extends KF-TXN-016 with `f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest` for Object async and BookKeeper WAL-only/async/sync；together with the fresh Object-sync gate this executes delete/fail-closed/repair and corruption/fail-closed/repair across all five profiles。WAL-only compaction uses projection-free L0 authority without inventing an F4 registration；KCP1 keeps the historical logical `planId` while compressing only an extended decision-source payload under 60 KiB persisted、1 MiB decoded and 4096-source hard limits。The fresh four-profile matrix passes 64/64 tasks in 5m34s and the Object-sync gate passes 73/73 tasks in 1m29s。KF-TXN-016 now has five-profile P/C/K current-source evidence；only the final aggregate remains open
 > 2026-07-30 M6 aggregate 增量：fork `76f62f3b83` and product `4a0ec22` pass fresh `phase9M6KafkaProcessCheck --rerun-tasks`（94/94 executed tasks，34m21s）。Rows whose only remaining note was the M6 process aggregate now record that aggregate as passed；rows with distinct profile、failure-cut or M7 requirements remain `PLANNED` until those exact requirements execute
+> 2026-07-30 M7 scale slice：product `main@bbe0881` implements the five canonical owners for KF-SCL-001..005 and
+> root `phase9ScaleCheck`。Fresh `--rerun-tasks` passes 36/36 executed tasks in 29s；the five JUnit owners each report
+> one test、zero skipped and zero failures。The manifest task is now `phase9ScaleCheck` and status is
+> `IMPLEMENTED_NOT_RUN`，because focused scale evidence is not the clean M7/final aggregate。KF-SCL-006..010 remain
+> `PLANNED`
 
 ## 1. Evidence tiers
 
@@ -780,11 +785,11 @@ composition/restart evidence only；the real-provider fresh-process restart tier
 
 | ID | Scenario / assertion | Planned test owner | Tier | Gate |
 | --- | --- | --- | --- | --- |
-| KF-SCL-001 | 16,384 bindings across 64 shards plus hot-shard pagination/restart complete without omission | `KafkaBindingScaleIntegrationTest` | R,P | M7 |
-| KF-SCL-002 | 10,000 active partition state/open/close/checkpoint scheduling stays bounded | `KafkaPartitionScaleIntegrationTest` | R,P | M7 |
-| KF-SCL-003 | 1,000 concurrent Produce/Fetch operations obey queue/byte/thread limits and make progress | `KafkaIoConcurrencyStressTest` | R,P,M | M7 |
-| KF-SCL-004 | ranged count near Integer.MAX_VALUE uses checked metadata math without per-record allocation | `KafkaRangedCountLimitTest` | D,M | M7 |
-| KF-SCL-005 | 128-source/million-record NCP2/NTC2 task respects memory/spill/source protection | `KafkaMaterializationScaleIntegrationTest` | R,C | M7 |
+| KF-SCL-001 | 16,384 bindings across 64 shards plus hot-shard pagination/restart complete without omission | product `KafkaBindingScaleIntegrationTest.scenarioKfScl001` through `phase9ScaleCheck`（exact 256/shard、17-entry pages、full Oxia client-runtime reconnect、authoritative-root/hash reload；focused current-source pass，final aggregate pending） | R,P | M7 |
+| KF-SCL-002 | 10,000 active partition state/open/close/checkpoint scheduling stays bounded | product `KafkaPartitionScaleIntegrationTest.scenarioKfScl002` through `phase9ScaleCheck`（10,000 manager owners、exact 64-way maintenance cap、full shutdown/resign；focused current-source pass，final aggregate pending） | R,P | M7 |
+| KF-SCL-003 | 1,000 concurrent Produce/Fetch operations obey queue/byte/thread limits and make progress | product `KafkaIoConcurrencyStressTest.scenarioKfScl003` through `phase9ScaleCheck`（500 append + 500 Fetch，8 active append/492 queued/2,000 owned bytes and eight Fetch threads；focused current-source pass，final aggregate pending） | R,P,M | M7 |
+| KF-SCL-004 | ranged count near Integer.MAX_VALUE uses checked metadata math without per-record allocation | product `KafkaRangedCountLimitTest.scenarioKfScl004` through `phase9ScaleCheck`（one physical byte/`Integer.MAX_VALUE` records and checked next-record/offset overflow；focused current-source pass，final aggregate pending） | D,M | M7 |
+| KF-SCL-005 | 128-source/million-record NCP2/NTC2 task respects memory/spill/source protection | product `KafkaMaterializationScaleIntegrationTest.scenarioKfScl005` through `phase9ScaleCheck`（128 sources/1,048,576 records/2,048 survivors/64 KiB winner budget/positive spill/256 source closes/zero staging leak；focused current-source pass，final aggregate pending） | R,C | M7 |
 | KF-SCL-006 | repeated leader churn across three brokers never accepts stale-term write/publication | `KafkaLeaderChurnChaosTest` | P,C | M7 |
 | KF-SCL-007 | Oxia/Object/BK/network response-loss matrix converges after fresh process restart | `KafkaProviderChaosIntegrationTest` | P,C | M7 |
 | KF-SCL-008 | supported Kafka client/protocol versions pass Produce/Fetch/group/txn/admin compatibility | `KafkaClientCompatibilitySuite` | P,K | M7 |

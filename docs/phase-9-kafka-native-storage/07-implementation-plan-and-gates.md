@@ -12,6 +12,12 @@
 > 2026-07-29 transaction-resolution profile 增量：product `2d7091d` 增加 `f9TransactionResolutionProfileMatrixProcessIntegrationTest`，以同一 fault seam 覆盖 Object async 与 BookKeeper WAL-only/async/sync 的 before/after-provider cuts；加上原 Object-sync gate 共五 profile、十个真实 release-process 场景。矩阵同时暴露并修复 released BookKeeper read handle 不能在容量压力下 LRU 淘汰的问题；所有 handle 仍被 lease 时保持 `BACKPRESSURE_REJECTED`。矩阵 66/66 tasks、6m28s，BookKeeper 全量单测 + Object-sync gate + manifest 联合回归 78/78 tasks、1m40s。KF-TXN-008 profile requirement closed；final/upstream aggregate remains open
 > 2026-07-29 mandatory NTC2 profile 增量：product `4676c12` 增加 `f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest`，与原 Object-sync gate 合计五 profile、十个 delete/corrupt/fail-closed/exact-repair/re-election 场景。WAL-only 使用 registration-free、projection-free L0 authority；extended KCP1 只压缩 persisted decision-source bytes 并保持旧 planId/raw compatibility。矩阵 64/64 tasks、5m34s，Object-sync 73/73 tasks、1m29s。KF-TXN-016 profile requirement closed；final/upstream aggregate remains open
 > 2026-07-30 M6 process aggregate 增量（覆盖上两行的 M6 aggregate open wording）：fork `76f62f3b83` + product `4a0ec22` pass fresh `phase9M6KafkaProcessCheck --rerun-tasks` with 94/94 executed tasks in 34m21s。The aggregate includes all current M6 process tasks and all five profiles；M7、upstream compatibility、performance and `phase9FinalCheck` remain open
+> 2026-07-30 M7 scale slice：product `main@bbe0881` implements root `phase9ScaleCheck` and
+> `scenarioKfScl001`–`scenarioKfScl005`。Fresh `--rerun-tasks` passes 36/36 executed tasks in 29s。The exact
+> boundaries are 16,384 bindings/64 shards/real-Oxia reconnect，10,000 open partition managers/64 active maintenance
+> calls，1,000 admitted Produce+Fetch operations under bounded executors，near-`Integer.MAX_VALUE` ranged metadata and
+> 128 exact sources/1,048,576 records through the production two-pass NTC2 executor。This is focused implementation
+> evidence，so those rows are `IMPLEMENTED_NOT_RUN` until the clean final aggregate；SCL006–010 remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -1277,6 +1283,35 @@ phase9FinalCheck --rerun-tasks
 
 `phase9FinalCheck` depends on all M1–M7 final gates and emits one deterministic report mapping every scenario ID to test
 class/method/result/artifact hash/environment。
+
+### Implemented scale slice at `main@bbe0881`
+
+`phase9ScaleCheck` is now executable and owns the first five M7 rows：
+
+- `KafkaBindingScaleIntegrationTest.scenarioKfScl001` creates exactly 16,384 ACTIVE bindings through production Oxia
+  codecs/CAS，balances 256 roots onto each of the 64 registry shards，closes the complete shared client runtime，then
+  reconnects and pages every shard at 17 entries/page。Every registry hint is reloaded from the authoritative binding
+  root and checked against the durable root hash；each shard must require exactly 16 pages；
+- `KafkaPartitionScaleIntegrationTest.scenarioKfScl002` opens 10,000 distinct identities through
+  `DefaultKafkaPartitionStorageManager`，runs one complete `KafkaPartitionMaintenanceRuntime` pass with an exact
+  64-operation concurrency ceiling，then shuts down and resigns every owner；
+- `KafkaIoConcurrencyStressTest.scenarioKfScl003` admits 500 appends into an 8-active/492-queued bounded executor while
+  owning exactly 2,000 bytes，and concurrently drives 500 demand-based Fetch waves on an eight-thread executor。The gate
+  releases both barriers only after all 1,000 operations are admitted，then requires complete progress and zero leaked
+  queue/byte/source ownership；
+- `KafkaRangedCountLimitTest.scenarioKfScl004` proves one physical byte may represent exactly
+  `Integer.MAX_VALUE` logical records across `AppendBatch`、`OffsetRange`、`AppendResult` and `ResolvedRange` without
+  per-record allocation，while the next logical record and overflowing offset math fail closed；
+- `KafkaMaterializationScaleIntegrationTest.scenarioKfScl005` supplies 128 exact source generations containing
+  1,048,576 Kafka records to `KafkaCompactionStreamingExecutor`。The two cold passes must close all 256 source reads，
+  spill under a 64 KiB winner-key budget，produce the exact 2,048 survivors through demand-driven NTC2 rows and return
+  staging reservations to zero。
+
+The root gate depends on `checkPhase9ScenarioManifest` and `phase9SourceLockCheck`，and serializes its real-Oxia owner
+through `DockerIntegrationGateService`。The fresh command
+`./gradlew phase9ScaleCheck --rerun-tasks` passes 36/36 tasks in 29s with five tests、zero skipped and zero failures。
+This does not satisfy the required leader/provider chaos、client/upstream compatibility、performance report or final
+evidence aggregation，therefore KF-SCL-001..005 remain below release status as `IMPLEMENTED_NOT_RUN`。
 
 ## 12. Gate implementation in Gradle
 

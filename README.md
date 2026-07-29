@@ -1,5 +1,15 @@
 # Nereus
 
+F9 current-source scale update（2026-07-30）：product `main@bbe0881` implements the first five M7 scale owners and
+the root `phase9ScaleCheck`。A fresh `--rerun-tasks` execution passes 36/36 tasks in 29s，covering 16,384 real-Oxia
+bindings distributed exactly across 64 registry shards and reloaded after a full client-runtime reconnect；10,000
+simultaneously open partition managers with maintenance capped at 64；1,000 admitted Produce/Fetch work items under
+exact thread、queue and byte limits；signed-int ranged-count metadata near `Integer.MAX_VALUE` without per-record
+allocation；and 128 exact sources / 1,048,576 Kafka records through the production two-pass NTC2 streaming executor with
+64 KiB winner memory、positive spill and zero leaked source/staging ownership。KF-SCL-001..005 are
+`IMPLEMENTED_NOT_RUN` until the clean release aggregate；leader/provider chaos、compatibility、performance reporting and
+the evidence aggregator remain open。
+
 F9 current-source update（2026-07-30）：Kafka fork `76f62f3b83` and product `main@4a0ec22` pass the complete fresh
 `phase9M6KafkaProcessCheck --rerun-tasks` real-process aggregate（94/94 tasks，34m21s）。The run includes all five
 storage profiles、transaction/coordinator migration and resolution cuts、mandatory internal-topic NTC2 damage/repair、

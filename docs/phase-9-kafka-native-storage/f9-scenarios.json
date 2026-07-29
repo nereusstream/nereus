@@ -3284,7 +3284,7 @@
     {
       "id": "KF-SCL-001",
       "milestone": "F9-M7",
-      "task": "phase9M7FinalCheck",
+      "task": "phase9ScaleCheck",
       "testClass": "KafkaBindingScaleIntegrationTest",
       "testMethod": "scenarioKfScl001",
       "scenario": "16,384 bindings across 64 shards plus hot-shard pagination/restart complete without omission",
@@ -3305,12 +3305,12 @@
       "gates": [
         "F9-M7"
       ],
-      "status": "PLANNED"
+      "status": "IMPLEMENTED_NOT_RUN"
     },
     {
       "id": "KF-SCL-002",
       "milestone": "F9-M7",
-      "task": "phase9M7FinalCheck",
+      "task": "phase9ScaleCheck",
       "testClass": "KafkaPartitionScaleIntegrationTest",
       "testMethod": "scenarioKfScl002",
       "scenario": "10,000 active partition state/open/close/checkpoint scheduling stays bounded",
@@ -3331,12 +3331,12 @@
       "gates": [
         "F9-M7"
       ],
-      "status": "PLANNED"
+      "status": "IMPLEMENTED_NOT_RUN"
     },
     {
       "id": "KF-SCL-003",
       "milestone": "F9-M7",
-      "task": "phase9M7FinalCheck",
+      "task": "phase9ScaleCheck",
       "testClass": "KafkaIoConcurrencyStressTest",
       "testMethod": "scenarioKfScl003",
       "scenario": "1,000 concurrent Produce/Fetch operations obey queue/byte/thread limits and make progress",
@@ -3358,12 +3358,12 @@
       "gates": [
         "F9-M7"
       ],
-      "status": "PLANNED"
+      "status": "IMPLEMENTED_NOT_RUN"
     },
     {
       "id": "KF-SCL-004",
       "milestone": "F9-M7",
-      "task": "phase9M7FinalCheck",
+      "task": "phase9ScaleCheck",
       "testClass": "KafkaRangedCountLimitTest",
       "testMethod": "scenarioKfScl004",
       "scenario": "ranged count near Integer.MAX_VALUE uses checked metadata math without per-record allocation",
@@ -3379,12 +3379,12 @@
       "gates": [
         "F9-M7"
       ],
-      "status": "PLANNED"
+      "status": "IMPLEMENTED_NOT_RUN"
     },
     {
       "id": "KF-SCL-005",
       "milestone": "F9-M7",
-      "task": "phase9M7FinalCheck",
+      "task": "phase9ScaleCheck",
       "testClass": "KafkaMaterializationScaleIntegrationTest",
       "testMethod": "scenarioKfScl005",
       "scenario": "128-source/million-record NCP2/NTC2 task respects memory/spill/source protection",
@@ -3405,7 +3405,7 @@
       "gates": [
         "F9-M7"
       ],
-      "status": "PLANNED"
+      "status": "IMPLEMENTED_NOT_RUN"
     },
     {
       "id": "KF-SCL-006",
