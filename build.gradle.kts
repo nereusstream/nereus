@@ -2892,7 +2892,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "1cbe8b65a8a802e8fd06503af3d5449ea79353e0",
+        "712bbf414dae88ef08f9a99e07bcdb0d6f3b85e0",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",

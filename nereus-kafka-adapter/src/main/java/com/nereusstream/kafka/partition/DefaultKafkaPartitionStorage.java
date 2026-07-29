@@ -512,6 +512,24 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     }
 
     @Override
+    public CompletableFuture<Void> probeMandatoryCompactedRead(Duration timeout) {
+        Objects.requireNonNull(timeout, "timeout");
+        KafkaStableSnapshot snapshot;
+        synchronized (guard) {
+            if (state != KafkaPartitionState.LEADER_WRITABLE
+                    && state != KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED) {
+                return CompletableFuture.failedFuture(
+                        new NereusException(
+                                ErrorCode.STORAGE_CLOSED,
+                                false,
+                                "Kafka partition cannot probe mandatory compacted reads: " + state));
+            }
+            snapshot = stableSnapshot;
+        }
+        return fetchReader.probeMandatoryCompactedRead(snapshot, timeout);
+    }
+
+    @Override
     public KafkaPartitionEventSubscription subscribe(KafkaPartitionEventListener listener) {
         Objects.requireNonNull(listener, "listener");
         synchronized (guard) {

@@ -1,9 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.kafka.partition;
 
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.kafka.retention.KafkaPartitionMaintenance;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -52,6 +55,20 @@ public interface KafkaPartitionStorage extends AutoCloseable {
             ByteBuffer validatedRecords, KafkaAppendContext context);
 
     CompletableFuture<KafkaStorageReadResult> read(KafkaStorageReadRequest request);
+
+    /**
+     * Probes the activated mandatory compacted prefix without falling back to COMMITTED bytes.
+     *
+     * <p>Kafka invokes this before electing an internal-topic coordinator. Implementations without
+     * binding-rooted compacted-view support must fail closed.
+     */
+    default CompletableFuture<Void> probeMandatoryCompactedRead(Duration timeout) {
+        return CompletableFuture.failedFuture(
+                new NereusException(
+                        ErrorCode.UNSUPPORTED_READ_SEMANTICS,
+                        false,
+                        "Kafka partition storage cannot probe a mandatory compacted read"));
+    }
 
     KafkaPartitionEventSubscription subscribe(KafkaPartitionEventListener listener);
 
