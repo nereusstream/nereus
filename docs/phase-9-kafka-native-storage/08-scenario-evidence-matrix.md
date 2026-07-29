@@ -3,6 +3,7 @@
 > 状态：Active scenario contract；146-row JSON manifest synchronized；rows remain `PLANNED` until owning milestone evidence
 > 规则：一个 requirement 至少一个稳定 ID；release report 必须给每个 ID 一个实际执行结果
 > 当前 F9-M1/M2 implementation 与 direct real-service gates 已通过；F9-M3 codec、bounded Produce 与 whole-request async Fetch、M4 transaction、M5 virtual-log/DeleteRecords/periodic-retention rows have deterministic partial evidence；native DeleteRecords checkpoint-before-trim + forced-restart recovery adds one R/P/C/K slice；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 milestone rows 暂不升级为 final-gated
+> 2026-07-29 增量：product `7c25d2e` adds a live two-release-process completed-state migration slice for KF-TXN-011/012/013；ongoing/aborted transaction takeover、mandatory internal-topic NTC2 and final aggregate remain open
 
 ## 1. Evidence tiers
 
@@ -522,12 +523,22 @@ hash。Markdown/JSON ID sets must match。
 | KF-TXN-008 | crash after transactional data/marker commit before derived update replays correctly | `KafkaTransactionProcessCutIntegrationTest` | P,C | M4 |
 | KF-TXN-009 | transaction spanning virtual segments/checkpoint/takeover remains atomic to consumers | `KafkaTransactionProcessCutIntegrationTest` | P,K | M4 |
 | KF-TXN-010 | transaction verification guard survives async executor handoff without request-thread local use | fork `ReplicaManagerTest.testStorageAppendExecutorPreservesTransactionGuardAndMarkerVersion`（D/K partial；R pending） | D,R,K | M4 |
-| KF-TXN-011 | `__consumer_offsets` opens/replays before group coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady`（D partial）+ product `NereusKafkaNativeProcessIntegrationTest`（single-node graceful restart R/P partial；kill/failure cut pending） | P,C | M4 |
-| KF-TXN-012 | `__transaction_state` opens/replays before transaction coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady` + `NereusTopicDeltaLifecycleTest.testLeaderCallbackWaitsForExactRecoveredStorageInstallation`（D partial）+ product `NereusKafkaNativeProcessIntegrationTest`（single-node graceful restart R/P partial；kill/failure cut pending） | P,C | M4 |
-| KF-TXN-013 | group commit/rebalance/restart/takeover works with native internal topic | product `NereusKafkaNativeProcessIntegrationTest`（group commit/rebalance/fresh-JVM resume P/K partial；broker takeover pending）；`KafkaGroupCoordinatorIntegrationTest` | P,K | M4 |
-| KF-TXN-014 | ongoing transaction coordinator failover resolves from internal topic | product `NereusKafkaNativeProcessIntegrationTest`（stable open transaction + forced process exit + fresh-JVM abort/next commit P/K partial；BookKeeper/multi-broker profile pending）；`KafkaTransactionCoordinatorIntegrationTest` | P,K | M4 |
+| KF-TXN-011 | `__consumer_offsets` opens/replays before group coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady`（D partial）+ product `f9M6KafkaProcessIntegrationTest`（single-node restart R/P）+ `f9CoordinatorMigrationProcessIntegrationTest`（live `[1] -> [2]` internal-topic recovery before group-offset service P/K current slice；failure cut pending） | P,C | M4 |
+| KF-TXN-012 | `__transaction_state` opens/replays before transaction coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady` + `NereusTopicDeltaLifecycleTest.testLeaderCallbackWaitsForExactRecoveredStorageInstallation`（D partial）+ product `f9M6KafkaProcessIntegrationTest`（single-node restart R/P）+ `f9CoordinatorMigrationProcessIntegrationTest`（live completed-state `[1] -> [2]` recovery before same-ID continuation P/K current slice；failure cut pending） | P,C | M4 |
+| KF-TXN-013 | group commit/rebalance/restart/takeover works with native internal topic | product `f9M6KafkaProcessIntegrationTest`（group commit/rebalance/fresh-JVM resume P/K）+ `f9CoordinatorMigrationProcessIntegrationTest`（old broker live、group partition handoff、offset 2 reload、resume/commit 4 P/K current slice）；BookKeeper/profile/final aggregate pending | P,K | M4 |
+| KF-TXN-014 | ongoing transaction coordinator failover resolves from internal topic | product `f9M6KafkaProcessIntegrationTest`（stable open transaction + forced process exit + fresh-JVM abort/next commit P/K partial）+ `f9CoordinatorMigrationProcessIntegrationTest`（completed transactional ID live migration only）；ongoing multi-broker/profile cut pending | P,K | M4 |
 | KF-TXN-015 | group offset lag does not protect user-topic retention；client observes normal reset/out-of-range | `KafkaGroupRetentionIndependenceTest` | R,P,K | M5 |
 | KF-TXN-016 | mandatory internal-topic NTC2 unavailable blocks coordinator election，no full-source fallback | `KafkaInternalTopicNoResurrectionTest` | P,C,K | M5 |
+
+Current coordinator-migration evidence（product `7c25d2e`；fork `1cbe8b65a8`）：
+`f9CoordinatorMigrationProcessIntegrationTest` starts node 1 combined controller/broker and node 2 broker-only over one
+real KRaft identity、four-shard Oxia and LocalStack Object-WAL。Node 1 commits user offset 0、transaction data/marker 1/2
+and group offset 2。One Admin request moves user、`__consumer_offsets-0` and `__transaction_state-0` from singleton `[1]`
+to `[2]`；the gate waits all three exact leader/replicas/ISR states and empty reassignment while node 1 remains alive。
+Only then may group offset 2 reload and the same transactional ID commit data/marker 3/4；READ_COMMITTED and the same group
+must continue at visible offset 3 with final earliest/latest `0/5`。Fresh task passes 73/73 actionable tasks in 1m07s；
+related cold-restart/takeover regressions pass 74/74 in 1m50s。Rows remain `PLANNED` because their C cuts、
+ongoing/aborted transaction path、profile/upstream coverage and final aggregate are incomplete。
 
 Implementation note（2026-07-24）：the product-side `KafkaProducerStatePropertyTest` now covers the canonical-format and
 sequence-wrap portions of KF-TXN-002/003 with a frozen digest and 200 deterministic randomized round trips。Both rows remain

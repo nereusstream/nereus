@@ -2,6 +2,7 @@
 
 > 状态：Implementation in progress；100-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed five-profile provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh、Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit、Kafka 64+64-shard stream-coverage deletion activation 与 fail-closed BookKeeper ledger-retention service composition are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie BookKeeper WAL-only/async/sync release-distribution initial process + fresh-JVM cold-restart gates pass；an independent `OBJECT_WAL_ASYNC_OBJECT` initial/fresh-JVM cold-restart gate passes over the same real Object provider；real two-bookie ledger deletion、provider-level applied-delete response-loss、fresh-JVM NCP2 fallback、Object/BookKeeper takeover、three-voter ACTIVE controller kill/failover、six-way readiness/PREPARED/ACTIVE store-publication cuts、four-way initial proof cuts、native checkpoint/trim forced restart and Object-WAL provider-applied trim response-loss forced restart pass；BookKeeper/all-profile response-loss、coordinator/internal-topic migration、broader kill-chaos and full observability remain target；F9-M6
 > 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton reassignment、旧 owner resignation、committed recovery 与新 leader continuation 已通过；three-release-process Object-WAL already-dispatched append gate 锁定 provider-future stack、process freeze、pre-upload session fencing、no-orphan WAL 和 exact LEO continuation；BookKeeper three-profile P matrix and common provider-applied C cut pass；three combined nodes with three static controller voters now pass ACTIVE-state controller kill/re-election/reconciliation and native IO continuation；three dedicated controllers plus broker `[4]` now also pass before-provider and after-provider failover for readiness create、PREPARED create and ACTIVE CAS，以及 initial snapshot proof/capability aggregation；one dedicated controller/broker gate further passes actual Oxia connection reset and same-controller-epoch retry；five-profile trim provider-applied response-loss/fresh-restart/no-repeat matrix 也已通过；coordinator migration、remaining DeleteRecords boundaries 和更广 chaos 仍为 rollout blocker
+> 2026-07-29 coordinator migration 增量：product `7c25d2e` 用两个 live release brokers 原子迁移 user、group 与 transaction partitions，completed coordinator state 在新 broker recovered-storage-ready 后恢复；ongoing/aborted transaction migration、mandatory internal-topic NTC2、remaining DeleteRecords boundaries 和更广 chaos 仍为 rollout blocker
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -585,6 +586,30 @@ same topic ID/partition remains in the new image and calls `resign` instead of d
 and `phase9M6KafkaProcessCheck` now depends on it。This is P-tier Object-WAL evidence with one controller，not
 multi-controller failover or a five-profile matrix。
 
+`f9CoordinatorMigrationProcessIntegrationTest` is the adjacent real internal-topic gate。It reuses the two-broker release
+topology and first materializes all state on node 1：one explicit user partition、a completed transaction at data/marker
+offsets 1/2 and a consumer-group commit at offset 2。Because both coordinator topics have one RF1 partition，the harness can
+freeze their exact initial placement and then submit one atomic Admin map for:
+
+```text
+user-topic-0           [1] -> [2]
+__consumer_offsets-0   [1] -> [2]
+__transaction_state-0  [1] -> [2]
+```
+
+The gate does not infer coordinator readiness from KRaft metadata alone。It first requires exact
+`leader=2, replicas=[2], ISR=[2]` for all three partitions、empty ongoing reassignment and both JVMs alive，then probes stock
+coordinator behavior：group offset 2 must reload；the same transactional ID must commit data/marker 3/4；READ_COMMITTED must
+read the pre/post handoff values；and the same group must resume at visible offset 3 and commit 4。Final user
+earliest/latest is `0/5`。A successful probe therefore composes topic-delta storage recovery、ready callback、coordinator
+election/replay and client request serving in the actual release process。
+
+The task owns `build/f9-kafka-coordinator-migration-evidence` for failure artifacts，is serialized after the ordinary
+multi-broker gate and before multi-controller gates，and is now a direct dependency of `phase9M6KafkaProcessCheck`。Fresh
+execution passes 73/73 actionable tasks in 1m07s；the cold-restart and ordinary handoff regressions pass 74/74 in 1m50s。
+This closes only completed group/transaction state migration；ongoing/aborted transaction failover and mandatory internal
+topic NTC2 failure remain rollout blockers。
+
 `f9TrimResponseLossProcessIntegrationTest` owns an independent test-only Byte Buddy agent jar and
 `build/f9-kafka-trim-response-loss-evidence`。The task arms the agent only immediately before native DeleteRecords，lets
 the real `DefaultStreamStorage.trim` provider future complete，writes a durable-test marker and withholds only the caller
@@ -724,9 +749,9 @@ response-loss still reloads and accepts an exact winner。The deterministic cont
 exception escape and now passes together with monotonic create/CAS and applied-response-loss cases。The fresh real process
 task passes 73/73 actionable tasks in 1m10s and belongs to `phase9M6KafkaProcessCheck`。
 
-Checkpoint/virtual-segment cuts、
-transaction/internal-topic coordinator migration and complete rollout evidence 尚未闭合，所以整个路径
-仍不能用于 production rollout readiness。
+Native checkpoint/trim recovery and completed group/transaction internal-topic migration are covered by the later process
+gates。Ongoing/aborted coordinator、mandatory NTC2、remaining boundary/chaos and complete rollout evidence 尚未闭合，
+所以整个路径仍不能用于 production rollout readiness。
 
 The selected shell is not a durability shortcut：`NereusUnifiedLogFactory` uses only
 `${cacheDir}/{brokerId}/partition-logs`，sets `loadExistingLogs=false` and `scheduleLocalMaintenance=false`，and rejects local

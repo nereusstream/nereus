@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；coordinator、full retention/profile matrix、real compaction restart and stock cleaner differential remain in progress
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration also passes，while ongoing/aborted coordinator、remaining retention boundaries、real compaction restart and stock cleaner differential remain in progress
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -1479,6 +1479,43 @@ per-partition serialization described above。
 | metadata | binding compaction coverage nested record/codec/transition validators + partition-scoped KCP1 scan continuation |
 | object store | NTC2 writer/reader/goldens from document 02 |
 
+### 15.1 Current completed-coordinator migration evidence
+
+Product `7c25d2e` adds
+`:nereus-kafka-adapter:f9CoordinatorMigrationProcessIntegrationTest` against the unchanged published Kafka fork
+`1cbe8b65a8`。It uses two real release JVMs、one KRaft controller quorum、four-shard Oxia and LocalStack Object-WAL：
+
+```text
+node 1:
+  user partition [1]
+  Produce offset 0
+  transaction(data=1, COMMIT=2)
+  group rebalance + commit user offset 2
+
+start node 2:
+  assert user/__consumer_offsets-0/__transaction_state-0 are all leader/replicas/ISR [1]
+  one Admin reassignment moves all three to [2]
+  await all three exact [2] states and no ongoing reassignment
+  keep node 1 alive
+
+node 2:
+  group lookup == 2
+  same transactional ID -> data=3, COMMIT=4
+  READ_COMMITTED sees offsets 1 and 3
+  same group resumes at visible offset 3 and commits 4
+  final user earliest/latest = 0/5
+```
+
+The gate proves the exact shared-storage handoff that coordinator election depends on：the new broker cannot successfully
+answer the group or transaction client until `NereusTopicDeltaLifecycle` has opened and published the recovered internal
+partition storage，after which stock coordinator replay consumes those bytes。It also proves old-owner resignation does not
+delete either shared binding while the old broker stays live。Fresh execution passes 73/73 actionable tasks in 1m07s；the
+baseline cold-restart and ordinary data-handoff regressions pass together at 74/74 in 1m50s。
+
+This is intentionally a completed-state cut。It does not replace the still-required tests for an ongoing transaction during
+coordinator handoff、abort-resolution failure cuts、BookKeeper/profile migration、mandatory internal-topic NTC2 unavailable
+or upstream coordinator suites。
+
 ## 16. Test plan
 
 ### 16.1 Producer/idempotence
@@ -1497,6 +1534,9 @@ per-partition serialization described above。
 - `__consumer_offsets` group commit/rebalance/restart/compaction；
 - `__transaction_state` coordinator failover and ongoing transaction；
 - corrupt mandatory internal-topic NTC2 fails election without COMMITTED fallback。
+
+Current executable subset：the first two bullets now include real completed-state live migration across two release brokers；
+ongoing/aborted transaction and internal-topic compaction/no-resurrection cuts remain open。
 
 ### 16.3 Retention/DeleteRecords
 

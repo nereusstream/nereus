@@ -651,6 +651,17 @@ commits/reads offset 0，starts node 2，Admin-reassigns to `[2]`，requires exa
 `leader=2, replicas=[2], ISR=[2]` and no ongoing reassignment while node 1 remains alive，then commits offset 1 and reads
 both batches from the cluster。Fresh execution passed 73/73 actionable tasks in 1m04s and the task is part of
 `phase9M6KafkaProcessCheck`。This first task is P-tier Object-WAL post-handoff evidence。
+
+Product `7c25d2e` adds `f9CoordinatorMigrationProcessIntegrationTest` without changing the published fork
+`1cbe8b65a8`。The same two-release-process topology first writes user offsets 0/1/2、group committed offset 2 and one
+completed transactional ID on node 1，then atomically reassigns the user partition、`__consumer_offsets-0` and
+`__transaction_state-0` together from `[1]` to `[2]` while node 1 remains alive。All three must converge to exact
+`leader/replicas/ISR=[2]` with no ongoing reassignment before any client assertion。Broker 2 then reloads group offset 2，
+reinitializes the same transactional ID and commits data/marker offsets 3/4；READ_COMMITTED sees both committed values and
+the same group resumes at visible offset 3 and commits offset 4，with final earliest/latest `0/5`。Fresh execution passes
+73/73 actionable tasks in 1m07s；the related baseline/takeover rerun passes 74/74 in 1m50s。This is completed-state
+internal-topic P/K takeover evidence，not an ongoing/aborted coordinator cut or mandatory-NTC2 proof。
+
 `f9InFlightTakeoverProcessIntegrationTest` adds the C cut with an independent controller JVM、a Toxiproxy-held
 single-attempt Produce、`jcmd` proof of `NereusUnifiedLog.appendStable` waiting on the provider future and a broker-1
 `SIGSTOP` before reassignment。After `[2]` is stable，`SIGCONT` makes the old append fail with
@@ -669,7 +680,8 @@ committing offset 1。Resuming broker 1 releases the delayed future but its stal
 and WAL-only publishes no Object bytes。Fresh execution passes 66/66 actionable tasks in 1m30s。Because this cut precedes
 `DURABLE` and the profile-specific materialization branch，the same production boundary is shared by WAL-only、async and
 sync；the prior three-profile P matrix supplies the profile-specific half。Transaction/internal-topic coordinator migration
-and broader chaos proof remain open。The native checkpoint/virtual-segment trim/restart subset is now covered separately by
+for completed state is covered by the gate above；ongoing/aborted coordinator cuts and broader chaos remain open。The native
+checkpoint/virtual-segment trim/restart subset is now covered separately by
 `f9CheckpointTrimRecoveryProcessIntegrationTest`：stock DeleteRecords publishes a rooted NKC1、advances durable trim，
 survives forced broker death，hydrates the checkpoint under its captured pre-trim window，prunes canonical state to the
 current trim and continues Produce/Fetch/ListOffsets。

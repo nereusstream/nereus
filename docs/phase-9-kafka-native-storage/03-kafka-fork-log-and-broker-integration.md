@@ -2,6 +2,7 @@
 
 > 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart、BookKeeper WAL-only/async/sync cold-restart、BookKeeper three-profile two-process post-handoff、BookKeeper provider-applied cut、real-Oxia two-runtime Object-WAL live takeover、three-voter ACTIVE controller failover、the complete six-way readiness/PREPARED/ACTIVE store-publication gates and four-way initial-proof gates 均通过；extended kill/chaos gates remain open
 > 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：fork `1cbe8b65a8` 与 product process gates 已通过 two-release-process Object-WAL/KRaft singleton live reassignment、already-dispatched Object/BookKeeper append cuts、three-profile post-handoff、multi-controller activation/store/proof/transport cuts；同一 published fork 又闭合 native DeleteRecords 的 durable log-start publication、broker-epoch-ready recovery 和 pre-trim NKC1 hydration，product `f9CheckpointTrimRecoveryProcessIntegrationTest` 证明 forced restart 后按当前 trim 重建 virtual segments 并继续 native IO；两个 trim-response-loss tasks 又在全部五种 profile 证明 provider-applied/caller-unobserved trim 的 fresh-process convergence 与同目标 no-op；remaining gaps are transaction/internal-topic coordinator migration、remaining DeleteRecords boundaries and broader chaos
+> 2026-07-29 coordinator migration 增量：product `7c25d2e` 在 fork `1cbe8b65a8` 上原子迁移 user、`__consumer_offsets-0`、`__transaction_state-0` 到 live broker 2，completed group/transaction coordinator state 恢复并继续提交；remaining coordinator gaps narrow to ongoing/aborted transaction takeover and mandatory internal-topic NTC2 failure
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -339,8 +340,24 @@ node 2/controller bootstrap 提交原子 `[1] -> [2]` 重分配，并要求
 `leader=2, replicas=[2], ISR=[2]`、无 ongoing reassignment、earliest/latest 仍为 `0/1`。`SIGCONT` 后旧请求以
 `FencedLeaderEpochException: append session changed before guarded object upload` 结束，旧进程保持存活，S3 WAL key
 集合不变，broker 2 随后在 offset 1 提交并把 latest 推到 2。该 gate 闭合 Object-WAL P/C 边界，但仍不包含
-checkpoint/virtual-segment transaction cut、coordinator migration 或 multi-controller activation cuts，
+checkpoint/virtual-segment transaction cut、completed coordinator migration 或 multi-controller activation cuts，
 因此不足以宣称 production rollout ready。
+
+`f9CoordinatorMigrationProcessIntegrationTest` independently closes that completed coordinator-migration gap using the
+same shipped release and no new fork hook。Node 1 owns the user partition and the one-partition group/transaction internal
+topics，then persists user offsets 0/1/2、group committed offset 2 and a completed transactional ID。After node 2 joins，
+one `alterPartitionReassignments` request moves the user、`__consumer_offsets-0` and `__transaction_state-0` partitions to
+singleton `[2]`。The harness waits for all three exact `leader=2, replicas=[2], ISR=[2]` states and an empty reassignment map
+while node 1 remains alive；this makes the storage-ready-before-coordinator-election ordering observable through actual
+client recovery rather than a mock callback。
+
+The post-handoff group lookup must return offset 2。Initializing the same transactional ID on broker 2 must recover its
+completed state and commit data/marker offsets 3/4，not restart at offset 1 or expose a stale producer epoch。READ_COMMITTED
+then reads the pre-handoff transactional record at offset 1 and the post-handoff record at offset 3；the same group resumes
+at visible offset 3 and commits offset 4，with final earliest/latest `0/5`。Fresh task execution passes 73/73 actionable
+tasks in 1m07s，and the unchanged cold-restart plus ordinary data-takeover gates pass 74/74 tasks in 1m50s。The task is
+aggregated by `phase9M6KafkaProcessCheck`；ongoing/aborted transaction coordinator takeover、mandatory NTC2 unavailability
+and full M4 upstream/final gates remain separate requirements。
 
 `f9BookKeeperProfileTakeoverProcessIntegrationTest` supplies the independent BookKeeper post-handoff matrix without a new
 fork seam。One stock ZooKeeper long-hierarchical metadata service and two real Bookies host three isolated authorities，
@@ -1067,7 +1084,8 @@ separate `f9InFlightTakeoverProcessIntegrationTest` supplies the release-process
 the BookKeeper three-profile post-handoff matrix and common provider-applied C cut also pass；ACTIVE-state multi-controller
 kill failover、the complete six-way readiness-create/PREPARED-create/ACTIVE-CAS store-publication takeover、the four-way
 initial snapshot-proof/capability-aggregation takeover and actual Oxia transport-reset recovery now pass separately，while
-coordinator/checkpoint variants remain open。
+completed coordinator migration and checkpoint/trim recovery now pass separately；ongoing/aborted coordinator and broader
+checkpoint/chaos variants remain open。
 真实 combined-node
 KRaft/Oxia/S3 process baseline 已通过；
 同节点 fresh-JVM cold restart 也已通过；独立 BookKeeper WAL-only/async/sync release-distribution
@@ -1271,7 +1289,8 @@ provider 的旧 append 只能由 current term publication，也不证明 coordin
 multi-controller takeover；Object-WAL already-dispatched append 的 release-process cut 由
 `f9InFlightTakeoverProcessIntegrationTest` 覆盖，BookKeeper profile 的 post-handoff 等价路径由
 `f9BookKeeperProfileTakeoverProcessIntegrationTest` 覆盖；Bookie-acked、Oxia-`WRITING`、old-root-`SEALED`
-等价切点由 `f9BookKeeperInFlightTakeoverProcessIntegrationTest` 覆盖。
+等价切点由 `f9BookKeeperInFlightTakeoverProcessIntegrationTest` 覆盖；completed group/transaction
+internal-topic migration 由独立 `f9CoordinatorMigrationProcessIntegrationTest` 覆盖。
 
 ## 8. Fetch execution
 

@@ -150,8 +150,11 @@ recovers offset 0 and appends offset 1 with earliest=0/latest=2；
 The current process suite additionally covers Object/BookKeeper live takeover、ACTIVE-state three-voter controller
 failover、the complete before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store-publication
 matrix、the four-way initial snapshot-proof/capability-aggregation matrix and actual first-activation Oxia transport
-reset/retry。Checkpoint/virtual-segment cuts、coordinator migration and wider chaos evidence remain future work，so this is not yet a
-production-rollout claim.
+reset/retry。`f9CoordinatorMigrationProcessIntegrationTest` now also keeps broker 1 alive while atomically moving the user
+partition、`__consumer_offsets-0` and `__transaction_state-0` to broker 2，then recovers group offset 2、reuses the same
+transactional ID for data/marker offsets 3/4、resumes the group at visible offset 3 and ends at earliest/latest `0/5`。
+Ongoing/aborted transaction takeover、mandatory internal-topic NTC2 failure、remaining DeleteRecords boundaries and wider
+chaos evidence remain future work，so this is not yet a production-rollout claim.
 
 ## Current Phase
 
