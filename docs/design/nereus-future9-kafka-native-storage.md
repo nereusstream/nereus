@@ -1,5 +1,15 @@
 # Future 9 — Native Kafka Shared-Storage Integration
 
+> 2026-07-30 F9-M7 performance slice：product `main@33c889c` implements canonical
+> `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` behind `phase9PerformanceCheck`。All five storage profiles
+> run synchronous-ack Produce、READ_COMMITTED Fetch、actual broker-JVM resource sampling and fresh-process cold recovery
+> across ten release-process lifecycles。Cold recovery preserves only the KRaft `meta.properties` directory identity；
+> no partition cache data or checkpoint is copied。The gate writes
+> `nereus-kafka-adapter/build/f9-kafka-performance-evidence/performance-report.json` only after all five profiles pass，
+> marks it `OBSERVATION_ONLY` and retains the exact environment/workload with every sample。Fresh root rerun passes
+> 75/75 executed tasks in 3m28s；the owner reports one test、zero skipped and zero failures（192.872s suite，187.701s
+> test）。SCL009 is `IMPLEMENTED_NOT_RUN`；SCL010 and the clean final aggregate remain open
+
 > 2026-07-30 F9-M7 compatibility slice：product `main@dc590f7` adds canonical
 > `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl008` behind `phase9CompatibilityCheck`。Four independent client
 > JVMs load exactly one `kafka-clients` JAR each（`3.9.0`、`4.0.1`、`4.1.1`、fork-current `4.3.0-SNAPSHOT`）and prove

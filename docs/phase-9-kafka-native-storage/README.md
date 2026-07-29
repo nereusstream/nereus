@@ -1,5 +1,15 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
+> 2026-07-30 M7 performance slice：product `main@33c889c` adds
+> `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` and root `phase9PerformanceCheck`。Five storage profiles
+> each execute first-process Produce/Fetch/resource sampling and a second-process identity-only-cache recovery，for ten
+> real release-broker lifecycles total。The recovery directory initially contains exactly the formatted KRaft
+> `meta.properties` identity and no cached partition content；the recovered latest offset is `40` and continuation
+> advances it to `41`。Successful completion emits the all-five-profile `OBSERVATION_ONLY` report under
+> `nereus-kafka-adapter/build/f9-kafka-performance-evidence/`。Fresh root rerun passes 75/75 executed tasks in 3m28s；
+> the single owner test reports zero skipped/failures in 187.701s。KF-SCL-009 is `IMPLEMENTED_NOT_RUN` until final
+> aggregation；KF-SCL-010 remains open
+
 > 2026-07-30 M7 compatibility slice：product `main@dc590f7` adds
 > `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl008` and root `phase9CompatibilityCheck`。Four isolated JVMs
 > assert their exact runtime identity（`3.9.0`、`4.0.1`、`4.1.1`、fork-current `4.3.0-SNAPSHOT`）before executing

@@ -33,6 +33,11 @@
 > broker，while 20 focused fork ApiVersions/Produce/Fetch/Admin/group/transaction tests rerun independently。The fresh
 > gate passes 70/70 outer tasks in 1m44s and 90/90 nested fork tasks in 49s with no skipped/failed tests。SCL008 is
 > `IMPLEMENTED_NOT_RUN` until final aggregation；SCL009–010 remain open
+> 2026-07-30 M7 performance slice：product `main@33c889c` adds canonical `scenarioKfScl009` plus
+> `phase9PerformanceCheck`。Five storage profiles execute ten real release-broker lifecycles，covering synchronous-ack
+> Produce、READ_COMMITTED Fetch、broker-JVM RSS/CPU/live-thread sampling and identity-only-cache fresh-process recovery。
+> The all-or-nothing report is explicitly `OBSERVATION_ONLY`。Fresh root rerun passes 75/75 executed tasks in 3m28s with
+> one test、zero skipped and zero failures。SCL009 is `IMPLEMENTED_NOT_RUN` until final aggregation；SCL010 remains open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -1413,6 +1418,55 @@ canonical product suite reports one test、zero skipped and zero failures（suit
 therefore moves from `PLANNED` to `IMPLEMENTED_NOT_RUN`：the focused P/K evidence is current，but the per-profile
 performance report、146-scenario evidence aggregator and clean M7/final aggregate remain open。
 
+### Implemented five-profile performance slice at `main@33c889c`
+
+`phase9PerformanceCheck` owns KF-SCL-009 through
+`NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009`。The root task depends on
+`checkPhase9ScenarioManifest`、`phase9SourceLockCheck` and the adapter
+`f9PerformanceProfileProcessIntegrationTest`，which in turn requires the exact source-locked Kafka release runtime。
+
+The code-level workload and evidence contract is：
+
+- start one real Oxia cluster、pinned LocalStack S3 service and two-bookie `LocalBookKeeper` fixture，then execute
+  `OBJECT_WAL_SYNC_OBJECT`、`OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、
+  `BOOKKEEPER_WAL_ASYNC_OBJECT` and `BOOKKEEPER_WAL_SYNC_OBJECT` sequentially；
+- create one RF1 topic per profile，write 8 warm-up plus 32 sampled records，use 4,096-byte deterministic values、
+  producer `acks=all`、no compression/linger and wait for every acknowledgement；
+- record sampled Produce elapsed time、records/bytes per second and acknowledgement `p50/p95/p99/max`；then consume all
+  40 records with `read_committed` and record elapsed time、records/bytes per second、first-record time and non-empty poll
+  `p50/p95/p99/max`；
+- force explicit bounded executor settings into every broker config：2 append threads / 32 queued operations、8 Fetch
+  threads / 32 queued operations and 128 MiB in-flight bytes on each side。The Fetch width also satisfies the physical
+  deletion concurrency contract of the BookKeeper async profile；
+- sample the actual descendant Java broker rather than the launcher shell：RSS comes from `ps`，CPU uses
+  `ProcessHandle.totalCpuDuration()` with strict `ps` elapsed-CPU fallback，and live Java threads come from
+  `jcmd PerfCounter.print`。Both the first and recovery broker must yield positive complete samples；
+- after normal first-process shutdown，copy only `<cache>/1/partition-logs/meta.properties` into a different empty cache
+  root and assert it is the sole regular file before restart。This preserves the KRaft replica `directory.id` required
+  by assignment while proving that no partition bytes/checkpoint/local log are authoritative；
+- the recovery process must Fetch exact offset `0` from provider state，observe latest `40`，append exact offset `40`
+  and advance latest to `41`。Each profile therefore owns two independent release-broker lifecycles；
+- delete stale report/log/config evidence before the run。Only after all five ordered profiles report `PASS` does the
+  owner write `nereus-kafka-adapter/build/f9-kafka-performance-evidence/performance-report.json` with
+  `schemaVersion=1`、`scenarioId=KF-SCL-009`、`sampled=true` and `thresholdPolicy=OBSERVATION_ONLY`；a partial/failing
+  matrix cannot leave a success report。
+
+The fresh `./gradlew phase9PerformanceCheck --rerun-tasks` run at this source executes 75/75 tasks in 3m28s。Its JUnit
+suite reports one test、zero skipped and zero failures（suite 192.872s；test 187.701s）。The machine report contains the
+following current-host observations；these are reproducibility evidence，not release SLA or cross-provider thresholds：
+
+| Profile | Produce records/s | Ack p99 μs | Fetch records/s | Recovery ready ms | First cold Fetch μs | RSS KiB | CPU ms | Live threads |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `OBJECT_WAL_SYNC_OBJECT` | 15.813 | 109935 | 25.045 | 4549 | 2627576 | 546528 | 12500 | 184 |
+| `OBJECT_WAL_ASYNC_OBJECT` | 13.581 | 86179 | 32.541 | 4234 | 2719034 | 577920 | 15880 | 184 |
+| `BOOKKEEPER_WAL_ONLY` | 29.307 | 41091 | 114.551 | 4541 | 1222105 | 548256 | 11110 | 176 |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | 7.090 | 229915 | 110.650 | 4548 | 1641637 | 656208 | 21550 | 205 |
+| `BOOKKEEPER_WAL_SYNC_OBJECT` | 2.975 | 440168 | 14.635 | 4539 | 6416870 | 677392 | 28960 | 207 |
+
+KF-SCL-009 therefore moves from `PLANNED` to `IMPLEMENTED_NOT_RUN`：its P/A-shaped report is current and complete，but
+only KF-SCL-010 may consume it together with all other 145 rows and promote release status through a clean
+`phase9FinalCheck --rerun-tasks`。
+
 ## 12. Gate implementation in Gradle
 
 Root target additions：
@@ -1471,6 +1525,10 @@ Correctness gates precede claims。M7 records，without hard-coding unsupported 
 - compaction throughput/spill amplification/object IO；
 - broker takeover time；
 - CPU/allocation profile and thread/blocking audit。
+
+The implemented KF-SCL-009 slice above owns the five-profile Produce、committed Fetch、identity-only-cache recovery and
+process RSS/CPU/live-thread fields。Compaction/spill、takeover and allocation-detail observations remain separate
+release-baseline inputs and are not fabricated by this report。
 
 Release threshold is set against an approved hardware/provider baseline and checked into the evidence manifest；no threshold is
 inferred from AutoMQ marketing or a mock benchmark。

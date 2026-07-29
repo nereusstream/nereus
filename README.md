@@ -1,5 +1,17 @@
 # Nereus
 
+F9 current-source performance update（2026-07-30）：product `main@33c889c` adds canonical
+`NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` and root `phase9PerformanceCheck`。The gate runs
+`OBJECT_WAL_SYNC_OBJECT`、`OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、
+`BOOKKEEPER_WAL_ASYNC_OBJECT` and `BOOKKEEPER_WAL_SYNC_OBJECT` through ten real release-broker lifecycles。Each profile
+records synchronous-ack Produce percentiles/throughput、committed Fetch latency/throughput、actual broker-JVM RSS/CPU/live
+threads and fresh-process recovery，where the recovery cache contains only the preserved KRaft `directory.id` identity
+and no partition data。The all-or-nothing machine report is
+`nereus-kafka-adapter/build/f9-kafka-performance-evidence/performance-report.json` with
+`thresholdPolicy=OBSERVATION_ONLY`。Fresh `phase9PerformanceCheck --rerun-tasks` passes 75/75 executed tasks in 3m28s；
+the canonical suite reports one test、zero skipped and zero failures（192.872s suite，187.701s test）。KF-SCL-009 is
+`IMPLEMENTED_NOT_RUN` until the final aggregate；only KF-SCL-010 remains open。
+
 F9 current-source compatibility update（2026-07-30）：product `main@dc590f7` adds the executable
 `phase9CompatibilityCheck` and canonical
 `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl008`。One real Nereus broker serves four isolated client JVMs

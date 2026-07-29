@@ -33,6 +33,12 @@
 > `4.3.0-SNAPSHOT` across Admin/Produce/Fetch/group/transaction，and the same root gate reruns 20 focused current-fork
 > compatibility tests。Fresh rerun passes 70/70 outer tasks in 1m44s and 90/90 nested fork tasks in 49s；all 21 tests
 > report zero skipped and zero failures。KF-SCL-008 moves to `IMPLEMENTED_NOT_RUN`；KF-SCL-009..010 remain `PLANNED`
+> 2026-07-30 M7 performance slice：product `main@33c889c` implements canonical `scenarioKfScl009` behind
+> `phase9PerformanceCheck`。All five storage profiles record synchronous-ack Produce、committed Fetch、actual broker-JVM
+> RSS/CPU/live threads and fresh-process identity-only-cache recovery across ten release-broker lifecycles。The report is
+> written only after every profile passes and is marked `OBSERVATION_ONLY`。Fresh rerun passes 75/75 executed tasks in
+> 3m28s；the owner reports one test、zero skipped and zero failures。KF-SCL-009 moves to `IMPLEMENTED_NOT_RUN`；
+> KF-SCL-010 remains `PLANNED`
 
 ## 1. Evidence tiers
 
@@ -808,7 +814,7 @@ composition/restart evidence only；the real-provider fresh-process restart tier
 | KF-SCL-006 | repeated leader churn across three brokers never accepts stale-term write/publication | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl006` through `phase9ChaosCheck`（three live release brokers、six `1→2→3→1→2→3→1` RF1 handoffs、monotonic leader/binding/session authority、distinct token、old-bootstrap exact continuation；focused current-source pass，final aggregate pending） | P,C | M7 |
 | KF-SCL-007 | Oxia/Object/BK/network response-loss matrix converges after fresh process restart | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl007` through `phase9ChaosCheck`，combined with `f9TrimResponseLossProcessIntegrationTest` and `f9TrimProfileMatrixProcessIntegrationTest`（actual Oxia reset + fresh controller/broker；provider-applied trim response loss/no-repeat across Object sync/async and all three BookKeeper profiles；focused current-source pass，final aggregate pending） | P,C | M7 |
 | KF-SCL-008 | supported Kafka client/protocol versions pass Produce/Fetch/group/txn/admin compatibility | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl008` through `phase9CompatibilityCheck`（isolated exact clients `3.9.0`/`4.0.1`/`4.1.1`/`4.3.0-SNAPSHOT`；Admin、offset-0 Produce/Fetch、group offset 1、committed/aborted transaction and READ_COMMITTED offsets `0,1`；20 focused current-fork tests；machine JSON report；focused current-source pass，final aggregate pending） | P,K | M7 |
-| KF-SCL-009 | performance report records per-profile latency/throughput/recovery/resource baselines without skipped samples | `KafkaNativePerformanceGate` | P,A | M7 |
+| KF-SCL-009 | performance report records per-profile latency/throughput/recovery/resource baselines without skipped samples | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` through `phase9PerformanceCheck`（all five storage profiles；8 warm-up + 32 sampled 4-KiB records；ack-all Produce percentiles/throughput；40-record committed Fetch latency/throughput；actual JVM RSS/CPU/live threads；identity-only-cache fresh-process recovery from latest `40` through continued latest `41`；all-or-nothing `OBSERVATION_ONLY` JSON report；focused current-source pass，final aggregate pending） | P,A | M7 |
 | KF-SCL-010 | clean `phase9FinalCheck --rerun-tasks` maps every Markdown/JSON ID to one passing result and exact sources | `Phase9EvidenceAggregatorTest` | A | M7 |
 
 ## 13. Coverage audit

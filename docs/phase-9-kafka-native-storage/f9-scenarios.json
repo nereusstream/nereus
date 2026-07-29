@@ -3487,8 +3487,8 @@
     {
       "id": "KF-SCL-009",
       "milestone": "F9-M7",
-      "task": "phase9M7FinalCheck",
-      "testClass": "KafkaNativePerformanceGate",
+      "task": "phase9PerformanceCheck",
+      "testClass": "NereusKafkaNativeProcessIntegrationTest",
       "testMethod": "scenarioKfScl009",
       "scenario": "performance report records per-profile latency/throughput/recovery/resource baselines without skipped samples",
       "evidenceTier": [
@@ -3508,7 +3508,7 @@
       "gates": [
         "F9-M7"
       ],
-      "status": "PLANNED"
+      "status": "IMPLEMENTED_NOT_RUN"
     },
     {
       "id": "KF-SCL-010",
