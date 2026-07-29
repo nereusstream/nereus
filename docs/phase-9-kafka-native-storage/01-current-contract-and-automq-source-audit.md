@@ -445,10 +445,11 @@ Spotless import-grouping correction 是 `712bbf414dae88ef08f9a99e07bcdb0d6f3b85e
 capture-drift diagnostic commit 是 `768924da60f10b2b9611d19c0c4cb7df2a10947f`；第四十九个 stock retention
 differential oracle commit 是 `bd9963c980fdd7e7a99ec393694d4b6a540dc21a`；第五十个 stock `LogCleaner`
 compaction differential oracle commit 是 `c4a0a2d1fa8656b3d3b8ef59cb3a0f733ab5ff53`；第五十一个 isolated
-development-artifact changing/zero-cache commit 是 `bf8a2946e5daf521b817708b2ed4324a974c2cf6`，并且是当前已发布 head。
+development-artifact changing/zero-cache commit 是 `bf8a2946e5daf521b817708b2ed4324a974c2cf6`；第五十二个
+transaction-marker leaderless retry commit 是 `1e3783458b62c9dede252446fde6729ac8075ae3`，并且是当前已发布 head。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/fifty-one-commit
-count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百二十四文件 exact change set/blob、
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/fifty-two-commit
+count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百二十六文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
 BrokerServer runtime create/ready/drain/close signature、controller activation success log、typed adapter factory/ReplicaManager binding、stock-only
@@ -720,8 +721,15 @@ Product `666bab1`/`08fe686` + fork `c4a0a2d1fa`/`bf8a2946e5` then close the stab
 oracle gap。Four real stock `Cleaner` runs compare exact survivor and batch metadata with the product two-pass executor，
 including null-key invalid-message drop、tail winner、tombstone/empty-marker delete horizons、committed/aborted control
 semantics and idempotent sequence preservation。The oracle corrected two product drifts：unkeyed data is now dropped，
-and only `DELETE_ELIGIBLE` markers introduce a new horizon；`RETAIN_REQUIRED` markers do not。The final fork commit makes
+and only `DELETE_ELIGIBLE` markers introduce a new horizon；`RETAIN_REQUIRED` markers do not。Fork `bf8a2946e5` makes
 only the isolated Nereus development modules changing with zero cache so the gate consumes the just-published bytes。
+Product `04e661e` + fork `1e3783458b` then close the Object-WAL injected transaction-resolution slice。A test-only agent
+cuts the migrated user-partition owner before provider invocation and after durable provider completion but before caller
+completion；both forced-restart paths recover the abort boundary、advance LSO、hide aborted data from READ_COMMITTED and
+reuse the same transactional ID。The first cut exposed a fork gap：an existing KRaft partition with temporary
+`leader=-1` was treated as deleted。`TransactionMarkerChannelManager` now routes that marker through `Node.noNode` to its
+unknown-broker retry queue when `metadataCache.contains(topicPartition)` is true，and skips only metadata-absent
+partitions。The focused fork unit test and the forced 66/66-task product rerun pass。
 
 The same published head and
 `f9MultiControllerFailoverProcessIntegrationTest` now close the ACTIVE steady-state controller-kill subset of the
@@ -797,5 +805,5 @@ the implemented slice，not KF-FINAL-001/002 release evidence。
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`bf8a2946e5daf521b817708b2ed4324a974c2cf6`。Executable source-lock expectation 已更新到该 reviewed、
+`1e3783458b62c9dede252446fde6729ac8075ae3`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

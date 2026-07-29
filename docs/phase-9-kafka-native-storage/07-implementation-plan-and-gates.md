@@ -8,6 +8,7 @@
 > 2026-07-29 mandatory NTC2 process 增量（覆盖上一行末尾）：product `0ae8ca9` + fork `768924da60` 的独立真实进程门完成 Object-WAL activated `__consumer_offsets` NTC2 delete/corrupt、fail-closed election、exact identity verification、root/index CAS repair、coverage `REPLACE` 与两次 ordinary re-election；M4/M5 剩余边界为 injected resolution failure、non-Object profile expansion、DeleteRecords boundary/stock oracle 与 final/upstream aggregate
 > 2026-07-29 retention/DeleteRecords 增量（覆盖上一行的 M5 open wording）：product `77480cb` + fork `bd9963c980` 增加独立 `phase9M5KafkaRetentionOracleCheck`，用 real stock `UnifiedLog.deleteOldSegments()` 对比 time/size/combined/HW/strict-equality/compact-only 结果；`f9DeleteRecordsBoundaryProcessIntegrationTest` 在真实 Object-WAL release broker 上要求 target `3/4/6/-1` 精确映射 low watermark `3/4/6/9`、latest 恒为 `9`、Fetch 首条 offset/value 一致并有 rooted NKC1。KF-RET-001/002/003/006 为 `PASSED_CURRENT_SOURCE`；stock `LogCleaner` differential、injected resolution failure、non-Object NTC2 profile expansion 与 final/upstream aggregate 仍 open
 > 2026-07-29 compaction oracle 增量（覆盖上一行的 `LogCleaner` open wording）：product `666bab1`/`08fe686` + fork `c4a0a2d1fa`/`bf8a2946e5` 增加 `phase9M5KafkaCompactionOracleCheck`，以真实 stock `Cleaner` 比较 keyed/tail/null/tombstone、committed/aborted/control、expired horizon 和 idempotent sparse-batch exact fingerprints；同时修复 null-key 误保留与 required marker 过早 horizon。`phase9M5CompactionCoreCheck` 依赖该任务，fork source lock 为 51 commits/124 files。KF-CMP-001/002/003/004 为 `PASSED_CURRENT_SOURCE`；OPEN/full-format、injected resolution failure、non-Object NTC2 与 final/upstream aggregate 仍 open
+> 2026-07-29 transaction-resolution cut 增量：product `04e661e` 增加 `f9TransactionResolutionCutProcessIntegrationTest` 和 test-only marker completion agent，fork `1e3783458b` 修复 existing-but-leaderless transaction marker 的 retry routing。双 release broker before/after-provider 强杀、fresh recovery、LSO/READ_COMMITTED 与 same-ID continuation 强制重放通过；门禁进入 `phase9M6KafkaProcessCheck`，source lock 更新为 52 commits/126 files。KF-TXN-008 为 `PASSED_CURRENT_SOURCE`；non-Object profile 与 final/upstream aggregate仍 open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -621,7 +622,7 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@bf8a2946e5` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@1e3783458b` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
   compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
   controller activation scheduling commit、one durable feature/control commit、one aggregate Spotless alignment commit and one
@@ -634,8 +635,8 @@ coordinator/transaction/compaction remain M4/M5。
   commit、one durable-log-start publication commit、one broker-epoch-ready recovery commit and one pre-trim checkpoint
   recovery/current-trim pruning commit、one mandatory internal-topic compacted-read coordinator gate commit、one
   bridge-Spotless-only import-grouping commit、one maintenance capture-drift diagnostic commit、one stock-retention
-  differential-oracle commit、one stock-compaction differential-oracle commit and one isolated development-artifact
-  changing/zero-cache commit。The
+  differential-oracle commit、one stock-compaction differential-oracle commit、one isolated development-artifact
+  changing/zero-cache commit and one transaction-marker existing-partition retry commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
@@ -656,7 +657,7 @@ coordinator/transaction/compaction remain M4/M5。
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the
-  fork branch/local+remote head/base ancestry/fifty-one-commit count/organization remote/one-hundred-twenty-four log-IO/bridge/recovery/
+  fork branch/local+remote head/base ancestry/fifty-two-commit count/organization remote/one-hundred-twenty-six log-IO/bridge/recovery/
   metadata-lifecycle/configuration/runtime-composition/retention/compaction
   plus stock-isolation/launcher/controller-runtime/feature-control blobs and markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
@@ -738,7 +739,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@bf8a2946e5` branch。
+`nereus/future9-native-kafka-storage@1e3783458b` branch。
 Product `7c25d2e` now adds the real two-broker completed-state half through
 `f9CoordinatorMigrationProcessIntegrationTest`。The first release JVM commits user data、one transaction and group offset
 2，then a second live JVM takes exact singleton ownership of the user partition、`__consumer_offsets-0` and
@@ -755,6 +756,15 @@ same ID continues at data/marker 2/3。Transaction B writes offset 4 on node 2 a
 data/marker 6/7 and requires READ_COMMITTED seek 4 to return 6。Both JVMs remain alive and every handoff requires exact
 singleton ownership plus empty reassignment。Fresh execution passes 64/64 tasks in 47s；the task is aggregated by M6。
 
+Product `04e661e` adds the injected-resolution half as
+`f9TransactionResolutionCutProcessIntegrationTest`。A test-only agent on broker 2 arms only after an OPEN user partition
+has migrated from broker 1；it either skips the real abort-marker provider append or lets durable provider completion occur
+while withholding caller completion。The harness kills broker 2 at the selected boundary and restarts it from the same
+binding。Both paths must converge LSO/READ_COMMITTED、hide the aborted record and reuse the same transactional ID。Fork
+`1e3783458b` fixes the discovered coordinator gap by retaining markers for metadata-existing `leader=-1` partitions in the
+unknown-broker retry queue。The focused fork test passes；the product gate's forced fresh execution passes 66/66 tasks in
+1m30s and is aggregated by M6。
+
 Product `0ae8ca9` adds the adjacent
 `f9MandatoryInternalTopicNtc2ProcessIntegrationTest`。It activates and snapshots real `__consumer_offsets-0` NTC2
 objects，deletes them before a live handoff，restores them exactly for re-election，then repeats the handoff with
@@ -762,8 +772,8 @@ same-key byte corruption and a second exact restoration。Both failure legs keep
 repair legs reload committed offset `1` through ordinary reassignment。The task is aggregated by M6 and passes from a clean
 release build against fork `768924da60`。
 
-The transaction task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、
-injected marker/EndTxn failure、non-Object mandatory-NTC2 profile coverage、upstream focused suites
+The transaction tasks deliberately do not use the `phase9M4Check` completion name；publication snapshot/object round trip、
+non-Object transaction/mandatory-NTC2 profile coverage、upstream focused suites
 and the M4 final aggregate are still required before M4 completion。
 
 ## 9. F9-M5 — Retention and compaction
@@ -917,7 +927,7 @@ Current stock compaction gate（product `666bab1`/`08fe686`，fork `c4a0a2d1fa`/
 ```text
 phase9M5KafkaCompactionOracleCheck
   publish = current 0.1.0-f9-dev modules
-  source lock = fork bf8a2946e5, 51 commits, 124 files
+  source lock = fork 1e3783458b, 52 commits, 126 files
   stock = UnifiedLog + Cleaner.buildOffsetMap + Cleaner.cleanSegments
   compare = offsets/key/value/timestamp/compression/delete-horizon
             + txn/control/producer-id/epoch/sequence/leader-epoch
@@ -1119,8 +1129,9 @@ before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store
 transport reset/same-epoch retry are also covered；the initial snapshot-proof/capability-aggregation four-cut matrix is
 covered as well；the native checkpoint/virtual-segment trim/restart slice、completed coordinator migration and live OPEN
 Object-WAL COMMIT/ABORT migration are covered；the mandatory internal-topic NTC2 deterministic product/fork gate and real
-Object-WAL delete/corrupt + exact repair/re-election gate are covered；priority budgets、injected resolution cuts、
-non-Object profile expansion and broader chaos remain open。
+Object-WAL delete/corrupt + exact repair/re-election gate are covered；the transaction-marker before/after-provider
+process-cut gate and existing-but-leaderless retry fix are covered；priority budgets、non-Object profile expansion and
+broader chaos remain open。
 
 ### Tasks
 
@@ -1135,6 +1146,7 @@ phase9M6CheckpointQuarantineCheck
 :nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest
 :nereus-kafka-adapter:f9CoordinatorMigrationProcessIntegrationTest
 :nereus-kafka-adapter:f9OngoingTransactionMigrationProcessIntegrationTest
+:nereus-kafka-adapter:f9TransactionResolutionCutProcessIntegrationTest
 :nereus-kafka-adapter:f9MultiControllerFailoverProcessIntegrationTest
 :nereus-kafka-adapter:f9ActivationCutFailoverProcessIntegrationTest
 :nereus-kafka-adapter:f9ActivationProofCutFailoverProcessIntegrationTest

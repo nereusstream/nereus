@@ -2016,8 +2016,8 @@
     {
       "id": "KF-TXN-008",
       "milestone": "F9-M4",
-      "task": "phase9M4FinalCheck",
-      "testClass": "KafkaTransactionProcessCutIntegrationTest",
+      "task": "f9TransactionResolutionCutProcessIntegrationTest",
+      "testClass": "NereusKafkaNativeProcessIntegrationTest",
       "testMethod": "scenarioKfTxn008",
       "scenario": "crash after transactional data/marker commit before derived update replays correctly",
       "evidenceTier": [
@@ -2027,8 +2027,7 @@
       "requiredServices": [
         "kraft",
         "oxia",
-        "object-store",
-        "bookkeeper"
+        "object-store"
       ],
       "sourceLocks": [
         "nereus",
@@ -2037,7 +2036,7 @@
       "gates": [
         "F9-M4"
       ],
-      "status": "PLANNED"
+      "status": "PASSED_CURRENT_SOURCE"
     },
     {
       "id": "KF-TXN-009",

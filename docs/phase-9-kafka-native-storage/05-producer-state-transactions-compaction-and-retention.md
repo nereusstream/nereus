@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration、deterministic mandatory NTC2 admission and real Object-WAL NTC2 delete/corrupt + exact repair/re-election pass；stock `LogCleaner` differential now covers stable-prefix keyed/null/tombstone/transaction/control/idempotent semantics，while injected resolution cuts、non-Object NTC2 profile expansion、full compression/OPEN-boundary oracle and real compaction restart remain in progress
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration、before/after-provider abort-marker process cuts、deterministic mandatory NTC2 admission and real Object-WAL NTC2 delete/corrupt + exact repair/re-election pass；stock `LogCleaner` differential now covers stable-prefix keyed/null/tombstone/transaction/control/idempotent semantics，while non-Object transaction/NTC2 profile expansion、full compression/OPEN-boundary oracle and real compaction restart remain in progress
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -1513,8 +1513,9 @@ The first executions exposed two real product mismatches。Product `666bab1` cha
 are not emitted by new plans。The same commit changes `effectiveDeleteHorizon` so only tombstones and
 `DELETE_ELIGIBLE` markers receive a new `now + delete.retention.ms` value；`RETAIN_REQUIRED` markers preserve an absent
 horizon。Product `08fe686` adds `phase9M5KafkaCompactionOracleCheck` to `phase9M5CompactionCoreCheck` and locks fork
-`bf8a2946e5` at 51 commits/124 files。That fork head marks only isolated Nereus development modules changing with
-zero cache，so a gate cannot silently reuse an older fixed `0.1.0-f9-dev` artifact。
+`1e3783458b` at 52 commits/126 files。Fork commit `bf8a2946e5` marks only isolated Nereus development modules changing
+with zero cache，so a gate cannot silently reuse an older fixed `0.1.0-f9-dev` artifact；the later head additionally owns
+the transaction-marker retry fix described in section 15.3。
 
 Mandatory differential tests run the same bounded log/config through stock Kafka cleaner and F9 engine，then compare visible
 logical records for READ_UNCOMMITTED and READ_COMMITTED plus transaction metadata。Any deliberate difference requires a
@@ -1729,6 +1730,63 @@ with a 32.753s JUnit case；the adjacent completed coordinator and ordinary hand
 This is Object-WAL P/K evidence for KF-TXN-007/012/014，not injected marker response-loss、broker death during resolution、
 BookKeeper/profile or mandatory-NTC2 evidence。
 
+### 15.3 Current transaction-resolution process-cut evidence
+
+Product `04e661e` registers `f9TransactionResolutionCutProcessIntegrationTest` as a direct
+`phase9M6KafkaProcessCheck` dependency。The task builds a test-only fat Java agent from the isolated
+`f9TransactionResolutionFaultAgent` source set；the agent is passed only to broker 2 with `-javaagent` and is absent from
+all production artifacts。Its exact seam is
+`DefaultKafkaPartitionStorage.append(MemoryRecords, KafkaAppendContext)`：
+
+- advice is inert until the fixture creates the one-shot `arm` file；
+- it filters the append through `KafkaAppendContext.tags().get("topic")`，so unrelated internal-topic and recovery
+  appends cannot consume the cut；
+- `before-provider` skips the real provider invocation and replaces the return value with an incomplete
+  `CompletableFuture`；
+- `after-provider` lets the real future complete successfully，persists an `applied` marker and replaces only the caller
+  completion with an incomplete future；
+- a create-once `captured` marker guarantees only one append is cut；separate failure advice records the first synchronous
+  or executor exception if the configured boundary is never reached。
+
+The real-process fixture keeps `__transaction_state-0` on broker 1 and moves only the OPEN transaction's user partition
+from broker 1 to broker 2。Before arming，it requires broker 2 to serve the migrated record through READ_UNCOMMITTED while
+READ_COMMITTED end/LSO remains `0`。It then calls the original producer's `abortTransaction()` and concurrently waits for
+the selected boundary，kills broker 2 and restarts broker 2 against the same KRaft/Oxia/S3 directories and binding：
+
+```text
+before-provider:
+  data=0 durable, abort marker not invoked
+  kill broker 2 -> coordinator retains pending marker -> recovered broker receives retry
+
+after-provider:
+  data=0 and abort marker durable, caller completion absent
+  kill broker 2 -> recovery rebuilds transaction index/LSO from durable bytes
+
+both:
+  recovered READ_COMMITTED end >= 2 and <= 3
+  aborted data at offset 0 is invisible
+  same transactional.id commits next data at recovered end
+  final committed marker advances end by exactly 2
+```
+
+The first before-provider execution exposed a stock coordinator liveness bug rather than a product-storage bug。During
+broker 2 restart，KRaft still contained the partition but reported `leader=-1`；
+`TransactionMarkerChannelManager.addTxnMarkersToBrokerQueue` treated an empty leader endpoint as a deleted partition，
+removed it from the pending transaction and completed ABORT without ever writing the data-partition marker。Fork
+`1e3783458b` changes that branch to：
+
+```scala
+metadataCache.getPartitionLeaderEndpoint(topicPartition, listenerName)
+  .orElse(if (metadataCache.contains(topicPartition)) Some(Node.noNode) else None)
+```
+
+`Node.noNode` routes the marker into the existing unknown-broker queue；a later metadata update drains it to the recovered
+leader。Only a partition absent from metadata is skipped。The new
+`TransactionMarkerChannelManagerTest.shouldSaveForLaterWhenExistingPartitionHasNoLeader` passes with the focused fork
+suite。The product process gate then passes both cuts，and the final forced `--rerun-tasks` execution runs 66/66 tasks in
+1m30s。This is Object-WAL P/C evidence for KF-TXN-008 and an injected-resolution slice for KF-TXN-007/014；non-Object
+profiles and the final aggregate remain separate requirements。
+
 ## 16. Test plan
 
 ### 16.1 Producer/idempotence
@@ -1749,8 +1807,8 @@ BookKeeper/profile or mandatory-NTC2 evidence。
 - corrupt mandatory internal-topic NTC2 fails election without COMMITTED fallback。
 
 Current executable subset：the first two bullets now include completed-state and live OPEN COMMIT/ABORT migration across two
-release brokers；injected resolution failure、profile expansion and internal-topic compaction/no-resurrection cuts remain
-open。
+release brokers plus before/after-provider abort-marker process cuts；Object-WAL mandatory internal-topic
+compaction/no-resurrection is also covered。Non-Object profile expansion and the final aggregate remain open。
 
 ### 16.3 Retention/DeleteRecords
 
