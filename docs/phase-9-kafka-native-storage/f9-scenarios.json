@@ -3462,8 +3462,8 @@
     {
       "id": "KF-SCL-008",
       "milestone": "F9-M7",
-      "task": "phase9M7FinalCheck",
-      "testClass": "KafkaClientCompatibilitySuite",
+      "task": "phase9CompatibilityCheck",
+      "testClass": "NereusKafkaNativeProcessIntegrationTest",
       "testMethod": "scenarioKfScl008",
       "scenario": "supported Kafka client/protocol versions pass Produce/Fetch/group/txn/admin compatibility",
       "evidenceTier": [
@@ -3473,8 +3473,7 @@
       "requiredServices": [
         "kraft",
         "oxia",
-        "object-store",
-        "bookkeeper"
+        "object-store"
       ],
       "sourceLocks": [
         "nereus",
@@ -3483,7 +3482,7 @@
       "gates": [
         "F9-M7"
       ],
-      "status": "PLANNED"
+      "status": "IMPLEMENTED_NOT_RUN"
     },
     {
       "id": "KF-SCL-009",

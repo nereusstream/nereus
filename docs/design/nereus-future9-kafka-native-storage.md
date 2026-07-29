@@ -1,5 +1,15 @@
 # Future 9 — Native Kafka Shared-Storage Integration
 
+> 2026-07-30 F9-M7 compatibility slice：product `main@dc590f7` adds canonical
+> `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl008` behind `phase9CompatibilityCheck`。Four independent client
+> JVMs load exactly one `kafka-clients` JAR each（`3.9.0`、`4.0.1`、`4.1.1`、fork-current `4.3.0-SNAPSHOT`）and prove
+> Admin、Produce/Fetch、group commit and committed/aborted transaction semantics against one real Nereus broker。The
+> machine report is preserved at
+> `nereus-kafka-adapter/build/f9-kafka-client-compatibility-evidence/compatibility-report.json`。The same root run
+> executes 20 focused current-fork ApiVersions/Produce/Fetch/Admin/group/transaction tests。Fresh rerun passes 70/70
+> outer tasks in 1m44s and 90/90 nested fork tasks in 49s，with zero skipped/failures。SCL008 is
+> `IMPLEMENTED_NOT_RUN`；SCL009–010 and the clean final aggregate remain open
+
 > 2026-07-30 F9-M7 provider-chaos slice：product `main@d6c1de0` makes
 > `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl007` the canonical Oxia network/fresh-process owner and expands
 > `phase9ChaosCheck` with Object sync/async plus BookKeeper WAL-only/async/sync trim response-loss tasks。The Oxia cut

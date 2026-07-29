@@ -27,6 +27,12 @@
 > `scenarioKfScl007` the canonical actual-Oxia-network/fresh-process owner and composes Object sync/async plus all three
 > BookKeeper profiles in `phase9ChaosCheck`。Fresh root rerun passes 80/80 tasks in 5m26s with no skipped/failed tests。
 > SCL007 is `IMPLEMENTED_NOT_RUN` until final aggregation；SCL008–010 remain open
+> 2026-07-30 M7 compatibility slice：product `main@dc590f7` adds canonical `scenarioKfScl008` plus
+> `phase9CompatibilityCheck`。Four isolated client JVMs prove exact `kafka-clients`
+> `3.9.0`/`4.0.1`/`4.1.1`/`4.3.0-SNAPSHOT` Admin、Produce、Fetch、group and transaction semantics against one real
+> broker，while 20 focused fork ApiVersions/Produce/Fetch/Admin/group/transaction tests rerun independently。The fresh
+> gate passes 70/70 outer tasks in 1m44s and 90/90 nested fork tasks in 49s with no skipped/failed tests。SCL008 is
+> `IMPLEMENTED_NOT_RUN` until final aggregation；SCL009–010 remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -1377,6 +1383,35 @@ Fresh `./gradlew phase9ChaosCheck --rerun-tasks` passes 80/80 executed tasks in 
 The root gate still owns the manifest/product/fork source locks and isolated release build。KF-SCL-007 therefore moves
 from `PLANNED` to `IMPLEMENTED_NOT_RUN`：the focused P/C evidence is current，but compatibility、performance、the
 146-scenario evidence aggregator and the clean M7/final aggregate have not yet run。
+
+### Implemented multi-version compatibility slice at `main@dc590f7`
+
+`phase9CompatibilityCheck` owns KF-SCL-008 through
+`NereusKafkaNativeProcessIntegrationTest.scenarioKfScl008` and the focused current-fork compatibility task：
+
+- the product owner starts one real combined KRaft broker backed by real Oxia and pinned LocalStack Object storage；
+- Gradle resolves and stages `kafka-clients` `3.9.0`、`4.0.1` and `4.1.1` in isolated directories；the current release
+  supplies fork version `4.3.0-SNAPSHOT`；
+- the parent launches one child JVM per version，requires exactly one `kafka-clients-<version>.jar` in its runtime and
+  requires `AppInfoParser.getVersion()` to equal the selected version before any protocol operation；
+- every child creates one RF1 topic，produces and byte-exact fetches offset `0`，joins a consumer group and commits
+  offset `1`，then writes one committed transaction at data offset `1`/control offset `2` and one aborted transaction
+  at data offset `3`/control offset `4`；
+- `READ_COMMITTED` must expose only data offsets `0,1`，the group must retain committed offset `1`，and Admin
+  `ListOffsets` must return earliest/latest `0/5`；
+- success requires exactly one terminal `COMPATIBILITY_PASS` marker per version。The parent deletes stale evidence
+  before launch and only after all four children pass writes
+  `nereus-kafka-adapter/build/f9-kafka-client-compatibility-evidence/compatibility-report.json` with all five operation
+  families marked true for every version；
+- `phase9KafkaForkCompatibilityCheck` independently reruns 20 current-fork tests：13 `NodeApiVersionsTest` cases，
+  one idempotent-producer case，one consumer Fetch case，two Admin create/list-offset cases，two classic/consumer
+  transaction cases and one group-coordinator offsets-topic case。
+
+Fresh `./gradlew phase9CompatibilityCheck --rerun-tasks` passes 70/70 outer tasks in 1m44s。The nested fork build
+passes 90/90 executed tasks in 49s and its six selected suites report 20 tests、zero skipped and zero failures。The
+canonical product suite reports one test、zero skipped and zero failures（suite 32.736s；test 28.587s）。KF-SCL-008
+therefore moves from `PLANNED` to `IMPLEMENTED_NOT_RUN`：the focused P/K evidence is current，but the per-profile
+performance report、146-scenario evidence aggregator and clean M7/final aggregate remain open。
 
 ## 12. Gate implementation in Gradle
 

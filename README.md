@@ -1,5 +1,17 @@
 # Nereus
 
+F9 current-source compatibility update（2026-07-30）：product `main@dc590f7` adds the executable
+`phase9CompatibilityCheck` and canonical
+`NereusKafkaNativeProcessIntegrationTest.scenarioKfScl008`。One real Nereus broker serves four isolated client JVMs
+whose classpaths contain exactly one `kafka-clients` version：`3.9.0`、`4.0.1`、`4.1.1` and fork-current
+`4.3.0-SNAPSHOT`。Every client proves Admin、plain Produce/Fetch、consumer-group commit and committed/aborted
+transaction visibility with exact offsets `0/1/3/5`；the gate preserves
+`nereus-kafka-adapter/build/f9-kafka-client-compatibility-evidence/compatibility-report.json`。The same root gate reruns
+20 focused fork tests for ApiVersions、Produce、Fetch、Admin、groups and transactions。Fresh
+`phase9CompatibilityCheck --rerun-tasks` passes 70/70 outer tasks in 1m44s and 90/90 nested fork tasks in 49s，with no
+skipped or failed tests。KF-SCL-008 is `IMPLEMENTED_NOT_RUN` until the final aggregate；performance reporting and the
+evidence aggregator remain open。
+
 F9 current-source provider-chaos update（2026-07-30）：product `main@d6c1de0` extends
 `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl007` and expands root `phase9ChaosCheck` into the complete
 Oxia/Object/BookKeeper response-loss matrix。The canonical owner performs an actual Toxiproxy connection reset during

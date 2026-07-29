@@ -1,5 +1,14 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
+> 2026-07-30 M7 compatibility slice：product `main@dc590f7` adds
+> `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl008` and root `phase9CompatibilityCheck`。Four isolated JVMs
+> assert their exact runtime identity（`3.9.0`、`4.0.1`、`4.1.1`、fork-current `4.3.0-SNAPSHOT`）before executing
+> Admin、plain Produce/Fetch、group commit and committed/aborted transaction checks against one real Nereus broker。
+> Successful runs emit one PASS marker per version and a four-client JSON report under
+> `nereus-kafka-adapter/build/f9-kafka-client-compatibility-evidence/`。The root gate also reruns 20 focused current-fork
+> compatibility tests。Fresh rerun passes 70/70 outer tasks in 1m44s plus 90/90 nested fork tasks in 49s，with zero
+> skipped/failures。KF-SCL-008 is `IMPLEMENTED_NOT_RUN` until final aggregation；KF-SCL-009..010 remain open
+
 > 2026-07-30 M7 provider-chaos slice：product `main@d6c1de0` makes `scenarioKfScl007` the canonical actual-Oxia-network
 > and fresh-controller/broker restart owner，and expands `phase9ChaosCheck` with Object sync/async plus BookKeeper
 > WAL-only/async/sync provider-applied trim response-loss recovery。The Oxia path proves activation retry after a real
