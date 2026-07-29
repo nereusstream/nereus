@@ -47,8 +47,10 @@ checkpoint window、prunes virtual segments to the current trim and continues Pr
 partial F9 results。A second process gate now injects a one-shot completion loss after the real Object-WAL trim future
 succeeds，kills the blocked broker，and proves a fresh JVM both converges from the durable head and treats the same
 DeleteRecords target as a no-op without another trim CAS or checkpoint object。A companion matrix runs the identical cut
-for Object async and all three BookKeeper profiles，closing the five-profile response-loss contract。Coordinator/internal-
-topic migration、remaining DeleteRecords boundaries and the stock retention oracle remain open。
+for Object async and all three BookKeeper profiles，closing the five-profile response-loss contract。Completed/live-OPEN
+coordinator migration 已通过；mandatory internal-topic NTC2 现在有 product generation-constrained probe 与 fork
+pre-election fail-closed deterministic gate，但真实 NTC2 删除/损坏后的 release-process election cut、remaining
+DeleteRecords boundaries and the stock retention oracle remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation
@@ -123,7 +125,7 @@ record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHol
 interfaces、an explicit native-storage launcher and a stock-owned controller metadata-publisher/runtime seam。Its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The SSH-published fork head is
-`nereus/future9-native-kafka-storage@1cbe8b65a8`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
+`nereus/future9-native-kafka-storage@712bbf414d`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
 controller factories through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。The controller runtime now coalesces
 metadata/leadership callbacks、runs first activation only while locally current、retries only retriable product failures and
 cancels scheduled retry on leadership loss；activation scheduling additionally waits for finalized

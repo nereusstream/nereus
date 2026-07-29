@@ -4,6 +4,7 @@
 > 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton reassignment、旧 owner resignation、committed recovery 与新 leader continuation 已通过；three-release-process Object-WAL already-dispatched append gate 锁定 provider-future stack、process freeze、pre-upload session fencing、no-orphan WAL 和 exact LEO continuation；BookKeeper three-profile P matrix and common provider-applied C cut pass；three combined nodes with three static controller voters now pass ACTIVE-state controller kill/re-election/reconciliation and native IO continuation；three dedicated controllers plus broker `[4]` now also pass before-provider and after-provider failover for readiness create、PREPARED create and ACTIVE CAS，以及 initial snapshot proof/capability aggregation；one dedicated controller/broker gate further passes actual Oxia connection reset and same-controller-epoch retry；five-profile trim provider-applied response-loss/fresh-restart/no-repeat matrix 也已通过；coordinator migration、remaining DeleteRecords boundaries 和更广 chaos 仍为 rollout blocker
 > 2026-07-29 coordinator migration 增量：product `7c25d2e` 用两个 live release brokers 原子迁移 user、group 与 transaction partitions，completed coordinator state 在新 broker recovered-storage-ready 后恢复；ongoing/aborted transaction migration、mandatory internal-topic NTC2、remaining DeleteRecords boundaries 和更广 chaos 仍为 rollout blocker
 > 2026-07-29 ongoing transaction migration 增量：product `efe782d` 在同一 release topology 双向迁移 user 与 transaction-state partitions，原 OPEN producers 跨 handoff 完成 COMMIT/ABORT，LSO `0 -> 2 -> 4 -> 6 -> 8`、same-ID continuation 与 READ_COMMITTED filtering 均通过；injected resolution cuts、mandatory NTC2、profile expansion、remaining DeleteRecords boundaries 和更广 chaos 仍为 blocker
+> 2026-07-29 mandatory NTC2 增量：product `b6b02f4` + fork `89b66ab03b` 已将 internal coordinator admission 绑定到 exact activated-generation `TOPIC_COMPACTED` probe；deterministic failure blocks storage installation/ready/election and triggers cancel + resign。真实对象故障、repair/re-election、profile matrix 与告警/诊断面仍为 rollout blocker
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -761,8 +762,9 @@ exception escape and now passes together with monotonic create/CAS and applied-r
 task passes 73/73 actionable tasks in 1m10s and belongs to `phase9M6KafkaProcessCheck`。
 
 Native checkpoint/trim recovery、completed coordinator migration and live OPEN Object-WAL COMMIT/ABORT migration are
-covered by the later process gates。Injected transaction-resolution cuts、mandatory NTC2、profile expansion、remaining
-boundary/chaos and complete rollout evidence 尚未闭合，
+covered by the later process gates，and the deterministic mandatory NTC2 admission gate is covered by product `b6b02f4` +
+fork `89b66ab03b`。Injected transaction-resolution cuts、real NTC2 deletion/corruption + repair/re-election、profile
+expansion、remaining boundary/chaos and complete rollout evidence 尚未闭合，
 所以整个路径仍不能用于 production rollout readiness。
 
 The selected shell is not a durability shortcut：`NereusUnifiedLogFactory` uses only
@@ -1147,11 +1149,23 @@ coordinators，never write Oxia/object keys directly。Read-only verify has stri
 
 ### 14.3 Mandatory NTC2 unavailable
 
-1. stop coordinator/client reads for affected partition；
-2. try verified same-view generation fallback；
-3. inspect F4 generation/object pins/protections；
-4. rebuild NTC2 deterministically from lossless COMMITTED source under same coverage and CAS replacement；
-5. never toggle cleanup policy or force COMMITTED fallback。
+1. confirm the affected group/transaction/share partition `openLeader` failed before storage/lookup installation；do not
+   manually invoke coordinator election；
+2. preserve the original `OBJECT_NOT_FOUND`/corruption/read-resolution code and exact topic ID、partition、leader epoch、
+   binding version、coverage activation epoch and generation-set digest；
+3. inspect every untrimmed identity in the resolved `GenerationReadConstraint`，including later generations even if the
+   first generation is readable；
+4. let the read layer try only verified candidates admitted by the same generation identity/view；do not issue a
+   COMMITTED read for the mandatory range；
+5. inspect F4 object identity、pins、protections and index record SHA；repair the unavailable physical candidate or publish
+   a deterministic NTC2 replacement from lossless COMMITTED source under the same coverage policy；
+6. activate the replacement by the normal binding CAS，then cause an ordinary metadata/open retry so the complete probe
+   succeeds before installation and coordinator election；
+7. never toggle cleanup policy、edit the binding digest by hand or force COMMITTED fallback。
+
+Current deterministic code guarantees steps 1–4 and fail-closed cleanup。Automatic bounded retry/repair and release-process
+proof of steps 5–6 are not implemented；operators must treat repeated probe failure as an offline coordinator partition,
+not as permission to serve older full-source state。
 
 ### 14.4 Metadata/Oxia unavailable
 

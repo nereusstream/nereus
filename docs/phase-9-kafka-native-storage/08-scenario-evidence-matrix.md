@@ -5,6 +5,7 @@
 > 当前 F9-M1/M2 implementation 与 direct real-service gates 已通过；F9-M3 codec、bounded Produce 与 whole-request async Fetch、M4 transaction、M5 virtual-log/DeleteRecords/periodic-retention rows have deterministic partial evidence；native DeleteRecords checkpoint-before-trim + forced-restart recovery adds one R/P/C/K slice；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 milestone rows 暂不升级为 final-gated
 > 2026-07-29 增量：product `7c25d2e` adds a live two-release-process completed-state migration slice for KF-TXN-011/012/013；ongoing/aborted transaction takeover、mandatory internal-topic NTC2 and final aggregate remain open
 > 2026-07-29 ongoing transaction 增量：product `efe782d` adds bidirectional live OPEN-state COMMIT/ABORT migration evidence for KF-TXN-007/012/014；injected transaction-resolution failure、mandatory NTC2、profile expansion and final aggregate remain open
+> 2026-07-29 mandatory NTC2 增量：product `b6b02f4` + fork `89b66ab03b` add deterministic KF-TXN-016 evidence：all untrimmed activated generations are probed only through constrained `TOPIC_COMPACTED` reads before coordinator storage installation/election；same-view unavailability cancels/resigns open。Real object deletion/corruption、process restart/handoff、repair/re-election and profile coverage remain open
 
 ## 1. Evidence tiers
 
@@ -169,9 +170,10 @@ R/P evidence for KF-TXN-011/012/013/014：both internal topics recover before el
 offset after restart，and the same transactional ID commits a new transaction after the transaction coordinator reloads。
 The extended gate also leaves one transaction open at a stable data batch，forcibly kills the broker and proves a fresh JVM
 resolves it with an ABORT marker before accepting the next transaction；read-committed and the group skip the aborted data。
-Rows stay `PLANNED` because their required complete BookKeeper/profile matrix、coordinator takeover and mandatory NTC2
-failure cuts plus aggregate tiers have not run。The fork commits are published in
-`nereusstream/kafka:nereus/future9-native-kafka-storage@1cbe8b65a8`。
+Rows stay `PLANNED` because their required complete BookKeeper/profile matrix、remaining coordinator failure cuts、
+real NTC2 deletion/corruption + repair/re-election and aggregate tiers have not run。The earlier recovery/election commits
+are contained in `nereusstream/kafka:nereus/future9-native-kafka-storage@1cbe8b65a8`；the later deterministic mandatory
+NTC2 gate is product `b6b02f4` + fork `89b66ab03b`。
 
 Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
 `3eb6b63` + `57dcf35`）：stock DeleteRecords normalization/capture invokes the shared checkpoint-before-trim path；
@@ -294,8 +296,8 @@ or completes the durable state before broker `[4]` completes native IO。
 KF-OPS-006/007 are `PASSED_CURRENT_SOURCE` deterministic evidence；the process gates add real cold-restart/takeover partial evidence to
 KF-META-009、KF-APP-005/006、KF-FET-001/006/007/009、KF-TXN-007/011/012/013/014 and
 KF-OPS-003/009/013/017，but those rows remain `PLANNED` where live preemption、timestamp/leader-epoch、
-remaining provider-profile matrix、checkpoint/virtual-segment、mandatory NTC2、activation-cut/chaos or aggregate requirements are
-still absent。
+remaining provider-profile matrix、checkpoint/virtual-segment、real NTC2 deletion/corruption + repair/re-election、
+activation-cut/chaos or aggregate requirements are still absent。
 ACTIVE steady-state、all six readiness-create/PREPARED-create/ACTIVE-CAS store-publication takeovers and all four initial
 snapshot-proof/capability-aggregation takeovers are now present；actual Oxia transport reset/same-controller-epoch recovery
 is also present。
@@ -529,7 +531,17 @@ hash。Markdown/JSON ID sets must match。
 | KF-TXN-013 | group commit/rebalance/restart/takeover works with native internal topic | product `f9M6KafkaProcessIntegrationTest`（group commit/rebalance/fresh-JVM resume P/K）+ `f9CoordinatorMigrationProcessIntegrationTest`（old broker live、group partition handoff、offset 2 reload、resume/commit 4 P/K current slice）；BookKeeper/profile/final aggregate pending | P,K | M4 |
 | KF-TXN-014 | ongoing transaction coordinator failover resolves from internal topic | product `f9M6KafkaProcessIntegrationTest`（stable open transaction + forced process exit + fresh-JVM abort/next commit P/K partial）+ `f9OngoingTransactionMigrationProcessIntegrationTest`（both brokers live、OPEN COMMIT `[1] -> [2]`、OPEN ABORT `[2] -> [1]`、same-ID continuation P/K current slice）；injected failure/BookKeeper/profile pending | P,K | M4 |
 | KF-TXN-015 | group offset lag does not protect user-topic retention；client observes normal reset/out-of-range | `KafkaGroupRetentionIndependenceTest` | R,P,K | M5 |
-| KF-TXN-016 | mandatory internal-topic NTC2 unavailable blocks coordinator election，no full-source fallback | `KafkaInternalTopicNoResurrectionTest` | P,C,K | M5 |
+| KF-TXN-016 | mandatory internal-topic NTC2 unavailable blocks coordinator election，no full-source fallback | product `KafkaInternalTopicNoResurrectionTest.scenarioKfTxn016` + later-generation/healthy-sparse/fully-trimmed probes；fork `NereusListOffsetsLifecycleTest.testInternalCoordinatorOpenFailsClosedWhenMandatoryCompactedProbeFails` + success-waits-install test；`NereusTopicDeltaLifecycleTest`/`BrokerMetadataPublisherTest` compose ready/election ordering（D/C/K partial；real P/repair/profile pending） | P,C,K | M5 |
+
+Current mandatory-NTC2 evidence（product `b6b02f4`；functional fork `89b66ab03b`；published locked head
+`712bbf414d`）：the product loads the exact binding、caps planning at activated coverage end、resolves the binding digest to
+one gap-free `GenerationReadConstraint` and probes every untrimmed identity with
+`TOPIC_COMPACTED + maxRecords=1 + maxBytes=1` under the open deadline。A later generation failure is not hidden by an
+earlier healthy generation；no probe can reach COMMITTED。The fork invokes this only for group/transaction/share
+coordinator topics before installing recovered storage/lookup。Failure leaves zero installed partitions，cancels the exact
+pending epoch and calls manager resign，so the ready callback and coordinator `onElection` remain absent。The full
+`f9CompactionPropertyTest` and `phase9M3KafkaForkBridgeCheck` pass。The row remains `PLANNED` because no release-process gate
+has yet made real activated NTC2 bytes unavailable and then proved repair/re-election。
 
 Current coordinator-migration evidence（product `7c25d2e`；fork `1cbe8b65a8`）：
 `f9CoordinatorMigrationProcessIntegrationTest` starts node 1 combined controller/broker and node 2 broker-only over one
@@ -549,8 +561,9 @@ Transaction B holds LSO 4 at data offset 4，migrates `[2] -> [1]` and aborts ma
 completion to release LSO 6，then same ID B commits data/marker 6/7。READ_COMMITTED seek 4 must return offset 6 and final
 earliest/latest/end is `0/8/8`。Both JVMs stay alive，each handoff requires exact singleton leader/replicas/ISR and empty
 reassignment，and failure preserves both configs/logs。Fresh task passes 64/64 actionable tasks in 47s with a 32.753s
-JUnit case。Rows remain `PLANNED` because injected marker/EndTxn loss、mandatory NTC2、BookKeeper/profile and final aggregate
-evidence are incomplete。
+JUnit case。Rows remain `PLANNED` because injected marker/EndTxn loss、real NTC2 deletion/corruption +
+repair/re-election、BookKeeper/profile and final aggregate evidence are incomplete；the deterministic NTC2 admission gate
+is covered separately by product `b6b02f4` + fork `89b66ab03b`。
 
 Implementation note（2026-07-24）：the product-side `KafkaProducerStatePropertyTest` now covers the canonical-format and
 sequence-wrap portions of KF-TXN-002/003 with a frozen digest and 200 deterministic randomized round trips。Both rows remain

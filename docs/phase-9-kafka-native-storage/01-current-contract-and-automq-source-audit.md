@@ -439,9 +439,11 @@ fixture completion commit 是 `ebf1d7616309a26ca95cffa3a2434bf9d5a20868`。该 h
 observability commit 是 `df238bb387706f60bc020e43c8dc6878fbf41051`；第四十三个 durable log-start
 publication commit 是 `1897f07fcd`；第四十四个 broker-registration-epoch-ready recovery commit 是
 `b300a169ee`；第四十五个 pre-trim checkpoint hydration/current-trim pruning commit 是
-`1cbe8b65a8a802e8fd06503af3d5449ea79353e0`，并且是当前已发布 head。
+`1cbe8b65a8a802e8fd06503af3d5449ea79353e0`；第四十六个 mandatory internal-topic compacted-read
+coordinator gate commit 是 `89b66ab03b724ba6835faa810cdd7da1b678fe14`；第四十七个 full-bridge
+Spotless import-grouping correction 是 `712bbf414dae88ef08f9a99e07bcdb0d6f3b85e0`，并且是当前已发布 head。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/forty-five-commit
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/forty-seven-commit
 count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百二十一文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
@@ -670,7 +672,9 @@ through the migrated coordinator，the COMMIT marker occupies offset 1 and the s
 producer aborts through the reverse-migrated coordinator and the asynchronous ABORT marker releases LSO at offset 6。The
 same aborted transactional ID then commits data/marker 6/7；READ_COMMITTED from 4 skips directly to 6 and final
 earliest/latest is `0/8`。Both handoffs require exact singleton leader/replicas/ISR and an empty reassignment map。Fresh
-execution passes 64/64 tasks in 47s；mandatory NTC2、injected marker/EndTxn failure and non-Object profiles remain open。
+execution passes 64/64 tasks in 47s；the deterministic mandatory NTC2 admission gate is covered by later product
+`b6b02f4` + fork `89b66ab03b` evidence，while real NTC2 deletion/corruption + repair/re-election、injected
+marker/EndTxn failure and non-Object profiles remain open。
 
 `f9InFlightTakeoverProcessIntegrationTest` adds the C cut with an independent controller JVM、a Toxiproxy-held
 single-attempt Produce、`jcmd` proof of `NereusUnifiedLog.appendStable` waiting on the provider future and a broker-1
@@ -778,5 +782,5 @@ the implemented slice，not KF-FINAL-001/002 release evidence。
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`1cbe8b65a8a802e8fd06503af3d5449ea79353e0`。Executable source-lock expectation 已更新到该 reviewed、
+`712bbf414dae88ef08f9a99e07bcdb0d6f3b85e0`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

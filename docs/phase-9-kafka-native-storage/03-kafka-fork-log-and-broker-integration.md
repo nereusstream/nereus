@@ -4,6 +4,7 @@
 > 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：fork `1cbe8b65a8` 与 product process gates 已通过 two-release-process Object-WAL/KRaft singleton live reassignment、already-dispatched Object/BookKeeper append cuts、three-profile post-handoff、multi-controller activation/store/proof/transport cuts；同一 published fork 又闭合 native DeleteRecords 的 durable log-start publication、broker-epoch-ready recovery 和 pre-trim NKC1 hydration，product `f9CheckpointTrimRecoveryProcessIntegrationTest` 证明 forced restart 后按当前 trim 重建 virtual segments 并继续 native IO；两个 trim-response-loss tasks 又在全部五种 profile 证明 provider-applied/caller-unobserved trim 的 fresh-process convergence 与同目标 no-op；remaining gaps are transaction/internal-topic coordinator migration、remaining DeleteRecords boundaries and broader chaos
 > 2026-07-29 coordinator migration 增量：product `7c25d2e` 在 fork `1cbe8b65a8` 上原子迁移 user、`__consumer_offsets-0`、`__transaction_state-0` 到 live broker 2，completed group/transaction coordinator state 恢复并继续提交；remaining coordinator gaps narrow to ongoing/aborted transaction takeover and mandatory internal-topic NTC2 failure
 > 2026-07-29 ongoing transaction migration 增量：product `efe782d` 在同一 fork 上让两个 OPEN transactions 分别跨 `[1] -> [2]` 与 `[2] -> [1]` user/transaction-state handoff COMMIT/ABORT，证明 LSO、same-ID continuation 与 READ_COMMITTED filtering；remaining gaps narrow to injected resolution failures、mandatory NTC2、profile expansion and final aggregate
+> 2026-07-29 mandatory NTC2 增量：fork `89b66ab03b` 将 group/transaction/share internal-topic `openLeader` completion 延后到 product `probeMandatoryCompactedRead` 成功；probe failure 清理 exact pending lookup、resign recovered storage，因而 `NereusTopicDeltaLifecycle` 不会发出 ready callback。最终 published/source-locked fork head 是 `712bbf414d`；真实 object deletion/corruption process cut 仍 open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -357,8 +358,10 @@ completed state and commit data/marker offsets 3/4，not restart at offset 1 or 
 then reads the pre-handoff transactional record at offset 1 and the post-handoff record at offset 3；the same group resumes
 at visible offset 3 and commits offset 4，with final earliest/latest `0/5`。Fresh task execution passes 73/73 actionable
 tasks in 1m07s，and the unchanged cold-restart plus ordinary data-takeover gates pass 74/74 tasks in 1m50s。The task is
-aggregated by `phase9M6KafkaProcessCheck`；ongoing/aborted transaction coordinator takeover、mandatory NTC2 unavailability
-and full M4 upstream/final gates remain separate requirements。
+aggregated by `phase9M6KafkaProcessCheck`；ongoing/aborted transaction coordinator takeover is covered by the following
+process gate，and product `b6b02f4` + fork `89b66ab03b` cover deterministic mandatory NTC2 admission。Injected
+transaction-resolution failure、real NTC2 deletion/corruption + repair/re-election and full M4 upstream/final gates remain
+separate requirements。
 
 `f9OngoingTransactionMigrationProcessIntegrationTest` closes the adjacent live OPEN-state slice without a fork change。
 The first producer keeps data offset 0 uncommitted while one Admin request moves the user partition and
@@ -634,6 +637,10 @@ metadataCache.setImage
        -> delete(old image topic ID, metadata offset)
        -> resign(new observed leader epoch)
        -> openLeader(exact cluster/topic/partition/leader/broker/profile/offset/deadline)
+            -> coordinator topic only:
+               probeMandatoryCompactedRead(exact open timeout)
+            -> probe success: install recovered storage + ListOffsets lookup
+            -> probe failure: cancel pending epoch + manager.resign
   -> each successful operation callback
        -> group/transaction/share coordinator election or resignation
   -> aggregate completion
@@ -650,14 +657,29 @@ leader state 的同步异常也必须撤销已准备的 exact epoch，不能永�
 
 internal-topic coordinator election 必须晚于对应 storage fully recovered；否则 coordinator 可能从未恢复的
 `__consumer_offsets`/`__transaction_state` 提供服务。`firstPublishFuture` 仍在 metadata publication 主流程结束时完成，
-不是 all-partition readiness barrier。`BrokerServer` 已能从显式 runtime factory 注入
-`Some(NereusTopicDeltaLifecycle)`，但尚无 shipped concrete Nereus factory，也尚未把异步 open failure 转成最终的
-per-partition offline policy；因此
-本节是已测试的 invocation seam，不是可启用 broker runtime 或 KF-OPS-017 完成声明。
+不是 all-partition readiness barrier。当前 concrete product factory 已经由 `NereusBrokerStorageRuntime` 注入
+`Some(NereusTopicDeltaLifecycle)`；异步 open/probe failure 仍由 metadata publishing fault handler 暴露，尚未形成
+自动 repair + per-partition re-election policy，因此这不是 KF-OPS-017 完成声明。
 `032974067c` 的 publisher regression 同时放入 group 与 transaction 两个 internal topic，证明 ready callback
 之前两个 coordinator 都不 election，callback 之后才分别以 exact leader epoch election；另一个 lifecycle
 regression 用 `__transaction_state` 锁定 callback 必须等待 exact recovered storage 安装。该证据仍是同进程
 deterministic seam，不替代真实 coordinator replay/restart/failover gate。
+
+Fork `89b66ab03b` 将“安装完成”的定义进一步收紧。`NereusListOffsetsLifecycle.completeManagerOpen` 先验证
+manager 返回的 storage identity/leader epoch/profile/state，然后仅对
+`Topic.GROUP_METADATA_TOPIC_NAME`、`Topic.TRANSACTION_STATE_TOPIC_NAME` 和
+`Topic.SHARE_GROUP_STATE_TOPIC_NAME` 调用：
+
+```scala
+storage.probeMandatoryCompactedRead(attempt.request.timeout())
+```
+
+probe future 未完成期间 slot 保持 recovery-pending，既不调用 `NereusUnifiedLog.installStorage`，也不安装
+`LeaderEpochAwareOffsetLookup`，更不会完成 `openLeader`。probe 成功后才进入原 installation critical section；
+probe 同步抛错、返回 null future 或异步失败都复用原 cleanup path：exact epoch
+`cancelLeaderEpochAwareOffsetLookup`、从 slot map 移除、调用 manager `resign`，最后以原始 failure 完成 open。
+若更高 authority、resign、delete 或 shutdown 在 probe 期间抢先移除 slot，迟到 completion 只能清理旧 storage，
+不能覆盖新 lookup。普通 user topic 不调用该 API，原 open latency/ordering 不变。
 
 ### 3.6 `core/.../kafka/server/ReplicaManager.scala`
 
@@ -830,6 +852,7 @@ public interface KafkaPartitionStorage extends AutoCloseable {
             KafkaAppendContext context);
 
     CompletableFuture<KafkaStorageReadResult> read(KafkaStorageReadRequest request);
+    CompletableFuture<Void> probeMandatoryCompactedRead(Duration timeout);
     CompletableFuture<Void> resign();
     void close();
 }
@@ -838,6 +861,12 @@ public interface KafkaPartitionStorage extends AutoCloseable {
 `KafkaAppendContext` 当前包含 expected start、leader epoch、request deadline、origin tags 和 required acks；required
 acks 不改变 Nereus stable boundary，只用于返回 facts/metrics。M5 增加 trim，M2 recovery/checkpoint coordinator 由
 storage manager 在 open/periodic path 组合，不把可重复 `recover()` 暴露到已经 writable 的 instance。
+
+`probeMandatoryCompactedRead` 是 coordinator admission API，不返回 Kafka bytes。接口 default 以
+`UNSUPPORTED_READ_SEMANTICS` fail closed，防止旧/第三方 storage implementation 静默绕过。生产
+`DefaultKafkaPartitionStorage` 只在 `LEADER_WRITABLE` 或
+`WRITE_FENCED_RECOVERY_REQUIRED` 状态捕获一个 immutable `KafkaStableSnapshot`，随后委托
+`KafkaCompactedFetchReader`；closed/resigning storage 返回 `STORAGE_CLOSED`。
 
 M4 将 stable append 与 Kafka-derived visibility publication 分成两个明确阶段：`append` 的 durable result 只推进
 `stableEndOffset`/commit version，保留前一版 HW/LSO；fork 在 stock `ProducerStateManager`、transaction index 和

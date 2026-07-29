@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration and Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration pass，while injected resolution cuts、mandatory NTC2、remaining retention boundaries、real compaction restart and stock cleaner differential remain in progress
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration and deterministic mandatory NTC2 admission pass，while injected resolution cuts、real NTC2 deletion/corruption + repair/re-election、remaining retention boundaries、real compaction restart and stock cleaner differential remain in progress
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -252,6 +252,83 @@ coordinator keys through Kafka semantics。
 Transaction coordinator recovery reads `__transaction_state` through the mandatory compacted view。If NTC2 coverage for an
 activated internal-topic range is unavailable，coordinator election fails；it may not fall back to full COMMITTED bytes and
 resurrect compacted state。
+
+### 5.1 Mandatory compacted-read admission probe
+
+Product `b6b02f4` implements the storage-side half of this contract。The public boundary is：
+
+```java
+CompletableFuture<Void> KafkaPartitionStorage.probeMandatoryCompactedRead(Duration timeout);
+```
+
+The interface default returns a failed future with `UNSUPPORTED_READ_SEMANTICS`。It is intentionally not a successful
+no-op：a fork compiled against the new API but running an implementation without binding/generation authority must block
+coordinator election。
+
+`DefaultKafkaPartitionStorage` captures the same immutable `KafkaStableSnapshot` used by Fetch and delegates to
+`KafkaCompactedFetchReader.probeMandatoryCompactedRead(snapshot, timeout)`。The reader executes this exact algorithm：
+
+1. require a positive millisecond-representable timeout and a configured `KafkaPartitionMetadataStore`；
+2. linearizably load the exact durable partition binding；missing binding is `STREAM_NOT_FOUND`；
+3. compute `authoritativeLogStart = max(snapshot.logStartOffset, binding.observedLogStartOffset)`；
+4. call `KafkaCompactedFetchPlanner.plan` with `maxOffsetExclusive = coverage.endOffset`，so an active untrimmed range
+   must produce exactly one `TOPIC_COMPACTED` segment and can never contain a COMMITTED tail；
+5. resolve the binding-rooted `generationSetSha256` through `KafkaActivatedGenerationAuthority` to one exact,
+   gap-free `GenerationReadConstraint`；
+6. for every constraint identity whose exclusive end is above `authoritativeLogStart`，issue one
+   `ReadRequest(start=max(logStart,generation.start), view=TOPIC_COMPACTED,
+   boundary=CONTAINING_ENTRY, firstEntry=ALLOW_FIRST_ENTRY_OVERFLOW,
+   maxRecords=1, maxBytes=1, isolation=COMMITTED, remainingDeadline)`；
+7. pass the exact `GenerationReadConstraint` to `ConstrainedSemanticStreamReader.read`；the resolver may try another
+   physical candidate only inside that same activated generation/view；
+8. require exact stream/requested offset/view and strictly advancing
+   `sourceCoverageEndOffset <= constraint.coverage.endOffset`；
+9. complete only when `CompletableFuture.allOf` has validated every untrimmed activated generation。
+
+The one-record/one-byte limits make this an availability probe rather than a duplicate coordinator replay；
+`ALLOW_FIRST_ENTRY_OVERFLOW` permits a single Kafka RecordBatch without weakening the view constraint。A sparse generation
+with no surviving row is still valid only when its source-coverage result advances across the probed offset。Coverage wholly
+below the current authoritative log start needs no physical probe；coverage version 0 also succeeds after binding identity/
+lifecycle validation because no irreversible compacted prefix exists yet。
+
+Failure semantics are deliberately direct：
+
+| Failure | Result before coordinator election |
+| --- | --- |
+| binding missing、coverage outside snapshot、digest/constraint mismatch | fail open with original metadata/invariant code |
+| constrained reader unavailable | `UNSUPPORTED_READ_SEMANTICS` |
+| any untrimmed activated generation has no healthy same-view candidate | propagate `OBJECT_NOT_FOUND`/corruption/read-resolution failure |
+| deadline expires | `TIMEOUT` |
+| probe returns another stream/view/offset or no coverage progress | `METADATA_INVARIANT_VIOLATION` |
+| all probes succeed | allow fork installation and eventual ready callback |
+
+There is no branch from this method to `StreamStorage.read(... COMMITTED ...)`。The only ordinary `read` call reused here is
+the exact constrained `TOPIC_COMPACTED` overload；therefore lossless source bytes cannot resurrect tombstoned coordinator
+state even when they remain physically readable。
+
+Fork `89b66ab03b` implements the admission half inside `NereusListOffsetsLifecycle`，between manager recovery and exact
+storage/lookup installation。Group、transaction and share coordinator topics wait；user topics bypass the probe。A failed
+probe cancels the prepared leader epoch、removes the slot and resigns the recovered product storage before completing
+`openLeader` exceptionally。`NereusTopicDeltaLifecycle` already calls `onLeaderReady` only after that future succeeds, so
+`BrokerMetadataPublisher` cannot invoke coordinator `onElection` on the failure path。
+
+Deterministic evidence is split at the ownership boundary：
+
+- `KafkaInternalTopicNoResurrectionTest.scenarioKfTxn016` injects
+  `OBJECT_NOT_FOUND` and asserts the only issued request uses `TOPIC_COMPACTED`；
+- `unavailableLaterActivatedGenerationAlsoFailsTheProbe` uses two activated generation identities，makes the first
+  readable and the later one unavailable，and proves readiness checks the whole untrimmed set rather than only its first
+  object；
+- healthy sparse and fully trimmed coverage tests lock success/no-I/O behavior；
+- fork `NereusListOffsetsLifecycleTest` first reproduced the bug（old code completed open while probe was pending），then
+  proves success waits before installation and failure performs cancel + resign with zero installed partitions；
+- existing `NereusTopicDeltaLifecycleTest` and `BrokerMetadataPublisherTest` compose that open future with the ready/
+  election boundary。
+
+The full deterministic `f9CompactionPropertyTest` and source-locked `phase9M3KafkaForkBridgeCheck` pass against fork
+`712bbf414d`。KF-TXN-016 remains `PLANNED` until a release-process test activates multiple real NTC2 generations, removes or
+corrupts a required object, migrates/restarts the coordinator partition, observes no coordinator service/COMMITTED read,
+repairs by same-view replacement and then proves election succeeds。
 
 Local fork commit `032974067c` adds deterministic ordering evidence at the stock seams：both group and transaction
 coordinator elections remain absent until `AsyncTopicDeltaLifecycle` reports the exact leader ready，and the
@@ -1513,7 +1590,8 @@ delete either shared binding while the old broker stays live。Fresh execution p
 baseline cold-restart and ordinary data-handoff regressions pass together at 74/74 in 1m50s。
 
 This is intentionally a completed-state cut；the next gate covers OPEN state。Abort-resolution failure cuts、
-BookKeeper/profile migration、mandatory internal-topic NTC2 unavailable and upstream coordinator suites remain required。
+BookKeeper/profile migration、real mandatory internal-topic NTC2 deletion/corruption + repair/re-election and upstream
+coordinator suites remain required；the deterministic pre-election admission gate is covered separately in section 5.1。
 
 ### 15.2 Current ongoing-transaction migration evidence
 
