@@ -508,7 +508,7 @@ class KafkaCompactionPartitionPassTest {
               1,
               1,
               0,
-              plan.candidate().decisionHorizon().endOffset(),
+              task.coverage().startOffset(),
               Math.max(1_200, current.value().updatedAtMillis() + 1));
       current = store.compareAndSet(current, observed).join();
     }

@@ -15,6 +15,7 @@
 package com.nereusstream.kafka.compaction;
 
 import com.nereusstream.api.PayloadFormat;
+import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.materialization.CommittedSourceSetResolution;
@@ -27,7 +28,6 @@ import com.nereusstream.materialization.SourceGeneration;
 import com.nereusstream.materialization.TaskKind;
 import com.nereusstream.materialization.TopicCompactionSpec;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -56,19 +56,45 @@ public final class KafkaCompactionSourceResolver {
             "Kafka compaction source resolution requires a non-empty candidate");
       }
       return committedSources
-          .resolve(exactStream, exactCandidate.decisionHorizon())
-          .thenApply(
-              resolution -> {
-                ExactSourceSet decisionSources = resolution.sourceSet();
-                requireKafkaDecisionSources(exactCandidate, decisionSources);
-                ExactSourceSet outputSources = outputPrefix(exactCandidate, decisionSources);
-                MaterializationTask outputTask =
-                    MaterializationTask.create(
+          .resolve(exactStream, exactCandidate.outputCoverage())
+          .thenCompose(
+              outputResolution -> {
+                ExactSourceSet outputSources = outputResolution.sourceSet();
+                requireKafkaOutputSources(exactCandidate, outputSources);
+                if (exactCandidate.outputCoverage().equals(exactCandidate.decisionHorizon())) {
+                  return CompletableFuture.completedFuture(
+                      resolved(exactCandidate, outputResolution, outputSources, exactPolicy));
+                }
+                return committedSources
+                    .resolve(
                         exactStream,
-                        exactCandidate.outputCoverage(),
-                        outputSources.sources(),
-                        exactPolicy);
-                return new ResolvedSources(exactCandidate, resolution, outputSources, outputTask);
+                        new OffsetRange(
+                            exactCandidate.outputCoverage().endOffset(),
+                            exactCandidate.decisionHorizon().endOffset()))
+                    .thenApply(
+                        tailResolution -> {
+                          requireSameAuthority(outputResolution, tailResolution);
+                          ArrayList<SourceGeneration> decisionSources =
+                              new ArrayList<>(
+                                  outputSources.sources().size()
+                                      + tailResolution.sourceSet().sources().size());
+                          decisionSources.addAll(outputSources.sources());
+                          decisionSources.addAll(tailResolution.sourceSet().sources());
+                          ExactSourceSet combined =
+                              ExactSourceSet.create(
+                                  ReadView.COMMITTED,
+                                  exactCandidate.decisionHorizon(),
+                                  decisionSources);
+                          requireKafkaDecisionSources(exactCandidate, combined);
+                          CommittedSourceSetResolution resolution =
+                              new CommittedSourceSetResolution(
+                                  exactStream,
+                                  combined,
+                                  outputResolution.streamSnapshot(),
+                                  outputResolution.registration());
+                          return resolved(
+                              exactCandidate, resolution, outputSources, exactPolicy);
+                        });
               });
     } catch (RuntimeException failure) {
       return CompletableFuture.failedFuture(failure);
@@ -138,23 +164,36 @@ public final class KafkaCompactionSourceResolver {
     }
   }
 
-  private static ExactSourceSet outputPrefix(
-      KafkaCompactionPlanner.Candidate candidate, ExactSourceSet decisionSources) {
-    List<SourceGeneration> prefix = new ArrayList<>();
-    for (SourceGeneration source : decisionSources.sources()) {
-      if (source.range().endOffset() <= candidate.outputCoverage().endOffset()) {
-        prefix.add(source);
-        continue;
-      }
-      break;
-    }
-    if (prefix.isEmpty()
-        || prefix.get(prefix.size() - 1).range().endOffset()
-            != candidate.outputCoverage().endOffset()) {
+  private static void requireKafkaOutputSources(
+      KafkaCompactionPlanner.Candidate candidate, ExactSourceSet sources) {
+    if (sources.view() != ReadView.COMMITTED
+        || !sources.coverage().equals(candidate.outputCoverage())
+        || sources.sources().stream()
+            .anyMatch(source -> source.payloadFormat() != PayloadFormat.KAFKA_RECORD_BATCH)) {
       throw new IllegalArgumentException(
-          "Kafka compaction output boundary does not match an exact source prefix");
+          "authoritative output sources do not match the Kafka compaction candidate");
     }
-    return ExactSourceSet.create(ReadView.COMMITTED, candidate.outputCoverage(), prefix);
+  }
+
+  private static void requireSameAuthority(
+      CommittedSourceSetResolution output, CommittedSourceSetResolution tail) {
+    if (!output.streamId().equals(tail.streamId())
+        || !output.streamSnapshot().sameVersionedAuthority(tail.streamSnapshot())
+        || !output.registration().equals(tail.registration())) {
+      throw new IllegalStateException(
+          "COMMITTED source authority changed between Kafka compaction output and tail resolution");
+    }
+  }
+
+  private static ResolvedSources resolved(
+      KafkaCompactionPlanner.Candidate candidate,
+      CommittedSourceSetResolution resolution,
+      ExactSourceSet outputSources,
+      MaterializationPolicy policy) {
+    MaterializationTask outputTask =
+        MaterializationTask.create(
+            resolution.streamId(), candidate.outputCoverage(), outputSources.sources(), policy);
+    return new ResolvedSources(candidate, resolution, outputSources, outputTask);
   }
 
   public record ResolvedSources(

@@ -86,6 +86,35 @@ class KafkaTopicCompactionCodecV1Test {
   }
 
   @Test
+  void normalizesDerivedSequencesForNonIdempotentMultiRecordBatches() {
+    MemoryRecords source =
+        MemoryRecords.withRecords(
+            20,
+            Compression.gzip().build(),
+            new SimpleRecord(1_500, utf8("a"), utf8("one")),
+            new SimpleRecord(1_501, utf8("b"), utf8("two")));
+
+    List<DecodedCompactionRecord> decoded = decode(source, 20, 22, "non-idempotent-sequence");
+
+    assertThat(decoded).extracting(DecodedCompactionRecord::producerId).containsOnly(-1L);
+    assertThat(decoded).extracting(DecodedCompactionRecord::producerEpoch).containsOnly((short) -1);
+    assertThat(decoded).extracting(DecodedCompactionRecord::sequence).containsOnly(-1);
+
+    RewrittenCompactionRecord rewritten =
+        codec.rewrite(
+            decoded.get(1),
+            new CompactionRewriteContext(
+                RecordBatch.MAGIC_VALUE_V2,
+                codec.messageFormatSha256(),
+                false,
+                OptionalLong.empty()));
+    RecordBatch rewrittenBatch =
+        MemoryRecords.readableRecords(rewritten.exactPayload()).batches().iterator().next();
+    assertThat(rewrittenBatch.hasProducerId()).isFalse();
+    assertThat(rewrittenBatch.iterator().next().sequence()).isEqualTo(RecordBatch.NO_SEQUENCE);
+  }
+
+  @Test
   void rewritesOneKeyedSurvivorAtItsAbsoluteOffsetWithExactHeadersAndCompression() {
     MemoryRecords source =
         MemoryRecords.withRecords(

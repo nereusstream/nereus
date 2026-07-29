@@ -37,7 +37,8 @@ final class PhysicalObjectRootTransitions {
                     || to == PhysicalObjectLifecycle.DELETING
                     || to == PhysicalObjectLifecycle.QUARANTINED;
             case DELETING -> to == PhysicalObjectLifecycle.DELETED;
-            case QUARANTINED -> to == PhysicalObjectLifecycle.MARKED;
+            case QUARANTINED -> to == PhysicalObjectLifecycle.ACTIVE
+                    || to == PhysicalObjectLifecycle.MARKED;
             case DELETED -> false;
         };
         if (!allowed) {

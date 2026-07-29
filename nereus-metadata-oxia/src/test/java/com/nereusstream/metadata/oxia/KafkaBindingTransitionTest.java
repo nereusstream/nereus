@@ -163,6 +163,39 @@ class KafkaBindingTransitionTest {
                 .hasMessageContaining("gap");
     }
 
+    @Test
+    void compactionActivationAdvancesAStaleAdvisoryStableEndToTheCapturedStreamEnd() {
+        KafkaPartitionBindingRecord stale = activeBinding(5, 5);
+
+        KafkaPartitionBindingRecord activated =
+                KafkaPartitionMetadataTransitions.activateCompactionCoverage(
+                        stale,
+                        KafkaCompactionCoverageActivationMode.INITIAL,
+                        20,
+                        5,
+                        10,
+                        KafkaMetadataCodecTest.bytes(1),
+                        KafkaMetadataCodecTest.bytes(2),
+                        2_100);
+
+        assertThat(activated.observedStableEndOffset()).isEqualTo(20);
+        assertThat(activated.compactionCoverage().startOffset()).isEqualTo(5);
+        assertThat(activated.compactionCoverage().endOffset()).isEqualTo(10);
+        assertThatThrownBy(
+                        () ->
+                                KafkaPartitionMetadataTransitions.activateCompactionCoverage(
+                                        activated,
+                                        KafkaCompactionCoverageActivationMode.EXTEND,
+                                        19,
+                                        5,
+                                        15,
+                                        KafkaMetadataCodecTest.bytes(3),
+                                        KafkaMetadataCodecTest.bytes(2),
+                                        2_200))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("authoritative partition window");
+    }
+
     private static KafkaPartitionBindingRecord activeBinding(long logStart, long stableEnd) {
         KafkaPartitionBindingRecord current = KafkaMetadataCodecTest.fullBinding();
         return new KafkaPartitionBindingRecord(

@@ -155,7 +155,7 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
                         false,
                         "only a committed generation can be quarantined after read corruption"));
             }
-            GenerationIndexRecord replacement = quarantinedIndex(current.value(), reason);
+            GenerationIndexRecord replacement = quarantinedIndex(current, reason);
             return generationStore.compareAndSetIndex(
                             cluster, replacement, current.metadataVersion())
                     .thenApply(ignored -> (Void) null)
@@ -258,7 +258,7 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
                     || current.value().lifecycle() == GenerationLifecycle.PREPARED) {
                 return CompletableFuture.completedFuture(null);
             }
-            GenerationIndexRecord replacement = quarantinedIndex(current.value(), reason);
+            GenerationIndexRecord replacement = quarantinedIndex(current, reason);
             return generationStore.compareAndSetIndex(
                             cluster, replacement, current.metadataVersion())
                     .thenApply(ignored -> (Void) null)
@@ -339,9 +339,13 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
     }
 
     private GenerationIndexRecord quarantinedIndex(
-            GenerationIndexRecord current,
+            VersionedGenerationIndex versioned,
             String reason) {
+        GenerationIndexRecord current = versioned.value();
         long now = Math.max(clock.millis(), current.stateChangedAtMillis());
+        String auditReason = reason
+                + "|prior-index-version=" + versioned.metadataVersion()
+                + "|prior-index-sha256=" + versioned.durableValueSha256().value();
         return new GenerationIndexRecord(
                 current.schemaVersion(),
                 current.streamId(),
@@ -370,7 +374,7 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
                 current.projectionRef(),
                 current.createdAtMillis(),
                 current.committedAtMillis(),
-                reason,
+                auditReason,
                 now,
                 0);
     }

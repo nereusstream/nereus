@@ -37,6 +37,7 @@ public interface KafkaPartitionMetadataStore extends AutoCloseable {
     default CompletableFuture<VersionedKafkaPartitionBinding> activateCompactionCoverage(
             VersionedKafkaPartitionBinding expected,
             KafkaCompactionCoverageActivationMode mode,
+            long authoritativeStableEndOffset,
             long startOffset,
             long endOffset,
             byte[] generationSetSha256,
@@ -47,6 +48,7 @@ public interface KafkaPartitionMetadataStore extends AutoCloseable {
                 KafkaPartitionMetadataTransitions.activateCompactionCoverage(
                         expected.value(),
                         mode,
+                        authoritativeStableEndOffset,
                         startOffset,
                         endOffset,
                         generationSetSha256,

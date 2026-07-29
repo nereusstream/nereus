@@ -319,7 +319,7 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
         || !root.streamId().equals(streamId.value())
         || root.observedLeaderEpoch() != leaderEpoch
         || root.observedLogStartOffset() != source.trimOffset()
-        || root.observedStableEndOffset() != source.endOffset()
+        || root.observedStableEndOffset() > source.endOffset()
         || canonical.checkpointOffset() != source.endOffset()
         || canonical.stableEndOffset() != source.endOffset()
         || canonical.logStartOffset() != source.trimOffset()
@@ -340,7 +340,7 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
     if (!current.identity().equals(captured.identity())
         || current.lifecycle() != KafkaPartitionLifecycle.ACTIVE
         || current.incarnation() != captured.incarnation()
-        || current.bindingEpoch() != captured.bindingEpoch()
+        || current.bindingEpoch() < captured.bindingEpoch()
         || !current.streamId().equals(captured.streamId())
         || current.payloadMappingId() != captured.payloadMappingId()
         || !current.storageProfile().equals(captured.storageProfile())
@@ -349,18 +349,87 @@ public final class DefaultKafkaPartitionMaintenance implements KafkaPartitionMai
         || current.observedBrokerEpoch() != captured.observedBrokerEpoch()
         || current.observedLogStartOffset() != captured.observedLogStartOffset()
         || current.observedStableEndOffset() < captured.observedStableEndOffset()
-        || !currentSource.authority().equals(capturedSource.authority())
-        || !currentSource.writerId().equals(capturedSource.writerId())
-        || currentSource.sessionEpoch() != capturedSource.sessionEpoch()
-        || !currentSource.fencingToken().equals(capturedSource.fencingToken())
-        || currentSource.leaseVersion() != capturedSource.leaseVersion()
+        || !capturedSource.sameSession(currentSource)
         || currentSource.trimOffset() != capturedSource.trimOffset()
         || currentSource.endOffset() < capturedSource.endOffset()
         || currentSource.commitVersion() < capturedSource.commitVersion()
+        || current.observedLogStartOffset() > currentSource.trimOffset()
+        || current.observedStableEndOffset() > currentSource.endOffset()
         || currentSource.appendInFlight()
         || currentSource.stateMapEndOffset() != currentSource.endOffset()) {
-      throw invariant("Kafka compaction partition authority changed after capture");
+      throw invariant(
+          "Kafka compaction partition authority changed after capture"
+              + authorityChangeDetails(
+                  capturedSource, captured, currentSource, current));
     }
+  }
+
+  private static String authorityChangeDetails(
+      KafkaCheckpointSourceState capturedSource,
+      KafkaPartitionBindingRecord captured,
+      KafkaCheckpointSourceState currentSource,
+      KafkaPartitionBindingRecord current) {
+    return " [bindingIdentityEqual="
+        + current.identity().equals(captured.identity())
+        + ", capturedLifecycle="
+        + captured.lifecycle()
+        + ", currentLifecycle="
+        + current.lifecycle()
+        + ", capturedIncarnation="
+        + captured.incarnation()
+        + ", currentIncarnation="
+        + current.incarnation()
+        + ", capturedBindingEpoch="
+        + captured.bindingEpoch()
+        + ", currentBindingEpoch="
+        + current.bindingEpoch()
+        + ", bindingStreamEqual="
+        + current.streamId().equals(captured.streamId())
+        + ", capturedLeader="
+        + captured.observedLeaderId()
+        + "/"
+        + captured.observedLeaderEpoch()
+        + "/"
+        + captured.observedBrokerEpoch()
+        + ", currentLeader="
+        + current.observedLeaderId()
+        + "/"
+        + current.observedLeaderEpoch()
+        + "/"
+        + current.observedBrokerEpoch()
+        + ", capturedObservedOffsets="
+        + captured.observedLogStartOffset()
+        + ".."
+        + captured.observedStableEndOffset()
+        + ", currentObservedOffsets="
+        + current.observedLogStartOffset()
+        + ".."
+        + current.observedStableEndOffset()
+        + ", sameSession="
+        + capturedSource.sameSession(currentSource)
+        + ", capturedLease="
+        + capturedSource.leaseVersion()
+        + ", currentLease="
+        + currentSource.leaseVersion()
+        + ", capturedSource="
+        + capturedSource.trimOffset()
+        + ".."
+        + capturedSource.endOffset()
+        + "/"
+        + capturedSource.commitVersion()
+        + "/"
+        + capturedSource.stateMapEndOffset()
+        + ", currentSource="
+        + currentSource.trimOffset()
+        + ".."
+        + currentSource.endOffset()
+        + "/"
+        + currentSource.commitVersion()
+        + "/"
+        + currentSource.stateMapEndOffset()
+        + ", currentAppendInFlight="
+        + currentSource.appendInFlight()
+        + "]";
   }
 
   private static Optional<MandatoryCoverage> mandatoryCoverage(

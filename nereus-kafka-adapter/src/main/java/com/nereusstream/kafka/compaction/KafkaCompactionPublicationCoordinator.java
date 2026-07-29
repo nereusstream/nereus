@@ -572,6 +572,7 @@ public final class KafkaCompactionPublicationCoordinator {
                           partitions.activateCompactionCoverage(
                               current,
                               mode,
+                              plan.candidate().decisionHorizon().endOffset(),
                               desired.coverage().startOffset(),
                               desired.coverage().endOffset(),
                               desired.digestBytes(),
@@ -806,9 +807,7 @@ public final class KafkaCompactionPublicationCoordinator {
     if (binding.value().lifecycle() != KafkaPartitionLifecycle.ACTIVE
         || !binding.value().streamId().equals(task.streamId().value())
         || binding.metadataVersion() < plan.bindingMetadataVersion()
-        || binding.value().observedLogStartOffset() > task.coverage().startOffset()
-        || binding.value().observedStableEndOffset() < plan.lastStableOffset()
-        || binding.value().observedStableEndOffset() < task.coverage().endOffset()) {
+        || binding.value().observedLogStartOffset() > task.coverage().startOffset()) {
       throw new KafkaMetadataConditionFailedException(
           "Kafka partition binding no longer authorizes compaction publication");
     }

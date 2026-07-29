@@ -177,47 +177,72 @@ public final class KafkaCompactedFetchReader {
                               false,
                               "Kafka partition binding disappeared before mandatory compacted-read"
                                   + " probe"));
-              var root = binding.value();
-              long startOffset =
-                  Math.max(stableSnapshot.logStartOffset(), root.observedLogStartOffset());
-              var coverage = root.compactionCoverage();
-              long maxOffsetExclusive =
-                  coverage.coverageVersion() == 0
-                      ? startOffset
-                      : Math.max(startOffset, coverage.endOffset());
-              KafkaStorageReadRequest request =
-                  new KafkaStorageReadRequest(
-                      startOffset,
-                      maxOffsetExclusive,
-                      1,
-                      Integer.MAX_VALUE,
-                      Integer.MAX_VALUE,
-                      true,
-                      startOffset,
-                      0,
-                      remaining(timeout, startedNanos));
-              KafkaCompactedFetchPlanner.Plan plan =
-                  planner.plan(identity, streamId, stableSnapshot, request, binding);
-              if (!plan.hasMandatoryCompactedPrefix()) {
-                if (coverage.coverageVersion() != 0 && startOffset < coverage.endOffset()) {
-                  throw invariant(
-                      "activated mandatory compacted coverage produced no compacted probe segment");
-                }
-                return CompletableFuture.completedFuture(null);
-              }
-              if (plan.segments().size() != 1
-                  || plan.segments().get(0).view() != ReadView.TOPIC_COMPACTED) {
-                throw invariant("mandatory compacted-read probe exposed another semantic view");
-              }
-              return constraintFor(plan)
+              KafkaActivatedGenerationAuthority authority =
+                  activatedGenerations.orElseThrow(
+                      () ->
+                          new NereusException(
+                              ErrorCode.UNSUPPORTED_READ_SEMANTICS,
+                              false,
+                              "mandatory compacted-read probe requires activated generation"
+                                  + " discovery"));
+              return authority
+                  .repairIfQuarantined(
+                      identity.durableId(),
+                      streamId,
+                      binding,
+                      remaining(timeout, startedNanos))
                   .thenCompose(
-                      constrained ->
-                          probeActivatedGenerations(
-                              constrained.constraint().orElseThrow(),
-                              startOffset,
-                              timeout,
-                              startedNanos));
+                      repaired ->
+                          probeMandatoryCompactedRead(
+                              stableSnapshot, timeout, startedNanos, repaired));
             });
+  }
+
+  private CompletableFuture<Void> probeMandatoryCompactedRead(
+      KafkaStableSnapshot stableSnapshot,
+      Duration timeout,
+      long startedNanos,
+      com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding binding) {
+    var root = binding.value();
+    long startOffset =
+        Math.max(stableSnapshot.logStartOffset(), root.observedLogStartOffset());
+    var coverage = root.compactionCoverage();
+    long maxOffsetExclusive =
+        coverage.coverageVersion() == 0
+            ? startOffset
+            : Math.max(startOffset, coverage.endOffset());
+    KafkaStorageReadRequest request =
+        new KafkaStorageReadRequest(
+            startOffset,
+            maxOffsetExclusive,
+            1,
+            Integer.MAX_VALUE,
+            Integer.MAX_VALUE,
+            true,
+            startOffset,
+            0,
+            remaining(timeout, startedNanos));
+    KafkaCompactedFetchPlanner.Plan plan =
+        planner.plan(identity, streamId, stableSnapshot, request, binding);
+    if (!plan.hasMandatoryCompactedPrefix()) {
+      if (coverage.coverageVersion() != 0 && startOffset < coverage.endOffset()) {
+        throw invariant(
+            "activated mandatory compacted coverage produced no compacted probe segment");
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+    if (plan.segments().size() != 1
+        || plan.segments().get(0).view() != ReadView.TOPIC_COMPACTED) {
+      throw invariant("mandatory compacted-read probe exposed another semantic view");
+    }
+    return constraintFor(plan)
+        .thenCompose(
+            constrained ->
+                probeActivatedGenerations(
+                    constrained.constraint().orElseThrow(),
+                    startOffset,
+                    timeout,
+                    startedNanos));
   }
 
   private CompletableFuture<Void> probeActivatedGenerations(

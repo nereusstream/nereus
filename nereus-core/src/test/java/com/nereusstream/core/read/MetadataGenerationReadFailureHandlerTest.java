@@ -70,7 +70,9 @@ class MetadataGenerationReadFailureHandlerTest {
                 .join().orElseThrow().value().lifecycle())
                 .isEqualTo(PhysicalObjectLifecycle.QUARANTINED);
         assertThat(index.get().value().lifecycle()).isEqualTo(GenerationLifecycle.QUARANTINED);
-        assertThat(index.get().value().stateReason()).isEqualTo("read-object_checksum_mismatch");
+        assertThat(index.get().value().stateReason())
+                .startsWith("read-object_checksum_mismatch|prior-index-version=")
+                .contains("|prior-index-sha256=");
     }
 
     @Test

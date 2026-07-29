@@ -11,7 +11,11 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.core.read.GenerationReadConstraint;
+import com.nereusstream.metadata.oxia.KafkaPartitionId;
+import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
 import com.nereusstream.metadata.oxia.records.KafkaCompactionCoverageRecord;
+import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -21,6 +25,22 @@ import java.util.concurrent.CompletableFuture;
 public interface KafkaActivatedGenerationAuthority {
   CompletableFuture<GenerationReadConstraint> resolve(
       StreamId streamId, KafkaCompactionCoverageRecord coverage);
+
+  /**
+   * Re-admits an exact physically repaired quarantined generation set and atomically replaces the
+   * binding digest before a mandatory coordinator probe.
+   */
+  default CompletableFuture<VersionedKafkaPartitionBinding> repairIfQuarantined(
+      KafkaPartitionId partition,
+      StreamId streamId,
+      VersionedKafkaPartitionBinding binding,
+      Duration timeout) {
+    Objects.requireNonNull(partition, "partition");
+    Objects.requireNonNull(streamId, "streamId");
+    Objects.requireNonNull(timeout, "timeout");
+    return CompletableFuture.completedFuture(
+        Objects.requireNonNull(binding, "binding"));
+  }
 
   static KafkaActivatedGenerationAuthority unavailable() {
     return (streamId, coverage) ->

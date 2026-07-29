@@ -729,7 +729,7 @@ public final class KafkaCompactionPartitionPass {
         || !binding.value().streamId().equals(exact.streamId().value())
         || snapshot.virtualSegments().logStartOffset() != binding.value().observedLogStartOffset()
         || snapshot.virtualSegments().stableEndOffset()
-            != binding.value().observedStableEndOffset()) {
+            < binding.value().observedStableEndOffset()) {
       throw condition("Kafka compaction capture does not match the ACTIVE binding window");
     }
     requireMandatoryCoverage(snapshot, binding.value().compactionCoverage());

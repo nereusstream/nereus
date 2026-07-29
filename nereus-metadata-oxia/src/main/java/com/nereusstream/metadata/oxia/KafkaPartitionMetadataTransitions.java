@@ -234,11 +234,32 @@ public final class KafkaPartitionMetadataTransitions {
             byte[] generationSetSha256,
             byte[] policySha256,
             long nowMillis) {
+        return activateCompactionCoverage(
+                current,
+                mode,
+                current.observedStableEndOffset(),
+                startOffset,
+                endOffset,
+                generationSetSha256,
+                policySha256,
+                nowMillis);
+    }
+
+    public static KafkaPartitionBindingRecord activateCompactionCoverage(
+            KafkaPartitionBindingRecord current,
+            KafkaCompactionCoverageActivationMode mode,
+            long authoritativeStableEndOffset,
+            long startOffset,
+            long endOffset,
+            byte[] generationSetSha256,
+            byte[] policySha256,
+            long nowMillis) {
         requireLifecycle(current, KafkaPartitionLifecycle.ACTIVE);
         Objects.requireNonNull(mode, "mode");
         KafkaCompactionCoverageRecord before = current.compactionCoverage();
-        if (endOffset <= startOffset
-                || endOffset > current.observedStableEndOffset()
+        if (authoritativeStableEndOffset < current.observedStableEndOffset()
+                || endOffset <= startOffset
+                || endOffset > authoritativeStableEndOffset
                 || nowMillis < current.updatedAtMillis()) {
             throw new IllegalArgumentException(
                     "compaction activation is outside the authoritative partition window");
@@ -294,7 +315,7 @@ public final class KafkaPartitionMetadataTransitions {
                 current.observedLeaderEpoch(),
                 current.observedBrokerEpoch(),
                 current.observedLogStartOffset(),
-                current.observedStableEndOffset(),
+                authoritativeStableEndOffset,
                 coverage,
                 current.checkpointReferences(),
                 current.pendingOperation(),

@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "47" ]] \
-    || fail "expected forty-seven reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "48" ]] \
+    || fail "expected forty-eight reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -200,7 +200,7 @@ c80c745f3bc4adb6ac462883ea89efdf0cbc4a7b core/src/main/java/kafka/log/nereus/Ner
 2205c54ff7d07b9009caa822f4cb425a6bff7386 core/src/main/java/kafka/log/nereus/NereusProducerStateManager.java
 aadcc658a9e74de9798b06d674ecb784947c8762 core/src/main/java/kafka/log/nereus/NereusRecordTimestampInspector.java
 4b941cc2ab3326b41d0e7186c6b65ae9f3f5cf70 core/src/main/java/kafka/log/nereus/NereusTransactionIndex.java
-9b8a6ac3e9cc5d6a3b06922d8af385d4583c4f5b core/src/main/java/kafka/log/nereus/NereusUnifiedLog.java
+fa026472f2e212f5410b46718c73c05582795cea core/src/main/java/kafka/log/nereus/NereusUnifiedLog.java
 df74856a75146e0e35aaf5431b1ecb35531ec054 core/src/main/java/kafka/server/builders/LogManagerBuilder.java
 0984006b925982dea46544d6459a5b5510e2a634 core/src/main/java/kafka/server/builders/ReplicaManagerBuilder.java
 64cbc00c179426640f4c602bc70e90a4c1e1cebe core/src/main/java/kafka/server/nereus/NereusControllerStorageRuntime.java
@@ -904,4 +904,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; forty-seven commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"
+echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; forty-eight commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"

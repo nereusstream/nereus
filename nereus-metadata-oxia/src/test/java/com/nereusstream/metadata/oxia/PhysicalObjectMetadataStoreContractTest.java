@@ -126,6 +126,26 @@ class PhysicalObjectMetadataStoreContractTest {
         }
     }
 
+    @Test
+    void exactPhysicalRepairCanReactivateAQuarantinedImmutableRoot() {
+        OxiaJavaPhysicalObjectMetadataStore store = store();
+        PhysicalObjectRootRecord active =
+                F4MetadataTestValues.physicalRoot(PhysicalObjectLifecycle.ACTIVE);
+        VersionedPhysicalObjectRoot created = store.createRoot(CLUSTER, active).join();
+        VersionedPhysicalObjectRoot quarantined = store.compareAndSetRoot(
+                CLUSTER,
+                rootState(active, PhysicalObjectLifecycle.QUARANTINED, 2, false),
+                created.metadataVersion()).join();
+
+        VersionedPhysicalObjectRoot repaired = store.compareAndSetRoot(
+                CLUSTER,
+                rootState(active, PhysicalObjectLifecycle.ACTIVE, 3, false),
+                quarantined.metadataVersion()).join();
+
+        assertThat(repaired.value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+        assertThat(repaired.value().lifecycleEpoch()).isEqualTo(3);
+    }
+
     static PhysicalObjectRootRecord rootState(
             PhysicalObjectRootRecord identity,
             PhysicalObjectLifecycle lifecycle,

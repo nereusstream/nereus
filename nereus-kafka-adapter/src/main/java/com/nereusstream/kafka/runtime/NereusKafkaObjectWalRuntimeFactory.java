@@ -582,7 +582,11 @@ public final class NereusKafkaObjectWalRuntimeFactory {
             registerOwned(constructedResources, "stream-storage", streamStorage);
             activatedGenerations = new KafkaActivatedGenerationSetResolver(
                     exactConfiguration.runtime().nereusCluster(),
-                    generationMetadataStore);
+                    generationMetadataStore,
+                    partitionMetadataStore,
+                    physicalMetadataStore,
+                    objectStore,
+                    exactContext.clock());
             KafkaCheckpointCodecV1 checkpointCodec = new KafkaCheckpointCodecV1();
             KafkaCheckpointReader checkpointReader =
                     new KafkaCheckpointReader(objectStore, checkpointCodec);

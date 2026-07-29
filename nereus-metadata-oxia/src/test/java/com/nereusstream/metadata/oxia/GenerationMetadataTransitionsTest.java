@@ -22,9 +22,16 @@ class GenerationMetadataTransitionsTest {
     void generationIndexAllowsOnlyTheClosedLifecycleAndImmutablePublicationIdentity() {
         GenerationIndexRecord prepared = F4MetadataTestValues.generation(GenerationLifecycle.PREPARED);
         GenerationIndexRecord committed = F4MetadataTestValues.generation(GenerationLifecycle.COMMITTED);
+        GenerationIndexRecord quarantined =
+                F4MetadataTestValues.generation(GenerationLifecycle.QUARANTINED);
         GenerationIndexRecord draining = F4MetadataTestValues.generation(GenerationLifecycle.DRAINING);
 
         assertThatCode(() -> GenerationMetadataTransitions.requireValidIndexReplacement(prepared, committed))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> GenerationMetadataTransitions.requireValidIndexReplacement(committed, quarantined))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> GenerationMetadataTransitions.requireValidIndexReplacement(
+                        quarantined, repairedGeneration(quarantined)))
                 .doesNotThrowAnyException();
         assertInvariant(() -> GenerationMetadataTransitions.requireValidIndexReplacement(prepared, draining));
         assertInvariant(() -> GenerationMetadataTransitions.requireValidIndexReplacement(
@@ -106,6 +113,20 @@ class GenerationMetadataTransitionsTest {
                 value.cumulativeSizeAtEnd(), value.firstCommitVersion(), value.lastCommitVersion(),
                 value.schemaRefs(), value.projectionRef(), value.createdAtMillis(), value.committedAtMillis(),
                 value.stateReason(), value.stateChangedAtMillis(), 0);
+    }
+
+    private static GenerationIndexRecord repairedGeneration(
+            GenerationIndexRecord value) {
+        return new GenerationIndexRecord(
+                value.schemaVersion(), value.streamId(), value.readViewId(), value.offsetStart(),
+                value.offsetEnd(), value.generation(), value.publicationId(), value.taskId(),
+                GenerationLifecycle.COMMITTED, value.sourceSetSha256(), value.policySha256(),
+                value.readTarget(), value.targetIdentitySha256(), value.materializationPolicySha256(),
+                value.payloadFormat(), value.sourceRecordCount(), value.outputRecordCount(),
+                value.entryCount(), value.logicalBytes(), value.cumulativeSizeAtStart(),
+                value.cumulativeSizeAtEnd(), value.firstCommitVersion(), value.lastCommitVersion(),
+                value.schemaRefs(), value.projectionRef(), value.createdAtMillis(),
+                value.committedAtMillis(), "", value.stateChangedAtMillis(), 0);
     }
 
     private static MaterializationTaskRecord taskWithPolicy(

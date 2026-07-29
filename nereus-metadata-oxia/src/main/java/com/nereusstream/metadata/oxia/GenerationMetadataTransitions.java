@@ -30,7 +30,8 @@ final class GenerationMetadataTransitions {
         boolean allowed = switch (from) {
             case PREPARED -> to == GenerationLifecycle.COMMITTED || to == GenerationLifecycle.ABORTED;
             case COMMITTED -> to == GenerationLifecycle.QUARANTINED || to == GenerationLifecycle.DRAINING;
-            case QUARANTINED -> to == GenerationLifecycle.DRAINING;
+            case QUARANTINED -> to == GenerationLifecycle.COMMITTED
+                    || to == GenerationLifecycle.DRAINING;
             case DRAINING -> to == GenerationLifecycle.RETIRED;
             case RETIRED, ABORTED -> false;
         };
@@ -46,6 +47,11 @@ final class GenerationMetadataTransitions {
             }
         } else if (replacement.committedAtMillis() != current.committedAtMillis()) {
             throw invariant("generation transition changed the established commit timestamp");
+        }
+        if (from == GenerationLifecycle.QUARANTINED
+                && to == GenerationLifecycle.COMMITTED
+                && !replacement.stateReason().isEmpty()) {
+            throw invariant("repaired committed generation cannot retain a quarantine reason");
         }
     }
 

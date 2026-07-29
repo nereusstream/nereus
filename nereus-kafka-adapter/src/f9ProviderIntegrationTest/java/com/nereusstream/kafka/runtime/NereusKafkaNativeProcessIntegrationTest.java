@@ -13,6 +13,7 @@ import com.nereusstream.bookkeeper.BookKeeperSecretRef;
 import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.bookkeeper.OxiaBookKeeperLedgerIdNamespaceReservationStore;
 import com.nereusstream.bookkeeper.OxiaBookKeeperProtocolActivationStore;
+import com.nereusstream.kafka.compaction.KafkaActivatedGenerationSetResolver;
 import com.nereusstream.metadata.oxia.BookKeeperKeyspace;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.BookKeeperScanToken;
@@ -20,8 +21,9 @@ import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
 import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
 import com.nereusstream.metadata.oxia.KafkaPartitionId;
 import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
-import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaBookKeeperMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaJavaGenerationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaKafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
@@ -33,6 +35,7 @@ import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
 import com.nereusstream.metadata.oxia.records.KafkaStorageActivationLifecycle;
 import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.KafkaStorageReadinessRecord;
+import com.nereusstream.objectstore.S3ObjectKeyMapper;
 import eu.rekawek.toxiproxy.model.ToxicDirection;
 import io.oxia.testcontainers.OxiaContainer;
 import java.io.IOException;
@@ -94,11 +97,16 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.async.AsyncRequestBody;
+import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 /**
  * Starts the product launcher in a separate OS process over real Oxia and an S3-compatible provider.
@@ -1839,6 +1847,259 @@ class NereusKafkaNativeProcessIntegrationTest {
             assertThat(objectCount(bucket))
                     .as("both live transaction migrations must remain object-backed")
                     .isPositive();
+        } catch (Exception | AssertionError operationFailure) {
+            failure = operationFailure;
+        }
+        if (brokerTwo != null) {
+            try {
+                stopBroker(brokerTwo, brokerTwoServerLog);
+            } catch (Exception | AssertionError shutdownFailure) {
+                failure = mergeFailure(failure, shutdownFailure);
+            }
+        }
+        try {
+            stopBroker(brokerOne, brokerOneServerLog);
+        } catch (Exception | AssertionError shutdownFailure) {
+            failure = mergeFailure(failure, shutdownFailure);
+        }
+        if (failure != null) {
+            try {
+                preserveMultiBrokerFailureEvidence(
+                        brokerOneConfig,
+                        brokerTwoConfig,
+                        brokerOneFormatLog,
+                        brokerTwoFormatLog,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.MINUTES)
+    void mandatoryInternalTopicNtc2FailureBlocksElectionUntilPhysicalRepair()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-mandatory-ntc2-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path brokerOneConfig = root.resolve("mandatory-ntc2-one.properties");
+        Path brokerTwoConfig = root.resolve("mandatory-ntc2-two.properties");
+        Path brokerOneFormatLog = root.resolve("mandatory-ntc2-one-format.log");
+        Path brokerTwoFormatLog = root.resolve("mandatory-ntc2-two-format.log");
+        Path brokerOneServerLog = root.resolve("mandatory-ntc2-one-server.log");
+        Path brokerTwoServerLog = root.resolve("mandatory-ntc2-two-server.log");
+        String bucket = "nereus-ntc2-" + UUID.randomUUID();
+        String topic = "process-mandatory-ntc2-" + UUID.randomUUID();
+        String groupId = "process-mandatory-ntc2-group-" + UUID.randomUUID();
+        String nereusCluster = "f9-process-mandatory-ntc2-" + UUID.randomUUID();
+        String kafkaClusterId = org.apache.kafka.common.Uuid.randomUuid().toString();
+        int brokerOnePort = freePort();
+        int controllerPort = differentFreePort(brokerOnePort);
+        int brokerTwoPort = differentFreePort(brokerOnePort, controllerPort);
+        String brokerOneBootstrap = "127.0.0.1:" + brokerOnePort;
+        String brokerTwoBootstrap = "127.0.0.1:" + brokerTwoPort;
+        String clusterBootstrap = brokerOneBootstrap + "," + brokerTwoBootstrap;
+
+        createBucket(bucket);
+        writeConfiguration(
+                brokerOneConfig,
+                brokerOnePort,
+                controllerPort,
+                bucket,
+                root.resolve("mandatory-ntc2-one-log"),
+                root.resolve("mandatory-ntc2-one-metadata"),
+                root.resolve("mandatory-ntc2-one-cache"),
+                "OBJECT_WAL_SYNC_OBJECT",
+                null,
+                1,
+                true,
+                nereusCluster);
+        writeConfiguration(
+                brokerTwoConfig,
+                brokerTwoPort,
+                controllerPort,
+                bucket,
+                root.resolve("mandatory-ntc2-two-log"),
+                root.resolve("mandatory-ntc2-two-metadata"),
+                root.resolve("mandatory-ntc2-two-cache"),
+                "OBJECT_WAL_SYNC_OBJECT",
+                null,
+                2,
+                false,
+                nereusCluster);
+        Map<String, String> compactionOverrides = Map.of(
+                "offsets.topic.segment.bytes", "1048576",
+                "offset.metadata.max.bytes", "32767",
+                "nereus.kafka.storage.retention.check.interval.ms", "1000");
+        overrideConfiguration(brokerOneConfig, compactionOverrides);
+        overrideConfiguration(brokerTwoConfig, compactionOverrides);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerOneConfig,
+                brokerOneFormatLog,
+                kafkaClusterId);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerTwoConfig,
+                brokerTwoFormatLog,
+                kafkaClusterId);
+
+        TopicPartition userPartition = new TopicPartition(topic, 0);
+        TopicPartition groupPartition = new TopicPartition(GROUP_METADATA_TOPIC, 0);
+        Process brokerOne = start(
+                List.of(startScript.toString(), brokerOneConfig.toString()),
+                kafkaHome,
+                brokerOneServerLog);
+        Process brokerTwo = null;
+        Throwable failure = null;
+        try {
+            awaitBroker(brokerOneBootstrap, brokerOne, brokerOneServerLog);
+            try (Admin admin = Admin.create(adminProperties(brokerOneBootstrap))) {
+                admin.createTopics(List.of(new NewTopic(topic, Map.of(0, List.of(1)))))
+                        .all()
+                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            }
+            RecordMetadata userRecord = produce(
+                    brokerOneBootstrap,
+                    topic,
+                    "mandatory-ntc2-key".getBytes(StandardCharsets.UTF_8),
+                    "mandatory-ntc2-value".getBytes(StandardCharsets.UTF_8));
+            assertThat(userRecord.offset()).isZero();
+            seedGroupOffsetRecords(
+                    brokerOneBootstrap,
+                    groupId,
+                    userPartition,
+                    40,
+                    30_000);
+            assertThat(committedGroupOffset(
+                    brokerOneBootstrap,
+                    groupId,
+                    userPartition))
+                    .isEqualTo(1L);
+
+            KafkaPartitionId groupPartitionId =
+                    kafkaPartitionId(
+                            brokerOneBootstrap,
+                            groupPartition,
+                            GROUP_METADATA_TOPIC);
+            awaitMandatoryCompactionCoverage(
+                    nereusCluster,
+                    groupPartitionId,
+                    brokerOneServerLog,
+                    PROCESS_TIMEOUT);
+            Map<String, PhysicalObjectSnapshot> activatedNtc2 = awaitNtc2Objects(
+                    bucket,
+                    List.of(brokerOne),
+                    brokerOneServerLog);
+            assertThat(activatedNtc2)
+                    .as("the live group topic must publish at least one real NTC2 object")
+                    .isNotEmpty();
+
+            brokerTwo = start(
+                    List.of(startScript.toString(), brokerTwoConfig.toString()),
+                    kafkaHome,
+                    brokerTwoServerLog);
+            awaitBroker(brokerTwoBootstrap, brokerTwo, brokerTwoServerLog);
+            awaitClusterBrokers(
+                    clusterBootstrap,
+                    List.of(1, 2),
+                    List.of(brokerOne, brokerTwo),
+                    brokerOneServerLog,
+                    brokerTwoServerLog);
+
+            deleteObjects(bucket, activatedNtc2.keySet());
+            assertThat(ntc2ObjectKeys(bucket))
+                    .as("the mandatory activated NTC2 bytes must be physically absent")
+                    .doesNotContainAnyElementsOf(activatedNtc2.keySet());
+            try (Admin admin = Admin.create(adminProperties(clusterBootstrap))) {
+                reassignPartitions(
+                        admin,
+                        List.of(groupPartition),
+                        2,
+                        brokerOne,
+                        brokerTwo,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+            }
+            assertGroupCoordinatorUnavailable(
+                    clusterBootstrap,
+                    groupId,
+                    userPartition,
+                    brokerOne,
+                    brokerTwo,
+                    brokerOneServerLog,
+                    brokerTwoServerLog);
+
+            putObjects(bucket, activatedNtc2);
+            assertObjectsEqual(bucket, activatedNtc2);
+            try (Admin admin = Admin.create(adminProperties(clusterBootstrap))) {
+                reassignPartitions(
+                        admin,
+                        List.of(groupPartition),
+                        1,
+                        brokerOne,
+                        brokerTwo,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+            }
+            assertThat(committedGroupOffset(
+                    clusterBootstrap,
+                    groupId,
+                    userPartition))
+                    .as("same-view physical repair must permit a later ordinary election")
+                    .isEqualTo(1L);
+
+            putObjects(bucket, corruptedObjects(activatedNtc2));
+            try (Admin admin = Admin.create(adminProperties(clusterBootstrap))) {
+                reassignPartitions(
+                        admin,
+                        List.of(groupPartition),
+                        2,
+                        brokerOne,
+                        brokerTwo,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+            }
+            assertGroupCoordinatorUnavailable(
+                    clusterBootstrap,
+                    groupId,
+                    userPartition,
+                    brokerOne,
+                    brokerTwo,
+                    brokerOneServerLog,
+                    brokerTwoServerLog);
+
+            putObjects(bucket, activatedNtc2);
+            assertObjectsEqual(bucket, activatedNtc2);
+            try (Admin admin = Admin.create(adminProperties(clusterBootstrap))) {
+                reassignPartitions(
+                        admin,
+                        List.of(groupPartition),
+                        1,
+                        brokerOne,
+                        brokerTwo,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+            }
+            assertThat(committedGroupOffset(
+                    clusterBootstrap,
+                    groupId,
+                    userPartition))
+                    .as("checksum-preserving repair must restore coordinator state")
+                    .isEqualTo(1L);
+            assertProcessesAlive(
+                    List.of(brokerOne, brokerTwo),
+                    brokerOneServerLog,
+                    brokerTwoServerLog);
         } catch (Exception | AssertionError operationFailure) {
             failure = operationFailure;
         }
@@ -5588,6 +5849,64 @@ class NereusKafkaNativeProcessIntegrationTest {
                         + readLog(serverLog));
     }
 
+    private static void awaitMandatoryCompactionCoverage(
+            String nereusCluster,
+            KafkaPartitionId partitionId,
+            Path serverLog,
+            Duration timeout
+    ) {
+        OxiaClientConfiguration oxia = oxiaConfiguration();
+        Clock clock = Clock.systemUTC();
+        long deadline = System.nanoTime() + timeout.toNanos();
+        Throwable lastFailure = null;
+        try (SharedOxiaClientRuntime shared =
+                        SharedOxiaClientRuntime.connect(oxia, clock);
+                OxiaJavaKafkaPartitionMetadataStore partitions =
+                        OxiaJavaKafkaPartitionMetadataStore.usingSharedRuntime(
+                                oxia,
+                                shared,
+                                nereusCluster,
+                                partitionId.kafkaClusterId())) {
+            KafkaActivatedGenerationSetResolver activated =
+                    new KafkaActivatedGenerationSetResolver(
+                            nereusCluster,
+                            OxiaJavaGenerationMetadataStore.usingSharedRuntime(
+                                    oxia,
+                                    shared,
+                                    clock));
+            while (System.nanoTime() < deadline) {
+                try {
+                    var binding = partitions.get(partitionId).join();
+                    if (binding.isPresent()) {
+                        var coverage =
+                                binding.orElseThrow().value().compactionCoverage();
+                        if (coverage.coverageVersion() == 1
+                                && coverage.endOffset() > coverage.startOffset()) {
+                            activated.resolve(
+                                            new StreamId(
+                                                    binding.orElseThrow()
+                                                            .value()
+                                                            .streamId()),
+                                            coverage)
+                                    .join();
+                            return;
+                        }
+                        lastFailure = new AssertionError(
+                                "mandatory compaction coverage is not active: "
+                                        + coverage);
+                    }
+                } catch (Throwable failure) {
+                    lastFailure = failure;
+                }
+                pauseForProviderState("mandatory internal-topic compaction coverage");
+            }
+        }
+        throw new AssertionError(
+                "mandatory internal-topic compaction coverage did not activate:\n"
+                        + readLog(serverLog),
+                lastFailure);
+    }
+
     private static BookKeeperInFlightEvidence
             awaitBookKeeperWritingReservation(
                     String nereusCluster,
@@ -6422,6 +6741,62 @@ class NereusKafkaNativeProcessIntegrationTest {
                     .isNotNull();
             return committed.offset();
         }
+    }
+
+    private static void seedGroupOffsetRecords(
+            String bootstrapServers,
+            String groupId,
+            TopicPartition partition,
+            int recordCount,
+            int metadataBytes
+    ) {
+        if (recordCount <= 0 || metadataBytes <= 0) {
+            throw new IllegalArgumentException(
+                    "group offset seed bounds must be positive");
+        }
+        try (KafkaConsumer<byte[], byte[]> consumer =
+                new KafkaConsumer<>(consumerProperties(bootstrapServers, groupId))) {
+            consumer.assign(List.of(partition));
+            for (int record = 0; record < recordCount; record++) {
+                String prefix = "mandatory-ntc2-" + record + "-";
+                String metadata =
+                        prefix + "x".repeat(Math.max(0, metadataBytes - prefix.length()));
+                consumer.commitSync(
+                        Map.of(partition, new OffsetAndMetadata(1L, metadata)),
+                        CLIENT_TIMEOUT);
+            }
+        }
+    }
+
+    private static void assertGroupCoordinatorUnavailable(
+            String bootstrapServers,
+            String groupId,
+            TopicPartition partition,
+            Process brokerOne,
+            Process brokerTwo,
+            Path brokerOneLog,
+            Path brokerTwoLog
+    ) {
+        assertProcessesAlive(
+                List.of(brokerOne, brokerTwo),
+                brokerOneLog,
+                brokerTwoLog);
+        Properties properties = consumerProperties(bootstrapServers, groupId);
+        properties.setProperty(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+        properties.setProperty(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, "3000");
+        boolean failedClosed = false;
+        try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
+            consumer.committed(Set.of(partition), Duration.ofSeconds(5));
+        } catch (RuntimeException expected) {
+            failedClosed = true;
+        }
+        assertThat(failedClosed)
+                .as("the coordinator must remain unavailable while mandatory NTC2 is unreadable")
+                .isTrue();
+        assertProcessesAlive(
+                List.of(brokerOne, brokerTwo),
+                brokerOneLog,
+                brokerTwoLog);
     }
 
     private static Properties consumerProperties(
@@ -8493,6 +8868,208 @@ class NereusKafkaNativeProcessIntegrationTest {
                             ListObjectsV2Request.builder().bucket(bucket).build())
                     .join()
                     .keyCount();
+        }
+    }
+
+    private static Map<String, PhysicalObjectSnapshot> awaitNtc2Objects(
+            String bucket,
+            List<Process> brokers,
+            Path... serverLogs
+    ) throws Exception {
+        long deadline = System.nanoTime() + PROCESS_TIMEOUT.toNanos();
+        Set<String> previous = Set.of();
+        int stableObservations = 0;
+        while (System.nanoTime() < deadline) {
+            assertProcessesAlive(brokers, serverLogs);
+            Set<String> current = ntc2ObjectKeys(bucket);
+            if (!current.isEmpty() && current.equals(previous)) {
+                stableObservations++;
+                if (stableObservations >= 4) {
+                    return readObjects(bucket, current);
+                }
+            } else {
+                previous = current;
+                stableObservations = 0;
+            }
+            Thread.sleep(250);
+        }
+        throw new AssertionError(
+                "activated NTC2 objects did not stabilize:\n"
+                        + joinedLogs(serverLogs));
+    }
+
+    private static Set<String> ntc2ObjectKeys(String bucket) {
+        try (S3AsyncClient admin = s3Client()) {
+            Set<String> keys = new java.util.HashSet<>();
+            String continuationToken = null;
+            do {
+                var response =
+                        admin.listObjectsV2(
+                                        ListObjectsV2Request.builder()
+                                                .bucket(bucket)
+                                                .continuationToken(continuationToken)
+                                                .build())
+                                .join();
+                response.contents().stream()
+                        .map(value -> value.key())
+                        .filter(
+                                NereusKafkaNativeProcessIntegrationTest
+                                        ::isPhysicalNtc2ObjectKey)
+                        .forEach(keys::add);
+                continuationToken =
+                        response.isTruncated()
+                                ? response.nextContinuationToken()
+                                : null;
+            } while (continuationToken != null);
+            return Set.copyOf(keys);
+        }
+    }
+
+    private static boolean isPhysicalNtc2ObjectKey(String physicalKey) {
+        String marker = "/objects/v1/";
+        int markerIndex = physicalKey.indexOf(marker);
+        if (markerIndex <= 0) {
+            return false;
+        }
+        try {
+            String logical =
+                    new S3ObjectKeyMapper(
+                                    physicalKey.substring(
+                                            0,
+                                            markerIndex))
+                            .unmap(physicalKey)
+                            .value();
+            return logical.contains(
+                    "/compacted/v2/topic-compacted-kafka/");
+        } catch (IllegalArgumentException invalid) {
+            return false;
+        }
+    }
+
+    private static Map<String, PhysicalObjectSnapshot> readObjects(
+            String bucket,
+            Set<String> keys
+    ) {
+        Map<String, PhysicalObjectSnapshot> objects = new java.util.LinkedHashMap<>();
+        try (S3AsyncClient admin = s3Client()) {
+            keys.stream().sorted().forEach(key -> {
+                var response = admin.getObject(
+                                GetObjectRequest.builder()
+                                        .bucket(bucket)
+                                        .key(key)
+                                        .checksumMode(
+                                                software.amazon.awssdk.services.s3.model
+                                                        .ChecksumMode.ENABLED)
+                                        .build(),
+                                AsyncResponseTransformer.toBytes())
+                        .join();
+                objects.put(
+                        key,
+                        new PhysicalObjectSnapshot(
+                                response.asByteArray(),
+                                response.response().metadata(),
+                                response.response().contentType(),
+                                response.response().checksumCRC32C()));
+            });
+        }
+        return Map.copyOf(objects);
+    }
+
+    private static void deleteObjects(
+            String bucket,
+            Set<String> keys
+    ) {
+        try (S3AsyncClient admin = s3Client()) {
+            for (String key : keys) {
+                admin.deleteObject(
+                                DeleteObjectRequest.builder()
+                                        .bucket(bucket)
+                                        .key(key)
+                                        .build())
+                        .join();
+            }
+        }
+    }
+
+    private static void putObjects(
+            String bucket,
+            Map<String, PhysicalObjectSnapshot> objects
+    ) {
+        try (S3AsyncClient admin = s3Client()) {
+            for (Map.Entry<String, PhysicalObjectSnapshot> object : objects.entrySet()) {
+                PhysicalObjectSnapshot snapshot = object.getValue();
+                admin.putObject(
+                                PutObjectRequest.builder()
+                                        .bucket(bucket)
+                                        .key(object.getKey())
+                                        .contentLength((long) snapshot.bytes().length)
+                                        .contentType(snapshot.contentType())
+                                        .metadata(snapshot.metadata())
+                                        .checksumCRC32C(snapshot.checksumCrc32c())
+                                        .build(),
+                                AsyncRequestBody.fromBytes(snapshot.bytes()))
+                        .join();
+            }
+        }
+    }
+
+    private static Map<String, PhysicalObjectSnapshot> corruptedObjects(
+            Map<String, PhysicalObjectSnapshot> originals
+    ) {
+        Map<String, PhysicalObjectSnapshot> corrupted = new java.util.LinkedHashMap<>();
+        originals.forEach((key, original) -> {
+            assertThat(original.bytes())
+                    .as("NTC2 object must contain physical bytes")
+                    .isNotEmpty();
+            byte[] bytes = original.bytes().clone();
+            bytes[bytes.length / 2] ^= 1;
+            corrupted.put(
+                    key,
+                    new PhysicalObjectSnapshot(
+                            bytes,
+                            original.metadata(),
+                            original.contentType(),
+                            null));
+        });
+        return Map.copyOf(corrupted);
+    }
+
+    private static void assertObjectsEqual(
+            String bucket,
+            Map<String, PhysicalObjectSnapshot> expected
+    ) {
+        Map<String, PhysicalObjectSnapshot> actual = readObjects(bucket, expected.keySet());
+        assertThat(actual.keySet()).containsExactlyInAnyOrderElementsOf(expected.keySet());
+        expected.forEach((key, snapshot) -> {
+            assertThat(actual.get(key).bytes())
+                        .as("restored object " + key)
+                        .containsExactly(snapshot.bytes());
+            assertThat(actual.get(key).metadata())
+                    .as("restored object metadata " + key)
+                    .isEqualTo(snapshot.metadata());
+            assertThat(actual.get(key).contentType())
+                    .as("restored object content type " + key)
+                    .isEqualTo(snapshot.contentType());
+            assertThat(actual.get(key).checksumCrc32c())
+                    .as("restored object provider checksum " + key)
+                    .isEqualTo(snapshot.checksumCrc32c());
+        });
+    }
+
+    private record PhysicalObjectSnapshot(
+            byte[] bytes,
+            Map<String, String> metadata,
+            String contentType,
+            String checksumCrc32c
+    ) {
+        private PhysicalObjectSnapshot {
+            bytes = bytes.clone();
+            metadata = Map.copyOf(metadata);
+        }
+
+        @Override
+        public byte[] bytes() {
+            return bytes.clone();
         }
     }
 

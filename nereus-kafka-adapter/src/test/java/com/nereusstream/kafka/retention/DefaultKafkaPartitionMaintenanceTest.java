@@ -42,6 +42,7 @@ import com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1;
 import com.nereusstream.materialization.MaterializationPolicyFactory;
 import com.nereusstream.materialization.TopicCompactionSpec;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
+import com.nereusstream.metadata.oxia.KafkaPartitionMetadataTransitions;
 import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
 import java.lang.reflect.Proxy;
@@ -208,14 +209,15 @@ class DefaultKafkaPartitionMaintenanceTest {
     AtomicReference<StableStreamHeadSnapshot> durableHead =
         new AtomicReference<>(head(0));
     AtomicReference<VersionedKafkaPartitionBinding> durableBinding =
-        new AtomicReference<>(binding());
+        new AtomicReference<>(binding(0, 0));
+    KafkaPartitionMetadataStore bindingStore = bindings(durableBinding);
     DefaultKafkaPartitionMaintenance maintenance =
         new DefaultKafkaPartitionMaintenance(
             IDENTITY,
             3,
             STREAM_ID,
             sourceValidator(durableHead),
-            bindings(durableBinding),
+            bindingStore,
             storage(
                 durableHead,
                 new AtomicInteger(),
@@ -278,14 +280,42 @@ class DefaultKafkaPartitionMaintenanceTest {
         maintenance.captureCompaction(hooks).join();
 
     assertThat(capture.binding()).isEqualTo(durableBinding.get());
+    assertThat(capture.binding().value().observedStableEndOffset())
+        .as("binding stable-end observation may lag the authoritative stream head")
+        .isZero();
     assertThat(capture.plannerSnapshot().virtualSegments().stableEndOffset()).isEqualTo(40);
     assertThat(selected.get().outputCoverage())
         .isEqualTo(new com.nereusstream.api.OffsetRange(0, 30));
     capture.authorityGuard().revalidate().join();
 
-    durableHead.set(head(10));
+    VersionedKafkaPartitionBinding beforeObservation = durableBinding.get();
+    var root = beforeObservation.value();
+    bindingStore
+        .compareAndSet(
+            beforeObservation,
+            KafkaPartitionMetadataTransitions.observe(
+                root,
+                root.observedTopicName(),
+                root.lastAppliedMetadataOffset(),
+                root.observedLeaderId(),
+                root.observedLeaderEpoch(),
+                root.observedBrokerEpoch(),
+                0,
+                40,
+                root.updatedAtMillis() + 1))
+        .join();
+    assertThat(durableBinding.get().value().bindingEpoch())
+        .isGreaterThan(capture.binding().value().bindingEpoch());
+    capture.authorityGuard().revalidate().join();
+
+    durableHead.set(head(0, 2));
+    capture.authorityGuard().revalidate().join();
+
+    durableHead.set(head(10, 2));
     assertThatThrownBy(() -> capture.authorityGuard().revalidate().join())
-        .hasRootCauseMessage("Kafka compaction partition authority changed after capture");
+        .rootCause()
+        .hasMessageStartingWith(
+            "Kafka compaction partition authority changed after capture");
   }
 
   private static KafkaPartitionMaintenance.Hooks hooks(

@@ -134,6 +134,9 @@ class KafkaCompactionPublicationCoordinatorTest {
       assertThat(result.binding().value().compactionCoverage().startOffset()).isZero();
       assertThat(result.binding().value().compactionCoverage().endOffset()).isEqualTo(2);
       assertThat(result.binding().value().compactionCoverage().activationEpoch()).isEqualTo(1);
+      assertThat(result.binding().value().observedStableEndOffset())
+          .as("coverage activation must advance the advisory binding observation")
+          .isEqualTo(context.fixture.plan().candidate().decisionHorizon().endOffset());
       assertThat(result.binding().value().compactionCoverage().generationSetSha256())
           .containsExactly(result.generationSet().digestBytes());
       assertThat(
@@ -392,6 +395,7 @@ class KafkaCompactionPublicationCoordinatorTest {
                                   .activateCompactionCoverage(
                                       current.orElseThrow(),
                                       KafkaCompactionCoverageActivationMode.INITIAL,
+                                      fixture.plan().candidate().decisionHorizon().endOffset(),
                                       0,
                                       2,
                                       bytes(9),
@@ -480,7 +484,7 @@ class KafkaCompactionPublicationCoordinatorTest {
               1,
               1,
               0,
-              plan.candidate().decisionHorizon().endOffset(),
+              task.coverage().startOffset(),
               Math.max(1_200, current.value().updatedAtMillis() + 1));
       current = store.compareAndSet(current, observed).join();
     }

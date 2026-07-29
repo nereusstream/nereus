@@ -100,6 +100,10 @@ final class KafkaRetentionTestFixtures {
   }
 
   static StableStreamHeadSnapshot head(long trimOffset) {
+    return head(trimOffset, 1);
+  }
+
+  static StableStreamHeadSnapshot head(long trimOffset, long leaseVersion) {
     AppendAuthority authority =
         new AppendAuthority(
             "kafka-partition-leader-v1",
@@ -109,7 +113,8 @@ final class KafkaRetentionTestFixtures {
             4);
     AcquiredAppendSession acquired =
         new AcquiredAppendSession(
-            new AppendSession(STREAM_ID, "writer-1", 1, "token-1", 1, 10_000),
+            new AppendSession(
+                STREAM_ID, "writer-1", 1, "token-1", leaseVersion, 10_000),
             Optional.of(authority));
     return new StableStreamHeadSnapshot(
         STREAM_ID,
@@ -131,6 +136,13 @@ final class KafkaRetentionTestFixtures {
 
   static VersionedKafkaPartitionBinding binding(
       long observedLogStartOffset, KafkaCheckpointReferenceRecord... checkpoints) {
+    return binding(observedLogStartOffset, 40, checkpoints);
+  }
+
+  static VersionedKafkaPartitionBinding binding(
+      long observedLogStartOffset,
+      long observedStableEndOffset,
+      KafkaCheckpointReferenceRecord... checkpoints) {
     KafkaPartitionPendingOperationRecord operation =
         new KafkaPartitionPendingOperationRecord(
             KafkaPartitionOperationType.CREATE.wireId(),
@@ -154,7 +166,15 @@ final class KafkaRetentionTestFixtures {
             creating, "kafka-stream", STREAM_ID.value(), 7, 10_001);
     var root =
         KafkaPartitionMetadataTransitions.observe(
-            active, IDENTITY.observedTopicName(), 7, 1, 3, 4, observedLogStartOffset, 40, 10_002);
+            active,
+            IDENTITY.observedTopicName(),
+            7,
+            1,
+            3,
+            4,
+            observedLogStartOffset,
+            observedStableEndOffset,
+            10_002);
     ArrayList<KafkaCheckpointReferenceRecord> ascending =
         new ArrayList<>(Arrays.asList(checkpoints));
     ascending.sort(
@@ -163,7 +183,7 @@ final class KafkaRetentionTestFixtures {
     for (KafkaCheckpointReferenceRecord checkpoint : ascending) {
       root =
           KafkaPartitionMetadataTransitions.prependCheckpoint(
-              root, checkpoint, observedLogStartOffset, 40, now++);
+              root, checkpoint, observedLogStartOffset, observedStableEndOffset, now++);
     }
     return new VersionedKafkaPartitionBinding(
         "/test/kafka-binding", root, 0, sha256(checkpoints.length == 0 ? 'a' : 'b'));

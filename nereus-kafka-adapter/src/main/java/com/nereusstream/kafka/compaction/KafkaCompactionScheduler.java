@@ -38,6 +38,9 @@ import java.util.concurrent.TimeUnit;
  * executor and scheduler are borrowed resources and are never closed here.
  */
 public final class KafkaCompactionScheduler implements AutoCloseable {
+  private static final System.Logger LOGGER =
+      System.getLogger(KafkaCompactionScheduler.class.getName());
+
   private enum State {
     NEW,
     RUNNING,
@@ -255,6 +258,7 @@ public final class KafkaCompactionScheduler implements AutoCloseable {
     if (completionFailure == null) {
       target.completion.complete(null);
     } else {
+      LOGGER.log(System.Logger.Level.ERROR, "Kafka compaction pass failed", completionFailure);
       target.completion.completeExceptionally(completionFailure);
     }
     if (next != null) {

@@ -40,7 +40,7 @@ bc4553fa84e8cba2ef0c70b3812aef7876dc014e nereus-core/src/main/java/com/nereusstr
 68c0457cddf7db051da12f676c8c0dc599458be7 nereus-core/src/main/java/com/nereusstream/core/append/AppendCoordinator.java
 336d08fa1078248b31925f5a6391932f177999ec nereus-core/src/main/java/com/nereusstream/core/append/AppendResultValidator.java
 399f51ecb61db8acb97dea6df5f145ba2a9c4b29 nereus-core/src/main/java/com/nereusstream/core/read/ReadCoordinator.java
-11294d4965e76c94cf34a5d66d455c7ace25dad4 nereus-core/src/main/java/com/nereusstream/core/read/ParquetV2CompactedTargetReader.java
+fddda498fc94e5a02a4bbc029e1403cdd4ee4b8a nereus-core/src/main/java/com/nereusstream/core/read/ParquetV2CompactedTargetReader.java
 e92e604b377ea8a481d5bece22600073c6fc0235 nereus-core/src/main/java/com/nereusstream/core/capability/PhysicalFormatCapabilityRegistry.java
 6ee7fb5ffcc0b1ff6c9d669ab16b69403b45e9f4 nereus-object-store/src/main/java/com/nereusstream/objectstore/wal/DefaultWalObjectReader.java
 c9334acbdd8e01c3a4505cf3b12c6c9cdfbe755e nereus-object-store/src/main/java/com/nereusstream/objectstore/compacted/CompactedObjectFormatV2.java
@@ -54,8 +54,8 @@ f4e35b83ffeb0fb630a9b45893f2f9630608dc3e nereus-materialization/src/main/java/co
 d1715b79b3080483e6ffe8389922840e89eda42d nereus-materialization/src/main/java/com/nereusstream/materialization/DefaultMaterializationPlanner.java
 32ef63f4979fb1af4b4e00acd69e56e58a4eddc9 nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperPrimaryWalRuntime.java
 988fe111e021d7d9d660abe301fe9d8ff54b0872 nereus-kafka-adapter/src/main/java/com/nereusstream/kafka/runtime/NereusKafkaBookKeeperWalRuntimeContext.java
-831eefecbac96998d4619d507d4a6addcf9110ec nereus-kafka-adapter/src/main/java/com/nereusstream/kafka/runtime/NereusKafkaObjectWalRuntimeFactory.java
-a388cb0c831475abbe0e1c4cdefd8f4573e0fbcd nereus-kafka-adapter/src/main/java/com/nereusstream/kafka/partition/DefaultKafkaPartitionStorage.java
+13a766aa9773bcbc4f34b32719c2218bc70bad08 nereus-kafka-adapter/src/main/java/com/nereusstream/kafka/runtime/NereusKafkaObjectWalRuntimeFactory.java
+cd53d97ee4a632a9057f165bcad91db1f53381c7 nereus-kafka-adapter/src/main/java/com/nereusstream/kafka/partition/DefaultKafkaPartitionStorage.java
 LOCKS
 
 echo "F9 source lock: AutoMQ and 29 Nereus ranged/head/session/planner/provider-composition sources match"

@@ -206,7 +206,7 @@ public final class KafkaTopicCompactionCodecV1 implements RangedTopicCompactionC
         batch.isTransactional(),
         batch.producerId(),
         batch.producerEpoch(),
-        record.sequence(),
+        producerSequence(batch, record),
         ByteBuffer.wrap(exactBatch));
   }
 
@@ -252,7 +252,7 @@ public final class KafkaTopicCompactionCodecV1 implements RangedTopicCompactionC
             logAppendTime,
             batch.producerId(),
             batch.producerEpoch(),
-            record.sequence(),
+            producerSequence(batch, record),
             batch.isTransactional(),
             batch.isControlBatch(),
             batch.partitionLeaderEpoch(),
@@ -291,7 +291,8 @@ public final class KafkaTopicCompactionCodecV1 implements RangedTopicCompactionC
         || batch.producerId() != sourceBatch.producerId()
         || batch.producerEpoch() != sourceBatch.producerEpoch()
         || !batch.deleteHorizonMs().equals(expectedDeleteHorizon)
-        || decoded.records().get(0).sequence() != source.sequence()
+        || producerSequence(batch, decoded.records().get(0))
+            != producerSequence(sourceBatch, source)
         || !sameRecord(source, decoded.records().get(0))) {
       throw new IllegalStateException(
           "Kafka compaction one-record rewrite failed its decode round trip");
@@ -330,6 +331,10 @@ public final class KafkaTopicCompactionCodecV1 implements RangedTopicCompactionC
 
   private static Compression compression(RecordBatch batch) {
     return Compression.of(batch.compressionType()).build();
+  }
+
+  private static int producerSequence(RecordBatch batch, Record record) {
+    return batch.hasProducerId() ? record.sequence() : RecordBatch.NO_SEQUENCE;
   }
 
   private static Disposition disposition(DecodedCompactionRecord record) {
