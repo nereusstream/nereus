@@ -69,6 +69,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "f9TrimProfileMatrixProcessIntegrationTest"
         || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
         || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
+        || task == "f9CoordinatorMigrationProcessIntegrationTest"
         || task == "f9MultiControllerFailoverProcessIntegrationTest"
         || task == "f9ActivationCutFailoverProcessIntegrationTest"
         || task == "f9ActivationProofCutFailoverProcessIntegrationTest"
@@ -149,6 +150,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "f9TrimResponseLossProcessIntegrationTest",
         "f9TrimProfileMatrixProcessIntegrationTest",
         "f9MultiBrokerTakeoverProcessIntegrationTest",
+        "f9CoordinatorMigrationProcessIntegrationTest",
         "f9MultiControllerFailoverProcessIntegrationTest",
         "f9ActivationCutFailoverProcessIntegrationTest",
         "f9ActivationProofCutFailoverProcessIntegrationTest",
@@ -3113,6 +3115,7 @@ tasks.register("phase9M6KafkaProcessCheck") {
     dependsOn(":nereus-kafka-adapter:f9TrimResponseLossProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9TrimProfileMatrixProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9CoordinatorMigrationProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiControllerFailoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9ActivationCutFailoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9ActivationProofCutFailoverProcessIntegrationTest")

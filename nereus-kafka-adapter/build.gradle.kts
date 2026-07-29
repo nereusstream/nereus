@@ -379,12 +379,42 @@ tasks.register<Test>("f9MultiBrokerTakeoverProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9CoordinatorMigrationProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Migrate user, group, and transaction partitions across two live release Kafka processes " +
+            "and recover both coordinators."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9MultiBrokerTakeoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-coordinator-migration-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "twoReleaseProcessesMigrateRecoveredGroupAndTransactionCoordinators",
+        )
+    }
+}
+
 tasks.register<Test>("f9MultiControllerFailoverProcessIntegrationTest") {
     group = "verification"
     description =
         "Kill the active controller in a three-voter release cluster and prove Nereus ACTIVE/IO continuity."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
-    shouldRunAfter(tasks.named("f9MultiBrokerTakeoverProcessIntegrationTest"))
+    shouldRunAfter(tasks.named("f9CoordinatorMigrationProcessIntegrationTest"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
     classpath = f9ProviderIntegrationTest.runtimeClasspath
     systemProperty(

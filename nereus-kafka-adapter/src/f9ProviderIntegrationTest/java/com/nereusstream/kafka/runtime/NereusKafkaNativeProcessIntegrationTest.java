@@ -118,6 +118,8 @@ class NereusKafkaNativeProcessIntegrationTest {
             DockerImageName.parse("ghcr.io/shopify/toxiproxy:2.12.0");
     private static final Duration PROCESS_TIMEOUT = Duration.ofSeconds(90);
     private static final Duration CLIENT_TIMEOUT = Duration.ofSeconds(60);
+    private static final String GROUP_METADATA_TOPIC = "__consumer_offsets";
+    private static final String TRANSACTION_STATE_TOPIC = "__transaction_state";
 
     @Container
     private static final OxiaContainer OXIA =
@@ -1222,6 +1224,300 @@ class NereusKafkaNativeProcessIntegrationTest {
                     brokerTwoServerLog);
             assertThat(appended.key()).isEqualTo(secondKey);
             assertThat(appended.value()).isEqualTo(secondValue);
+        } catch (Exception | AssertionError operationFailure) {
+            failure = operationFailure;
+        }
+        if (brokerTwo != null) {
+            try {
+                stopBroker(brokerTwo, brokerTwoServerLog);
+            } catch (Exception | AssertionError shutdownFailure) {
+                failure = mergeFailure(failure, shutdownFailure);
+            }
+        }
+        try {
+            stopBroker(brokerOne, brokerOneServerLog);
+        } catch (Exception | AssertionError shutdownFailure) {
+            failure = mergeFailure(failure, shutdownFailure);
+        }
+        if (failure != null) {
+            try {
+                preserveMultiBrokerFailureEvidence(
+                        brokerOneConfig,
+                        brokerTwoConfig,
+                        brokerOneFormatLog,
+                        brokerTwoFormatLog,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.MINUTES)
+    void twoReleaseProcessesMigrateRecoveredGroupAndTransactionCoordinators()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-coordinator-migration-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path brokerOneConfig = root.resolve("coordinator-migration-one.properties");
+        Path brokerTwoConfig = root.resolve("coordinator-migration-two.properties");
+        Path brokerOneFormatLog = root.resolve("coordinator-migration-one-format.log");
+        Path brokerTwoFormatLog = root.resolve("coordinator-migration-two-format.log");
+        Path brokerOneServerLog = root.resolve("coordinator-migration-one-server.log");
+        Path brokerTwoServerLog = root.resolve("coordinator-migration-two-server.log");
+        String bucket = "nereus-kafka-coordinator-" + UUID.randomUUID();
+        String topic = "process-coordinator-" + UUID.randomUUID();
+        String groupId = "process-migrated-group-" + UUID.randomUUID();
+        String transactionalId = "process-migrated-transaction-" + UUID.randomUUID();
+        String nereusCluster = "f9-process-coordinator-" + UUID.randomUUID();
+        String kafkaClusterId = org.apache.kafka.common.Uuid.randomUuid().toString();
+        int brokerOnePort = freePort();
+        int controllerPort = differentFreePort(brokerOnePort);
+        int brokerTwoPort = differentFreePort(brokerOnePort, controllerPort);
+        String brokerOneBootstrap = "127.0.0.1:" + brokerOnePort;
+        String brokerTwoBootstrap = "127.0.0.1:" + brokerTwoPort;
+        String clusterBootstrap = brokerOneBootstrap + "," + brokerTwoBootstrap;
+
+        createBucket(bucket);
+        writeConfiguration(
+                brokerOneConfig,
+                brokerOnePort,
+                controllerPort,
+                bucket,
+                root.resolve("coordinator-migration-one-log"),
+                root.resolve("coordinator-migration-one-metadata"),
+                root.resolve("coordinator-migration-one-cache"),
+                "OBJECT_WAL_SYNC_OBJECT",
+                null,
+                1,
+                true,
+                nereusCluster);
+        writeConfiguration(
+                brokerTwoConfig,
+                brokerTwoPort,
+                controllerPort,
+                bucket,
+                root.resolve("coordinator-migration-two-log"),
+                root.resolve("coordinator-migration-two-metadata"),
+                root.resolve("coordinator-migration-two-cache"),
+                "OBJECT_WAL_SYNC_OBJECT",
+                null,
+                2,
+                false,
+                nereusCluster);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerOneConfig,
+                brokerOneFormatLog,
+                kafkaClusterId);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerTwoConfig,
+                brokerTwoFormatLog,
+                kafkaClusterId);
+
+        TopicPartition userPartition = new TopicPartition(topic, 0);
+        TopicPartition groupPartition = new TopicPartition(GROUP_METADATA_TOPIC, 0);
+        TopicPartition transactionPartition =
+                new TopicPartition(TRANSACTION_STATE_TOPIC, 0);
+        byte[] firstKey =
+                "coordinator-key-0".getBytes(StandardCharsets.UTF_8);
+        byte[] firstValue =
+                "nereus-coordinator-first".getBytes(StandardCharsets.UTF_8);
+        byte[] firstTransactionalKey =
+                "coordinator-transaction-key-0".getBytes(StandardCharsets.UTF_8);
+        byte[] firstTransactionalValue =
+                "nereus-coordinator-transaction-first"
+                        .getBytes(StandardCharsets.UTF_8);
+        byte[] migratedTransactionalKey =
+                "coordinator-transaction-key-1".getBytes(StandardCharsets.UTF_8);
+        byte[] migratedTransactionalValue =
+                "nereus-coordinator-transaction-migrated"
+                        .getBytes(StandardCharsets.UTF_8);
+
+        Process brokerOne = start(
+                List.of(startScript.toString(), brokerOneConfig.toString()),
+                kafkaHome,
+                brokerOneServerLog);
+        Process brokerTwo = null;
+        Throwable failure = null;
+        try {
+            awaitBroker(brokerOneBootstrap, brokerOne, brokerOneServerLog);
+            try (Admin admin = Admin.create(adminProperties(brokerOneBootstrap))) {
+                admin.createTopics(List.of(
+                                new NewTopic(topic, Map.of(0, List.of(1)))))
+                        .all()
+                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            }
+
+            RecordMetadata first = produce(
+                    brokerOneBootstrap,
+                    topic,
+                    firstKey,
+                    firstValue);
+            assertThat(first.offset()).isZero();
+            RecordMetadata firstTransactional = transactionalProduce(
+                    brokerOneBootstrap,
+                    transactionalId,
+                    topic,
+                    firstTransactionalKey,
+                    firstTransactionalValue);
+            assertThat(firstTransactional.offset()).isEqualTo(1L);
+            ConsumerRecord<byte[], byte[]> grouped = consumeGroupThroughOffset(
+                    brokerOneBootstrap,
+                    groupId,
+                    topic,
+                    userPartition,
+                    0L,
+                    1L,
+                    brokerOneServerLog);
+            assertThat(grouped.offset()).isEqualTo(1L);
+            assertThat(committedGroupOffset(
+                    brokerOneBootstrap,
+                    groupId,
+                    userPartition))
+                    .isEqualTo(2L);
+
+            brokerTwo = start(
+                    List.of(startScript.toString(), brokerTwoConfig.toString()),
+                    kafkaHome,
+                    brokerTwoServerLog);
+            awaitBroker(brokerTwoBootstrap, brokerTwo, brokerTwoServerLog);
+            awaitClusterBrokers(
+                    clusterBootstrap,
+                    List.of(1, 2),
+                    List.of(brokerOne, brokerTwo),
+                    brokerOneServerLog,
+                    brokerTwoServerLog);
+
+            try (Admin admin = Admin.create(adminProperties(clusterBootstrap))) {
+                awaitPartitionLeader(
+                        admin,
+                        userPartition,
+                        1,
+                        brokerOne,
+                        brokerTwo,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+                awaitPartitionLeader(
+                        admin,
+                        groupPartition,
+                        1,
+                        brokerOne,
+                        brokerTwo,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+                awaitPartitionLeader(
+                        admin,
+                        transactionPartition,
+                        1,
+                        brokerOne,
+                        brokerTwo,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+
+                admin.alterPartitionReassignments(Map.of(
+                                userPartition,
+                                Optional.of(new NewPartitionReassignment(List.of(2))),
+                                groupPartition,
+                                Optional.of(new NewPartitionReassignment(List.of(2))),
+                                transactionPartition,
+                                Optional.of(new NewPartitionReassignment(List.of(2)))))
+                        .all()
+                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                for (TopicPartition migrated :
+                        List.of(userPartition, groupPartition, transactionPartition)) {
+                    awaitPartitionLeader(
+                            admin,
+                            migrated,
+                            2,
+                            brokerOne,
+                            brokerTwo,
+                            brokerOneServerLog,
+                            brokerTwoServerLog);
+                }
+                assertThat(admin.listPartitionReassignments(
+                                        Set.of(
+                                                userPartition,
+                                                groupPartition,
+                                                transactionPartition))
+                                .reassignments()
+                                .get(
+                                        CLIENT_TIMEOUT.toSeconds(),
+                                        TimeUnit.SECONDS))
+                        .as("all three Nereus RF1 handoffs must converge atomically")
+                        .isEmpty();
+            }
+
+            assertThat(brokerOne.isAlive())
+                    .as("the old broker must remain alive while both coordinators migrate")
+                    .isTrue();
+            assertThat(committedGroupOffset(
+                    clusterBootstrap,
+                    groupId,
+                    userPartition))
+                    .as("the migrated group coordinator must recover the committed offset")
+                    .isEqualTo(2L);
+
+            RecordMetadata migratedTransactional = transactionalProduce(
+                    clusterBootstrap,
+                    transactionalId,
+                    topic,
+                    migratedTransactionalKey,
+                    migratedTransactionalValue);
+            assertThat(migratedTransactional.offset())
+                    .as("the migrated transaction coordinator must retain the prior marker")
+                    .isEqualTo(3L);
+            ConsumerRecord<byte[], byte[]> recoveredTransactional =
+                    fetchReadCommitted(
+                            clusterBootstrap,
+                            userPartition,
+                            1L,
+                            brokerTwoServerLog);
+            assertThat(recoveredTransactional.key()).isEqualTo(firstTransactionalKey);
+            assertThat(recoveredTransactional.value()).isEqualTo(firstTransactionalValue);
+            ConsumerRecord<byte[], byte[]> migratedFetched =
+                    fetchReadCommitted(
+                            clusterBootstrap,
+                            userPartition,
+                            3L,
+                            brokerTwoServerLog);
+            assertThat(migratedFetched.key()).isEqualTo(migratedTransactionalKey);
+            assertThat(migratedFetched.value()).isEqualTo(migratedTransactionalValue);
+
+            ConsumerRecord<byte[], byte[]> migratedGrouped = consumeGroupThroughOffset(
+                    clusterBootstrap,
+                    groupId,
+                    topic,
+                    userPartition,
+                    3L,
+                    3L,
+                    brokerTwoServerLog);
+            assertThat(migratedGrouped.offset()).isEqualTo(3L);
+            assertThat(committedGroupOffset(
+                    clusterBootstrap,
+                    groupId,
+                    userPartition))
+                    .isEqualTo(4L);
+            try (Admin admin = Admin.create(adminProperties(clusterBootstrap))) {
+                assertOffsets(admin, userPartition, 0L, 5L);
+            }
+            assertProcessesAlive(
+                    List.of(brokerOne, brokerTwo),
+                    brokerOneServerLog,
+                    brokerTwoServerLog);
+            assertThat(objectCount(bucket))
+                    .as("user and both coordinator partitions must remain object-backed")
+                    .isPositive();
         } catch (Exception | AssertionError operationFailure) {
             failure = operationFailure;
         }
