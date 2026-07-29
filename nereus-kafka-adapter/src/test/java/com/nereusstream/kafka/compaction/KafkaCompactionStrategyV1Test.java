@@ -21,7 +21,7 @@ import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decisi
 import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decision.RETAIN_CONTROL;
 import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decision.RETAIN_LATEST_VALUE;
 import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decision.RETAIN_TOMBSTONE;
-import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decision.RETAIN_UNKEYED;
+import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decision.DROP_UNKEYED;
 import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.MarkerStatus.DELETE_ELIGIBLE;
 import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.MarkerStatus.NOT_CONTROL;
 import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.MarkerStatus.RETAIN_REQUIRED;
@@ -56,11 +56,11 @@ class KafkaCompactionStrategyV1Test {
   }
 
   @Test
-  void retainsEveryUnkeyedRecordAsItsOwnDeterministicIdentity() {
+  void dropsUnkeyedRecordsLikeStockLogCleaner() {
     DecodedCompactionRecord unkeyed = record(20, KeyKind.UNKEYED, false, false);
 
     assertThat(strategy.decide(unkeyed, context(true, NON_TRANSACTIONAL)))
-        .isEqualTo(RETAIN_UNKEYED);
+        .isEqualTo(DROP_UNKEYED);
   }
 
   @Test

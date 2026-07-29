@@ -309,7 +309,7 @@ public final class KafkaCompactionPassOneCollector implements AutoCloseable {
       if (markerStatus == null) {
         throw new IllegalArgumentException("Kafka control marker lacks a frozen pass-one decision");
       }
-      OptionalLong deleteHorizon = effectiveDeleteHorizon(record, snapshot);
+      OptionalLong deleteHorizon = effectiveDeleteHorizon(record, snapshot, markerStatus);
       return new KafkaCompactionStrategyV1.RecordContext(
           latestForKey,
           transactionStatus,
@@ -326,7 +326,14 @@ public final class KafkaCompactionPassOneCollector implements AutoCloseable {
         throw new IllegalArgumentException(
             "Kafka compaction rewrite requested outside output coverage");
       }
-      return effectiveDeleteHorizon(record, snapshot);
+      KafkaCompactionStrategyV1.MarkerStatus markerStatus =
+          record.keyKind() == KeyKind.CONTROL
+              ? markerStatuses.get(record.absoluteOffset())
+              : KafkaCompactionStrategyV1.MarkerStatus.NOT_CONTROL;
+      if (markerStatus == null) {
+        throw new IllegalArgumentException("Kafka control marker lacks a frozen pass-one decision");
+      }
+      return effectiveDeleteHorizon(record, snapshot, markerStatus);
     }
 
     public PassTwoVerifier newPassTwoVerifier() {
@@ -435,11 +442,15 @@ public final class KafkaCompactionPassOneCollector implements AutoCloseable {
   }
 
   private static OptionalLong effectiveDeleteHorizon(
-      DecodedCompactionRecord record, Snapshot snapshot) {
+      DecodedCompactionRecord record,
+      Snapshot snapshot,
+      KafkaCompactionStrategyV1.MarkerStatus markerStatus) {
     if (record.deleteHorizonMillis().isPresent()) {
       return record.deleteHorizonMillis();
     }
-    if (record.tombstone() || record.keyKind() == KeyKind.CONTROL) {
+    if (record.tombstone()
+        || record.keyKind() == KeyKind.CONTROL
+            && markerStatus == KafkaCompactionStrategyV1.MarkerStatus.DELETE_ELIGIBLE) {
       return OptionalLong.of(Math.addExact(snapshot.nowMillis(), snapshot.deleteRetentionMs()));
     }
     return OptionalLong.empty();

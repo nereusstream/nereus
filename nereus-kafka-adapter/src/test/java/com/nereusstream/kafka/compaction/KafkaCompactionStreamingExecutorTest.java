@@ -252,17 +252,18 @@ class KafkaCompactionStreamingExecutorTest {
     return fixture(true);
   }
 
-  private Fixture fixture(boolean retainUnkeyed) {
+  private Fixture fixture(boolean retainSurvivor) {
     ReadBatch output =
         readBatch(
-            new OffsetRange(0, retainUnkeyed ? 2 : 1),
-            retainUnkeyed
+            new OffsetRange(0, retainSurvivor ? 2 : 1),
+            retainSurvivor
                 ? bytes(
                     MemoryRecords.withRecords(
                         0,
                         Compression.NONE,
                         new SimpleRecord(1_000, "k".getBytes(), "old".getBytes()),
-                        new SimpleRecord(1_001, null, "unkeyed".getBytes())))
+                        new SimpleRecord(
+                            1_001, "keep".getBytes(), "survivor".getBytes())))
                 : bytes(
                     MemoryRecords.withRecords(
                         0,
@@ -296,7 +297,7 @@ class KafkaCompactionStreamingExecutorTest {
     MaterializationTask outputTask =
         MaterializationTask.create(
             new StreamId(
-                retainUnkeyed
+                retainSurvivor
                     ? "stream-compaction-streaming"
                     : "stream-compaction-empty-streaming"),
             output.range(),

@@ -20,7 +20,7 @@ import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decisi
 import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decision.RETAIN_CONTROL;
 import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decision.RETAIN_LATEST_VALUE;
 import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decision.RETAIN_TOMBSTONE;
-import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decision.RETAIN_UNKEYED;
+import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.Decision.DROP_UNKEYED;
 import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.MarkerStatus.RETAIN_REQUIRED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -60,7 +60,7 @@ class KafkaCompactionPassOneCollectorTest {
     KafkaCompactionPassOneCollector.Facts facts = collector.finish();
 
     assertThat(strategy.decide(old, facts.contextFor(old))).isEqualTo(DROP_SUPERSEDED);
-    assertThat(strategy.decide(unkeyed, facts.contextFor(unkeyed))).isEqualTo(RETAIN_UNKEYED);
+    assertThat(strategy.decide(unkeyed, facts.contextFor(unkeyed))).isEqualTo(DROP_UNKEYED);
     assertThat(facts.scannedRecordCount()).isEqualTo(3);
     assertThat(facts.outputRecordCount()).isEqualTo(2);
     assertThat(facts.fullFactSha256().type()).isEqualTo(ChecksumType.SHA256);
@@ -98,7 +98,7 @@ class KafkaCompactionPassOneCollectorTest {
         .isEqualTo(RETAIN_LATEST_VALUE);
     assertThat(strategy.decide(aborted, facts.contextFor(aborted))).isEqualTo(DROP_ABORTED);
     assertThat(strategy.decide(marker, facts.contextFor(marker))).isEqualTo(RETAIN_CONTROL);
-    assertThat(facts.rewriteDeleteHorizon(marker)).isEqualTo(OptionalLong.of(1_100));
+    assertThat(facts.rewriteDeleteHorizon(marker)).isEmpty();
   }
 
   @Test

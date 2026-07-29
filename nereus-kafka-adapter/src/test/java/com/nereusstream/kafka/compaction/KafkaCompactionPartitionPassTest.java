@@ -271,7 +271,7 @@ class KafkaCompactionPartitionPassTest {
                     0,
                     Compression.NONE,
                     new SimpleRecord(1_000, "k".getBytes(), "old".getBytes()),
-                    new SimpleRecord(1_001, null, "unkeyed".getBytes()))),
+                    new SimpleRecord(1_001, "keep".getBytes(), "survivor".getBytes()))),
             "partition-pass-output");
     ReadBatch tail =
         readBatch(

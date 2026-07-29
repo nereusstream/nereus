@@ -43,7 +43,7 @@ public final class KafkaCompactionStrategyV1 {
       return controlDecision(context);
     }
     if (record.keyKind() == KeyKind.UNKEYED) {
-      return Decision.RETAIN_UNKEYED;
+      return Decision.DROP_UNKEYED;
     }
     if (!context.latestForKey()) {
       return Decision.DROP_SUPERSEDED;
@@ -142,8 +142,8 @@ public final class KafkaCompactionStrategyV1 {
   public enum Decision {
     RETAIN_LATEST_VALUE(true),
     RETAIN_TOMBSTONE(true),
-    RETAIN_UNKEYED(true),
     RETAIN_CONTROL(true),
+    DROP_UNKEYED(false),
     DROP_SUPERSEDED(false),
     DROP_ABORTED(false),
     DROP_EXPIRED_TOMBSTONE(false),

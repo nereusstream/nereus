@@ -17,6 +17,7 @@ package com.nereusstream.kafka.compaction;
 import static com.nereusstream.kafka.codec.KafkaRecordBatchTestSupport.bytes;
 import static com.nereusstream.kafka.codec.KafkaRecordBatchTestSupport.readBatch;
 import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.MarkerStatus.DELETE_ELIGIBLE;
+import static com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1.MarkerStatus.RETAIN_REQUIRED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -67,7 +68,7 @@ class KafkaCompactionTwoPassExecutorTest {
                 0,
                 Compression.gzip().build(),
                 new SimpleRecord(1_000, utf8("k"), utf8("old")),
-                new SimpleRecord(1_001, null, utf8("unkeyed"))));
+                new SimpleRecord(1_001, utf8("keep"), utf8("survivor"))));
     ReadBatch tail =
         batch(
             2,
@@ -93,7 +94,7 @@ class KafkaCompactionTwoPassExecutorTest {
     assertThat(result.rows()).hasSize(1);
     assertThat(result.rows().get(0).streamOffsetStart()).isEqualTo(1);
     assertThat(result.rows().get(0).disposition())
-        .isEqualTo(KafkaCompactionDispositionV2.RETAIN_UNKEYED);
+        .isEqualTo(KafkaCompactionDispositionV2.RETAIN_VALUE);
     RecordBatch rewritten =
         MemoryRecords.readableRecords(result.rows().get(0).exactPayload())
             .batches()
@@ -141,6 +142,28 @@ class KafkaCompactionTwoPassExecutorTest {
                         result))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("coverage");
+  }
+
+  @Test
+  void dropsNullKeyRecordsLikeStockLogCleaner() {
+    ReadBatch output =
+        batch(
+            0,
+            1,
+            "null-key-output",
+            MemoryRecords.withRecords(
+                0,
+                Compression.NONE,
+                new SimpleRecord(1_000, null, utf8("unkeyed"))));
+    KafkaCompactionTwoPassExecutor executor = executor(new Limits(10, 10, 1 << 20));
+
+    Result result =
+        executor
+            .prepare(snapshot(0, 1, 1, List.of()), sourceSet(List.of(output)), List.of(output))
+            .rewrite(sourceSet(List.of(output)), List.of(output), false);
+
+    assertThat(result.outputRecordCount()).isZero();
+    assertThat(result.rows()).isEmpty();
   }
 
   @Test
@@ -231,6 +254,32 @@ class KafkaCompactionTwoPassExecutorTest {
                             .next()
                             .deleteHorizonMs())
                     .hasValue(1_100));
+  }
+
+  @Test
+  void doesNotIntroduceDeleteHorizonForARequiredControlMarker() {
+    ReadBatch marker =
+        batch(
+            12,
+            13,
+            "required-marker",
+            MemoryRecords.withEndTransactionMarker(
+                12, 2_002, 3, 10, (short) 2, new EndTransactionMarker(ControlRecordType.COMMIT, 4)));
+
+    Result result =
+        executor(new Limits(10, 10, 1 << 20))
+            .prepare(
+                snapshot(12, 13, 13, List.of(new MarkerDecision(12, RETAIN_REQUIRED))),
+                sourceSet(List.of(marker)),
+                List.of(marker))
+            .rewrite(sourceSet(List.of(marker)), List.of(marker), false);
+
+    RecordBatch rewritten =
+        MemoryRecords.readableRecords(result.rows().get(0).exactPayload())
+            .batches()
+            .iterator()
+            .next();
+    assertThat(rewritten.deleteHorizonMs()).isEmpty();
   }
 
   @Test
