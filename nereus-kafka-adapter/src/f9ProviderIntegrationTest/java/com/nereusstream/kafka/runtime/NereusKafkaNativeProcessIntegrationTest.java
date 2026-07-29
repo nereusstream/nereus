@@ -1551,6 +1551,327 @@ class NereusKafkaNativeProcessIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.MINUTES)
+    void ongoingTransactionsCommitAndAbortAcrossLiveCoordinatorMigrations()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-ongoing-transaction-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path brokerOneConfig = root.resolve("ongoing-transaction-one.properties");
+        Path brokerTwoConfig = root.resolve("ongoing-transaction-two.properties");
+        Path brokerOneFormatLog = root.resolve("ongoing-transaction-one-format.log");
+        Path brokerTwoFormatLog = root.resolve("ongoing-transaction-two-format.log");
+        Path brokerOneServerLog = root.resolve("ongoing-transaction-one-server.log");
+        Path brokerTwoServerLog = root.resolve("ongoing-transaction-two-server.log");
+        String bucket = "nereus-kafka-ongoing-" + UUID.randomUUID();
+        String topic = "process-ongoing-transaction-" + UUID.randomUUID();
+        String committingTransactionalId =
+                "process-live-commit-" + UUID.randomUUID();
+        String abortingTransactionalId =
+                "process-live-abort-" + UUID.randomUUID();
+        String nereusCluster =
+                "f9-process-ongoing-transaction-" + UUID.randomUUID();
+        String kafkaClusterId = org.apache.kafka.common.Uuid.randomUuid().toString();
+        int brokerOnePort = freePort();
+        int controllerPort = differentFreePort(brokerOnePort);
+        int brokerTwoPort = differentFreePort(brokerOnePort, controllerPort);
+        String brokerOneBootstrap = "127.0.0.1:" + brokerOnePort;
+        String brokerTwoBootstrap = "127.0.0.1:" + brokerTwoPort;
+        String clusterBootstrap = brokerOneBootstrap + "," + brokerTwoBootstrap;
+
+        createBucket(bucket);
+        writeConfiguration(
+                brokerOneConfig,
+                brokerOnePort,
+                controllerPort,
+                bucket,
+                root.resolve("ongoing-transaction-one-log"),
+                root.resolve("ongoing-transaction-one-metadata"),
+                root.resolve("ongoing-transaction-one-cache"),
+                "OBJECT_WAL_SYNC_OBJECT",
+                null,
+                1,
+                true,
+                nereusCluster);
+        writeConfiguration(
+                brokerTwoConfig,
+                brokerTwoPort,
+                controllerPort,
+                bucket,
+                root.resolve("ongoing-transaction-two-log"),
+                root.resolve("ongoing-transaction-two-metadata"),
+                root.resolve("ongoing-transaction-two-cache"),
+                "OBJECT_WAL_SYNC_OBJECT",
+                null,
+                2,
+                false,
+                nereusCluster);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerOneConfig,
+                brokerOneFormatLog,
+                kafkaClusterId);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerTwoConfig,
+                brokerTwoFormatLog,
+                kafkaClusterId);
+
+        TopicPartition userPartition = new TopicPartition(topic, 0);
+        TopicPartition transactionPartition =
+                new TopicPartition(TRANSACTION_STATE_TOPIC, 0);
+        byte[] committingKey =
+                "ongoing-commit-key".getBytes(StandardCharsets.UTF_8);
+        byte[] committingValue =
+                "nereus-ongoing-commit".getBytes(StandardCharsets.UTF_8);
+        byte[] continuedKey =
+                "ongoing-continued-key".getBytes(StandardCharsets.UTF_8);
+        byte[] continuedValue =
+                "nereus-ongoing-continued".getBytes(StandardCharsets.UTF_8);
+        byte[] abortingKey =
+                "ongoing-abort-key".getBytes(StandardCharsets.UTF_8);
+        byte[] abortingValue =
+                "nereus-ongoing-abort".getBytes(StandardCharsets.UTF_8);
+        byte[] recoveredAfterAbortKey =
+                "ongoing-after-abort-key".getBytes(StandardCharsets.UTF_8);
+        byte[] recoveredAfterAbortValue =
+                "nereus-ongoing-after-abort".getBytes(StandardCharsets.UTF_8);
+
+        Process brokerOne = start(
+                List.of(startScript.toString(), brokerOneConfig.toString()),
+                kafkaHome,
+                brokerOneServerLog);
+        Process brokerTwo = null;
+        Throwable failure = null;
+        try {
+            awaitBroker(brokerOneBootstrap, brokerOne, brokerOneServerLog);
+            try (Admin admin = Admin.create(adminProperties(brokerOneBootstrap))) {
+                admin.createTopics(List.of(
+                                new NewTopic(topic, Map.of(0, List.of(1)))))
+                        .all()
+                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            }
+
+            try (OpenTransaction committing = beginTransaction(
+                    brokerOneBootstrap,
+                    committingTransactionalId,
+                    topic,
+                    committingKey,
+                    committingValue,
+                    120_000)) {
+                assertThat(committing.metadata().offset()).isZero();
+                ConsumerRecord<byte[], byte[]> uncommitted = fetch(
+                        brokerOneBootstrap,
+                        userPartition,
+                        0L,
+                        brokerOneServerLog);
+                assertThat(uncommitted.key()).isEqualTo(committingKey);
+                assertThat(uncommitted.value()).isEqualTo(committingValue);
+                assertThat(readCommittedEndOffset(
+                        brokerOneBootstrap,
+                        userPartition))
+                        .as("the open transaction must hold the LSO at zero")
+                        .isZero();
+
+                brokerTwo = start(
+                        List.of(startScript.toString(), brokerTwoConfig.toString()),
+                        kafkaHome,
+                        brokerTwoServerLog);
+                awaitBroker(brokerTwoBootstrap, brokerTwo, brokerTwoServerLog);
+                awaitClusterBrokers(
+                        clusterBootstrap,
+                        List.of(1, 2),
+                        List.of(brokerOne, brokerTwo),
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+
+                try (Admin admin = Admin.create(adminProperties(clusterBootstrap))) {
+                    awaitPartitionLeader(
+                            admin,
+                            userPartition,
+                            1,
+                            brokerOne,
+                            brokerTwo,
+                            brokerOneServerLog,
+                            brokerTwoServerLog);
+                    awaitPartitionLeader(
+                            admin,
+                            transactionPartition,
+                            1,
+                            brokerOne,
+                            brokerTwo,
+                            brokerOneServerLog,
+                            brokerTwoServerLog);
+                    reassignPartitions(
+                            admin,
+                            List.of(userPartition, transactionPartition),
+                            2,
+                            brokerOne,
+                            brokerTwo,
+                            brokerOneServerLog,
+                            brokerTwoServerLog);
+                }
+
+                assertThat(readCommittedEndOffset(
+                        clusterBootstrap,
+                        userPartition))
+                        .as("recovery must preserve the open transaction and LSO")
+                        .isZero();
+                committing.commit();
+            }
+
+            ConsumerRecord<byte[], byte[]> committed = fetchReadCommitted(
+                    clusterBootstrap,
+                    userPartition,
+                    0L,
+                    brokerTwoServerLog);
+            assertThat(committed.key()).isEqualTo(committingKey);
+            assertThat(committed.value()).isEqualTo(committingValue);
+            assertThat(readCommittedEndOffset(
+                    clusterBootstrap,
+                    userPartition))
+                    .isEqualTo(2L);
+
+            RecordMetadata continued = transactionalProduce(
+                    clusterBootstrap,
+                    committingTransactionalId,
+                    topic,
+                    continuedKey,
+                    continuedValue);
+            assertThat(continued.offset())
+                    .as("the recovered transactional ID must continue after its first marker")
+                    .isEqualTo(2L);
+            assertThat(fetchReadCommitted(
+                            clusterBootstrap,
+                            userPartition,
+                            2L,
+                            brokerTwoServerLog)
+                    .value())
+                    .isEqualTo(continuedValue);
+            assertThat(readCommittedEndOffset(
+                    clusterBootstrap,
+                    userPartition))
+                    .isEqualTo(4L);
+
+            try (OpenTransaction aborting = beginTransaction(
+                    clusterBootstrap,
+                    abortingTransactionalId,
+                    topic,
+                    abortingKey,
+                    abortingValue,
+                    120_000)) {
+                assertThat(aborting.metadata().offset()).isEqualTo(4L);
+                assertThat(fetch(
+                                clusterBootstrap,
+                                userPartition,
+                                4L,
+                                brokerTwoServerLog)
+                        .value())
+                        .isEqualTo(abortingValue);
+                assertThat(readCommittedEndOffset(
+                        clusterBootstrap,
+                        userPartition))
+                        .as("the second open transaction must hold the LSO at four")
+                        .isEqualTo(4L);
+
+                try (Admin admin = Admin.create(adminProperties(clusterBootstrap))) {
+                    reassignPartitions(
+                            admin,
+                            List.of(userPartition, transactionPartition),
+                            1,
+                            brokerOne,
+                            brokerTwo,
+                            brokerOneServerLog,
+                            brokerTwoServerLog);
+                }
+
+                assertThat(readCommittedEndOffset(
+                        clusterBootstrap,
+                        userPartition))
+                        .as("reverse handoff must preserve the open aborting transaction")
+                        .isEqualTo(4L);
+                aborting.abort();
+            }
+
+            awaitReadCommittedEndOffset(
+                    clusterBootstrap,
+                    userPartition,
+                    6L,
+                    List.of(brokerOne, brokerTwo),
+                    brokerOneServerLog,
+                    brokerTwoServerLog);
+            RecordMetadata recoveredAfterAbort = transactionalProduce(
+                    clusterBootstrap,
+                    abortingTransactionalId,
+                    topic,
+                    recoveredAfterAbortKey,
+                    recoveredAfterAbortValue);
+            assertThat(recoveredAfterAbort.offset())
+                    .as("the aborted transactional ID must continue after the abort marker")
+                    .isEqualTo(6L);
+            ConsumerRecord<byte[], byte[]> visibleAfterAbort =
+                    fetchReadCommitted(
+                            clusterBootstrap,
+                            userPartition,
+                            4L,
+                            brokerOneServerLog);
+            assertThat(visibleAfterAbort.offset())
+                    .as("READ_COMMITTED must skip the migrated aborted data and marker")
+                    .isEqualTo(6L);
+            assertThat(visibleAfterAbort.key()).isEqualTo(recoveredAfterAbortKey);
+            assertThat(visibleAfterAbort.value()).isEqualTo(recoveredAfterAbortValue);
+            try (Admin admin = Admin.create(adminProperties(clusterBootstrap))) {
+                assertOffsets(admin, userPartition, 0L, 8L);
+            }
+            assertThat(readCommittedEndOffset(
+                    clusterBootstrap,
+                    userPartition))
+                    .isEqualTo(8L);
+            assertProcessesAlive(
+                    List.of(brokerOne, brokerTwo),
+                    brokerOneServerLog,
+                    brokerTwoServerLog);
+            assertThat(objectCount(bucket))
+                    .as("both live transaction migrations must remain object-backed")
+                    .isPositive();
+        } catch (Exception | AssertionError operationFailure) {
+            failure = operationFailure;
+        }
+        if (brokerTwo != null) {
+            try {
+                stopBroker(brokerTwo, brokerTwoServerLog);
+            } catch (Exception | AssertionError shutdownFailure) {
+                failure = mergeFailure(failure, shutdownFailure);
+            }
+        }
+        try {
+            stopBroker(brokerOne, brokerOneServerLog);
+        } catch (Exception | AssertionError shutdownFailure) {
+            failure = mergeFailure(failure, shutdownFailure);
+        }
+        if (failure != null) {
+            try {
+                preserveMultiBrokerFailureEvidence(
+                        brokerOneConfig,
+                        brokerTwoConfig,
+                        brokerOneFormatLog,
+                        brokerTwoFormatLog,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.MINUTES)
     void threeCombinedNodesKeepNativeIoThroughControllerLeaderKill()
             throws Exception {
         clearFailureEvidence();
@@ -5996,9 +6317,28 @@ class NereusKafkaNativeProcessIntegrationTest {
             byte[] key,
             byte[] value
     ) throws Exception {
+        return beginTransaction(
+                bootstrapServers,
+                transactionalId,
+                topic,
+                key,
+                value,
+                30_000);
+    }
+
+    private static OpenTransaction beginTransaction(
+            String bootstrapServers,
+            String transactionalId,
+            String topic,
+            byte[] key,
+            byte[] value,
+            int transactionTimeoutMillis
+    ) throws Exception {
         Properties properties = producerProperties(bootstrapServers);
         properties.setProperty(ProducerConfig.TRANSACTIONAL_ID_CONFIG, transactionalId);
-        properties.setProperty(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG, "30000");
+        properties.setProperty(
+                ProducerConfig.TRANSACTION_TIMEOUT_CONFIG,
+                Integer.toString(transactionTimeoutMillis));
         KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(properties);
         try {
             producer.initTransactions();
@@ -6164,6 +6504,62 @@ class NereusKafkaNativeProcessIntegrationTest {
             }
         }
         throw new AssertionError("Fetch timed out:\n" + readLog(serverLog));
+    }
+
+    private static long readCommittedEndOffset(
+            String bootstrapServers,
+            TopicPartition partition
+    ) {
+        Properties properties = consumerProperties(
+                bootstrapServers,
+                "f9-process-lso-" + UUID.randomUUID());
+        try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
+            consumer.assign(List.of(partition));
+            Long endOffset =
+                    consumer.endOffsets(Set.of(partition), CLIENT_TIMEOUT).get(partition);
+            assertThat(endOffset)
+                    .as("read_committed end offset must be available for " + partition)
+                    .isNotNull();
+            return endOffset;
+        }
+    }
+
+    private static void awaitReadCommittedEndOffset(
+            String bootstrapServers,
+            TopicPartition partition,
+            long expectedEndOffset,
+            List<Process> brokers,
+            Path... serverLogs
+    ) throws Exception {
+        long deadline = System.nanoTime() + CLIENT_TIMEOUT.toNanos();
+        Long lastObserved = null;
+        Throwable lastFailure = null;
+        while (System.nanoTime() < deadline) {
+            assertProcessesAlive(brokers, serverLogs);
+            try {
+                lastObserved =
+                        readCommittedEndOffset(
+                                bootstrapServers,
+                                partition);
+                if (lastObserved == expectedEndOffset) {
+                    return;
+                }
+            } catch (Throwable failure) {
+                lastFailure = failure;
+            }
+            Thread.sleep(250);
+        }
+        AssertionError timeout = new AssertionError(
+                "read_committed end offset did not converge to "
+                        + expectedEndOffset
+                        + "; last observed "
+                        + lastObserved
+                        + ":\n"
+                        + joinedLogs(serverLogs));
+        if (lastFailure != null) {
+            timeout.addSuppressed(lastFailure);
+        }
+        throw timeout;
     }
 
     private static void runBroker(
@@ -7031,6 +7427,44 @@ class NereusKafkaNativeProcessIntegrationTest {
         assertThat(active.defaultStorageProfile())
                 .isEqualTo(
                         prepared.defaultStorageProfile());
+    }
+
+    private static void reassignPartitions(
+            Admin admin,
+            List<TopicPartition> partitions,
+            int expectedLeaderId,
+            Process brokerOne,
+            Process brokerTwo,
+            Path brokerOneLog,
+            Path brokerTwoLog
+    ) throws Exception {
+        Map<TopicPartition, Optional<NewPartitionReassignment>> assignments =
+                new java.util.LinkedHashMap<>();
+        for (TopicPartition partition : partitions) {
+            assignments.put(
+                    partition,
+                    Optional.of(
+                            new NewPartitionReassignment(
+                                    List.of(expectedLeaderId))));
+        }
+        admin.alterPartitionReassignments(assignments)
+                .all()
+                .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        for (TopicPartition partition : partitions) {
+            awaitPartitionLeader(
+                    admin,
+                    partition,
+                    expectedLeaderId,
+                    brokerOne,
+                    brokerTwo,
+                    brokerOneLog,
+                    brokerTwoLog);
+        }
+        assertThat(admin.listPartitionReassignments(Set.copyOf(partitions))
+                        .reassignments()
+                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS))
+                .as("all Nereus shared-storage handoffs must complete")
+                .isEmpty();
     }
 
     private static void awaitPartitionLeader(
@@ -8619,6 +9053,14 @@ class NereusKafkaNativeProcessIntegrationTest {
             KafkaProducer<byte[], byte[]> producer,
             RecordMetadata metadata
     ) implements AutoCloseable {
+        private void commit() {
+            producer.commitTransaction();
+        }
+
+        private void abort() {
+            producer.abortTransaction();
+        }
+
         @Override
         public void close() {
             producer.close(Duration.ZERO);
