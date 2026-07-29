@@ -182,7 +182,7 @@ The Kafka fork commits are published at
 
 Current native checkpoint/trim process evidence（product `fa0e2a4`；fork `1897f07fcd` + `b300a169ee` +
 `1cbe8b65a8`）：`f9CheckpointTrimRecoveryProcessIntegrationTest` starts a real release Kafka process over four-shard
-Oxia、two-bookie BookKeeper and LocalStack Object storage with `BOOKKEEPER_WAL_SYNC_OBJECT`。Six ~600 KiB batches and
+Oxia and LocalStack Object storage with `OBJECT_WAL_SYNC_OBJECT`。Six ~600 KiB batches and
 `segment.bytes=1 MiB` create multiple virtual segments；stock `kafka-delete-records.sh` advances exact target `3` only
 after a rooted NKC1 at offset `6` exists。The gate requires durable stream `trim/end=3/6`，forcibly terminates the broker，
 starts a fresh release JVM，recovers earliest/latest `3/6`、Fetches offset `3`、keeps the checkpoint rooted，then appends
@@ -196,6 +196,23 @@ captured `[logStart,stableEnd]` and only then pruned to the current durable trim
 stream head；broker recovery waits asynchronously for the registered broker epoch；and a non-empty paged read treats
 `READ_LIMIT_TOO_SMALL` for the next entry as a page stop。Fresh focused adapter/fork tests、the ordinary process restart
 gate and the two-process live-reassignment gate all pass after this change。
+
+Current native trim-response-loss evidence（product `4e0ca9c`；fork unchanged at `1cbe8b65a8`）：
+`f9TrimResponseLossProcessIntegrationTest` installs a one-shot test agent around
+`DefaultStreamStorage.trim(StreamId,long,TrimOptions)`。The real Object-WAL provider succeeds and advances stream
+`trim/end` to `3/6`，but the future visible to `KafkaTrimBarrier` remains incomplete；the harness proves binding
+`observedLogStart=0` and the native DeleteRecords process is still pending before forcing broker death。A fresh release JVM
+recovers earliest/latest `3/6` and Fetch offset `3`，then the same native target returns low watermark `3` without changing
+stream-head commit/metadata identity、binding version/references or NKC1 object-key set。Append/fetch offset `6` reaches
+`3/7`。Fresh refactored execution passes 66 actionable tasks in 54s and the task is aggregated by
+`phase9M6KafkaProcessCheck`。
+
+`f9TrimProfileMatrixProcessIntegrationTest` applies the same helper and assertions to
+`OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT` and
+`BOOKKEEPER_WAL_SYNC_OBJECT`。The three BookKeeper cases use real ZooKeeper/two-bookie storage with isolated authority
+scopes，and every profile uses a forced first-process kill plus fresh restart。The matrix passes 75 actionable tasks in
+3m23s and belongs to both M6 process aggregates。Together the tasks supply the all-five-profile R/P/C process slice for
+KF-RET-005/010；rows stay `PLANNED` only because remaining boundary/oracle/final aggregate requirements are not complete。
 
 Current BookKeeper deletion evidence（product 2026-07-28）：
 `KafkaBookKeeperStreamCoverageProofProducerTest` proves complete 64-shard Kafka binding inventory plus complete 64-shard F4
@@ -525,12 +542,12 @@ full replay；no request-path or recovery claim is inferred from codec-only evid
 | KF-RET-002 | size retention uses exact Kafka logical bytes and matches stock predicate | product `KafkaRetentionPlannerTest` + fork `NereusCanonicalLogStateTest`/`NereusUnifiedLogFactoryTest`（deterministic logical-byte prefix/facade partial）；fork `KafkaRetentionOracleTest`（stock differential pending） | D,M,K | M5 |
 | KF-RET-003 | combined policies choose monotonic next-segment boundary，never active segment | product `KafkaRetentionPlannerTest` + `KafkaPartitionMaintenanceRuntimeTest`（deterministic planner/scheduler partial）；fork `KafkaRetentionOracleTest`（pending） | D,M | M5 |
 | KF-RET-004 | insufficient checkpoint blocks trim；new checkpoint then permits exact candidate | product `KafkaTrimBarrierTest`（port-level partial）；`KafkaRetentionBarrierIntegrationTest`（real publication pending） | R,C | M5 |
-| KF-RET-005 | trim response loss reloads durable head and completes idempotently | product `KafkaTrimBarrierTest`（port-level partial）；`KafkaRetentionBarrierIntegrationTest`（real provider pending） | R,P,C | M5 |
+| KF-RET-005 | trim response loss reloads durable head and completes idempotently | product `KafkaTrimBarrierTest` + `f9TrimResponseLossProcessIntegrationTest` + `f9TrimProfileMatrixProcessIntegrationTest`（all-five-profile real provider-applied/caller-unobserved forced-restart/no-repeat R/P/C current slice；final aggregate pending） | R,P,C | M5 |
 | KF-RET-006 | DeleteRecords at batch start/middle/end/HW maps durable logStart/low watermark correctly | product `KafkaDeleteRecordsCoordinatorTest` + fork `PartitionTest`/`NereusUnifiedLogFactoryTest`（exact target/HW/local publication D/K partial）+ `f9CheckpointTrimRecoveryProcessIntegrationTest`（native start-boundary/rooted-NKC1/forced-restart R/P/C/K partial）；middle/end/HW and profile matrix pending | R,K | M5 |
 | KF-RET-007 | retention/config/new-append races revalidate and never over-trim | `KafkaRetentionRacePropertyTest` | M,R,C | M5 |
 | KF-RET-008 | compact+delete preserves compacted visibility until logical trim passes range | `KafkaCompactionRetentionIntegrationTest` | R,K | M5 |
 | KF-RET-009 | logical trim success is independent of delayed protected physical GC | product `KafkaBookKeeperStreamCoverageProofProducerTest` + `BookKeeperDeletionActivationCoordinatorTest`（activation D partial）+ `f9BookKeeperLedgerDeletionProviderIntegrationTest`（real Oxia/two-bookie physical delete + exact-ledger applied-delete response-loss + post-delete NCP2 read R/C partial）+ `TerminalWorkflowMetadataRetirementTest`（Kafka payload-format retirement regression）+ `f9BookKeeperWalAsyncObjectProcessIntegrationTest`（release-process physical delete + fresh-JVM NCP2 recovery P partial）；`KafkaRetentionPhysicalGcIntegrationTest`（release-process response-loss restart/multi-broker takeover pending） | R,P,C | M5 |
-| KF-RET-010 | all storage profiles obey same checkpoint barrier and trim semantics | `KafkaRetentionProfileMatrixTest` | R | M5/M7 |
+| KF-RET-010 | all storage profiles obey same checkpoint barrier and trim semantics | `f9TrimResponseLossProcessIntegrationTest` + `f9TrimProfileMatrixProcessIntegrationTest`（all five real profiles share checkpoint/trim/restart/no-repeat process contract；remaining boundary/chaos aggregate pending） | R | M5/M7 |
 
 Implementation note（2026-07-27）：product `KafkaDerivedIndexStateCodecV1Test` provides canonical-format partial evidence
 for the time-index and exact logical-byte facts consumed by KF-RET-001/002：frozen section 5/6 bytes、cross-section
@@ -553,8 +570,9 @@ normalization/invocation and exact local publication；`NereusCanonicalLogStateT
 derived indexes and trim pruning；`KafkaPartitionMaintenanceRuntimeTest` covers bounded periodic enumeration、
 internal-topic priority、overlap coalescing and drain。`f9CheckpointTrimRecoveryProcessIntegrationTest` now covers one
 real start-boundary trim、Fetch wake-up and forced restart with pre-trim checkpoint hydration/current-trim pruning。
-Rows remain `PLANNED` until the stock differential oracle、remaining batch boundaries、all-profile and response-loss
-restart/takeover gates pass。
+The two trim-response-loss tasks add the provider-applied/caller-unobserved restart and same-target no-repeat path across
+all five profiles。Rows remain `PLANNED` until the stock differential oracle、remaining batch boundaries and broader
+takeover/chaos gates pass。
 
 ## 10. Kafka compaction
 

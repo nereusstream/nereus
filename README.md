@@ -44,8 +44,11 @@ both sides of the complete empty-cluster `currentSnapshot` proof and `loadCapabi
 higher-epoch ACTIVE recovery and native IO。The native checkpoint/trim process gate now uses stock DeleteRecords to publish
 a rooted NKC1、durably advances log start、kills the release JVM and proves a fresh process hydrates the captured pre-trim
 checkpoint window、prunes virtual segments to the current trim and continues Produce/Fetch/ListOffsets。These are still
-partial F9 results；coordinator/internal-topic migration、
-release-process response-loss restart and the stock retention oracle remain open。
+partial F9 results。A second process gate now injects a one-shot completion loss after the real Object-WAL trim future
+succeeds，kills the blocked broker，and proves a fresh JVM both converges from the durable head and treats the same
+DeleteRecords target as a no-op without another trim CAS or checkpoint object。A companion matrix runs the identical cut
+for Object async and all three BookKeeper profiles，closing the five-profile response-loss contract。Coordinator/internal-
+topic migration、remaining DeleteRecords boundaries and the stock retention oracle remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation

@@ -668,15 +668,16 @@ Kafka-fork commit `4c060aec89` now keeps the stock `Partition.deleteRecordsOnLea
 normalization，captures the product snapshot under the partition lock，waits on the storage worker and advances the same
 `NereusUnifiedLog` only after durable trim。Focused `PartitionTest` and `NereusUnifiedLogFactoryTest` cover normalized
 HW、exact mid-batch target and local log-start publication。The process slice below now supplies one exact
-`BOOKKEEPER_WAL_SYNC_OBJECT` start-boundary/Fetch-wake-up/forced-restart path；batch-middle/end/HW、all-profile and
-response-loss matrices remain required before KF-RET-006 is complete。
+`OBJECT_WAL_SYNC_OBJECT` start-boundary/Fetch-wake-up/forced-restart path；the following provider-applied response-loss
+slice and its companion profile matrix close the same cut across all five profiles。Batch-middle/end/HW remain required
+before KF-RET-006 is complete。
 
 #### 9.4.1 Forced-restart checkpoint/trim recovery
 
 `:nereus-kafka-adapter:f9CheckpointTrimRecoveryProcessIntegrationTest` runs the exact native sequence：
 
 ```text
-format KRaft + activate Nereus BOOKKEEPER_WAL_SYNC_OBJECT
+format KRaft + activate Nereus OBJECT_WAL_SYNC_OBJECT
   -> create RF1 topic with segment.bytes=1048576 and cleanup.policy=delete
   -> Produce six independent ~600 KiB RecordBatches at offsets 0..5
   -> kafka-delete-records.sh requests offset 3
@@ -705,6 +706,60 @@ binding 时只要求 `observedStableEndOffset <= durableEnd` 且不低于 checkp
 大记录还固定了 page-boundary contract：若前一页已返回至少一个 batch，下一次 strict read 因剩余 byte budget
 小于首 entry 返回 `READ_LIMIT_TOO_SMALL`，`ParquetV2CompactedTargetReader`、`ReadTargetDispatcher` 与
 `KafkaCompactedFetchReader` 必须停止当前页并返回已累积 batches；只有 accumulator 为空时才把错误传给调用方。
+
+#### 9.4.2 Provider-applied trim response loss and fresh-process idempotence
+
+`:nereus-kafka-adapter:f9TrimResponseLossProcessIntegrationTest` 复用相同 Object-WAL/RF1 数据形状，但把故障精确
+放在 provider durable mutation 之后、`KafkaTrimBarrier` 观察 completion 之前：
+
+```text
+arm TrimCompletionLossAgent(target=3)
+  -> intercept DefaultStreamStorage.trim(streamId, 3, options) once
+  -> let the original provider future complete successfully
+  -> persist applied marker and return an incomplete caller future
+  -> observe rooted NKC1 + stream trim/end=3/6
+  -> require binding observedLogStart/end=0/6 and DeleteRecords process still alive
+  -> SIGKILL broker
+  -> fresh broker reloads durable trim and publishes local/binding logStart=3
+  -> retry native DeleteRecords(target=3) => lowWatermark=3
+  -> require zero new stream-head CAS, binding CAS or checkpoint object
+  -> Produce/Fetch offset 6; ListOffsets=3/7
+```
+
+Agent capture 只允许在 test 创建 `arm` marker 后发生，避免 startup/recovery trim 消耗 one-shot fault。Advice
+替换的是返回给 caller 的 `CompletableFuture<Void>`，不是 provider future；provider exception 与 marker-write
+failure 仍必须完成 caller exceptionally，只有真实 provider success 才制造 lost completion。`captured`、
+`applied`、CLI liveness 和外部 Oxia snapshot 共同定义故障边界；CLI 文本不是边界，因为 stock tool 会在分区
+future 完成前打印结果表头。
+
+Fresh-process no-op 不能只看 low watermark。测试在重试前后读取同一
+`StableStreamHeadSnapshot` 和 binding，并要求以下 identity 全等：
+
+```text
+stream:
+  trimOffset, committedEndOffset, cumulativeSize,
+  commitVersion, lastCommitId, metadataVersion, durableHeadSha256
+binding:
+  metadataVersion, observedLogStartOffset, observedStableEndOffset,
+  ordered checkpointReferences
+object store:
+  exact NKC1 checkpoint object-key set
+```
+
+其中 stream `metadataVersion` 不变证明没有重复 trim CAS；binding metadata version 不变证明 already-deleted
+路径没有重复 publication；checkpoint refs 和 NKC1 key set 不变证明没有重复 checkpoint PUT。只比较 checkpoint
+prefix，避免 Object-async/BookKeeper-async 的正常 NCP2 materialization 或 ledger GC 被误判为 trim side effect。
+测试把 session TTL/renew interval 固定为 `90s/30s`，确保上述短窗口内的 metadata version 不被正常 authority
+renewal 混入。
+
+`:nereus-kafka-adapter:f9TrimProfileMatrixProcessIntegrationTest` 用同一 `runTrimResponseLossProfile` helper 对
+`OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT`、
+`BOOKKEEPER_WAL_SYNC_OBJECT` 重复以上完整序列；加上前置 `OBJECT_WAL_SYNC_OBJECT` task，五档代码路径均被真实
+release JVM 覆盖。三种 BookKeeper profile 共用真实 stock ZooKeeper/two-bookie service，但使用互不相交的
+namespace reservation、protocol activation、bucket 和 Kafka/Nereus directories。Fresh matrix 以 75/75 tasks、
+3m23s 通过，并由 M6 general/BookKeeper process aggregates 聚合。KF-RET-005/010 的 five-profile
+response-loss/checkpoint-barrier process slice 已闭合；batch-middle/end/HW、stock differential 和 broader chaos
+仍需后续门禁。
 
 ### 9.5 Trim vs materialization
 
@@ -1418,7 +1473,7 @@ per-partition serialization described above。
 | --- | --- |
 | Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex`、`NereusCanonicalLogState`、`NereusLogSegment` implemented locally；dedicated `NereusTimeIndex`/`NereusLeaderEpochCache` subclasses are unnecessary unless a later stock caller cannot consume the canonical facade |
 | adapter checkpoint | producer/txn/epoch/segment/time/byte section codecs V1 + full composition implemented |
-| adapter retention | planner/checkpoint/barrier/DeleteRecords/durable listener + per-partition maintenance + bounded periodic owned-partition runtime implemented；one native forced-restart checkpoint/trim process gate passes，full profile/response-loss/stock-oracle matrix pending |
+| adapter retention | planner/checkpoint/barrier/DeleteRecords/durable listener + per-partition maintenance + bounded periodic owned-partition runtime implemented；native forced-restart checkpoint/trim and all-five-profile provider-applied response-loss/no-repeat process gates pass，remaining boundaries/stock-oracle matrix pending |
 | adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge + projection-free Kafka stream registration/ACTIVE-readiness generation guard + activated Object-WAL production composition + fork registration/concrete partition-lock/KRaft/local-log capture + stock marker pre-scan implemented；real-provider restart/takeover and full cleaner differential gate pending |
 | materialization | ranged decoder SPI、V2 two-pass engine/publisher/verifier + explicit projection-required/direct-stream authority modes and caller authority final-CAS fence |
 | metadata | binding compaction coverage nested record/codec/transition validators + partition-scoped KCP1 scan continuation |

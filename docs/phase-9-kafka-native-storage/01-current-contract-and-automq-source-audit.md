@@ -673,6 +673,13 @@ and broader chaos proof remain open。The native checkpoint/virtual-segment trim
 `f9CheckpointTrimRecoveryProcessIntegrationTest`：stock DeleteRecords publishes a rooted NKC1、advances durable trim，
 survives forced broker death，hydrates the checkpoint under its captured pre-trim window，prunes canonical state to the
 current trim and continues Produce/Fetch/ListOffsets。
+`f9TrimResponseLossProcessIntegrationTest` and `f9TrimProfileMatrixProcessIntegrationTest` then place a one-shot cut after
+the real `DefaultStreamStorage.trim` provider future succeeds but before the retention barrier observes completion。Across
+Object sync/async and BookKeeper WAL-only/async/sync，the old process shows stream `trim/end=3/6` while binding start stays
+`0` and DeleteRecords remains pending；after forced death，a fresh process restores `3/6`，same-target retry leaves
+stream/binding versions、checkpoint references and NKC1 key set unchanged，and continuation reaches `3/7`。The focused
+tasks pass 66/66 and 75/75 actionable tasks；this closes the five-profile KF-RET-005/010 process slice without claiming the
+remaining DeleteRecords boundary/oracle or M7 aggregate。
 
 The same published head and
 `f9MultiControllerFailoverProcessIntegrationTest` now close the ACTIVE steady-state controller-kill subset of the

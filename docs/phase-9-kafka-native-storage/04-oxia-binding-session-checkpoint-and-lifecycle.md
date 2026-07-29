@@ -858,7 +858,38 @@ Fresh execution passes 73/73 actionable tasks in 1m10s；the JUnit scenario itse
 failure/error and is included in `phase9M6KafkaProcessCheck`。This closes actual Oxia connection-reset recovery during first
 activation。It does not claim arbitrary provider failures、rolling capability mismatch or the M7 chaos aggregate。
 
-### 7.11 Recovery component ownership
+### 7.11 Durable trim response-loss reconciliation（2026-07-29）
+
+The durable stream head、checkpoint references、Kafka binding observation and fork-local log start are deliberately
+different publication domains。For DeleteRecords target `T`，`StreamStorage.trim(T)` may be durably visible while its
+completion is lost before `KafkaRetentionDurableTrimListener` advances the binding and before the fork publishes local
+`UnifiedLog.logStartOffset`。That state is legal and is recovered as follows：
+
+```text
+stream.trimOffset >= T
+binding.observedLogStartOffset < T
+local process has no successful DeleteRecords completion
+  -> forced process loss
+  -> new opener reads stream head as authority
+  -> checkpoint hydration uses its captured historical window
+  -> canonical/local state is pruned to stream.trimOffset
+  -> binding observation is monotonically advanced
+  -> retry target <= durable trim returns without another mutation
+```
+
+`f9TrimResponseLossProcessIntegrationTest` makes this exact state externally observable with a one-shot completion-loss
+agent。Before kill it requires stream `trim/end=3/6`、rooted NKC1、binding observed start/end `0/6` and a pending native
+DeleteRecords process。After fresh-process open，the same target `3` is an idempotent success only if no stream-head
+metadata version、binding metadata version、checkpoint-reference set or NKC1 object-key set changes。This freezes two ownership
+rules：the stream head is recovery truth when binding lags；an already-satisfied target must not republish either durable
+domain。Binding may lag the stream head, but it may never lead it。
+
+`f9TrimProfileMatrixProcessIntegrationTest` then applies the same state transition and identity comparison to Object async
+plus BookKeeper WAL-only/async/sync。Together with the Object-sync task，all five profile factories cross the same durable
+stream/binding/checkpoint ownership boundary。The BookKeeper profiles use one real two-bookie service with isolated
+reservation/activation scopes；the matrix passes 75/75 tasks in 3m23s and is part of both M6 process aggregates。
+
+### 7.12 Recovery component ownership
 
 The executable recovery boundary is now split by resource ownership：
 
