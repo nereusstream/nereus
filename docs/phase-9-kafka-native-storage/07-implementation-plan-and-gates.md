@@ -11,6 +11,7 @@
 > 2026-07-29 transaction-resolution cut 增量：product `04e661e` 增加 `f9TransactionResolutionCutProcessIntegrationTest` 和 test-only marker completion agent，fork `1e3783458b` 修复 existing-but-leaderless transaction marker 的 retry routing。双 release broker before/after-provider 强杀、fresh recovery、LSO/READ_COMMITTED 与 same-ID continuation 强制重放通过；门禁进入 `phase9M6KafkaProcessCheck`，source lock 更新为 52 commits/126 files。KF-TXN-008 为 `PASSED_CURRENT_SOURCE`；non-Object profile 与 final/upstream aggregate仍 open
 > 2026-07-29 transaction-resolution profile 增量：product `2d7091d` 增加 `f9TransactionResolutionProfileMatrixProcessIntegrationTest`，以同一 fault seam 覆盖 Object async 与 BookKeeper WAL-only/async/sync 的 before/after-provider cuts；加上原 Object-sync gate 共五 profile、十个真实 release-process 场景。矩阵同时暴露并修复 released BookKeeper read handle 不能在容量压力下 LRU 淘汰的问题；所有 handle 仍被 lease 时保持 `BACKPRESSURE_REJECTED`。矩阵 66/66 tasks、6m28s，BookKeeper 全量单测 + Object-sync gate + manifest 联合回归 78/78 tasks、1m40s。KF-TXN-008 profile requirement closed；final/upstream aggregate remains open
 > 2026-07-29 mandatory NTC2 profile 增量：product `4676c12` 增加 `f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest`，与原 Object-sync gate 合计五 profile、十个 delete/corrupt/fail-closed/exact-repair/re-election 场景。WAL-only 使用 registration-free、projection-free L0 authority；extended KCP1 只压缩 persisted decision-source bytes 并保持旧 planId/raw compatibility。矩阵 64/64 tasks、5m34s，Object-sync 73/73 tasks、1m29s。KF-TXN-016 profile requirement closed；final/upstream aggregate remains open
+> 2026-07-30 M6 process aggregate 增量（覆盖上两行的 M6 aggregate open wording）：fork `76f62f3b83` + product `4a0ec22` pass fresh `phase9M6KafkaProcessCheck --rerun-tasks` with 94/94 executed tasks in 34m21s。The aggregate includes all current M6 process tasks and all five profiles；M7、upstream compatibility、performance and `phase9FinalCheck` remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -951,7 +952,7 @@ Current stock compaction gate（product `666bab1`/`08fe686`，fork `c4a0a2d1fa`/
 ```text
 phase9M5KafkaCompactionOracleCheck
   publish = current 0.1.0-f9-dev modules
-  source lock = fork 1e3783458b, 52 commits, 126 files
+  source lock = fork 76f62f3b83, 53 commits, 126 files
   stock = UnifiedLog + Cleaner.buildOffsetMap + Cleaner.cleanSegments
   compare = offsets/key/value/timestamp/compression/delete-horizon
             + txn/control/producer-id/epoch/sequence/leader-epoch
@@ -1156,6 +1157,60 @@ Object-WAL COMMIT/ABORT migration are covered；the mandatory internal-topic NTC
 five-profile delete/corrupt + exact repair/re-election gates are covered；the transaction-marker before/after-provider
 process-cut gate now covers all five storage profiles and the existing-but-leaderless retry fix is covered；priority
 budgets and broader chaos remain open。
+
+### Current-source M6 aggregate evidence（2026-07-30）
+
+The final M6 process run is pinned to these exact implementation boundaries：
+
+```text
+Kafka fork branch = nereus/future9-native-kafka-storage
+Kafka fork head = 76f62f3b83e882105219b6c7687dbde594a8b8a2
+Kafka fork delta = 53 commits / 126 files from 427b409cf440f745ad6195673d3342f6bd3974d4
+product fork source-lock commit = 14fb643
+product process-harness commits = 3293d76, c76a466, 4a0ec22
+aggregate command = ./gradlew phase9M6KafkaProcessCheck --rerun-tasks
+aggregate result = 94/94 actionable tasks executed, BUILD SUCCESSFUL in 34m21s
+```
+
+Fork `Partition.makeLeader` accepts an `onLeaderStatePublished` callback and invokes it after publishing the new leader
+epoch/replica identity but before releasing the partition state write lock。`ReplicaManager.applyLocalLeadersDelta` passes
+the `leaderEpochAwareOffsetLookupPending` installation through that callback instead of running it after `makeLeader`
+returns。Consequently，network ListOffsets cannot observe the newly published leader with an empty local cache before
+recovered HW/LSO state is installed；it either waits behind the same lock or receives the existing fail-closed
+`OffsetNotAvailableException`。Fork test
+`PartitionTest.testLeaderPublicationFencesListOffsetsBeforeMakeLeaderReleasesStateLock` holds the callback，starts a
+concurrent lookup，proves the lookup cannot pass the lock，then releases the callback and proves pending-state rejection。
+The real `f9OngoingTransactionMigrationProcessIntegrationTest` independently verifies bidirectional OPEN transaction
+handoff without a transient LSO reset。
+
+The three product harness commits remove aggregate-load nondeterminism without changing a product boundary：
+
+1. `awaitBroker` and `awaitClusterBrokers` keep the two-second probe deadline but close a failed Admin attempt with
+   `Admin.close(Duration.ZERO)` before retrying；an implicit unbounded close may not consume the whole readiness window。
+2. Topic creation and `alterPartitionReassignments` in Object and BookKeeper in-flight gates use
+   `longRunningAdminProperties`（30-second request/default API timeout）while their outer futures retain the existing
+   60-second deadline。Fast read-only offset assertions keep the five-second profile。
+3. Activation controller/broker listener ports are held by loopback `ServerSocket` reservations across bucket creation、
+   config generation and storage formatting，and the exact listener reservation is released only immediately before its
+   process launch。All unreleased reservations close on every return/failure path。
+
+Focused cold runs pass the exact previously failing gates：
+
+```text
+f9InFlightTakeoverProcessIntegrationTest
+  64/64 tasks, 1m05s, JUnit 1 test / 0 failures
+
+f9ActivationCutFailoverProcessIntegrationTest
+  75/75 tasks, 2m33s, all six publication cuts / 0 failures
+
+f9BookKeeperInFlightTakeoverProcessIntegrationTest
+  75/75 tasks, 2m04s, all three BookKeeper profiles / 0 failures
+```
+
+The final aggregate then executes the same takeover gates after the long transaction/NTC2/activation matrices and passes。
+No fencing、offset、LSO、physical-entry、orphan-object、activation-state or repair assertion was removed or widened。This
+evidence closes the F9-M6 real-process aggregate；it does not satisfy the F9-M7 scale、chaos、performance、upstream
+compatibility or `phase9FinalCheck` requirements。
 
 ### Tasks
 

@@ -1,5 +1,11 @@
 # Nereus
 
+F9 current-source update（2026-07-30）：Kafka fork `76f62f3b83` and product `main@4a0ec22` pass the complete fresh
+`phase9M6KafkaProcessCheck --rerun-tasks` real-process aggregate（94/94 tasks，34m21s）。The run includes all five
+storage profiles、transaction/coordinator migration and resolution cuts、mandatory internal-topic NTC2 damage/repair、
+retention/DeleteRecords、activation/controller failover and Object/BookKeeper in-flight takeover。This closes F9-M6
+process evidence，not the still-open M7 scale/chaos/compatibility release aggregate。
+
 Nereus is a protocol-neutral shared-storage streaming engine currently delivered through its Pulsar-native
 integration. Native KRaft Kafka Future 9 has completed the F9-M1 foundation and F9-M2 metadata/checkpoint
 implementation；the Nereus-side F9-M3 byte-exact RecordBatch、serialized partition IO、bounded append execution、async
