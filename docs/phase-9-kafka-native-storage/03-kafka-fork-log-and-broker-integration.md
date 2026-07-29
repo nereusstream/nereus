@@ -4,7 +4,7 @@
 > 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：fork `1cbe8b65a8` 与 product process gates 已通过 two-release-process Object-WAL/KRaft singleton live reassignment、already-dispatched Object/BookKeeper append cuts、three-profile post-handoff、multi-controller activation/store/proof/transport cuts；同一 published fork 又闭合 native DeleteRecords 的 durable log-start publication、broker-epoch-ready recovery 和 pre-trim NKC1 hydration，product `f9CheckpointTrimRecoveryProcessIntegrationTest` 证明 forced restart 后按当前 trim 重建 virtual segments 并继续 native IO；两个 trim-response-loss tasks 又在全部五种 profile 证明 provider-applied/caller-unobserved trim 的 fresh-process convergence 与同目标 no-op；remaining gaps are transaction/internal-topic coordinator migration、remaining DeleteRecords boundaries and broader chaos
 > 2026-07-29 coordinator migration 增量：product `7c25d2e` 在 fork `1cbe8b65a8` 上原子迁移 user、`__consumer_offsets-0`、`__transaction_state-0` 到 live broker 2，completed group/transaction coordinator state 恢复并继续提交；remaining coordinator gaps narrow to ongoing/aborted transaction takeover and mandatory internal-topic NTC2 failure
 > 2026-07-29 ongoing transaction migration 增量：product `efe782d` 在同一 fork 上让两个 OPEN transactions 分别跨 `[1] -> [2]` 与 `[2] -> [1]` user/transaction-state handoff COMMIT/ABORT，证明 LSO、same-ID continuation 与 READ_COMMITTED filtering；remaining gaps narrow to injected resolution failures、mandatory NTC2、profile expansion and final aggregate
-> 2026-07-29 mandatory NTC2 增量：fork `89b66ab03b` 将 group/transaction/share internal-topic `openLeader` completion 延后到 product `probeMandatoryCompactedRead` 成功；probe failure 清理 exact pending lookup、resign recovered storage，因而 `NereusTopicDeltaLifecycle` 不会发出 ready callback。最终 published/source-locked fork head 是 `712bbf414d`；真实 object deletion/corruption process cut 仍 open
+> 2026-07-29 mandatory NTC2 增量：fork `89b66ab03b` 将 group/transaction/share internal-topic `openLeader` completion 延后到 product `probeMandatoryCompactedRead` 成功；probe failure 清理 exact pending lookup、resign recovered storage，因而 `NereusTopicDeltaLifecycle` 不会发出 ready callback。Product `0ae8ca9` 的真实双 release broker gate 已闭合 activated `__consumer_offsets` NTC2 物理删除、byte corruption、两次 fail-closed election 与 exact physical repair/re-election；最终 published/source-locked fork head 是 `768924da60`
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -360,8 +360,9 @@ at visible offset 3 and commits offset 4，with final earliest/latest `0/5`。Fr
 tasks in 1m07s，and the unchanged cold-restart plus ordinary data-takeover gates pass 74/74 tasks in 1m50s。The task is
 aggregated by `phase9M6KafkaProcessCheck`；ongoing/aborted transaction coordinator takeover is covered by the following
 process gate，and product `b6b02f4` + fork `89b66ab03b` cover deterministic mandatory NTC2 admission。Injected
-transaction-resolution failure、real NTC2 deletion/corruption + repair/re-election and full M4 upstream/final gates remain
-separate requirements。
+transaction-resolution failure、non-Object mandatory-NTC2 profile expansion and full M4 upstream/final gates remain
+separate requirements；the real Object-WAL deletion/corruption + repair/re-election slice is covered by
+`f9MandatoryInternalTopicNtc2ProcessIntegrationTest`。
 
 `f9OngoingTransactionMigrationProcessIntegrationTest` closes the adjacent live OPEN-state slice without a fork change。
 The first producer keeps data offset 0 uncommitted while one Admin request moves the user partition and
@@ -658,8 +659,11 @@ leader state 的同步异常也必须撤销已准备的 exact epoch，不能永�
 internal-topic coordinator election 必须晚于对应 storage fully recovered；否则 coordinator 可能从未恢复的
 `__consumer_offsets`/`__transaction_state` 提供服务。`firstPublishFuture` 仍在 metadata publication 主流程结束时完成，
 不是 all-partition readiness barrier。当前 concrete product factory 已经由 `NereusBrokerStorageRuntime` 注入
-`Some(NereusTopicDeltaLifecycle)`；异步 open/probe failure 仍由 metadata publishing fault handler 暴露，尚未形成
-自动 repair + per-partition re-election policy，因此这不是 KF-OPS-017 完成声明。
+`Some(NereusTopicDeltaLifecycle)`；异步 open/probe failure 仍由 metadata publishing fault handler 暴露。对于
+exact activated path 因 read failure 被 quarantine、且物理对象已恢复为原 identity 的情形，后续 ordinary
+per-partition open 会执行 bounded CAS repair，再由正常 metadata reassignment/re-election 触发 ready callback；
+它不自动创建替代内容，也不把全局 metadata publication 变成 all-partition readiness barrier，因此仍不是
+KF-OPS-017 完成声明。
 `032974067c` 的 publisher regression 同时放入 group 与 transaction 两个 internal topic，证明 ready callback
 之前两个 coordinator 都不 election，callback 之后才分别以 exact leader epoch election；另一个 lifecycle
 regression 用 `__transaction_state` 锁定 callback 必须等待 exact recovered storage 安装。该证据仍是同进程

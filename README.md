@@ -48,9 +48,12 @@ partial F9 results。A second process gate now injects a one-shot completion los
 succeeds，kills the blocked broker，and proves a fresh JVM both converges from the durable head and treats the same
 DeleteRecords target as a no-op without another trim CAS or checkpoint object。A companion matrix runs the identical cut
 for Object async and all three BookKeeper profiles，closing the five-profile response-loss contract。Completed/live-OPEN
-coordinator migration 已通过；mandatory internal-topic NTC2 现在有 product generation-constrained probe 与 fork
-pre-election fail-closed deterministic gate，但真实 NTC2 删除/损坏后的 release-process election cut、remaining
-DeleteRecords boundaries and the stock retention oracle remain open。
+coordinator migration 已通过；mandatory internal-topic NTC2 现在同时有 generation-constrained deterministic gate 和
+真实双 release broker Object-WAL gate：物理删除或原 key 原 metadata 下的字节损坏都会在 coordinator election 前
+quarantine exact root/index 并 fail closed；恢复原始 bytes、user metadata、content type 与 provider CRC 后，运行时会验证
+HEAD/CRC/ETag/full-read SHA，CAS 恢复同一 root/index，以 `REPLACE` 发布新 generation-set digest/activation epoch，再由
+ordinary reassignment 恢复 group offset。Object async/BookKeeper profile expansion、remaining DeleteRecords boundaries
+and the stock retention oracle remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation
@@ -125,7 +128,7 @@ record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHol
 interfaces、an explicit native-storage launcher and a stock-owned controller metadata-publisher/runtime seam。Its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The SSH-published fork head is
-`nereus/future9-native-kafka-storage@712bbf414d`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
+`nereus/future9-native-kafka-storage@768924da60`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
 controller factories through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。The controller runtime now coalesces
 metadata/leadership callbacks、runs first activation only while locally current、retries only retriable product failures and
 cancels scheduled retry on leadership loss；activation scheduling additionally waits for finalized
@@ -159,9 +162,11 @@ transactional ID for data/marker offsets 3/4、resumes the group at visible offs
 and `__transaction_state-0` in one Admin request from broker 1 to broker 2，commits through the migrated coordinator，then opens a
 second transaction and moves both partitions back to broker 1 before aborting。The gate requires exact singleton
 leader/replicas/ISR on every handoff、both JVMs alive、LSO convergence `0 -> 2 -> 4 -> 6 -> 8`，same-ID continuation after
-both outcomes and `read_committed` skipping the aborted data。Mandatory internal-topic NTC2 failure、injected
-abort-resolution cuts、BookKeeper/profile expansion、remaining DeleteRecords boundaries and wider chaos evidence remain
-future work，so this is not yet a production-rollout claim.
+both outcomes and `read_committed` skipping the aborted data。`f9MandatoryInternalTopicNtc2ProcessIntegrationTest` further
+deletes and corrupts activated `__consumer_offsets` NTC2 bytes while both brokers remain live，proves each handoff leaves
+the group coordinator unavailable without COMMITTED fallback，then performs two exact physical-repair/re-election cycles
+and reloads committed offset `1`。Injected abort-resolution cuts、non-Object NTC2 profile expansion、remaining
+DeleteRecords boundaries and wider chaos evidence remain future work，so this is not yet a production-rollout claim.
 
 ## Current Phase
 

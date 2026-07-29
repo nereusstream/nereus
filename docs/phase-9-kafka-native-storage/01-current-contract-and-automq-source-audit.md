@@ -175,7 +175,7 @@ API/core/primary-reader/NCP2/NTC2/materialization rows 是当前已实现事实�
 | `nereus-core/.../AppendResultValidator.java` | `336d08fa1078248b31925f5a6391932f177999ec` | post-commit/recovery result is checked against exact stream/range/count/bytes/format/schema/expected-start facts |
 | `nereus-core/.../AppendSessionManager.java` | `bc4553fa84e8cba2ef0c70b3812aef7876dc014e` | exact writer/token renewal delegates the authority-preserving metadata CAS；invalid writer/TTL fails closed |
 | `nereus-core/.../ReadCoordinator.java` | `293b5bacd47c2908e226cadec32a6f67b01bdfb5` | public request owns exact/containing boundaries、global first overflow、source/coverage/result validation |
-| `nereus-core/.../ParquetV2CompactedTargetReader.java` | `11294d4965e76c94cf34a5d66d455c7ace25dad4` | exact NCP2/NTC2 adapter；sparse topic coverage is explicit |
+| `nereus-core/.../ParquetV2CompactedTargetReader.java` | `fddda498fc94e5a02a4bbc029e1403cdd4ee4b8a` | exact NCP2/NTC2 adapter；sparse topic coverage is explicit |
 | `nereus-core/.../PhysicalFormatCapabilityRegistry.java` | `e92e604b377ea8a481d5bece22600073c6fc0235` | exact physical/logical/view capability admission；old capability cannot write V2 |
 | `nereus-core/.../StreamViewReader.java` | `54aad465e8d2d78e5d7460085223b794394e5ca4` | deprecated compatibility adapter delegates to the public semantic path |
 | `nereus-core/.../ViewReadResult.java` | `3b6b03b79c4da37913dacda46f6e0979daba78d7` | deprecated compatibility value；public owner is `SemanticReadResult` |
@@ -194,8 +194,8 @@ API/core/primary-reader/NCP2/NTC2/materialization rows 是当前已实现事实�
 | `nereus-materialization/.../DefaultMaterializationPlanner.java` | `d1715b79b3080483e6ffe8389922840e89eda42d` | normalizes only the exact Kafka V1 Object mapping into the Kafka-batch compatibility domain, so a higher NCP2 prefix supersedes a retired BookKeeper gen0 prefix while a readable BK tail remains selectable |
 | `nereus-bookkeeper/.../BookKeeperPrimaryWalRuntime.java` | `32ef63f4979fb1af4b4e00acd69e56e58a4eddc9` | default client construction delegates to one explicit borrowed operations boundary used consistently by append/read/recovery/activation/retention |
 | `nereus-kafka-adapter/.../NereusKafkaBookKeeperWalRuntimeContext.java` | `988fe111e021d7d9d660abe301fe9d8ff54b0872` | three-argument production compatibility constructor supplies the standard adapter；explicit operations decorators remain borrowed |
-| `nereus-kafka-adapter/.../NereusKafkaObjectWalRuntimeFactory.java` | `831eefecbac96998d4619d507d4a6addcf9110ec` | passes the exact operations identity into the provider-neutral BookKeeper graph without changing client ownership |
-| `nereus-kafka-adapter/.../DefaultKafkaPartitionStorage.java` | `a388cb0c831475abbe0e1c4cdefd8f4573e0fbcd` | a durable authority/head conflict always moves the old leader to `WRITE_FENCED_RECOVERY_REQUIRED` even when the rejected append is provably `KNOWN_NOT_COMMITTED` |
+| `nereus-kafka-adapter/.../NereusKafkaObjectWalRuntimeFactory.java` | `13a766aa9773bcbc4f34b32719c2218bc70bad08` | passes partition/root/object-store/clock repair dependencies into the activated-generation authority while preserving provider ownership |
+| `nereus-kafka-adapter/.../DefaultKafkaPartitionStorage.java` | `cd53d97ee4a632a9057f165bcad91db1f53381c7` | a durable authority/head conflict always moves the old leader to `WRITE_FENCED_RECOVERY_REQUIRED`；internal-topic open also exposes the mandatory compacted-read probe |
 | `nereus-materialization/.../DefaultTopicCompactionEngine.java` | `c4849680050a2be4b0059161509564b36daa350d` | NTC1 collector assumes one logical row per batch |
 | `nereus-metadata-oxia/.../OxiaJavaClientMetadataStore.java` | `3c7d29d7a2b7f4f87e240c65503f46f05c03e464` | live other-writer session rejected until expiry |
 
@@ -441,9 +441,10 @@ publication commit 是 `1897f07fcd`；第四十四个 broker-registration-epoch-
 `b300a169ee`；第四十五个 pre-trim checkpoint hydration/current-trim pruning commit 是
 `1cbe8b65a8a802e8fd06503af3d5449ea79353e0`；第四十六个 mandatory internal-topic compacted-read
 coordinator gate commit 是 `89b66ab03b724ba6835faa810cdd7da1b678fe14`；第四十七个 full-bridge
-Spotless import-grouping correction 是 `712bbf414dae88ef08f9a99e07bcdb0d6f3b85e0`，并且是当前已发布 head。
+Spotless import-grouping correction 是 `712bbf414dae88ef08f9a99e07bcdb0d6f3b85e0`；第四十八个 maintenance
+capture-drift diagnostic commit 是 `768924da60f10b2b9611d19c0c4cb7df2a10947f`，并且是当前已发布 head。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/forty-seven-commit
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/forty-eight-commit
 count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百二十一文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
@@ -672,9 +673,9 @@ through the migrated coordinator，the COMMIT marker occupies offset 1 and the s
 producer aborts through the reverse-migrated coordinator and the asynchronous ABORT marker releases LSO at offset 6。The
 same aborted transactional ID then commits data/marker 6/7；READ_COMMITTED from 4 skips directly to 6 and final
 earliest/latest is `0/8`。Both handoffs require exact singleton leader/replicas/ISR and an empty reassignment map。Fresh
-execution passes 64/64 tasks in 47s；the deterministic mandatory NTC2 admission gate is covered by later product
-`b6b02f4` + fork `89b66ab03b` evidence，while real NTC2 deletion/corruption + repair/re-election、injected
-marker/EndTxn failure and non-Object profiles remain open。
+execution passes 64/64 tasks in 47s；the deterministic mandatory NTC2 admission gate is covered by product
+`b6b02f4` + fork `89b66ab03b`，and product `0ae8ca9` + fork `768924da60` now add the real Object-WAL
+deletion/corruption + exact repair/re-election gate。Injected marker/EndTxn failure and non-Object profiles remain open。
 
 `f9InFlightTakeoverProcessIntegrationTest` adds the C cut with an independent controller JVM、a Toxiproxy-held
 single-attempt Produce、`jcmd` proof of `NereusUnifiedLog.appendStable` waiting on the provider future and a broker-1
@@ -782,5 +783,5 @@ the implemented slice，not KF-FINAL-001/002 release evidence。
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`712bbf414dae88ef08f9a99e07bcdb0d6f3b85e0`。Executable source-lock expectation 已更新到该 reviewed、
+`768924da60f10b2b9611d19c0c4cb7df2a10947f`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

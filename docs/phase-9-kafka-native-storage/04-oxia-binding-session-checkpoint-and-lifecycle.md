@@ -3,7 +3,8 @@
 > 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs/full composition and Object-WAL exact-reference durable checkpoint quarantine partial slices implemented
 > 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment、Object/BookKeeper in-flight cuts、three-profile handoff、three-voter ACTIVE failover、activation store/proof cuts 与 real Oxia transport reset 均通过；native DeleteRecords 的 rooted NKC1 publication、durable trim、forced process death、pre-trim checkpoint hydration/current-trim pruning 与 continued IO 也已通过；completed group/transaction internal-topic migration 已由 product `7c25d2e` 的 live two-broker gate 闭合，ongoing/aborted coordinator 和 broader chaos cuts 仍 open
 > 2026-07-29 ongoing transaction migration 增量：product `efe782d` 在两个 live Object-WAL brokers 间双向迁移 user 与 `__transaction_state-0`，OPEN transactions 分别跨 handoff COMMIT/ABORT；exact ownership、LSO convergence、same-ID continuation 与 aborted filtering 均通过，剩余边界为 injected resolution failure、mandatory NTC2、profile expansion 与 broader chaos
-> 2026-07-29 mandatory NTC2 增量：product `b6b02f4` 从 exact binding root 解析 activated generation-set digest，fork `89b66ab03b` 在 internal coordinator storage installation 前等待每个未 trim generation 的 constrained probe；failure preserves the binding、cancels local pending epoch and resigns storage。真实 repair/re-election cut 仍 open
+> 2026-07-29 mandatory NTC2 deterministic 增量：product `b6b02f4` 从 exact binding root 解析 activated generation-set digest，fork `89b66ab03b` 在 internal coordinator storage installation 前等待每个未 trim generation 的 constrained probe；failure preserves the binding、cancels local pending epoch and resigns storage。Physical repair evidence is recorded in the next increment
+> 2026-07-29 mandatory NTC2 真实修复增量（覆盖上一行末尾）：product `0ae8ca9` 让 read-failure quarantine 持久化 prior index version/SHA，允许且仅允许 exact `QUARANTINED -> COMMITTED` generation 与 `QUARANTINED -> ACTIVE` physical-root repair；resolver 校验恢复对象的 HEAD/full-read identity 后执行 bounded CAS repair，再以 `REPLACE` 递增 coverage activation epoch。真实 Object-WAL delete/corrupt 两轮 repair/re-election 通过；non-Object profile expansion 仍 open
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -178,6 +179,36 @@ activatedAtMillis:long              0 for EMPTY, otherwise positive
 This is correctness state, not an observed cache.Once a range becomes mandatory `TOPIC_COMPACTED` visibility, readers cannot
 fall back to lossless COMMITTED bytes and resurrect removed records。Coverage extension/replacement rules and the generation-
 publication handshake are defined in document 05 §11。Trim may advance `startOffset`; `endOffset` never decreases。
+
+#### 3.5.1 Exact quarantined-generation repair
+
+Mandatory compacted-read failure first uses the ordinary read-failure handler to quarantine both the physical root and the
+generation index。The index `stateReason` appends:
+
+```text
+|prior-index-version=<activated metadata version>
+|prior-index-sha256=<activated durable record SHA-256>
+```
+
+These fields are not diagnostics-only：the binding `generationSetSha256` names the historical wrapper identity, while an
+Oxia CAS changes the current wrapper version/SHA。`KafkaActivatedGenerationSetResolver.repairIfQuarantined(...)` therefore
+reconstructs exactly one gap-free historical path from `COMMITTED` members plus quarantined members carrying those prior
+identities；zero or multiple digest matches fail closed。It then performs, in order:
+
+1. decode only an `ObjectSliceReadTarget` for `STREAM_COMPACTED_OBJECT` /
+   `PARQUET_V2_TOPIC_COMPACTED` / `KAFKA_RECORD_BATCH`；
+2. require the current physical root to retain the same object key/id、full-object offset/length and storage checksum；
+3. `headObject(timeout)` and compare length、CRC32C and non-empty ETag；
+4. full `readRange` with the expected CRC and compare the durable content SHA-256；
+5. CAS `PhysicalObjectLifecycle.QUARANTINED -> ACTIVE` with `lifecycleEpoch + 1`；
+6. CAS only the same publication identity `GenerationLifecycle.QUARANTINED -> COMMITTED`，clearing `stateReason`；
+7. recompute the generation-set digest from current COMMITTED wrapper versions/SHAs and call
+   `activateCompactionCoverage(..., REPLACE, ...)`，which increments `activationEpoch`。
+
+Each metadata transition retries only `F4MetadataConditionFailedException` and is capped at eight attempts。A concurrent
+binding change、different repaired bytes/root identity、missing prior identity、non-COMMITTED unchanged path member or
+another publication identity aborts repair。Already repaired coverage is idempotent；there is no COMMITTED read fallback
+and no operator edit of the binding digest。
 
 ### 3.6 Pending operation nested record
 

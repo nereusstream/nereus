@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration and deterministic mandatory NTC2 admission pass，while injected resolution cuts、real NTC2 deletion/corruption + repair/re-election、remaining retention boundaries、real compaction restart and stock cleaner differential remain in progress
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration、deterministic mandatory NTC2 admission and real Object-WAL NTC2 delete/corrupt + exact repair/re-election pass，while injected resolution cuts、non-Object NTC2 profile expansion、remaining retention boundaries、real compaction restart and stock cleaner differential remain in progress
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -306,6 +306,15 @@ There is no branch from this method to `StreamStorage.read(... COMMITTED ...)`�
 the exact constrained `TOPIC_COMPACTED` overload；therefore lossless source bytes cannot resurrect tombstoned coordinator
 state even when they remain physically readable。
 
+Before each mandatory probe, `KafkaCompactedFetchReader` calls
+`KafkaActivatedGenerationAuthority.repairIfQuarantined(partition, streamId, binding, timeout)`。This is not a
+full-source rebuild path：it runs only when the historical binding digest uniquely resolves after substituting durable
+`prior-index-version`/`prior-index-sha256` facts for quarantined wrappers。The resolver verifies the restored physical
+object against the retained root with HEAD length/CRC32C/ETag plus a full expected-CRC read and content SHA-256，then CAS
+reactivates the exact root and generation。Finally it recomputes the generation-set digest from the new COMMITTED wrapper
+versions/SHAs and activates the same coverage with `REPLACE`，yielding a larger activation epoch。The probe reloads that
+returned binding and still reads only the new exact `TOPIC_COMPACTED` constraint；a mismatched repair remains unavailable。
+
 Fork `89b66ab03b` implements the admission half inside `NereusListOffsetsLifecycle`，between manager recovery and exact
 storage/lookup installation。Group、transaction and share coordinator topics wait；user topics bypass the probe。A failed
 probe cancels the prepared leader epoch、removes the slot and resigns the recovered product storage before completing
@@ -326,9 +335,21 @@ Deterministic evidence is split at the ownership boundary：
   election boundary。
 
 The full deterministic `f9CompactionPropertyTest` and source-locked `phase9M3KafkaForkBridgeCheck` pass against fork
-`712bbf414d`。KF-TXN-016 remains `PLANNED` until a release-process test activates multiple real NTC2 generations, removes or
-corrupts a required object, migrates/restarts the coordinator partition, observes no coordinator service/COMMITTED read,
-repairs by same-view replacement and then proves election succeeds。
+`768924da60`。Product `0ae8ca9` adds
+`f9MandatoryInternalTopicNtc2ProcessIntegrationTest.mandatoryInternalTopicNtc2FailureBlocksElectionUntilPhysicalRepair`：
+one real `__consumer_offsets-0` is compacted on broker 1，its activated physical NTC2 keys are decoded from the ObjectStore
+mapping and snapshotted with bytes/user metadata/content type/provider CRC。With broker 2 live, the gate:
+
+1. deletes every activated NTC2 object，moves the group partition to broker 2 and proves group lookup is unavailable；
+2. restores the exact snapshots，moves back to broker 1 and reloads committed offset `1`；
+3. flips one middle byte under each original key while preserving metadata，moves to broker 2 and again proves unavailable；
+4. restores the exact snapshots a second time，moves back and reloads committed offset `1` again。
+
+Both brokers stay alive throughout。Each failed open quarantines the exact root/index before coordinator election；each
+repair is followed by an ordinary reassignment rather than a test-only election callback。Fresh execution passes 73/73
+outer tasks in 1m39s after the fork release build passes 166/166 actionable tasks。KF-TXN-016 is therefore
+`PASSED_CURRENT_SOURCE` for Object-WAL P/C/K；Object async/BookKeeper profile expansion and the F9 final aggregate remain
+separate gates。
 
 Local fork commit `032974067c` adds deterministic ordering evidence at the stock seams：both group and transaction
 coordinator elections remain absent until `AsyncTopicDeltaLifecycle` reports the exact leader ready，and the
@@ -1590,8 +1611,8 @@ delete either shared binding while the old broker stays live。Fresh execution p
 baseline cold-restart and ordinary data-handoff regressions pass together at 74/74 in 1m50s。
 
 This is intentionally a completed-state cut；the next gate covers OPEN state。Abort-resolution failure cuts、
-BookKeeper/profile migration、real mandatory internal-topic NTC2 deletion/corruption + repair/re-election and upstream
-coordinator suites remain required；the deterministic pre-election admission gate is covered separately in section 5.1。
+BookKeeper/profile migration and upstream coordinator suites remain required；the deterministic and real Object-WAL
+mandatory-NTC2 gates are covered separately in section 5.1。
 
 ### 15.2 Current ongoing-transaction migration evidence
 

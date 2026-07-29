@@ -5,11 +5,12 @@
 > 2026-07-29 trim matrix 增量（覆盖上两行的 response-loss open wording）：Object sync/async 与 BookKeeper WAL-only/async/sync 五档均已通过 provider-applied/caller-unobserved trim、forced restart、same-target no-repeat 与 continued IO；仍 open 的是 transaction/internal-topic coordinator migration、batch middle/end/HW、stock oracle 与 broader chaos
 > 2026-07-29 coordinator migration 增量（覆盖上两行的 coordinator open wording）：product `7c25d2e` 在 fork `1cbe8b65a8` 上以两个真实 release JVM 原子迁移 user、`__consumer_offsets-0`、`__transaction_state-0` 到 broker 2，旧 broker 保持存活；group offset 和 completed transactional-ID state 在 recovered-storage-ready 后恢复并继续提交。Ongoing/aborted coordinator takeover、mandatory internal-topic NTC2 failure、batch middle/end/HW、stock oracle 与 broader chaos 仍 open
 > 2026-07-29 ongoing transaction migration 增量（覆盖上一行的 ongoing/aborted open wording）：product `efe782d` 新增 `f9OngoingTransactionMigrationProcessIntegrationTest`，在两个 live Object-WAL release brokers 间来回迁移 user 与 `__transaction_state-0`；两个 OPEN transaction 分别跨 handoff COMMIT/ABORT，LSO 收敛、same-ID continuation 与 READ_COMMITTED aborted filtering 均通过。Injected abort-resolution failure、mandatory NTC2、BookKeeper/profile expansion、batch middle/end/HW、stock oracle 与 final aggregate 仍 open
-> 2026-07-29 mandatory internal-topic NTC2 增量：product `b6b02f4` + fork `89b66ab03b` 在 coordinator election 前加入 binding-rooted、generation-constrained `TOPIC_COMPACTED` availability gate；每个未 trim 的 activated generation 都执行一个有界 probe，任一 `OBJECT_NOT_FOUND`/corruption/metadata failure 都阻止 `openLeader` 完成、撤销 exact pending lookup 并 resign recovered storage，且不存在 COMMITTED fallback。`KafkaInternalTopicNoResurrectionTest`、fork lifecycle tests、完整 `phase9M3KafkaForkBridgeCheck` 均通过；真实 release-process 删除/损坏 NTC2 cut、repair 后重新选举及 profile matrix 仍 open
+> 2026-07-29 mandatory internal-topic NTC2 deterministic 增量：product `b6b02f4` + fork `89b66ab03b` 在 coordinator election 前加入 binding-rooted、generation-constrained `TOPIC_COMPACTED` availability gate；每个未 trim 的 activated generation 都执行一个有界 probe，任一 `OBJECT_NOT_FOUND`/corruption/metadata failure 都阻止 `openLeader` 完成、撤销 exact pending lookup 并 resign recovered storage，且不存在 COMMITTED fallback。`KafkaInternalTopicNoResurrectionTest`、fork lifecycle tests、完整 `phase9M3KafkaForkBridgeCheck` 均通过；physical repair evidence is recorded in the next increment
+> 2026-07-29 mandatory NTC2 真实故障/修复增量（覆盖上一行末尾的 process-cut open wording）：product `0ae8ca9` + fork `768924da60` 的 `f9MandatoryInternalTopicNtc2ProcessIntegrationTest` 在真实 Oxia、LocalStack 与两个 live release Kafka JVM 上激活 `__consumer_offsets-0` NTC2，依次执行物理删除与原 key/metadata 下的 byte corruption；两次迁移都在 coordinator election 前 quarantine exact physical root/index 并保持 group service unavailable，且没有 COMMITTED fallback。恢复原 bytes、user metadata、content type 与 provider CRC 后，product 校验 HEAD length/CRC/ETag、full-read CRC/SHA，CAS 恢复同一 root/index，并以 `REPLACE` 发布新 generation-set digest/activation epoch；两次 ordinary reassignment 都恢复 committed group offset `1`。Object async/BookKeeper profile expansion、injected transaction-resolution cuts、batch middle/end/HW、stock oracle 与 final aggregate 仍 open
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Kafka fork development head：`nereusstream/kafka:nereus/future9-native-kafka-storage@712bbf414dae88ef08f9a99e07bcdb0d6f3b85e0`（47 commits / 121 files from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；前 45 commits 保持既有 M3–M6/config/profile/runtime/takeover/trim slices，第 46 个 commit `89b66ab03b` 在 coordinator storage installation/election 前加入 mandatory compacted-read gate，第 47 个 commit `712bbf414d` 仅修正被 full bridge Spotless 暴露的 runtime import grouping）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；SSH push is configured and the remote head is verified
+> Kafka fork development head：`nereusstream/kafka:nereus/future9-native-kafka-storage@768924da60f10b2b9611d19c0c4cb7df2a10947f`（48 commits / 121 files from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；前 47 commits 保持既有 M3–M6/config/profile/runtime/takeover/trim/mandatory-read slices，第 48 个 commit `768924da60` 为 maintenance capture-drift invariant 增加 source/snapshot/stable-end/producer-state diagnostics）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；SSH push is configured and the remote head is verified
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
@@ -130,8 +131,9 @@ exact recovered storage ready callback 后才发生。codec/replay/factory/shell
 consumer-group offset 的 fresh-JVM 内部主题恢复，并覆盖 stable open transaction 后强制进程退出、fresh-JVM
 ABORT resolution 与 read-committed filtering；真实 checkpoint publication、multi-broker live takeover、
 BookKeeper/profile matrix、completed coordinator migration 和 Object-WAL ongoing transaction bidirectional
-COMMIT/ABORT migration 已有真实进程证据，mandatory NTC2 的 deterministic admission gate 也已闭合；injected
-abort-resolution failure、真实 NTC2 object deletion/corruption + repair/re-election、checkpoint cut 与完整 M4
+COMMIT/ABORT migration 已有真实进程证据，mandatory NTC2 的 deterministic admission gate 与真实 Object-WAL
+delete/corrupt + exact repair/re-election gate 也已闭合；injected
+abort-resolution failure、non-Object NTC2 profile、checkpoint cut 与完整 M4
 aggregate 仍未完成，因此不能声明 M4 完成。
 Section 3 现由 Kafka-artifact-neutral `KafkaLeaderEpochState` 与 `KafkaLeaderEpochStateCodecV1` 实现：
 leader epoch/start offset 双严格递增，只有首条可低于 logStart 作为 carried-forward range，所有 start 均不超过
@@ -504,7 +506,8 @@ Fresh task 通过 73/73 actionable tasks、1m07s，JUnit process case 为 31.829
 通过。该 task 已进入 `phase9M6KafkaProcessCheck`，为 KF-TXN-011/012/013 提供 completed-state P/K takeover
 slice；它本身不声称 ongoing/aborted transaction coordinator takeover、mandatory internal-topic NTC2
 no-resurrection 或 M4 final aggregate 已完成。后续 product `b6b02f4` + fork `89b66ab03b` 已闭合 deterministic
-NTC2 admission/no-resurrection gate，但真实 object deletion/corruption + repair/re-election process cut 仍未完成。
+NTC2 admission/no-resurrection gate，product `0ae8ca9` + fork `768924da60` 又闭合真实 Object-WAL
+delete/corrupt + exact repair/re-election process cut；non-Object profiles 与 final aggregate 仍未完成。
 
 `:nereus-kafka-adapter:f9OngoingTransactionMigrationProcessIntegrationTest --rerun-tasks` 在 product `efe782d` 与同一
 fork head 上复用两个始终存活的 release JVM，但把 coordinator cut 推进到 OPEN state。该测试使用独立 user
@@ -525,7 +528,7 @@ partition 和 `__transaction_state-0`，并执行两个相反方向的迁移：
 `build/f9-kafka-ongoing-transaction-evidence`，已进入 `phase9M6KafkaProcessCheck`；fresh execution 为 64/64
 actionable tasks、47s，JUnit case 32.753s；completed coordinator + ordinary takeover 回归为 74/74 tasks、1m30s。
 该 slice 为 KF-TXN-007/012/014 提供 Object-WAL P/K 证据，但不替代 marker/EndTxn response-loss、进程 kill、
-BookKeeper/profile、真实 NTC2 deletion/corruption + repair/re-election 或 M4 final aggregate。
+BookKeeper/profile 或 M4 final aggregate；真实 Object-WAL NTC2 fault/repair 由独立 gate 覆盖。
 
 BookKeeper post-handoff 由独立
 `:nereus-kafka-adapter:f9BookKeeperProfileTakeoverProcessIntegrationTest --rerun-tasks` 覆盖：同一个 stock

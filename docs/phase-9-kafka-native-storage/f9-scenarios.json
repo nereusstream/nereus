@@ -2226,8 +2226,8 @@
     {
       "id": "KF-TXN-016",
       "milestone": "F9-M5",
-      "task": "phase9M5FinalCheck",
-      "testClass": "KafkaInternalTopicNoResurrectionTest",
+      "task": "f9MandatoryInternalTopicNtc2ProcessIntegrationTest",
+      "testClass": "NereusKafkaNativeProcessIntegrationTest",
       "testMethod": "scenarioKfTxn016",
       "scenario": "mandatory internal-topic NTC2 unavailable blocks coordinator election，no full-source fallback",
       "evidenceTier": [
@@ -2238,8 +2238,7 @@
       "requiredServices": [
         "kraft",
         "oxia",
-        "object-store",
-        "bookkeeper"
+        "object-store"
       ],
       "sourceLocks": [
         "nereus",
@@ -2248,7 +2247,7 @@
       "gates": [
         "F9-M5"
       ],
-      "status": "PLANNED"
+      "status": "PASSED_CURRENT_SOURCE"
     },
     {
       "id": "KF-RET-001",
