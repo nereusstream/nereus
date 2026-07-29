@@ -7,10 +7,11 @@
 > 2026-07-29 ongoing transaction migration 增量（覆盖上一行的 ongoing/aborted open wording）：product `efe782d` 新增 `f9OngoingTransactionMigrationProcessIntegrationTest`，在两个 live Object-WAL release brokers 间来回迁移 user 与 `__transaction_state-0`；两个 OPEN transaction 分别跨 handoff COMMIT/ABORT，LSO 收敛、same-ID continuation 与 READ_COMMITTED aborted filtering 均通过。Injected abort-resolution failure、mandatory NTC2、BookKeeper/profile expansion、batch middle/end/HW、stock oracle 与 final aggregate 仍 open
 > 2026-07-29 mandatory internal-topic NTC2 deterministic 增量：product `b6b02f4` + fork `89b66ab03b` 在 coordinator election 前加入 binding-rooted、generation-constrained `TOPIC_COMPACTED` availability gate；每个未 trim 的 activated generation 都执行一个有界 probe，任一 `OBJECT_NOT_FOUND`/corruption/metadata failure 都阻止 `openLeader` 完成、撤销 exact pending lookup 并 resign recovered storage，且不存在 COMMITTED fallback。`KafkaInternalTopicNoResurrectionTest`、fork lifecycle tests、完整 `phase9M3KafkaForkBridgeCheck` 均通过；physical repair evidence is recorded in the next increment
 > 2026-07-29 mandatory NTC2 真实故障/修复增量（覆盖上一行末尾的 process-cut open wording）：product `0ae8ca9` + fork `768924da60` 的 `f9MandatoryInternalTopicNtc2ProcessIntegrationTest` 在真实 Oxia、LocalStack 与两个 live release Kafka JVM 上激活 `__consumer_offsets-0` NTC2，依次执行物理删除与原 key/metadata 下的 byte corruption；两次迁移都在 coordinator election 前 quarantine exact physical root/index 并保持 group service unavailable，且没有 COMMITTED fallback。恢复原 bytes、user metadata、content type 与 provider CRC 后，product 校验 HEAD length/CRC/ETag、full-read CRC/SHA，CAS 恢复同一 root/index，并以 `REPLACE` 发布新 generation-set digest/activation epoch；两次 ordinary reassignment 都恢复 committed group offset `1`。Object async/BookKeeper profile expansion、injected transaction-resolution cuts、batch middle/end/HW、stock oracle 与 final aggregate 仍 open
+> 2026-07-29 retention/DeleteRecords 增量（覆盖上一行末尾的 batch/oracle open wording）：product `77480cb` + fork `bd9963c980` 新增独立 `phase9M5KafkaRetentionOracleCheck` 和 `f9DeleteRecordsBoundaryProcessIntegrationTest`。前者用四个真实 stock `UnifiedLog` closed/active segments 对比 Nereus planner 与 `deleteOldSegments()` 的 selected count/logStart，覆盖 time、size、combined、HW cap、strict equality、compact-only；后者在真实 Oxia/LocalStack/release Kafka 上用三个三-record batches 依次执行 target `3/4/6/-1`，要求 low watermark `3/4/6/9`、latest 恒为 `9`、每次 Fetch 首条 offset/value 与新 logStart 一致，并验证首个 trim 的 rooted NKC1。KF-RET-001/002/003/006 现为 `PASSED_CURRENT_SOURCE`；stock `LogCleaner` compaction differential、injected transaction-resolution、non-Object NTC2 profile expansion 与 final aggregate 仍 open
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Kafka fork development head：`nereusstream/kafka:nereus/future9-native-kafka-storage@768924da60f10b2b9611d19c0c4cb7df2a10947f`（48 commits / 121 files from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；前 47 commits 保持既有 M3–M6/config/profile/runtime/takeover/trim/mandatory-read slices，第 48 个 commit `768924da60` 为 maintenance capture-drift invariant 增加 source/snapshot/stable-end/producer-state diagnostics）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；SSH push is configured and the remote head is verified
+> Kafka fork development head：`nereusstream/kafka:nereus/future9-native-kafka-storage@bd9963c980fdd7e7a99ec393694d4b6a540dc21a`（49 commits / 122 files from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；第 48 个 commit `768924da60` 为 maintenance capture-drift invariant 增加 source/snapshot/stable-end/producer-state diagnostics，第 49 个 `bd9963c980` 增加 stock `UnifiedLog` retention differential oracle 与最小精确 test-only metrics import）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；SSH push is configured and the remote head is verified
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
@@ -209,7 +210,8 @@ fresh JVM 必须恢复 `logStart=3/end=6`、从 offset `3` byte-exact Fetch、�
 `f9RetentionTest`、checkpoint publication recovery、partition opener/storage、compacted Fetch/runtime-config
 focused tests、Kafka fork recovery/canonical-state tests、既有
 `f9M6KafkaProcessIntegrationTest` 和 `f9MultiBrokerTakeoverProcessIntegrationTest`；因此该 slice 已进入
-`phase9M6KafkaProcessCheck`，但不把 KF-RET-006 或整个 F9-M5 提前标成 final。
+`phase9M6KafkaProcessCheck`。The later dedicated boundary gate upgrades KF-RET-006 to
+`PASSED_CURRENT_SOURCE`，but neither gate marks the whole F9-M5 final。
 
 同日新增的 `f9TrimResponseLossProcessIntegrationTest` 固定 KF-RET-005 的一个真实
 `OBJECT_WAL_SYNC_OBJECT` R/P/C 切片。Test-only `TrimCompletionLossAgent` 只在显式 arm 后拦截一次
@@ -231,7 +233,9 @@ provider-applied/caller-unobserved、强杀、fresh restart、same-target no-op/
 bucket/config/cache/log。Fresh matrix 以 75/75 actionable tasks、3m23s 通过，证据目录为
 `nereus-kafka-adapter/build/f9-kafka-trim-profile-matrix-evidence/`，并进入
 `phase9M6KafkaProcessCheck` 与 `phase9M6KafkaBookKeeperProcessCheck`。这闭合 KF-RET-010 的五-profile
-response-loss/checkpoint-barrier process slice；batch-middle/end/HW、stock oracle 与更广 chaos 仍保持 open。
+response-loss/checkpoint-barrier process slice；the next `f9DeleteRecordsBoundaryProcessIntegrationTest` and
+`phase9M5KafkaRetentionOracleCheck` close batch-middle/end/HW and the stock retention oracle，while broader chaos and
+stock `LogCleaner` compaction differential remain open。
 Ranged compaction 的首个 codec slice 另新增 materialization-side immutable decode/rewrite records 和 adapter
 `KafkaCompactionPlanner`/`KafkaTopicCompactionCodecV1`：planner 从 mandatory end 起只选 LSO/min-lag 允许的连续 closed
 virtual segments，并冻结到 stable-end decision horizon；codec 严格解码一个 exact magic-v2 ranged batch，为每条

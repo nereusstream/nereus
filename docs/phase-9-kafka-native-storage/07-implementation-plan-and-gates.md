@@ -6,6 +6,7 @@
 > 2026-07-29 ongoing transaction migration 增量：product `efe782d` 的独立 process gate 已闭合 Object-WAL OPEN transaction 跨双向 coordinator handoff 的 COMMIT/ABORT、LSO、same-ID continuation 与 READ_COMMITTED filtering；仍 open 的 M4 coordinator 边界缩小为 injected resolution failure、mandatory NTC2、profile expansion 与 final/upstream aggregate
 > 2026-07-29 mandatory NTC2 deterministic 增量：product `b6b02f4` + fork `89b66ab03b` 闭合 exact binding-rooted、all-untrimmed-generation、`TOPIC_COMPACTED`-only pre-election gate；physical repair evidence is recorded in the next increment
 > 2026-07-29 mandatory NTC2 process 增量（覆盖上一行末尾）：product `0ae8ca9` + fork `768924da60` 的独立真实进程门完成 Object-WAL activated `__consumer_offsets` NTC2 delete/corrupt、fail-closed election、exact identity verification、root/index CAS repair、coverage `REPLACE` 与两次 ordinary re-election；M4/M5 剩余边界为 injected resolution failure、non-Object profile expansion、DeleteRecords boundary/stock oracle 与 final/upstream aggregate
+> 2026-07-29 retention/DeleteRecords 增量（覆盖上一行的 M5 open wording）：product `77480cb` + fork `bd9963c980` 增加独立 `phase9M5KafkaRetentionOracleCheck`，用 real stock `UnifiedLog.deleteOldSegments()` 对比 time/size/combined/HW/strict-equality/compact-only 结果；`f9DeleteRecordsBoundaryProcessIntegrationTest` 在真实 Object-WAL release broker 上要求 target `3/4/6/-1` 精确映射 low watermark `3/4/6/9`、latest 恒为 `9`、Fetch 首条 offset/value 一致并有 rooted NKC1。KF-RET-001/002/003/006 为 `PASSED_CURRENT_SOURCE`；stock `LogCleaner` differential、injected resolution failure、non-Object NTC2 profile expansion 与 final/upstream aggregate 仍 open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -619,7 +620,7 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@768924da60` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@bd9963c980` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
   compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
   controller activation scheduling commit、one durable feature/control commit、one aggregate Spotless alignment commit and one
@@ -631,7 +632,8 @@ coordinator/transaction/compaction remain M4/M5。
   local-replica-removal binding-preservation commit、one per-controller-epoch activation-reconciliation observability
   commit、one durable-log-start publication commit、one broker-epoch-ready recovery commit and one pre-trim checkpoint
   recovery/current-trim pruning commit、one mandatory internal-topic compacted-read coordinator gate commit、one
-  bridge-Spotless-only import-grouping commit and one maintenance capture-drift diagnostic commit。The
+  bridge-Spotless-only import-grouping commit、one maintenance capture-drift diagnostic commit and one stock-retention
+  differential-oracle commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
@@ -652,7 +654,7 @@ coordinator/transaction/compaction remain M4/M5。
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the
-  fork branch/local+remote head/base ancestry/forty-eight-commit count/organization remote/one-hundred-twenty-one log-IO/bridge/recovery/
+  fork branch/local+remote head/base ancestry/forty-nine-commit count/organization remote/one-hundred-twenty-two log-IO/bridge/recovery/
   metadata-lifecycle/configuration/runtime-composition/retention/compaction
   plus stock-isolation/launcher/controller-runtime/feature-control blobs and markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
@@ -734,7 +736,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@768924da60` branch。
+`nereus/future9-native-kafka-storage@bd9963c980` branch。
 Product `7c25d2e` now adds the real two-broker completed-state half through
 `f9CoordinatorMigrationProcessIntegrationTest`。The first release JVM commits user data、one transaction and group offset
 2，then a second live JVM takes exact singleton ownership of the user partition、`__consumer_offsets-0` and
@@ -784,8 +786,9 @@ and the M4 final aggregate are still required before M4 completion。
 :nereus-kafka-adapter:f9CompactionPropertyTest
 :nereus-materialization:f9KafkaCompactionTest
 :nereus-kafka-adapter:f9CompactionIntegrationTest
-Kafka fork: nereusF9DeleteRecordsTest
-Kafka fork: nereusF9CleanerOracleTest
+:nereus-kafka-adapter:f9DeleteRecordsBoundaryProcessIntegrationTest
+phase9M5KafkaRetentionOracleCheck
+Kafka fork: nereusF9CleanerOracleTest (stock LogCleaner compaction differential pending)
 Kafka fork: nereusF9InternalTopicCompactionTest
 phase9M5Check
 phase9M5FinalCheck --rerun-tasks
@@ -810,8 +813,10 @@ owner and drain it through the runtime background-service lifecycle。Kafka fork
 provide stock DeleteRecords invocation、partition-lock capture、same-log local updater and owned writable-partition
 enumeration；`378e9f8967` supplies the live virtual segment/config/index facts consumed by the planner。The focused
 retention suite and fork UnifiedLog/Partition/config regressions pass。This task deliberately does not use the
-`phase9M5Check` completion name：remaining DeleteRecords boundaries、broader chaos evidence、compaction
-full stock-cleaner differential oracle and aggregate gates remain required。Compaction production fork
+`phase9M5Check` completion name：the later `phase9M5KafkaRetentionOracleCheck` and
+`f9DeleteRecordsBoundaryProcessIntegrationTest` close the retention differential and exact start/middle/end/HW mapping，
+but broader chaos evidence、compaction full stock-`LogCleaner` differential oracle and aggregate gates remain required。
+Compaction production fork
 registration/concrete authority capture is now implemented separately by product `e18bf36` and fork `58342d9dca`。
 
 The product-side DeleteRecords slice now accepts only Kafka-normalized non-negative offsets，rechecks delete policy and
@@ -880,8 +885,31 @@ The companion `f9TrimProfileMatrixProcessIntegrationTest` reuses the exact helpe
 `OBJECT_WAL_ASYNC_OBJECT` and all three BookKeeper profiles，so the pair covers all five profile factories。The matrix uses
 real ZooKeeper/two-bookie services、isolated BookKeeper reservation/activation scopes and fresh Kafka processes per
 profile；it passes 75/75 tasks in 3m23s and is a dependency of both M6 process aggregates。This closes the current
-KF-RET-005/010 five-profile R/P/C process slice；the manifest rows remain `PLANNED` until remaining boundary/oracle/aggregate
-requirements pass。
+KF-RET-005/010 five-profile R/P/C process slice。
+
+Current stock retention and exact DeleteRecords boundary gates（product `77480cb`，fork `bd9963c980`）：
+
+```text
+phase9M5KafkaRetentionOracleCheck
+  real stock UnifiedLog segments = [0,2), [2,4), [4,6), active [6,8)
+  compare = product candidate + selected count vs stock deleteOldSegments + logStart
+  cases = time / size / combined / HW=3 / strict equality / compact-only
+
+:nereus-kafka-adapter:f9DeleteRecordsBoundaryProcessIntegrationTest
+  services = real KRaft release JVM + Oxia + LocalStack
+  produced offsets = 0..8 in three three-record producer batches
+  requests = 3, 4, 6, HIGH_WATERMARK(-1)
+  low watermarks = 3, 4, 6, 9
+  invariant = latest remains 9; Fetch starts at exact new offset/value
+  checkpoint = first trim has rooted NKC1(offset=9)
+```
+
+The fork oracle uses fixed time and explicit `UnifiedLog.roll()`，so no filesystem timing or segment-size heuristic chooses
+the expected boundary。The product process test invokes the stock CLI for every target，waits for its reported
+low watermark，then independently asks Admin for earliest/latest and performs a consumer Fetch。The forced fresh execution
+passes 64/64 tasks in 38s；the oracle passes through its dedicated product gate with fork Spotless/Checkstyle。Manifest rows
+KF-RET-001/002/003/006 are `PASSED_CURRENT_SOURCE`。The remaining M5 blocker is not “stock oracle” generically：it is the
+separate compaction differential against stock `LogCleaner` plus final aggregate/chaos coverage。
 
 `:nereus-kafka-adapter:f9CompactionPropertyTest` and `phase9M5CompactionCoreCheck` now add the first slice-4 partial
 gate。`nereus-materialization` owns immutable ranged decode/rewrite records rather than reusing the F4 one-entry/one-record

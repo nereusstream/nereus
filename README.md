@@ -52,8 +52,15 @@ coordinator migration 已通过；mandatory internal-topic NTC2 现在同时有 
 真实双 release broker Object-WAL gate：物理删除或原 key 原 metadata 下的字节损坏都会在 coordinator election 前
 quarantine exact root/index 并 fail closed；恢复原始 bytes、user metadata、content type 与 provider CRC 后，运行时会验证
 HEAD/CRC/ETag/full-read SHA，CAS 恢复同一 root/index，以 `REPLACE` 发布新 generation-set digest/activation epoch，再由
-ordinary reassignment 恢复 group offset。Object async/BookKeeper profile expansion、remaining DeleteRecords boundaries
-and the stock retention oracle remain open。
+ordinary reassignment 恢复 group offset。At that milestone，Object async/BookKeeper profile expansion、remaining
+DeleteRecords boundaries and the stock retention oracle were still open。The next F9-M5 increment closes the last two
+retention-specific gaps：
+fork `KafkaRetentionOracleTest` compares Nereus planning with real stock `UnifiedLog.deleteOldSegments()` for time、size、
+combined、HW-capped、strict-equality and compact-only cases；the real Object-WAL
+`f9DeleteRecordsBoundaryProcessIntegrationTest` then advances native low watermark through exact offsets
+`3 -> 4 -> 6 -> 9` (batch start、middle、end/next-start and `HIGH_WATERMARK=-1`) while latest stays `9`，Fetch begins
+at the new exact logical start and the first trim is rooted by NKC1。Injected transaction-resolution cuts、non-Object NTC2
+profile expansion、stock `LogCleaner` compaction differential and final aggregate remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation
@@ -128,7 +135,7 @@ record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHol
 interfaces、an explicit native-storage launcher and a stock-owned controller metadata-publisher/runtime seam。Its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The SSH-published fork head is
-`nereus/future9-native-kafka-storage@768924da60`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
+`nereus/future9-native-kafka-storage@bd9963c980`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
 controller factories through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。The controller runtime now coalesces
 metadata/leadership callbacks、runs first activation only while locally current、retries only retriable product failures and
 cancels scheduled retry on leadership loss；activation scheduling additionally waits for finalized
@@ -165,8 +172,10 @@ leader/replicas/ISR on every handoff、both JVMs alive、LSO convergence `0 -> 2
 both outcomes and `read_committed` skipping the aborted data。`f9MandatoryInternalTopicNtc2ProcessIntegrationTest` further
 deletes and corrupts activated `__consumer_offsets` NTC2 bytes while both brokers remain live，proves each handoff leaves
 the group coordinator unavailable without COMMITTED fallback，then performs two exact physical-repair/re-election cycles
-and reloads committed offset `1`。Injected abort-resolution cuts、non-Object NTC2 profile expansion、remaining
-DeleteRecords boundaries and wider chaos evidence remain future work，so this is not yet a production-rollout claim.
+and reloads committed offset `1`。The current suite also passes the stock retention differential oracle and the exact
+DeleteRecords start/middle/end/HW process boundary。Injected abort-resolution cuts、non-Object NTC2 profile expansion、
+stock `LogCleaner` compaction differential and wider chaos evidence remain future work，so this is not yet a
+production-rollout claim.
 
 ## Current Phase
 

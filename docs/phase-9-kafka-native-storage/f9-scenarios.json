@@ -2252,7 +2252,7 @@
     {
       "id": "KF-RET-001",
       "milestone": "F9-M5",
-      "task": "phase9M5FinalCheck",
+      "task": "phase9M5KafkaRetentionOracleCheck",
       "testClass": "KafkaRetentionOracleTest",
       "testMethod": "scenarioKfRet001",
       "scenario": "time retention over virtual closed segments matches stock predicate",
@@ -2269,12 +2269,12 @@
       "gates": [
         "F9-M5"
       ],
-      "status": "PLANNED"
+      "status": "PASSED_CURRENT_SOURCE"
     },
     {
       "id": "KF-RET-002",
       "milestone": "F9-M5",
-      "task": "phase9M5FinalCheck",
+      "task": "phase9M5KafkaRetentionOracleCheck",
       "testClass": "KafkaRetentionOracleTest",
       "testMethod": "scenarioKfRet002",
       "scenario": "size retention uses exact Kafka logical bytes and matches stock predicate",
@@ -2291,12 +2291,12 @@
       "gates": [
         "F9-M5"
       ],
-      "status": "PLANNED"
+      "status": "PASSED_CURRENT_SOURCE"
     },
     {
       "id": "KF-RET-003",
       "milestone": "F9-M5",
-      "task": "phase9M5FinalCheck",
+      "task": "phase9M5KafkaRetentionOracleCheck",
       "testClass": "KafkaRetentionOracleTest",
       "testMethod": "scenarioKfRet003",
       "scenario": "combined policies choose monotonic next-segment boundary，never active segment",
@@ -2312,7 +2312,7 @@
       "gates": [
         "F9-M5"
       ],
-      "status": "PLANNED"
+      "status": "PASSED_CURRENT_SOURCE"
     },
     {
       "id": "KF-RET-004",
@@ -2370,8 +2370,8 @@
     {
       "id": "KF-RET-006",
       "milestone": "F9-M5",
-      "task": "phase9M5FinalCheck",
-      "testClass": "KafkaNativeDeleteRecordsIntegrationTest",
+      "task": "f9DeleteRecordsBoundaryProcessIntegrationTest",
+      "testClass": "NereusKafkaNativeProcessIntegrationTest",
       "testMethod": "scenarioKfRet006",
       "scenario": "DeleteRecords at batch start/middle/end/HW maps durable logStart/low watermark correctly",
       "evidenceTier": [
@@ -2381,8 +2381,7 @@
       "requiredServices": [
         "kraft",
         "oxia",
-        "object-store",
-        "bookkeeper"
+        "object-store"
       ],
       "sourceLocks": [
         "nereus",
@@ -2391,7 +2390,7 @@
       "gates": [
         "F9-M5"
       ],
-      "status": "PLANNED"
+      "status": "PASSED_CURRENT_SOURCE"
     },
     {
       "id": "KF-RET-007",

@@ -621,8 +621,27 @@ KAFKA_RETENTION_V1:<TIME|SIZE|TIME+SIZE>:
 
 Current implementation（2026-07-27）：`KafkaRetentionPlanner` implements the contract above。Its deterministic test covers
 strict time equality、time+size union、exact size excess、HW boundary、compact-only policy、zero-byte-retention active
-segment protection and config-history mismatch。The Kafka differential oracle and scheduler/coordinator integration remain
-required before KF-RET-001/002/003 can be marked complete。
+segment protection and config-history mismatch。Fork `bd9963c980` adds the stock differential half as
+`KafkaRetentionOracleTest`。The test creates a real `UnifiedLog` with legal `segment.bytes=1 MiB`，fixed
+`MockTime(now=10000)` and eight single-record batches at timestamps
+`[1000,1000,2000,2000,9000,9000,10000,10000]`；explicit `UnifiedLog.roll()` after offsets `1/3/5` fixes closed segment
+boundaries at `2/4/6` and leaves `[6,8)` active。For each case it converts the live stock segment facts into the exact
+`KafkaVirtualSegmentState` consumed by the product planner，then compares both selected segment count and final logStart
+against a real `UnifiedLog.deleteOldSegments()` call：
+
+| Case | Policy/HW | Expected logStart |
+| --- | --- | --- |
+| time | `retention.ms=5000`, HW `8` | `4` |
+| size | retain four record-batch bytes, HW `8` | `4` |
+| combined | time + size on the same image | `4` |
+| HW cap | `retention.ms=0`, HW `3` | `2` |
+| strict equality | `retention.ms=9000`, HW `8` | `0` |
+| compact-only | delete disabled | `0` |
+
+The dedicated product gate `phase9M5KafkaRetentionOracleCheck` publishes the exact `0.1.0-f9-dev` artifacts，checks the
+49-commit/122-file fork source lock，runs fork Spotless/Checkstyle and executes only this oracle。KF-RET-001/002/003 are
+therefore `PASSED_CURRENT_SOURCE`；this is a stock retention oracle，not the still-pending stock `LogCleaner` compaction
+differential。
 
 ### 9.3 Checkpoint-before-trim barrier
 
@@ -767,8 +786,9 @@ normalization，captures the product snapshot under the partition lock，waits o
 `NereusUnifiedLog` only after durable trim。Focused `PartitionTest` and `NereusUnifiedLogFactoryTest` cover normalized
 HW、exact mid-batch target and local log-start publication。The process slice below now supplies one exact
 `OBJECT_WAL_SYNC_OBJECT` start-boundary/Fetch-wake-up/forced-restart path；the following provider-applied response-loss
-slice and its companion profile matrix close the same cut across all five profiles。Batch-middle/end/HW remain required
-before KF-RET-006 is complete。
+slice and its companion profile matrix close the same cut across all five profiles。Section 9.4.3 supplies the independent
+start/middle/end/HW mapping gate and makes KF-RET-006 `PASSED_CURRENT_SOURCE`；the row is not a claim that every boundary
+was repeated under all five profiles。
 
 #### 9.4.1 Forced-restart checkpoint/trim recovery
 
@@ -856,8 +876,38 @@ renewal 混入。
 release JVM 覆盖。三种 BookKeeper profile 共用真实 stock ZooKeeper/two-bookie service，但使用互不相交的
 namespace reservation、protocol activation、bucket 和 Kafka/Nereus directories。Fresh matrix 以 75/75 tasks、
 3m23s 通过，并由 M6 general/BookKeeper process aggregates 聚合。KF-RET-005/010 的 five-profile
-response-loss/checkpoint-barrier process slice 已闭合；batch-middle/end/HW、stock differential 和 broader chaos
-仍需后续门禁。
+response-loss/checkpoint-barrier process slice 已闭合；the boundary and retention differential are closed by the next
+gate，while broader chaos remains open。
+
+#### 9.4.3 Exact start/middle/end/HW process mapping
+
+`:nereus-kafka-adapter:f9DeleteRecordsBoundaryProcessIntegrationTest` uses the release distribution at locked fork
+`bd9963c980` and a real four-shard Oxia + LocalStack Object-WAL runtime。The fixture creates one RF1 delete-policy topic，
+then opens three independent producers；each producer sends three records with `batch.size=1 MiB`、`linger.ms=5000`、
+compression disabled and an explicit flush/close，yielding ordered offsets `0..8` in three request batches。The same live
+broker processes four stock `kafka-delete-records.sh` requests sequentially：
+
+```text
+requested target      3       4       6       HIGH_WATERMARK(-1)
+semantic boundary     start   middle  end / next-start   current HW
+expected lowWatermark 3       4       6       9
+expected latest       9       9       9       9
+expected first Fetch  3       4       6       none
+```
+
+Each CLI result must return the exact expected RF1 low watermark；Admin earliest/latest must equal
+`expectedLowWatermark/9` after every mutation。For targets below `9`，a consumer seeks to the new start and must receive
+both the exact offset and the value originally produced at that offset，proving the containing-entry filter does not leak
+trimmed records or round the logical start。After target `3`，the test also reloads Oxia and requires a rooted NKC1 with
+`checkpointLogStart=0`、`checkpointOffset=9` and durable trim/end `3/9` before proceeding。The `-1` request is passed
+through the stock CLI and only normalized inside the fork under the partition lock。
+
+The Gradle task is a first-class dependency of `phase9M6KafkaProcessCheck`，runs after the forced-restart trim gate and
+before response-loss injection，uses its own evidence directory
+`nereus-kafka-adapter/build/f9-kafka-delete-records-boundary-evidence/` and is explicitly classified as Docker-backed so
+service availability is checked before execution。A forced fresh run passes 64/64 actionable tasks in 38s。Together with
+the deterministic range/policy/config-race tests and 9.4.1/9.4.2 recovery/idempotence gates，this closes the current-source
+KF-RET-006 contract without marking F9-M5 final。
 
 ### 9.5 Trim vs materialization
 

@@ -6,6 +6,7 @@
 > 2026-07-29 ongoing transaction migration 增量：product `efe782d` 在同一 release topology 双向迁移 user 与 transaction-state partitions，原 OPEN producers 跨 handoff 完成 COMMIT/ABORT，LSO `0 -> 2 -> 4 -> 6 -> 8`、same-ID continuation 与 READ_COMMITTED filtering 均通过；injected resolution cuts、mandatory NTC2、profile expansion、remaining DeleteRecords boundaries 和更广 chaos 仍为 blocker
 > 2026-07-29 mandatory NTC2 deterministic 增量：product `b6b02f4` + fork `89b66ab03b` 已将 internal coordinator admission 绑定到 exact activated-generation `TOPIC_COMPACTED` probe；deterministic failure blocks storage installation/ready/election and triggers cancel + resign。Physical repair evidence is recorded in the next increment
 > 2026-07-29 mandatory NTC2 真实故障/修复增量（覆盖上一行末尾）：product `0ae8ca9` + fork `768924da60` 已在真实 Oxia/LocalStack/双 release broker 上通过 activated `__consumer_offsets` NTC2 删除与 byte-corruption 两轮 fail-closed，随后以 exact bytes + metadata 恢复、HEAD/full-read identity verification、bounded root/index CAS、coverage `REPLACE` 和 ordinary reassignment 恢复 coordinator。Object async/BookKeeper profile matrix、告警面、remaining DeleteRecords boundaries 与 wider chaos 仍为 rollout blocker
+> 2026-07-29 retention/DeleteRecords 增量：product `77480cb` + fork `bd9963c980` 已通过 stock UnifiedLog retention differential 和真实 Object-WAL native DeleteRecords start/middle/end/HW process gate；任务、49-commit/122-file source lock、evidence directory 与 M6 process aggregate 已接线。该结果关闭 KF-RET-001/002/003/006 current-source evidence，但不替代 stock `LogCleaner` differential、non-Object NTC2、injected transaction-resolution 或 final rollout aggregate
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -765,7 +766,9 @@ task passes 73/73 actionable tasks in 1m10s and belongs to `phase9M6KafkaProcess
 Native checkpoint/trim recovery、completed coordinator migration、live OPEN Object-WAL COMMIT/ABORT migration and real
 Object-WAL mandatory-NTC2 delete/corrupt + repair/re-election are covered by the later process gates；the deterministic
 admission half is product `b6b02f4` + fork `89b66ab03b`，and the physical repair half is product `0ae8ca9` + fork
-`768924da60`。Injected transaction-resolution cuts、non-Object NTC2 profile expansion、remaining boundary/chaos and
+`768924da60`。Product `77480cb` + fork `bd9963c980` additionally close the stock retention oracle and native
+DeleteRecords start/middle/end/HW mapping。Injected transaction-resolution cuts、non-Object NTC2 profile expansion、
+stock `LogCleaner` differential、remaining chaos and
 complete rollout evidence 尚未闭合，
 所以整个路径仍不能用于 production rollout readiness。
 
