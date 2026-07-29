@@ -63,8 +63,10 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
     val task = requested.substringAfterLast(':')
     task.startsWith("phase9M3")
         || task.startsWith("phase9M6Kafka")
+        || task == "phase9M5KafkaRetentionOracleCheck"
         || task == "f9M6KafkaProcessIntegrationTest"
         || task == "f9CheckpointTrimRecoveryProcessIntegrationTest"
+        || task == "f9DeleteRecordsBoundaryProcessIntegrationTest"
         || task == "f9TrimResponseLossProcessIntegrationTest"
         || task == "f9TrimProfileMatrixProcessIntegrationTest"
         || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
@@ -149,6 +151,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "f9BookKeeperLedgerDeletionProviderIntegrationTest",
         "f9M6KafkaProcessIntegrationTest",
         "f9CheckpointTrimRecoveryProcessIntegrationTest",
+        "f9DeleteRecordsBoundaryProcessIntegrationTest",
         "f9TrimResponseLossProcessIntegrationTest",
         "f9TrimProfileMatrixProcessIntegrationTest",
         "f9MultiBrokerTakeoverProcessIntegrationTest",
@@ -2894,7 +2897,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "768924da60f10b2b9611d19c0c4cb7df2a10947f",
+        "bd9963c980fdd7e7a99ec393694d4b6a540dc21a",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -3032,6 +3035,26 @@ tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
     )
 }
 
+tasks.register<Exec>("phase9M5KafkaRetentionOracleCheck") {
+    group = "verification"
+    description =
+        "Compare Nereus time, size, combined, high-watermark, and compact-only retention boundaries with stock UnifiedLog."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    dependsOn("publishPhase9DevelopmentArtifacts")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":core:spotlessCheck",
+        ":core:checkstyleTest",
+        ":core:test",
+        "--tests",
+        "kafka.log.nereus.KafkaRetentionOracleTest",
+        "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
+        "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
+    )
+}
+
 tasks.register<Exec>("phase9M6KafkaFeatureServerCommonCheck") {
     group = "verification"
     description = "Verify the opt-in nereus.storage.version definition and stock feature-set isolation."
@@ -3116,6 +3139,7 @@ tasks.register("phase9M6KafkaProcessCheck") {
         "Run real Oxia + LocalStack + BookKeeper cold-restart, broker/controller takeover, and in-flight fencing acceptance."
     dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9CheckpointTrimRecoveryProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9DeleteRecordsBoundaryProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9TrimResponseLossProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9TrimProfileMatrixProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest")
@@ -3240,6 +3264,7 @@ tasks.register("phase9M5RetentionCheck") {
     group = "verification"
     description = "Run the partial F9-M5 retention, DeleteRecords, and checkpoint-before-trim gate."
     dependsOn("phase9M4ProducerStateCheck")
+    dependsOn("phase9M5KafkaRetentionOracleCheck")
     dependsOn(":nereus-kafka-adapter:f9RetentionTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperLedgerDeletionProviderIntegrationTest")
 }

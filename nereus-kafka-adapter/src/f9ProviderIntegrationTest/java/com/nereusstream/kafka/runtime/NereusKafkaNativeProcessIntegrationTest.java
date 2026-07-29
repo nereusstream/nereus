@@ -77,6 +77,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.requests.DeleteRecordsRequest;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.bookkeeper.client.BKException;
@@ -677,6 +678,177 @@ class NereusKafkaNativeProcessIntegrationTest {
                                 initialRecordCount + 1L,
                                 restartServerLog,
                                 Duration.ofSeconds(30));
+                    }
+                });
+    }
+
+    @Test
+    @Timeout(value = 4, unit = TimeUnit.MINUTES)
+    void deleteRecordsMapsBatchStartMiddleEndAndHighWatermarkExactly()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-delete-boundary-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path deleteRecordsScript =
+                executable(kafkaHome.resolve("bin/kafka-delete-records.sh"));
+        Path config = root.resolve("delete-boundary-server.properties");
+        Path formatLog = root.resolve("delete-boundary-format.log");
+        Path serverLog = root.resolve("delete-boundary-server.log");
+        String bucket = "n-delete-boundary-" + UUID.randomUUID();
+        String topic = "delete-boundary-process-" + UUID.randomUUID();
+        int brokerPort = freePort();
+        int controllerPort = differentFreePort(brokerPort);
+        String bootstrapServers = "127.0.0.1:" + brokerPort;
+        String nereusCluster = writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                root.resolve("delete-boundary-kafka-log"),
+                root.resolve("delete-boundary-metadata-log"),
+                root.resolve("delete-boundary-cache"));
+
+        createBucket(bucket);
+        formatStorage(formatScript, kafkaHome, config, formatLog);
+
+        TopicPartition partition = new TopicPartition(topic, 0);
+        List<byte[]> values = new ArrayList<>();
+        for (int offset = 0; offset < 9; offset++) {
+            values.add(
+                    ("delete-boundary-value-" + offset)
+                            .getBytes(StandardCharsets.UTF_8));
+        }
+
+        runBrokerWithProcess(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                serverLog,
+                bootstrapServers,
+                StopMode.NORMAL,
+                broker -> {
+                    try (Admin admin =
+                            Admin.create(checkpointAdminProperties(bootstrapServers))) {
+                        NewTopic created = new NewTopic(topic, 1, (short) 1);
+                        created.configs(Map.of(
+                                "cleanup.policy", "delete",
+                                "segment.bytes", "1048576"));
+                        admin.createTopics(List.of(created))
+                                .all()
+                                .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+
+                        List<RecordMetadata> produced =
+                                produceThreeRecordBatches(
+                                        bootstrapServers,
+                                        topic,
+                                        values);
+                        assertThat(produced)
+                                .extracting(RecordMetadata::offset)
+                                .containsExactly(
+                                        0L,
+                                        1L,
+                                        2L,
+                                        3L,
+                                        4L,
+                                        5L,
+                                        6L,
+                                        7L,
+                                        8L);
+                        assertOffsets(admin, partition, 0, 9);
+
+                        KafkaPartitionId partitionId = kafkaPartitionId(
+                                bootstrapServers,
+                                partition,
+                                topic);
+                        long[] requestedOffsets = {
+                                3L,
+                                4L,
+                                6L,
+                                DeleteRecordsRequest.HIGH_WATERMARK
+                        };
+                        long[] expectedLowWatermarks = {3L, 4L, 6L, 9L};
+                        String[] boundaries = {
+                                "batch-start",
+                                "batch-middle",
+                                "batch-end",
+                                "high-watermark"
+                        };
+                        for (int index = 0;
+                                index < requestedOffsets.length;
+                                index++) {
+                            Path offsetJson =
+                                    root.resolve(
+                                            "delete-boundary-"
+                                                    + boundaries[index]
+                                                    + ".json");
+                            Path output =
+                                    root.resolve(
+                                            "delete-boundary-"
+                                                    + boundaries[index]
+                                                    + ".log");
+                            Process deletion =
+                                    startNativeDeleteRecords(
+                                            deleteRecordsScript,
+                                            kafkaHome,
+                                            bootstrapServers,
+                                            partition,
+                                            requestedOffsets[index],
+                                            offsetJson,
+                                            output);
+                            try {
+                                awaitNativeDeleteRecords(
+                                        deletion,
+                                        partition,
+                                        expectedLowWatermarks[index],
+                                        output,
+                                        broker,
+                                        serverLog);
+                            } finally {
+                                if (deletion.isAlive()) {
+                                    deletion.destroyForcibly();
+                                    deletion.waitFor(10, TimeUnit.SECONDS);
+                                }
+                            }
+                            assertOffsets(
+                                    admin,
+                                    partition,
+                                    expectedLowWatermarks[index],
+                                    9);
+                            if (expectedLowWatermarks[index] < 9) {
+                                ConsumerRecord<byte[], byte[]> retained =
+                                        fetch(
+                                                bootstrapServers,
+                                                partition,
+                                                expectedLowWatermarks[index],
+                                                serverLog);
+                                assertThat(retained.offset())
+                                        .as(boundaries[index] + " first visible offset")
+                                        .isEqualTo(expectedLowWatermarks[index]);
+                                assertThat(retained.value())
+                                        .isEqualTo(
+                                                values.get(
+                                                        (int)
+                                                                expectedLowWatermarks[
+                                                                        index]));
+                            }
+                            if (index == 0) {
+                                KafkaCheckpointReferenceRecord checkpoint =
+                                        awaitTrimmedCheckpoint(
+                                                nereusCluster,
+                                                partitionId,
+                                                0,
+                                                3,
+                                                9,
+                                                serverLog,
+                                                Duration.ofSeconds(30));
+                                assertThat(checkpoint.checkpointOffset()).isEqualTo(9);
+                            }
+                        }
                     }
                 });
     }
@@ -6571,6 +6743,47 @@ class NereusKafkaNativeProcessIntegrationTest {
             return producer.send(new ProducerRecord<>(topic, 0, key, value))
                     .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
         }
+    }
+
+    private static List<RecordMetadata> produceThreeRecordBatches(
+            String bootstrapServers,
+            String topic,
+            List<byte[]> values
+    ) throws Exception {
+        if (values.size() != 9) {
+            throw new IllegalArgumentException(
+                    "DeleteRecords boundary fixture requires exactly nine values");
+        }
+        List<RecordMetadata> produced = new ArrayList<>(values.size());
+        for (int batch = 0; batch < 3; batch++) {
+            Properties properties = producerProperties(bootstrapServers);
+            properties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, "1048576");
+            properties.setProperty(ProducerConfig.LINGER_MS_CONFIG, "5000");
+            properties.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "none");
+            try (KafkaProducer<byte[], byte[]> producer =
+                    new KafkaProducer<>(properties)) {
+                List<Future<RecordMetadata>> pending = new ArrayList<>(3);
+                for (int index = 0; index < 3; index++) {
+                    int offset = batch * 3 + index;
+                    pending.add(
+                            producer.send(
+                                    new ProducerRecord<>(
+                                            topic,
+                                            0,
+                                            ("delete-boundary-key-" + offset)
+                                                    .getBytes(StandardCharsets.UTF_8),
+                                            values.get(offset))));
+                }
+                producer.flush();
+                for (Future<RecordMetadata> future : pending) {
+                    produced.add(
+                            future.get(
+                                    CLIENT_TIMEOUT.toSeconds(),
+                                    TimeUnit.SECONDS));
+                }
+            }
+        }
+        return List.copyOf(produced);
     }
 
     private static PendingProduce beginSingleAttemptProduce(

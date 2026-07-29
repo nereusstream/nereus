@@ -281,13 +281,42 @@ tasks.register<Test>("f9CheckpointTrimRecoveryProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9DeleteRecordsBoundaryProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Run native Kafka DeleteRecords at a batch start, middle, end, and the high-watermark sentinel."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9CheckpointTrimRecoveryProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-delete-records-boundary-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "deleteRecordsMapsBatchStartMiddleEndAndHighWatermarkExactly",
+        )
+    }
+}
+
 tasks.register<Test>("f9TrimResponseLossProcessIntegrationTest") {
     group = "verification"
     description =
         "Lose one provider-applied trim response, kill the broker, and prove fresh-process DeleteRecords convergence."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
     dependsOn(f9TrimFaultAgentJar)
-    shouldRunAfter(tasks.named("f9CheckpointTrimRecoveryProcessIntegrationTest"))
+    shouldRunAfter(tasks.named("f9DeleteRecordsBoundaryProcessIntegrationTest"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
     classpath = f9ProviderIntegrationTest.runtimeClasspath
     systemProperty(
