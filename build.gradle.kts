@@ -74,6 +74,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
         || task == "f9CoordinatorMigrationProcessIntegrationTest"
         || task == "f9OngoingTransactionMigrationProcessIntegrationTest"
+        || task == "f9TransactionResolutionCutProcessIntegrationTest"
         || task == "f9MandatoryInternalTopicNtc2ProcessIntegrationTest"
         || task == "f9MultiControllerFailoverProcessIntegrationTest"
         || task == "f9ActivationCutFailoverProcessIntegrationTest"
@@ -158,6 +159,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "f9MultiBrokerTakeoverProcessIntegrationTest",
         "f9CoordinatorMigrationProcessIntegrationTest",
         "f9OngoingTransactionMigrationProcessIntegrationTest",
+        "f9TransactionResolutionCutProcessIntegrationTest",
         "f9MandatoryInternalTopicNtc2ProcessIntegrationTest",
         "f9MultiControllerFailoverProcessIntegrationTest",
         "f9ActivationCutFailoverProcessIntegrationTest",
@@ -2898,7 +2900,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "bf8a2946e5daf521b817708b2ed4324a974c2cf6",
+        "1e3783458b62c9dede252446fde6729ac8075ae3",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -3166,6 +3168,7 @@ tasks.register("phase9M6KafkaProcessCheck") {
     dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9CoordinatorMigrationProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9OngoingTransactionMigrationProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9TransactionResolutionCutProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MandatoryInternalTopicNtc2ProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiControllerFailoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9ActivationCutFailoverProcessIntegrationTest")

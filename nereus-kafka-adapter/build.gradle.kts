@@ -25,6 +25,7 @@ val f9ProviderIntegrationTest by sourceSets.creating {
 val f9BookKeeperFaultAgent by sourceSets.creating
 val f9ActivationFaultAgent by sourceSets.creating
 val f9TrimFaultAgent by sourceSets.creating
+val f9TransactionResolutionFaultAgent by sourceSets.creating
 
 configurations[f9ProviderIntegrationTest.implementationConfigurationName].extendsFrom(
     configurations.testImplementation.get(),
@@ -49,6 +50,10 @@ dependencies {
     add(f9BookKeeperFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
     add(f9ActivationFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
     add(f9TrimFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
+    add(
+        f9TransactionResolutionFaultAgent.implementationConfigurationName,
+        "net.bytebuddy:byte-buddy:1.17.7",
+    )
 }
 
 val f9BookKeeperFaultAgentJar =
@@ -108,6 +113,27 @@ val f9TrimFaultAgentJar =
         from(f9TrimFaultAgent.output)
         from({
             configurations[f9TrimFaultAgent.runtimeClasspathConfigurationName]
+                .map { dependency ->
+                    if (dependency.isDirectory) dependency else zipTree(dependency)
+                }
+        })
+    }
+
+val f9TransactionResolutionFaultAgentJar =
+    tasks.register<Jar>("f9TransactionResolutionFaultAgentJar") {
+        group = "build"
+        description =
+            "Build the test-only Java agent that gates one transaction marker append boundary."
+        archiveFileName.set("nereus-f9-transaction-resolution-fault-agent.jar")
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        manifest {
+            attributes[
+                "Premain-Class"
+            ] = "com.nereusstream.kafka.testing.agent.TransactionMarkerCompletionGateAgent"
+        }
+        from(f9TransactionResolutionFaultAgent.output)
+        from({
+            configurations[f9TransactionResolutionFaultAgent.runtimeClasspathConfigurationName]
                 .map { dependency ->
                     if (dependency.isDirectory) dependency else zipTree(dependency)
                 }
@@ -468,13 +494,52 @@ tasks.register<Test>("f9OngoingTransactionMigrationProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9TransactionResolutionCutProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Kill a release broker before and after durable transaction-marker append completion, " +
+            "then prove fresh-process abort resolution."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9TransactionResolutionFaultAgentJar)
+    shouldRunAfter(tasks.named("f9OngoingTransactionMigrationProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.transaction.resolution.fault.agent",
+        layout.buildDirectory
+            .file("libs/nereus-f9-transaction-resolution-fault-agent.jar")
+            .get()
+            .asFile
+            .absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-transaction-resolution-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "preparedAbortRecoversAcrossTransactionMarkerProcessCuts",
+        )
+    }
+}
+
 tasks.register<Test>("f9MandatoryInternalTopicNtc2ProcessIntegrationTest") {
     group = "verification"
     description =
         "Delete and corrupt activated internal-topic NTC2 objects, prove coordinator election fails closed, " +
             "then restore the exact bytes and prove ordinary re-election."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
-    shouldRunAfter(tasks.named("f9OngoingTransactionMigrationProcessIntegrationTest"))
+    shouldRunAfter(tasks.named("f9TransactionResolutionCutProcessIntegrationTest"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
     classpath = f9ProviderIntegrationTest.runtimeClasspath
     systemProperty(

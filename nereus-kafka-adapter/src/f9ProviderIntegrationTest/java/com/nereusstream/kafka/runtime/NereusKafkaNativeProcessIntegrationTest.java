@@ -2051,6 +2051,374 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     @Test
+    @Timeout(value = 8, unit = TimeUnit.MINUTES)
+    void preparedAbortRecoversAcrossTransactionMarkerProcessCuts()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-transaction-resolution-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path faultAgent = requiredTransactionResolutionFaultAgent();
+        for (TransactionMarkerCut cut : TransactionMarkerCut.values()) {
+            runTransactionMarkerProcessCut(
+                    cut,
+                    kafkaHome,
+                    formatScript,
+                    startScript,
+                    faultAgent);
+        }
+    }
+
+    private void runTransactionMarkerProcessCut(
+            TransactionMarkerCut cut,
+            Path kafkaHome,
+            Path formatScript,
+            Path startScript,
+            Path faultAgent
+    ) throws Exception {
+        String slug = cut.slug();
+        Path brokerOneConfig = root.resolve(slug + "-one.properties");
+        Path brokerTwoConfig = root.resolve(slug + "-two.properties");
+        Path brokerOneFormatLog = root.resolve(slug + "-one-format.log");
+        Path brokerTwoFormatLog = root.resolve(slug + "-two-format.log");
+        Path brokerOneServerLog = root.resolve(slug + "-one-server.log");
+        Path brokerTwoCutLog = root.resolve(slug + "-two-cut-server.log");
+        Path brokerTwoRecoveryLog = root.resolve(slug + "-two-recovery-server.log");
+        Path agentArm = root.resolve(slug + "-agent-arm");
+        Path agentCaptured = root.resolve(slug + "-agent-captured");
+        Path agentBlocked = root.resolve(slug + "-agent-blocked");
+        Path agentApplied = root.resolve(slug + "-agent-applied");
+        Path agentFailure = root.resolve(slug + "-agent-failure");
+        Path agentInstalled = root.resolve(slug + "-agent-installed");
+        String bucket =
+                "nereus-f9-"
+                        + slug
+                        + "-"
+                        + UUID.randomUUID().toString().substring(0, 12);
+        String topic = "process-" + slug + "-" + UUID.randomUUID();
+        String transactionalId = "process-" + slug + "-transaction-" + UUID.randomUUID();
+        String nereusCluster = "f9-process-" + slug + "-" + UUID.randomUUID();
+        String kafkaClusterId = org.apache.kafka.common.Uuid.randomUuid().toString();
+        int brokerOnePort = freePort();
+        int controllerPort = differentFreePort(brokerOnePort);
+        int brokerTwoPort = differentFreePort(brokerOnePort, controllerPort);
+        String brokerOneBootstrap = "127.0.0.1:" + brokerOnePort;
+        String brokerTwoBootstrap = "127.0.0.1:" + brokerTwoPort;
+        String clusterBootstrap = brokerOneBootstrap + "," + brokerTwoBootstrap;
+
+        createBucket(bucket);
+        writeConfiguration(
+                brokerOneConfig,
+                brokerOnePort,
+                controllerPort,
+                bucket,
+                root.resolve(slug + "-one-log"),
+                root.resolve(slug + "-one-metadata"),
+                root.resolve(slug + "-one-cache"),
+                "OBJECT_WAL_SYNC_OBJECT",
+                null,
+                1,
+                true,
+                nereusCluster);
+        writeConfiguration(
+                brokerTwoConfig,
+                brokerTwoPort,
+                controllerPort,
+                bucket,
+                root.resolve(slug + "-two-log"),
+                root.resolve(slug + "-two-metadata"),
+                root.resolve(slug + "-two-cache"),
+                "OBJECT_WAL_SYNC_OBJECT",
+                null,
+                2,
+                false,
+                nereusCluster);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerOneConfig,
+                brokerOneFormatLog,
+                kafkaClusterId);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerTwoConfig,
+                brokerTwoFormatLog,
+                kafkaClusterId);
+
+        String agentOptions = transactionResolutionFaultAgentOptions(
+                faultAgent,
+                cut,
+                agentArm,
+                agentCaptured,
+                agentBlocked,
+                agentApplied,
+                agentFailure,
+                agentInstalled,
+                topic);
+        TopicPartition userPartition = new TopicPartition(topic, 0);
+        TopicPartition transactionPartition =
+                new TopicPartition(TRANSACTION_STATE_TOPIC, 0);
+        byte[] abortedKey = (slug + "-aborted-key").getBytes(StandardCharsets.UTF_8);
+        byte[] abortedValue = (slug + "-aborted-value").getBytes(StandardCharsets.UTF_8);
+        byte[] continuedKey = (slug + "-continued-key").getBytes(StandardCharsets.UTF_8);
+        byte[] continuedValue = (slug + "-continued-value").getBytes(StandardCharsets.UTF_8);
+
+        Process brokerOne = start(
+                List.of(startScript.toString(), brokerOneConfig.toString()),
+                kafkaHome,
+                brokerOneServerLog);
+        AtomicReference<Process> brokerTwo = new AtomicReference<>();
+        AtomicReference<Path> brokerTwoLog = new AtomicReference<>(brokerTwoCutLog);
+        OpenTransaction aborting = null;
+        Throwable failure = null;
+        try {
+            awaitBroker(brokerOneBootstrap, brokerOne, brokerOneServerLog);
+            try (Admin admin = Admin.create(adminProperties(brokerOneBootstrap))) {
+                admin.createTopics(List.of(
+                                new NewTopic(topic, Map.of(0, List.of(1)))))
+                        .all()
+                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            }
+            aborting = beginTransaction(
+                    clusterBootstrap,
+                    transactionalId,
+                    topic,
+                    abortedKey,
+                    abortedValue,
+                    120_000);
+            assertThat(aborting.metadata().offset()).isZero();
+            assertThat(readCommittedEndOffset(clusterBootstrap, userPartition))
+                    .as("the prepared-abort fixture must start with an OPEN transaction")
+                    .isZero();
+
+            Process cutBroker = start(
+                    List.of(startScript.toString(), brokerTwoConfig.toString()),
+                    kafkaHome,
+                    brokerTwoCutLog,
+                    Map.of("KAFKA_OPTS", agentOptions));
+            brokerTwo.set(cutBroker);
+            awaitBroker(brokerTwoBootstrap, cutBroker, brokerTwoCutLog);
+            awaitMarker(
+                    agentInstalled,
+                    cutBroker,
+                    brokerTwoCutLog,
+                    Duration.ofSeconds(30));
+            awaitClusterBrokers(
+                    clusterBootstrap,
+                    List.of(1, 2),
+                    List.of(brokerOne, cutBroker),
+                    brokerOneServerLog,
+                    brokerTwoCutLog);
+            try (Admin admin = Admin.create(adminProperties(clusterBootstrap))) {
+                reassignPartitions(
+                        admin,
+                        List.of(userPartition),
+                        2,
+                        brokerOne,
+                        cutBroker,
+                        brokerOneServerLog,
+                        brokerTwoCutLog);
+                awaitPartitionLeader(
+                        admin,
+                        transactionPartition,
+                        1,
+                        brokerOne,
+                        cutBroker,
+                        brokerOneServerLog,
+                        brokerTwoCutLog);
+            }
+            ConsumerRecord<byte[], byte[]> migratedOpen =
+                    fetch(
+                            clusterBootstrap,
+                            userPartition,
+                            0L,
+                            brokerTwoCutLog);
+            assertThat(migratedOpen.key())
+                    .as("the cut broker must serve the migrated OPEN transaction before arming")
+                    .isEqualTo(abortedKey);
+            assertThat(migratedOpen.value()).isEqualTo(abortedValue);
+            assertThat(readCommittedEndOffset(clusterBootstrap, userPartition))
+                    .as("handoff must preserve the unresolved OPEN transaction")
+                    .isZero();
+
+            Files.createFile(agentArm);
+            AtomicReference<Throwable> restartFailure = new AtomicReference<>();
+            Thread restarter = new Thread(
+                    () -> {
+                        try {
+                            Path boundary =
+                                    cut == TransactionMarkerCut.BEFORE_PROVIDER
+                                            ? agentBlocked
+                                            : agentApplied;
+                            assertThat(awaitMarkerOrFailure(
+                                            boundary,
+                                            agentFailure,
+                                            cutBroker,
+                                            brokerTwoCutLog,
+                                            Duration.ofSeconds(45))
+                                            .strip())
+                                    .isEqualTo(cut.agentValue());
+                            assertThat(agentCaptured).exists();
+                            killBroker(cutBroker, brokerTwoCutLog);
+                            Process recoveredBroker = start(
+                                    List.of(
+                                            startScript.toString(),
+                                            brokerTwoConfig.toString()),
+                                    kafkaHome,
+                                    brokerTwoRecoveryLog);
+                            brokerTwo.set(recoveredBroker);
+                            brokerTwoLog.set(brokerTwoRecoveryLog);
+                            awaitBroker(
+                                    brokerTwoBootstrap,
+                                    recoveredBroker,
+                                    brokerTwoRecoveryLog);
+                        } catch (Throwable cutFailure) {
+                            restartFailure.set(cutFailure);
+                        }
+                    },
+                    "f9-" + slug + "-restarter");
+            restarter.setDaemon(true);
+            restarter.start();
+            try {
+                aborting.abort();
+            } catch (RuntimeException expectedUncertainOutcome) {
+                // The cut deliberately allows EndTxn to be client-uncertain. Durable recovery below is authoritative.
+            }
+            restarter.join(PROCESS_TIMEOUT.plus(CLIENT_TIMEOUT).toMillis());
+            assertThat(restarter.isAlive())
+                    .as("the transaction-resolution restarter must terminate")
+                    .isFalse();
+            if (restartFailure.get() != null) {
+                rethrow(restartFailure.get());
+            }
+            assertThat(agentCaptured).exists();
+            if (cut == TransactionMarkerCut.BEFORE_PROVIDER) {
+                assertThat(agentBlocked).exists();
+                assertThat(agentApplied).doesNotExist();
+            } else {
+                assertThat(agentApplied).exists();
+                assertThat(agentBlocked).doesNotExist();
+            }
+            Process recoveredBroker = brokerTwo.get();
+            assertThat(recoveredBroker)
+                    .as("the cut broker must restart from the same durable assignment")
+                    .isNotNull();
+            awaitClusterBrokers(
+                    clusterBootstrap,
+                    List.of(1, 2),
+                    List.of(brokerOne, recoveredBroker),
+                    brokerOneServerLog,
+                    brokerTwoRecoveryLog);
+            try (Admin admin = Admin.create(adminProperties(clusterBootstrap))) {
+                awaitPartitionLeader(
+                        admin,
+                        userPartition,
+                        2,
+                        brokerOne,
+                        recoveredBroker,
+                        brokerOneServerLog,
+                        brokerTwoRecoveryLog);
+                awaitPartitionLeader(
+                        admin,
+                        transactionPartition,
+                        1,
+                        brokerOne,
+                        recoveredBroker,
+                        brokerOneServerLog,
+                        brokerTwoRecoveryLog);
+            }
+            long resolvedEnd = awaitReadCommittedEndOffsetAtLeast(
+                    clusterBootstrap,
+                    userPartition,
+                    2L,
+                    List.of(brokerOne, recoveredBroker),
+                    brokerOneServerLog,
+                    brokerTwoRecoveryLog);
+            assertThat(resolvedEnd)
+                    .as("one recovery may add at most one duplicate abort marker")
+                    .isLessThanOrEqualTo(3L);
+            aborting.close();
+            aborting = null;
+
+            RecordMetadata continued = transactionalProduce(
+                    clusterBootstrap,
+                    transactionalId,
+                    topic,
+                    continuedKey,
+                    continuedValue);
+            assertThat(continued.offset())
+                    .as("the same transactional ID must continue at the recovered LSO")
+                    .isEqualTo(resolvedEnd);
+            ConsumerRecord<byte[], byte[]> visible = fetchReadCommitted(
+                    clusterBootstrap,
+                    userPartition,
+                    0L,
+                    brokerTwoRecoveryLog);
+            assertThat(visible.offset())
+                    .as("READ_COMMITTED must skip data from the cut prepared abort")
+                    .isEqualTo(resolvedEnd);
+            assertThat(visible.key()).isEqualTo(continuedKey);
+            assertThat(visible.value()).isEqualTo(continuedValue);
+            awaitReadCommittedEndOffset(
+                    clusterBootstrap,
+                    userPartition,
+                    resolvedEnd + 2,
+                    List.of(brokerOne, recoveredBroker),
+                    brokerOneServerLog,
+                    brokerTwoRecoveryLog);
+            assertThat(objectCount(bucket))
+                    .as("the transaction-resolution cut must remain Object-WAL backed")
+                    .isPositive();
+        } catch (Throwable operationFailure) {
+            failure = operationFailure;
+        }
+        if (aborting != null) {
+            try {
+                aborting.close();
+            } catch (Throwable closeFailure) {
+                failure = mergeFailure(failure, closeFailure);
+            }
+        }
+        Process currentBrokerTwo = brokerTwo.get();
+        if (currentBrokerTwo != null && currentBrokerTwo.isAlive()) {
+            try {
+                stopBroker(currentBrokerTwo, brokerTwoLog.get());
+            } catch (Throwable shutdownFailure) {
+                failure = mergeFailure(failure, shutdownFailure);
+            }
+        }
+        try {
+            stopBroker(brokerOne, brokerOneServerLog);
+        } catch (Throwable shutdownFailure) {
+            failure = mergeFailure(failure, shutdownFailure);
+        }
+        if (failure != null) {
+            try {
+                preserveAdditionalFailureEvidence(
+                        brokerOneConfig,
+                        brokerTwoConfig,
+                        brokerOneFormatLog,
+                        brokerTwoFormatLog,
+                        brokerOneServerLog,
+                        brokerTwoCutLog,
+                        brokerTwoRecoveryLog,
+                        agentArm,
+                        agentCaptured,
+                        agentBlocked,
+                        agentApplied,
+                        agentInstalled);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    @Test
     @Timeout(value = 5, unit = TimeUnit.MINUTES)
     void mandatoryInternalTopicNtc2FailureBlocksElectionUntilPhysicalRepair()
             throws Exception {
@@ -7150,6 +7518,41 @@ class NereusKafkaNativeProcessIntegrationTest {
         throw timeout;
     }
 
+    private static long awaitReadCommittedEndOffsetAtLeast(
+            String bootstrapServers,
+            TopicPartition partition,
+            long minimumEndOffset,
+            List<Process> brokers,
+            Path... serverLogs
+    ) throws Exception {
+        long deadline = System.nanoTime() + CLIENT_TIMEOUT.toNanos();
+        Long lastObserved = null;
+        Throwable lastFailure = null;
+        while (System.nanoTime() < deadline) {
+            assertProcessesAlive(brokers, serverLogs);
+            try {
+                lastObserved = readCommittedEndOffset(bootstrapServers, partition);
+                if (lastObserved >= minimumEndOffset) {
+                    return lastObserved;
+                }
+            } catch (Throwable failure) {
+                lastFailure = failure;
+            }
+            Thread.sleep(250);
+        }
+        AssertionError timeout = new AssertionError(
+                "read_committed end offset did not reach "
+                        + minimumEndOffset
+                        + "; last observed "
+                        + lastObserved
+                        + ":\n"
+                        + joinedLogs(serverLogs));
+        if (lastFailure != null) {
+            timeout.addSuppressed(lastFailure);
+        }
+        throw timeout;
+    }
+
     private static void runBroker(
             Path startScript,
             Path kafkaHome,
@@ -7384,6 +7787,41 @@ class NereusKafkaNativeProcessIntegrationTest {
         while (System.nanoTime() < deadline) {
             if (Files.exists(marker)) {
                 return Files.readString(marker, StandardCharsets.UTF_8);
+            }
+            if (!broker.isAlive()) {
+                throw new AssertionError(
+                        "Kafka process exited before publishing marker "
+                                + marker.getFileName()
+                                + ":\n"
+                                + readLog(serverLog));
+            }
+            Thread.sleep(100);
+        }
+        throw new AssertionError(
+                "Kafka process did not publish marker "
+                        + marker.getFileName()
+                        + " before the deadline:\n"
+                + readLog(serverLog));
+    }
+
+    private static String awaitMarkerOrFailure(
+            Path marker,
+            Path failureMarker,
+            Process broker,
+            Path serverLog,
+            Duration timeout
+    ) throws Exception {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (Files.exists(marker)) {
+                return Files.readString(marker, StandardCharsets.UTF_8);
+            }
+            if (Files.exists(failureMarker)) {
+                throw new AssertionError(
+                        "transaction marker failed before reaching the injected boundary:\n"
+                                + Files.readString(failureMarker, StandardCharsets.UTF_8)
+                                + "\n"
+                                + readLog(serverLog));
             }
             if (!broker.isAlive()) {
                 throw new AssertionError(
@@ -8294,6 +8732,21 @@ class NereusKafkaNativeProcessIntegrationTest {
         return agent;
     }
 
+    private static Path requiredTransactionResolutionFaultAgent() {
+        String configured =
+                System.getProperty(
+                        "nereus.kafka.transaction.resolution.fault.agent");
+        assertThat(configured)
+                .as("nereus.kafka.transaction.resolution.fault.agent")
+                .isNotBlank();
+        Path agent = Path.of(configured).toAbsolutePath().normalize();
+        assertThat(agent)
+                .as("configured transaction-resolution fault-agent JAR")
+                .exists()
+                .isRegularFile();
+        return agent;
+    }
+
     private static String activationFaultAgentOptions(
             Path agent,
             ActivationControllerCut cut,
@@ -8436,6 +8889,56 @@ class NereusKafkaNativeProcessIntegrationTest {
                         .collect(
                                 java.util.stream.Collectors
                                         .joining(","));
+    }
+
+    private static String transactionResolutionFaultAgentOptions(
+            Path agent,
+            TransactionMarkerCut cut,
+            Path arm,
+            Path captured,
+            Path blocked,
+            Path applied,
+            Path failure,
+            Path installed,
+            String topic
+    ) {
+        Map<String, String> arguments =
+                Map.of(
+                        "phase",
+                        cut.agentValue(),
+                        "arm",
+                        arm.toString(),
+                        "captured",
+                        captured.toString(),
+                        "blocked",
+                        blocked.toString(),
+                        "applied",
+                        applied.toString(),
+                        "failure",
+                        failure.toString(),
+                        "installed",
+                        installed.toString(),
+                        "topic",
+                        topic);
+        arguments.forEach(
+                (name, value) ->
+                        assertThat(value)
+                                .as(
+                                        "transaction-resolution fault-agent "
+                                                + name
+                                                + " argument")
+                                .doesNotContain(",", "="));
+        assertThat(agent.toString())
+                .as("transaction-resolution fault-agent JAR path")
+                .doesNotContain(" ");
+        return "-javaagent:"
+                + agent
+                + "="
+                + arguments.entrySet()
+                        .stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .map(entry -> entry.getKey() + "=" + entry.getValue())
+                        .collect(java.util.stream.Collectors.joining(","));
     }
 
     private static Path extractReleaseDistribution(
@@ -9854,6 +10357,34 @@ class NereusKafkaNativeProcessIntegrationTest {
         @Override
         public void close() {
             producer.close(Duration.ZERO);
+        }
+    }
+
+    private enum TransactionMarkerCut {
+        BEFORE_PROVIDER(
+                "transaction-marker-before-provider",
+                "before-provider"),
+        AFTER_PROVIDER(
+                "transaction-marker-after-provider",
+                "after-provider");
+
+        private final String slug;
+        private final String agentValue;
+
+        TransactionMarkerCut(
+                String slug,
+                String agentValue
+        ) {
+            this.slug = slug;
+            this.agentValue = agentValue;
+        }
+
+        private String slug() {
+            return slug;
+        }
+
+        private String agentValue() {
+            return agentValue;
         }
     }
 }

@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "51" ]] \
-    || fail "expected fifty-one reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "52" ]] \
+    || fail "expected fifty-two reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -86,6 +86,7 @@ core/src/main/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryBridge.jav
 core/src/main/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapper.java
 core/src/main/java/kafka/server/nereus/NereusKafkaStorageClusterSnapshotProvider.java
 core/src/main/scala/kafka/cluster/Partition.scala
+core/src/main/scala/kafka/coordinator/transaction/TransactionMarkerChannelManager.scala
 core/src/main/scala/kafka/Kafka.scala
 core/src/main/scala/kafka/log/LogManager.scala
 core/src/main/scala/kafka/log/UnifiedLogFactory.scala
@@ -136,6 +137,7 @@ core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryBridgeTest
 core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryTest.java
 core/src/test/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapperTest.java
 core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
+core/src/test/scala/unit/kafka/coordinator/transaction/TransactionMarkerChannelManagerTest.scala
 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
 core/src/test/scala/unit/kafka/log/nereus/NereusUnifiedLogFactoryTest.scala
@@ -181,7 +183,7 @@ storage/src/test/java/org/apache/kafka/storage/internals/log/ProducerStateManage
 FILES
 )"
 [[ "$actual_changes" == "$expected_changes" ]] \
-    || fail "fork change set differs from the reviewed one-hundred-twenty-four-file log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control slice"
+    || fail "fork change set differs from the reviewed one-hundred-twenty-six-file log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control slice"
 
 while read -r expected path; do
     [[ -n "$expected" ]] || continue
@@ -222,6 +224,7 @@ b903540487b6553d4a1944b5f36e9567fc9262ba core/src/main/java/kafka/server/nereus/
 1970537a48ac13fd77c6bc32fd2bf1e99fb31670 core/src/main/java/kafka/server/nereus/NereusKafkaStorageClusterSnapshotProvider.java
 ae2387ee9d6b318eaf37f62840d8ca3ac44f4e9b core/src/main/scala/kafka/Kafka.scala
 d477c7485376ae62f82abcb8393c9582be8794df core/src/main/scala/kafka/cluster/Partition.scala
+2f44ef68e7a275e175688f8caa87df90c042b8f6 core/src/main/scala/kafka/coordinator/transaction/TransactionMarkerChannelManager.scala
 69b47dc0c8441ec0e22408b6a7a4ea42e56a9d2b core/src/main/scala/kafka/log/LogManager.scala
 27cf63cf77c51cd5d1cdc9599629e8e6b644e93e core/src/main/scala/kafka/log/UnifiedLogFactory.scala
 13424fa161ab9825b2274a4b124c5cb80d01070e core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
@@ -271,6 +274,7 @@ ec32f2b8e23e9548a7a8b4e8bdb717a7949dc788 core/src/test/java/kafka/server/nereus/
 0dad9ef15898372476787e354ce96ac2415a8a3c core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryTest.java
 676c053d9608eec99321f8d8dc08e265a9a4fcde core/src/test/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapperTest.java
 e06ff96da5853e2ab0afc1cbc3e4153b981f7b7d core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
+2827d460f295902e75076ad567587db182d11fd2 core/src/test/scala/unit/kafka/coordinator/transaction/TransactionMarkerChannelManagerTest.scala
 fa5e33215b9b9ae54e41a9d49e52785ffe994b63 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 3de59699c5ffa95d1b86ab12c2bbe3808fe162aa core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
 85387fbaddd2848806536d80e7443089b65f0112 core/src/test/scala/unit/kafka/log/nereus/NereusUnifiedLogFactoryTest.scala
@@ -910,4 +914,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; fifty-one commits, one hundred twenty-four log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"
+echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; fifty-two commits, one hundred twenty-six log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"
