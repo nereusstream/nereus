@@ -16,6 +16,15 @@ F9 inherited-source-lock correction（2026-07-30）：product `main@4efa103` rep
 The SCL010 pre-evidence and JUnit aggregator now also record and assert this Pulsar branch/SHA/clean receipt；the first
 full-final attempt stopped at the old lock before any F9 scenario failed，and final passage remains pending。
 
+F9 inherited-compatibility correction（2026-07-30）：the second final attempt reached current Pulsar and exposed the
+removed `ManagedLedgerInternalStats.properties` and `ManagedCursor.hasBacklog` surfaces，then the full
+managed-ledger regression exposed a pre-existing F9 exact-key regression that had hidden legacy F2 NCP1
+`OPAQUE_RECORD_BATCH` generations。Product `main@4d8d627` removes the deleted stats assignment without moving
+managed-ledger properties into physical-ledger properties，updates the audited cursor surface and registers exactly
+two NCP1 logical keys（legacy `OPAQUE_RECORD_BATCH` plus current `PULSAR_ENTRY_BATCH`，no wildcard）。Focused core
+reader tests pass 22/22 tasks；focused managed-ledger tests pass 53/53 tasks；all 223 managed-ledger tests pass in
+44/44 tasks。Final aggregate passage remains pending。
+
 F9 current-source performance update（2026-07-30）：product `main@33c889c` adds canonical
 `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` and root `phase9PerformanceCheck`。The gate runs
 `OBJECT_WAL_SYNC_OBJECT`、`OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、

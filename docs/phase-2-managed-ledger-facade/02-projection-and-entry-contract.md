@@ -1,6 +1,13 @@
 # Projection and Pulsar Entry Contract
 
 > Implementation status：F2-M1 implemented；`phase2M1Check` passed against the locked Pulsar composite on 2026-07-12
+> 2026-07-30 current-source compatibility：product `main@4d8d627` preserves this durable
+> `OPAQUE_RECORD_BATCH` mapping after F9 introduced logical-format-qualified reader keys。
+> `ParquetCompactedTargetReader` now registers exactly the legacy NCP1 `OPAQUE_RECORD_BATCH` key and the current
+> NCP1 `PULSAR_ENTRY_BATCH` key；all other physical/logical combinations remain fail-closed。The current Pulsar 5
+> facade also stops populating the removed `ManagedLedgerInternalStats.properties` field；topic properties remain on
+> `ManagedLedger.getProperties()` and are not reclassified as per-physical-ledger properties。All 223
+> managed-ledger tests pass
 
 F2-M0R chooses one concrete Position projection for the first implementation. This removes the
 rollover/allocation ambiguity in the Future 2 overview while preserving a version field for a later

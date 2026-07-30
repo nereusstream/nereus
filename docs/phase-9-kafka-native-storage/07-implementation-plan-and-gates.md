@@ -11,6 +11,14 @@
 > `5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4` and carries this third exact-source receipt into
 > pre-evidence/JUnit assertions。The historical global lock remains unchanged；final aggregate passage is still open
 
+> 2026-07-30 inherited-compatibility correction：the second final run exposed three concrete compatibility defects
+> against that locked source：deleted `ManagedLedgerInternalStats.properties`、deleted
+> `ManagedCursor.hasBacklog` and F9 exact-format registration excluding legacy F2 NCP1
+> `OPAQUE_RECORD_BATCH`。Product `main@4d8d627` removes/reclassifies the two deleted Pulsar surfaces and registers
+> exactly two NCP1 logical-format keys（legacy opaque + current Pulsar entry batch）while preserving exact-key
+> fail-closed dispatch。Core reader/registry pass 22/22 tasks；three focused managed-ledger owners pass 53/53 tasks；
+> the complete 223-test managed-ledger suite passes in 44/44 tasks。Final aggregate passage remains open
+
 > 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss、release-process physical-deletion/fresh-JVM NCP2 fallback、Object/BookKeeper process takeover cuts、real-Oxia two-runtime Object-WAL live leader takeover、ACTIVE-state three-voter controller failover、the complete six-way readiness/PREPARED/ACTIVE store-publication cuts、four-way initial proof cuts and all-five-profile trim-response-loss forced restart are implemented；remaining M4 internal-topic cuts、DeleteRecords boundary/oracle work and inherited final gates remain open
 > 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton takeover、Object/BookKeeper in-flight cuts、three-profile handoff、ACTIVE multi-controller failover、activation store/proof cuts 与 Oxia transport recovery 已进入 M6 process aggregate；`f9CheckpointTrimRecoveryProcessIntegrationTest` 闭合 native DeleteRecords -> rooted NKC1 -> durable trim -> forced restart -> pre-trim checkpoint hydration/current-trim pruning -> continued IO；`f9TrimResponseLossProcessIntegrationTest` 与 `f9TrimProfileMatrixProcessIntegrationTest` 又在五种 profile 闭合 provider-applied/caller-unobserved -> forced restart -> same-target no-op/no-repeat；仍 open 的 takeover 边界是 coordinator/internal topics 与更广 chaos
 > 2026-07-29 coordinator migration 增量：`f9CoordinatorMigrationProcessIntegrationTest` 已在两个 live release brokers 闭合 completed group/transaction internal-topic state 的 `[1] -> [2]` recovery/continuation；仍 open 的 M4 coordinator 边界缩小为 ongoing/aborted transaction takeover、mandatory NTC2 与 final/upstream aggregate
@@ -1526,6 +1534,18 @@ a generated build artifact，not a committed evergreen claim；documentation and
 ```bash
 ./gradlew phase9FinalCheck --rerun-tasks
 ```
+
+The first two clean final attempts are retained as negative evidence rather than hidden：
+
+- attempt 1 stopped at historical global Pulsar lock `2f9c1eb9` before F9 tests；
+- attempt 2 passed the F9-specific lock but stopped at the removed Pulsar 5 internal-stats field；
+- the follow-up 223-test module run then detected removed `hasBacklog` plus the exact NCP1 legacy-format regression。
+
+`main@4d8d627` closes the latter two without weakening the final graph。`NereusManagedLedger` no longer tries to
+populate a field absent from the public Pulsar DTO；topic properties remain available from `getProperties()` and are
+not copied into `LedgerInfo.properties`。`ManagedCursorPublicSurfaceClassificationTest` removes only the method absent
+from the locked interface。`ParquetCompactedTargetReader.keys()` returns an immutable two-key set for
+`NCP1 + OPAQUE_RECORD_BATCH` and `NCP1 + PULSAR_ENTRY_BATCH`，while `requireTarget` still rejects every other exact key。
 
 ## 12. Gate implementation in Gradle
 

@@ -49,6 +49,11 @@
 > lock `2f9c1eb9` before F9 scenario execution。Product `main@4efa103` adds a F9-only exact clean lock and receipt for
 > `5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4` without changing other futures' historical lock。
 > KF-SCL-010 remains `IMPLEMENTED_NOT_RUN` until the rerun completes
+> 2026-07-30 inherited-compatibility correction：the second final attempt exposed deleted Pulsar 5
+> `ManagedLedgerInternalStats.properties`；the resulting full module audit then exposed deleted
+> `ManagedCursor.hasBacklog` and F9's accidental exclusion of legacy NCP1 `OPAQUE_RECORD_BATCH` from exact reader
+> registration。Product `main@4d8d627` closes all three with no wildcard/fall-through；22/22 core-reader tasks and all
+> 223 managed-ledger tests pass。No scenario status is promoted until the next clean full aggregate
 
 ## 1. Evidence tiers
 

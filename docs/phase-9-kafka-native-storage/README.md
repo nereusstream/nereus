@@ -14,6 +14,15 @@
 > `5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4` and adds that exact clean receipt to the final
 > evidence；other future locks are not rewritten。Final aggregate passage remains pending
 
+> 2026-07-30 inherited-compatibility correction：the second final run reached
+> `:nereus-managed-ledger:compileJava` and proved that Pulsar 5 removed top-level
+> `ManagedLedgerInternalStats.properties`。After that compile fix，the complete module audit found
+> `ManagedCursor.hasBacklog` had also been removed and F9's exact-format registration had accidentally made the NCP1
+> reader accept only `PULSAR_ENTRY_BATCH`，excluding durable F2 `OPAQUE_RECORD_BATCH` generations。Product
+> `main@4d8d627` updates both API audits and declares two exact NCP1 keys with no wildcard/fall-through。The three
+> focused managed-ledger owners pass 53/53 tasks，the NCP1 core reader/registry pass 22/22 tasks and all 223
+> managed-ledger tests pass in 44/44 tasks。Final aggregate passage remains pending
+
 > 2026-07-30 M7 performance slice：product `main@33c889c` adds
 > `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` and root `phase9PerformanceCheck`。Five storage profiles
 > each execute first-process Produce/Fetch/resource sampling and a second-process identity-only-cache recovery，for ten

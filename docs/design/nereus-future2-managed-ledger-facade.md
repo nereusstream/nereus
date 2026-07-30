@@ -1,6 +1,10 @@
 # Nereus Future 2：ManagedLedger Facade
 
 > 状态：Implemented/final-gated；F2-M0/M0R/M0R2、P15-M6 and F2-M1-M6 complete
+> 2026-07-30 current-source compatibility：product `main@4d8d627` aligns the facade with locked Pulsar
+> `5.0.0-M1-nereus@50fc70fe` and restores the exact legacy NCP1 `OPAQUE_RECORD_BATCH` reader key beside
+> `PULSAR_ENTRY_BATCH`；the implementation keeps topic properties and physical-ledger properties distinct and passes
+> all 223 managed-ledger tests
 > 前置：Future 1 append/read/trim contract + Phase 1.5 recovery/lifecycle + P15-M6 complete logical result handoff
 > Active code-level contract：`../phase-2-managed-ledger-facade/README.md`
 

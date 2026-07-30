@@ -14,6 +14,14 @@
 > `5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4`，leaves F2/F3/F4 historical locks untouched and
 > includes the Pulsar branch/SHA/clean receipt in both pre-evidence and aggregator assertions。Final passage remains open
 
+> 2026-07-30 inherited-compatibility correction：the second final attempt then exposed current Pulsar's removed
+> `ManagedLedgerInternalStats.properties` field；the ensuing full managed-ledger run also caught removed
+> `ManagedCursor.hasBacklog` and a legacy NCP1 exact-key regression introduced by F9 format registration。Product
+> `main@4d8d627` removes only the unavailable stats field assignment，retains managed-ledger properties through
+> `getProperties()`，keeps physical `LedgerInfo.properties` semantically separate，updates the locked cursor surface and
+> admits exactly NCP1 `OPAQUE_RECORD_BATCH` + `PULSAR_ENTRY_BATCH` keys。Core reader tests pass 22/22 tasks and all 223
+> managed-ledger tests pass in 44/44 tasks；final aggregate passage remains open
+
 > 2026-07-30 F9-M7 performance slice：product `main@33c889c` implements canonical
 > `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` behind `phase9PerformanceCheck`。All five storage profiles
 > run synchronous-ack Produce、READ_COMMITTED Fetch、actual broker-JVM resource sampling and fresh-process cold recovery
