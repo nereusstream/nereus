@@ -134,11 +134,13 @@ plus D/K/P evidence for KF-OPS-007。
 `f9InFlightTakeoverProcessIntegrationTest` adds the named C cut with three real release JVMs：node 3 remains the sole
 controller voter，node 1 owns `[1]` and node 2 is the target。A Toxiproxy downstream timeout holds a retries-disabled offset-1
 Produce；a `jcmd Thread.print -l` sample must prove the node-1 storage worker is blocked in
-`NereusUnifiedLog.appendStable -> CompletableFuture.get` before `SIGSTOP`。Admin then connects through the two live nodes，
-atomically installs `[2]` and proves recovered earliest/latest `0/1`。After `SIGCONT`，the stale future fails with
+`NereusUnifiedLog.appendStable -> CompletableFuture.get` before `SIGSTOP`。The harness then waits for KRaft heartbeat
+fencing to remove node 1 from the non-fenced broker list and broker-endpoint Admin forwarding target，probes the surviving
+path with `listPartitionReassignments`，atomically installs `[2]` and proves recovered earliest/latest `0/1`。After
+`SIGCONT`，the stale future fails with
 `append session changed before guarded object upload`，the old JVM survives，the WAL key set and latest remain unchanged，
-and node 2 alone commits/fetches offset 1 before latest becomes 2。Fresh execution passes 64/64 actionable tasks in 1m01s
-including runtime publication/source lock and is included in `phase9M6KafkaProcessCheck`。This supplies Object-WAL P/C
+and node 2 alone commits/fetches offset 1 before latest becomes 2。The hardened Object/BookKeeper pair passes 76/76
+actionable tasks in 2m40s and is included in `phase9M6KafkaProcessCheck`。This supplies Object-WAL P/C
 evidence for KF-META-007/KF-META-012/KF-APP-014。At this point the manifest still required `bookkeeper` service coverage；
 the following P/C gates now supply it。The topology still has only one controller and final aggregates remain open，so these
 rows retain `PLANNED` under the milestone status policy。
@@ -164,7 +166,9 @@ test-only Java agent waits for the real BookKeeper provider future to succeed bu
 physical `(ledgerId, entryId)` before broker 1 may be `SIGSTOP`ped。After atomic `[1] -> [2]`，broker 2's offset-1 append must
 drive the old reservation to `ABANDONED` and old root to `SEALED`，then return/fetch offset 1。Releasing and resuming broker 1
 must fail its stale completion while the process lives、WAL-only remains object-free and final earliest/latest remains
-`0/2`。Fresh execution passes 66/66 actionable tasks in 1m30s and the task belongs to both M6 process aggregates。Because the
+`0/2`。The held Produce remains pending through reassignment under 120s/130s request/delivery windows and its failure must
+not be Kafka `TimeoutException`。Fresh exact execution passes 66/66 actionable tasks in 1m32s；the joint Object/BookKeeper
+rerun passes 76/76 in 2m40s，and the task belongs to both M6 process aggregates。Because the
 cut is before `WRITING -> DURABLE` and profile-specific NCP2 behavior，it combines with the three-profile P matrix as the
 BookKeeper service/profile P/C evidence for KF-META-007/KF-META-012/KF-APP-014。The rows remain `PLANNED` under the manifest's
 milestone/final-aggregate status policy；the remaining reason is no longer a missing BookKeeper in-flight cut。

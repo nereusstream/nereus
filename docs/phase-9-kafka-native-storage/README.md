@@ -630,11 +630,16 @@ BookKeeper provider-applied C-tier 由
 `NereusUnifiedLog.appendStable -> CompletableFuture.get`、Oxia reservation lifecycle `WRITING` 和独立
 BookKeeper client 对同一 `(ledgerId, entryId)` 的 `readUnconfirmed`，因此不是 sleep-based 或 pre-provider cut。
 
-随后 broker 1 被 `SIGSTOP`，live KRaft 原子完成 `[1] -> [2]`；broker 2 的首次 offset-1 append 懒触发
+随后 broker 1 被 `SIGSTOP`。测试不会立即复用可能指向 frozen broker 的 Admin forwarding target；它轮询
+fresh broker-2/controller-broker Admin，直到 KRaft heartbeat fencing 已从 live broker set 和 forwarding ID 中
+排除 broker 1，并先完成一次空 `listPartitionReassignments` probe，再原子完成 `[1] -> [2]`。Broker 2 的首次
+offset-1 append 懒触发
 `BookKeeperLedgerRecovery`，旧 reservation 必须精确进入 `ABANDONED`，旧 root 必须进入 `SEALED`，新 append
 返回 offset 1 并可 Fetch。release marker 与 `SIGCONT` 让旧 Bookie-acked future 继续；它必须因 stale metadata
-authority 失败，旧 JVM 保持存活，durable earliest/latest 仍为 `0/2`，WAL-only bucket 始终为空。Fresh gate 以
-66/66 actionable tasks、1m30s 通过且 configuration cache 可复用，并进入
+authority 失败，旧 JVM 保持存活，durable earliest/latest 仍为 `0/2`，WAL-only bucket 始终为空。测试以
+120s request/130s delivery timeout 保持故障请求跨越 handoff，要求 handoff 后 future 仍 pending，并显式拒绝
+Kafka `TimeoutException` 作为 stale-write 证据。Fresh exact gate 以 66/66 actionable tasks、1m32s 通过；与
+Object in-flight gate 联合 fresh rerun 为 76/76、2m40s，并进入
 `phase9M6KafkaProcessCheck` 与 `phase9M6KafkaBookKeeperProcessCheck`。该切点位于三种 BookKeeper profile 共享的
 `BookKeeperPrimaryWalAppender`、早于 `DURABLE` 和任何 materialization 分支；结合上面的 three-profile P matrix，
 它补齐三 profile 的共同 C 边界。`KF-APP-014` manifest status 仍按全局里程碑策略保留 `PLANNED`，不把这一个

@@ -661,7 +661,11 @@ After offset 0 is stable，the harness installs a downstream timeout toxic and s
 `NereusUnifiedLog.appendStable` and `CompletableFuture.get` while the client future is incomplete。Only then may the
 harness freeze broker 1 with `SIGSTOP`。
 
-The toxic is removed while broker 1 is frozen；Admin connects only to broker 2/node 3 and installs singleton `[2]`。
+The toxic is removed while broker 1 is frozen。Kafka's broker-endpoint `DescribeCluster.controller` is a live broker chosen
+as an Admin forwarding target，not necessarily the KRaft controller；therefore an Admin created immediately after
+`SIGSTOP` can remain pinned to frozen broker 1。`awaitTakeoverAdmin` repeatedly creates an Admin from broker 2/node 3 broker
+listeners until the non-fenced broker list excludes node 1、the forwarding ID is not 1 and an empty
+`listPartitionReassignments` request completes。Only that returned, already-probed Admin may install singleton `[2]`。
 Before resuming the old process，broker 2 must recover exact `[0,1)` and report earliest/latest `0/1`。When broker 1 receives
 `SIGCONT`，the guarded object path re-runs `revalidateAppendSession` against the durable head and observes the newer session；
 the old future terminates with `FencedLeaderEpochException` and the exact message
@@ -740,8 +744,9 @@ The process gate rejects a timing-only observation。Before takeover it requires
    `(ledgerId, entryId)` via `readUnconfirmed` with positive length；
 5. durable earliest/latest still `0/1`。
 
-Broker 1 is then `SIGSTOP`ped；the controller and broker 2 atomically install
-`leader=2, replicas=[2], ISR=[2]`。Because the BookKeeper writer is lazy，broker 2's offset-1 Produce is the explicit recovery
+Broker 1 is then `SIGSTOP`ped；the common broker-endpoint takeover helper first waits for KRaft heartbeat fencing to remove
+broker 1 from both the live broker set and Admin forwarding target，probes the surviving forwarding path，then atomically
+installs `leader=2, replicas=[2], ISR=[2]`。Because the BookKeeper writer is lazy，broker 2's offset-1 Produce is the explicit recovery
 trigger。`BookKeeperLedgerRecovery` must abandon the captured `WRITING` reservation and seal its root before allocating the
 new writer ledger；the new Produce returns offset 1 and reads byte-exactly。Only after those metadata facts are observed does
 the test create the release marker and `SIGCONT` broker 1。The stale pipeline may receive its provider success but its
@@ -750,8 +755,10 @@ metadata CAS must fail；the old process stays alive、WAL-only has zero S3 obje
 This single C cut covers all three BookKeeper profiles because `BOOKKEEPER_WAL_ONLY`、
 `BOOKKEEPER_WAL_ASYNC_OBJECT` and `BOOKKEEPER_WAL_SYNC_OBJECT` all execute the same
 `BookKeeperPrimaryWalAppender` through `WRITING -> provider write -> DURABLE`；their NCP2 behavior starts only after the
-captured boundary。Section 7.5 separately proves each profile's post-handoff composition。Fresh task execution passes 66/66
-actionable tasks in 1m30s and belongs to both `phase9M6KafkaProcessCheck` and
+captured boundary。The held Produce uses 120-second request/130-second delivery timeouts，must remain incomplete through
+reassignment and may not end with Kafka `TimeoutException`。Section 7.5 separately proves each profile's post-handoff
+composition。A fresh exact run passes 66/66 actionable tasks in 1m32s；the hardened Object + BookKeeper pair passes 76/76
+in 2m40s and this task belongs to both `phase9M6KafkaProcessCheck` and
 `phase9M6KafkaBookKeeperProcessCheck`。
 
 ### 7.7 ACTIVE controller failover metadata boundary（2026-07-29）

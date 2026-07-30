@@ -108,7 +108,9 @@ fails closed。
 On 2026-07-28，the F9 process harness also closed the Object-WAL already-dispatched append takeover cut：three real
 release JVMs share one KRaft/Oxia/LocalStack authority，Toxiproxy holds the old leader inside provider IO，`jcmd` proves
 the storage worker is blocked in `NereusUnifiedLog.appendStable`，and `SIGSTOP` freezes broker 1 before an atomic
-`[1] -> [2]` reassignment。After `SIGCONT`，the stale request fails with
+`[1] -> [2]` reassignment。The harness first waits for KRaft heartbeat fencing to remove broker 1 from the broker-endpoint
+Admin forwarding path，so reassignment is not confused with a client request pinned to the frozen process。After
+`SIGCONT`，the stale request fails with
 `append session changed before guarded object upload`，the WAL key set and latest offset remain unchanged，and broker 2
 commits the next batch at the exact old stable end。The dedicated
 `f9InFlightTakeoverProcessIntegrationTest` is part of `phase9M6KafkaProcessCheck`。

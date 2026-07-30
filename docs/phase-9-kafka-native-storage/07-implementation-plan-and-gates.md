@@ -447,9 +447,11 @@ coordinator/transaction/compaction remain M4/M5。
   hook：node 3 keeps the controller alive，node 1 owns RF1 `[1]` and node 2 is the target；all three use one proxied Object
   endpoint so provider-scope digest remains identical。After a baseline offset-0 commit，a downstream timeout toxic holds a
   retries-disabled Produce；`jcmd Thread.print -l` must locate the real storage worker in
-  `NereusUnifiedLog.appendStable -> CompletableFuture.get` before `SIGSTOP` is permitted。The live nodes atomically install
-  `[2]` and recover LEO 1。After `SIGCONT`，the old future fails at append-session revalidation before guarded upload，
-  its WAL key set/LEO remain unchanged，and only broker 2 commits offset 1。The exact task passes in 1m01s and is included in
+  `NereusUnifiedLog.appendStable -> CompletableFuture.get` before `SIGSTOP` is permitted。The harness waits for KRaft to
+  fence node 1 out of the live broker set/Admin forwarding target，probes the surviving forwarding path and only then
+  atomically installs `[2]` and recovers LEO 1。After `SIGCONT`，the old future fails at append-session revalidation before
+  guarded upload，its WAL key set/LEO remain unchanged，and only broker 2 commits offset 1。The hardened Object/BookKeeper
+  pair passes 76/76 actionable tasks in 2m40s and this task is included in
   `phase9M6KafkaProcessCheck`；
 - `f9BookKeeperProfileTakeoverProcessIntegrationTest` adds the profile P-tier matrix with stock ZooKeeper、two Bookies and
   two release Kafka processes。WAL-only、async-object and sync-object each commit offset 0 on `[1]`，atomically reach exact
@@ -461,7 +463,9 @@ coordinator/transaction/compaction remain M4/M5。
   `DefaultBookKeeperClientOperations.write`，then requires `jcmd` blocked-stack evidence、Oxia `WRITING` metadata and an
   independently readable physical entry before `SIGSTOP`。Broker 2's first append after exact `[2]` handoff must abandon
   that reservation、seal the old ledger and commit offset 1；the resumed old completion must fail without killing the JVM、
-  creating Object bytes or moving final `0/2` offsets。Fresh execution passes 66/66 actionable tasks in 1m30s and is in both
+  creating Object bytes or moving final `0/2` offsets。The test waits for KRaft broker fencing before Admin forwarding，
+  keeps the held client request alive with 120s/130s request/delivery windows and rejects Kafka timeout as the stale-write
+  cause。Fresh exact execution passes 66/66 actionable tasks in 1m32s and is in both
   M6 process aggregates；
 - `f9MultiControllerFailoverProcessIntegrationTest` adds ACTIVE steady-state controller P/C evidence with three real
   combined nodes and three static voters。It first freezes exact voter set、controller leader/epoch、the leader's Nereus

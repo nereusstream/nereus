@@ -683,7 +683,9 @@ deletion/corruption + exact repair/re-election gate。Injected marker/EndTxn fai
 
 `f9InFlightTakeoverProcessIntegrationTest` adds the C cut with an independent controller JVM、a Toxiproxy-held
 single-attempt Produce、`jcmd` proof of `NereusUnifiedLog.appendStable` waiting on the provider future and a broker-1
-`SIGSTOP` before reassignment。After `[2]` is stable，`SIGCONT` makes the old append fail with
+`SIGSTOP` before reassignment。The harness first waits until KRaft heartbeat fencing removes broker 1 from the broker
+endpoint's `DescribeCluster` result and synthetic Admin forwarding target，then requires a fresh broker-2 Admin to complete
+`listPartitionReassignments` before it may submit `[1] -> [2]`。After `[2]` is stable，`SIGCONT` makes the old append fail with
 `append session changed before guarded object upload`；the WAL key set/latest offset do not move and broker 2 continues at
 offset 1。`f9BookKeeperProfileTakeoverProcessIntegrationTest` now repeats the live singleton handoff with real stock
 ZooKeeper metadata、two Bookies and two Kafka release processes for WAL-only、async-object and sync-object。Each profile
@@ -696,7 +698,10 @@ without changing production code：a test-only Java agent allows the real Bookie
 `BookKeeperPrimaryWalAppender`。After broker 1 is frozen and KRaft installs `[2]`，broker 2's first append invokes
 `BookKeeperLedgerRecovery`，which must transition that exact reservation to `ABANDONED` and the old root to `SEALED` before
 committing offset 1。Resuming broker 1 releases the delayed future but its stale metadata CAS cannot publish；LEO remains 2
-and WAL-only publishes no Object bytes。Fresh execution passes 66/66 actionable tasks in 1m30s。Because this cut precedes
+and WAL-only publishes no Object bytes。The held Produce uses a 120-second request/130-second delivery window，must still be
+incomplete after reassignment and may not satisfy the stale-write assertion with Kafka `TimeoutException`。A fresh exact
+BookKeeper run passes 66/66 actionable tasks in 1m32s；the hardened Object + BookKeeper pair passes 76/76 in 2m40s。Because
+this cut precedes
 `DURABLE` and the profile-specific materialization branch，the same production boundary is shared by WAL-only、async and
 sync；the prior three-profile P matrix supplies the profile-specific half。Completed and live OPEN Object-WAL
 transaction/internal-topic coordinator migration are covered by the gates above；injected resolution cuts、profile expansion

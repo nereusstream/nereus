@@ -344,7 +344,9 @@ release JVM，将 RF1 partition 固定在 `[1]`，用 downstream timeout toxic �
 `jcmd Thread.print -l` 等待 storage worker 同时出现
 `NereusUnifiedLog.appendStable` 与 `CompletableFuture.get`。这不是 sleep-based 猜测：命中说明 single-attempt
 Produce 已进入 provider-backed stable append 且尚未返回。测试随即 `SIGSTOP` node 1、移除 toxic，从仍活跃的
-node 2/controller bootstrap 提交原子 `[1] -> [2]` 重分配，并要求
+node 2/controller broker listener 重新发现集群；只有 KRaft heartbeat 已将 node 1 从 non-fenced broker list 和
+Admin forwarding target 中移除，且新的 Admin 已通过一次空
+`listPartitionReassignments` forwarding probe，测试才提交原子 `[1] -> [2]` 重分配，并要求
 `leader=2, replicas=[2], ISR=[2]`、无 ongoing reassignment、earliest/latest 仍为 `0/1`。`SIGCONT` 后旧请求以
 `FencedLeaderEpochException: append session changed before guarded object upload` 结束，旧进程保持存活，S3 WAL key
 集合不变，broker 2 随后在 offset 1 提交并把 latest 推到 2。该 gate 闭合 Object-WAL P/C 边界，但仍不包含
@@ -400,12 +402,16 @@ The harness accepts the cut only when all of these facts agree：`jcmd` shows
 `NereusUnifiedLog.appendStable -> CompletableFuture.get`、the exact Oxia reservation is `WRITING`、and an independent
 BookKeeper client reads the exact physical entry unconfirmed。
 
-Broker 1 is then `SIGSTOP`ped while node 3 keeps KRaft live。After exact `[1] -> [2]` reassignment，broker 2's offset-1
+Broker 1 is then `SIGSTOP`ped while node 3 keeps KRaft live。The shared takeover helper polls fresh broker-endpoint
+Admin clients until KRaft no longer advertises broker 1 as live or selects it as the forwarding target，and proves the
+surviving forwarding path with `listPartitionReassignments` before exact `[1] -> [2]` reassignment。Broker 2's offset-1
 Produce lazily opens the writer and runs `BookKeeperLedgerRecovery`；the gate requires the captured reservation to become
 `ABANDONED` and its old root `SEALED` before that Produce can return offset 1。Only then does the harness release the agent
 future and `SIGCONT` broker 1。The old completion must fail at stale metadata authority、must not kill the JVM or move
-earliest/latest away from `0/2`，and the WAL-only bucket must remain empty。Fresh execution passes 66/66 actionable tasks in
-1m30s with reusable Gradle configuration cache。The cut is before `WRITING -> DURABLE`，so it is shared by all three
+earliest/latest away from `0/2`，and the WAL-only bucket must remain empty。The fault-held Produce uses
+`request.timeout.ms=120000` and `delivery.timeout.ms=130000`，must still be incomplete after handoff and must not end in a
+Kafka client timeout。Fresh exact execution passes 66/66 actionable tasks in 1m32s；the hardened Object/BookKeeper pair
+passes 76/76 in 2m40s。The cut is before `WRITING -> DURABLE`，so it is shared by all three
 BookKeeper profiles；the profile-specific materialization behavior remains covered by the preceding P matrix。
 
 ### 3.3 `core/.../kafka/log/LogManager.scala`

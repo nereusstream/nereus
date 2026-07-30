@@ -655,8 +655,10 @@ operational sequence is：
 2. snapshot raw `/wal/` keys，install a downstream timeout toxic and start a retries-disabled/non-idempotent Produce；
 3. require `jcmd Thread.print -l` to show `NereusUnifiedLog.appendStable -> CompletableFuture.get` while the client future
    remains incomplete；
-4. `SIGSTOP` broker 1，remove the toxic，and use only live broker-2/controller bootstrap addresses for Admin；
-5. atomically reassign `[1] -> [2]`，wait for exact leader/replica/ISR singleton and empty reassignment，then prove
+4. `SIGSTOP` broker 1，remove the toxic，then poll fresh broker-2/controller-broker Admin clients until KRaft heartbeat
+   fencing removes broker 1 from both the live broker set and broker-endpoint Admin forwarding target；
+5. require an empty `listPartitionReassignments` forwarding probe，then atomically reassign `[1] -> [2]`，wait for exact
+   leader/replica/ISR singleton and empty reassignment，then prove
    earliest/latest remain `0/1` and offset 0 is byte-exact；
 6. `SIGCONT` broker 1；require stale Produce failure plus
    `append session changed before guarded object upload`，old-process liveness and unchanged WAL keys/latest；
@@ -677,11 +679,14 @@ tasks in 2m17s and belongs to both M6 process aggregates。
 `f9BookKeeperFaultAgentJar` is built before the process task and injected only into broker 1's `KAFKA_OPTS`。The broker config
 and release artifact remain unchanged。The gate requires installed/captured/applied/release markers、a real
 `NereusUnifiedLog.appendStable` blocked stack、the exact Oxia `WRITING` reservation、independent physical BookKeeper entry
-read、new-owner `ABANDONED`/old-root `SEALED` reconciliation、stale-future failure、old-process liveness、zero WAL-only
+read、KRaft-fenced broker-endpoint forwarding readiness、new-owner `ABANDONED`/old-root `SEALED`
+reconciliation、stale-future failure、old-process liveness、zero WAL-only
 objects and final earliest/latest `0/2`。Both `phase9M6KafkaProcessCheck` and
 `phase9M6KafkaBookKeeperProcessCheck` depend on it；the root development-version detector and Docker serialization service
 also name the direct task，so it cannot run against stale `0.1.0-f9-dev` artifacts or collide with another container gate。
-Fresh execution passes 66/66 actionable tasks in 1m30s with configuration-cache reuse。
+The fault-held Producer raises only this test path to 120-second request/130-second delivery timeout，must remain incomplete
+after handoff and must fail for a non-client-timeout cause after release。Fresh exact execution passes 66/66 actionable
+tasks in 1m32s；the Object + BookKeeper takeover pair passes 76/76 in 2m40s。
 
 `f9MultiControllerFailoverProcessIntegrationTest` is the independent ACTIVE steady-state controller-failure gate。Its Gradle
 task depends on the same exact release runtime、uses `maxParallelForks=1` and owns
