@@ -59,10 +59,18 @@ class KafkaCompactionTerminalRetirerTest {
             .join();
 
     assertThat(result)
-        .isEqualTo(new KafkaCompactionTerminalRetirer.RetirementResult(true, true, 1, 1));
-    assertThat(guardCalls).hasValue(2);
+        .isEqualTo(new KafkaCompactionTerminalRetirer.RetirementResult(2, true, true, 1, 1));
+    assertThat(guardCalls).hasValue(3);
     assertThat(context.events())
-        .containsSubsequence("task-delete", "guard", "task-get", "plan-get", "plan-delete");
+        .containsSubsequence(
+            "task-get",
+            "source-protection-release",
+            "guard",
+            "task-delete",
+            "guard",
+            "task-get",
+            "plan-get",
+            "plan-delete");
     assertThat(context.taskStore().current).isNull();
     assertThat(context.planStore().current).isNull();
   }
@@ -77,6 +85,28 @@ class KafkaCompactionTerminalRetirerTest {
     assertThat(result.taskDeleteAttempts()).isEqualTo(1);
     assertThat(context.taskStore().deleteCalls).isEqualTo(1);
     assertThat(result.planDeleteAttempts()).isEqualTo(1);
+    assertThat(context.planStore().current).isNull();
+  }
+
+  @Test
+  void planOnlyRecoveryDoesNotRequireTheAlreadyDeletedTasksReleaseAuthority() {
+    Context context = context();
+    VersionedMaterializationTask deletedTask = context.taskStore().current;
+    context.taskStore().current = null;
+
+    KafkaCompactionTerminalRetirer.RetirementResult result =
+        context
+            .retirer()
+            .retire(
+                context.partition(),
+                deletedTask,
+                context.planStore().current,
+                () -> CompletableFuture.completedFuture(null))
+            .join();
+
+    assertThat(result)
+        .isEqualTo(new KafkaCompactionTerminalRetirer.RetirementResult(0, false, true, 0, 1));
+    assertThat(context.events()).doesNotContain("source-protection-release", "task-delete");
     assertThat(context.planStore().current).isNull();
   }
 
@@ -184,7 +214,14 @@ class KafkaCompactionTerminalRetirerTest {
             fixture.outputTask(),
             KafkaCompactionTaskTestSupport.cancelled(fixture.outputTask(), 1));
     KafkaCompactionTerminalRetirer retirer =
-        new KafkaCompactionTerminalRetirer(plans, tasks, new KafkaCompactionPlanRecordMapper());
+        new KafkaCompactionTerminalRetirer(
+            plans,
+            tasks,
+            (terminalTask, guard) -> {
+              events.add("source-protection-release");
+              return guard.revalidate().thenApply(ignored -> 2);
+            },
+            new KafkaCompactionPlanRecordMapper());
     return new Context(fixture, partition, events, plans, tasks, retirer);
   }
 

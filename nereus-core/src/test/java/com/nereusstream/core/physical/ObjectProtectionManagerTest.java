@@ -51,6 +51,7 @@ class ObjectProtectionManagerTest {
         assertThat(validations.get()).isEqualTo(3);
         assertThat(store.getRoot(CLUSTER, object().objectKeyHash()).join()).isPresent();
         assertThat(store.protection(CLUSTER, request.identity())).isPresent();
+        assertThat(manager.findExisting(object(), request.identity()).join()).contains(first);
 
         AtomicInteger authorizations = new AtomicInteger();
         manager.release(first, exact -> {
@@ -60,6 +61,7 @@ class ObjectProtectionManagerTest {
         }).join();
         assertThat(authorizations.get()).isOne();
         assertThat(store.protection(CLUSTER, request.identity())).isEmpty();
+        assertThat(manager.findExisting(object(), request.identity()).join()).isEmpty();
     }
 
     @Test

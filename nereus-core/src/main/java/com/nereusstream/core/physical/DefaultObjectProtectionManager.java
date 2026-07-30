@@ -85,6 +85,25 @@ public final class DefaultObjectProtectionManager implements ObjectProtectionMan
     }
 
     @Override
+    public CompletableFuture<Optional<ObjectProtection>> findExisting(
+            PhysicalObjectIdentity object,
+            ObjectProtectionIdentity identity) {
+        PhysicalObjectIdentity exactObject = Objects.requireNonNull(object, "object");
+        ObjectProtectionIdentity exactIdentity = Objects.requireNonNull(identity, "identity");
+        if (!exactIdentity.object().equals(exactObject.objectKeyHash())) {
+            return failed(new IllegalArgumentException(
+                    "protection identity does not match the physical object"));
+        }
+        if (closed.get()) {
+            return failed(closedFailure());
+        }
+        return serialized(
+                exactIdentity,
+                () -> findProtection(exactIdentity, Optional.empty())
+                        .thenApply(optional -> optional.map(value -> fromVersioned(exactObject, value))));
+    }
+
+    @Override
     public CompletableFuture<ObjectProtection> revalidate(
             ObjectProtection protection,
             OwnerRevalidator ownerRevalidator) {

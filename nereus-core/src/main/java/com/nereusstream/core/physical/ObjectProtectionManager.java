@@ -1,6 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.core.physical;
 
+import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /** Durable create/revalidate/transfer/release handshake for non-reader object references. */
@@ -26,6 +28,19 @@ public interface ObjectProtectionManager extends AutoCloseable {
     CompletableFuture<ObjectProtection> acquireOrTransfer(
             ObjectProtectionRequest request,
             OwnerRevalidator ownerRevalidator);
+
+    /**
+     * Finds one exact durable protection without acquiring or transferring it.
+     *
+     * <p>Terminal workflow cleanup uses this read-only lookup so an already released protection is
+     * distinguishable from a live task-owned reference.
+     */
+    default CompletableFuture<Optional<ObjectProtection>> findExisting(
+            PhysicalObjectIdentity object,
+            ObjectProtectionIdentity identity) {
+        return CompletableFuture.failedFuture(
+                new UnsupportedOperationException("exact object-protection lookup is unsupported"));
+    }
 
     CompletableFuture<ObjectProtection> revalidate(
             ObjectProtection protection,

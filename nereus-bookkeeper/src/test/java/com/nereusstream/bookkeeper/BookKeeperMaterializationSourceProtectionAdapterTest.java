@@ -17,13 +17,18 @@ import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.core.physical.ObjectProtectionOwner;
 import com.nereusstream.core.wal.DurablePrimaryAppend;
 import com.nereusstream.materialization.MaterializationSourceProtection;
+import com.nereusstream.materialization.MaterializationFailure;
+import com.nereusstream.materialization.MaterializationSourceRetiredException;
 import com.nereusstream.materialization.SourceGeneration;
+import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
 import com.nereusstream.metadata.oxia.CommitAppendRequest;
 import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.PreparedStableAppend;
 import com.nereusstream.metadata.oxia.records.BookKeeperProtectionType;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
 import com.nereusstream.metadata.oxia.records.ProtectionLifecycle;
+import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -92,6 +97,7 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
                     .doesNotThrowAnyException();
             assertThat(claimRevalidations).hasValueGreaterThanOrEqualTo(2);
 
+            retireGenerationZeroAnchor(runtime, fixture);
             MaterializationSourceProtection replay = adapter.acquireOrTransfer(
                             BookKeeperPrimaryWalAppenderTest.STREAM,
                             fixture.source(),
@@ -186,6 +192,28 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
         }
     }
 
+    @Test
+    void exactRetiredGenerationZeroAnchorCancelsStaleMaterializationSource() {
+        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime =
+                new BookKeeperPrimaryWalAppenderTest.Runtime()) {
+            SourceFixture fixture = source(runtime);
+            retireGenerationZeroAnchor(runtime, fixture);
+
+            assertThatThrownBy(() -> adapter(runtime).acquireOrTransfer(
+                            BookKeeperPrimaryWalAppenderTest.STREAM,
+                            fixture.source(),
+                            "stale-materialization-source",
+                            owner("/tasks/stale", 0, 'f'),
+                            expected -> CompletableFuture.completedFuture(null))
+                    .join())
+                    .rootCause()
+                    .isInstanceOf(MaterializationSourceRetiredException.class)
+                    .satisfies(failure -> assertThat(
+                                    ((MaterializationFailure) failure).failureClass())
+                            .isEqualTo(TaskFailureClass.SOURCE_RETIRED));
+        }
+    }
+
     private static SourceFixture source(BookKeeperPrimaryWalAppenderTest.Runtime runtime) {
         var session = BookKeeperPrimaryWalAppenderTest.session();
         DurablePrimaryAppend durable;
@@ -274,6 +302,55 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
 
     private static ObjectProtectionOwner owner(String key, long version, char identity) {
         return new ObjectProtectionOwner(key, version, sha(identity));
+    }
+
+    private static void retireGenerationZeroAnchor(
+            BookKeeperPrimaryWalAppenderTest.Runtime runtime,
+            SourceFixture fixture) {
+        BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> anchor =
+                runtime.metadata.getProtection(
+                                BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                                runtime.configuration.providerScopeSha256(),
+                                fixture.target().ledgerId(),
+                                0,
+                                1)
+                        .join()
+                        .orElseThrow();
+        runtime.metadata.compareAndSetProtection(
+                        BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                        runtime.configuration.providerScopeSha256(),
+                        withLifecycle(anchor.value(), ProtectionLifecycle.RETIRED),
+                        anchor.metadataVersion())
+                .join();
+    }
+
+    private static BookKeeperLedgerProtectionRecord withLifecycle(
+            BookKeeperLedgerProtectionRecord value,
+            ProtectionLifecycle lifecycle) {
+        return new BookKeeperLedgerProtectionRecord(
+                value.schemaVersion(),
+                value.ledgerIdentitySha256(),
+                value.clusterAlias(),
+                value.ledgerId(),
+                value.rootLifecycleEpoch(),
+                value.ledgerRangeSlot(),
+                value.protectionSlot(),
+                value.protectionTypeId(),
+                value.referenceId(),
+                value.firstEntryId(),
+                value.entryCount(),
+                value.rangeChecksumSha256(),
+                value.streamId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.commitVersion(),
+                value.ownerKey(),
+                value.ownerMetadataVersion(),
+                value.ownerIdentitySha256(),
+                lifecycle,
+                value.createdAtMillis(),
+                value.expiresAtMillis(),
+                0);
     }
 
     private static Checksum sha(char value) {

@@ -1532,8 +1532,12 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
 
     private FailureDecision failureDecision(Throwable failure, long attempt) {
         TaskFailureClass failureClass;
-        if (failure instanceof MaterializationExecutionException execution) {
-            failureClass = execution.failureClass();
+        if (failure instanceof MaterializationFailure materialization) {
+            failureClass = Objects.requireNonNull(
+                    materialization.failureClass(), "materialization failure class");
+            if (failureClass == TaskFailureClass.NONE) {
+                failureClass = TaskFailureClass.OUTPUT_INVARIANT;
+            }
         } else if (failure instanceof NereusException nereus) {
             failureClass = switch (nereus.code()) {
                 case OBJECT_UPLOAD_FAILED, OBJECT_READ_FAILED, OBJECT_NOT_FOUND, TIMEOUT ->

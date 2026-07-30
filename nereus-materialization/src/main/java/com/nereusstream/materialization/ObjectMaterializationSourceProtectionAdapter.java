@@ -9,8 +9,10 @@ import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectProtectionOwner;
 import com.nereusstream.core.physical.ObjectProtectionRequest;
 import com.nereusstream.core.read.PhysicalObjectIdentityResolver;
+import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /** Existing F4 object-protection protocol exposed through the provider-neutral source SPI. */
@@ -55,6 +57,24 @@ public final class ObjectMaterializationSourceProtectionAdapter
                                 0),
                         ownerRevalidator::revalidate))
                 .thenApply(value -> wrap(referenceId, value));
+    }
+
+    @Override
+    public CompletableFuture<Optional<MaterializationSourceProtection>> findExisting(
+            StreamId streamId,
+            SourceGeneration source,
+            String referenceId) {
+        Objects.requireNonNull(streamId, "streamId");
+        ObjectSliceReadTarget target = requireTarget(source);
+        String exactReferenceId = requireText(referenceId, "referenceId");
+        return identities.resolve(target, source.view())
+                .thenCompose(identity -> protections.findExisting(
+                        identity,
+                        new ObjectProtectionIdentity(
+                                identity.objectKeyHash(),
+                                ObjectProtectionType.MATERIALIZATION_SOURCE,
+                                exactReferenceId)))
+                .thenApply(optional -> optional.map(value -> wrap(exactReferenceId, value)));
     }
 
     @Override
@@ -114,5 +134,13 @@ public final class ObjectMaterializationSourceProtectionAdapter
                 protection.owner(),
                 protection.metadataVersion(),
                 protection);
+    }
+
+    private static String requireText(String value, String field) {
+        Objects.requireNonNull(value, field);
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(field + " cannot be blank");
+        }
+        return value;
     }
 }

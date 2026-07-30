@@ -28,7 +28,9 @@ import com.nereusstream.kafka.runtime.NereusKafkaCompactionRuntimeConfiguration;
 import com.nereusstream.materialization.DefaultCommittedSourceSetResolver;
 import com.nereusstream.materialization.DefaultExactSourceRangeReader;
 import com.nereusstream.materialization.DefaultGenerationCommitter;
+import com.nereusstream.materialization.DefaultMaterializationTaskProtectionReconciler;
 import com.nereusstream.materialization.DefaultMaterializationOutputVerifier;
+import com.nereusstream.materialization.DefaultTerminalMaterializationSourceProtectionReleaser;
 import com.nereusstream.materialization.MaterializationSourceProtectionAdapter;
 import com.nereusstream.materialization.MaterializationSourceProtectionRegistry;
 import com.nereusstream.materialization.MaterializationSourceProvider;
@@ -125,6 +127,18 @@ public final class KafkaCompactionProductionRuntimeFactory {
     MetadataPhysicalObjectIdentityResolver identities =
         new MetadataPhysicalObjectIdentityResolver(
             exactCluster, exactL0, exactPhysical);
+    MaterializationSourceProtectionRegistry sourceProtections =
+        sourceProtections(identities, exactProtections, exactAdditionalSources);
+    DefaultMaterializationTaskProtectionReconciler taskProtections =
+        new DefaultMaterializationTaskProtectionReconciler(
+            exactCluster,
+            tasks,
+            exactGenerations,
+            identities,
+            exactProtections,
+            sourceProtections,
+            configuration.generationOperationTimeout(),
+            exactScheduler);
     ReadTargetDispatcher dispatcher = new ReadTargetDispatcher(exactReaders);
     KafkaCompactionBatchSource batchSource =
         new KafkaCompactionBatchSource(
@@ -167,10 +181,7 @@ public final class KafkaCompactionProductionRuntimeFactory {
             exactGenerations,
             exactPhysical,
             exactProtections,
-            sourceProtections(
-                identities,
-                exactProtections,
-                exactAdditionalSources),
+            sourceProtections,
             new KafkaGenerationProtocolActivationGuard(
                 exactCluster,
                 exactGenerations,
@@ -197,7 +208,15 @@ public final class KafkaCompactionProductionRuntimeFactory {
     KafkaCompactionPlanCoordinator planCoordinator =
         new KafkaCompactionPlanCoordinator(exactPlans, tasks, exactClock);
     KafkaCompactionTerminalRetirer retirer =
-        new KafkaCompactionTerminalRetirer(exactPlans, tasks);
+        new KafkaCompactionTerminalRetirer(
+            exactPlans,
+            tasks,
+            new DefaultTerminalMaterializationSourceProtectionReleaser(
+                exactCluster,
+                tasks,
+                sourceProtections,
+                configuration.generationOperationTimeout(),
+                exactScheduler));
     KafkaCompactionPlanner planner = new KafkaCompactionPlanner();
 
     return new KafkaCompactionRuntime(
@@ -214,6 +233,7 @@ public final class KafkaCompactionProductionRuntimeFactory {
                   planCoordinator,
                   exactPlans,
                   tasks,
+                  taskProtections,
                   batchSource,
                   parquet,
                   publications,

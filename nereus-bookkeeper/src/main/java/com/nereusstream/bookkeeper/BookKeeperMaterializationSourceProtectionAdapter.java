@@ -11,6 +11,7 @@ import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.core.physical.ObjectProtectionOwner;
 import com.nereusstream.materialization.MaterializationSourceProtection;
 import com.nereusstream.materialization.MaterializationSourceProtectionAdapter;
+import com.nereusstream.materialization.MaterializationSourceRetiredException;
 import com.nereusstream.materialization.SourceGeneration;
 import com.nereusstream.metadata.oxia.BookKeeperLedgerMetadataStore;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataConditionFailedException;
@@ -80,20 +81,34 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
             OwnerRevalidator exactRevalidator = Objects.requireNonNull(
                     ownerRevalidator, "ownerRevalidator");
             BookKeeperOperationDeadline deadline = deadline();
-            return loadRoot(target, deadline)
-                    .thenCompose(root -> loadRangeAnchor(exactStream, exactSource, target, deadline)
-                            .thenCompose(anchor -> acquireSlot(
-                                    exactStream,
-                                    exactSource,
-                                    target,
-                                    root,
-                                    anchor.value().ledgerRangeSlot(),
-                                    exactReference,
-                                    exactOwner,
-                                    exactRevalidator,
-                                    firstSlot(exactReference),
-                                    0,
-                                    deadline)));
+            return findExisting(streamId, exactSource, exactReference)
+                    .thenCompose(existing -> {
+                        if (existing.isPresent()) {
+                            MaterializationSourceProtection current =
+                                    existing.orElseThrow();
+                            return current.owner().equals(exactOwner)
+                                    ? revalidate(current, exactRevalidator)
+                                    : transfer(current, exactOwner, exactRevalidator);
+                        }
+                        return loadRoot(target, deadline)
+                                .thenCompose(root -> loadRangeAnchor(
+                                                exactStream,
+                                                exactSource,
+                                                target,
+                                                deadline)
+                                        .thenCompose(anchor -> acquireSlot(
+                                                exactStream,
+                                                exactSource,
+                                                target,
+                                                root,
+                                                anchor.value().ledgerRangeSlot(),
+                                                exactReference,
+                                                exactOwner,
+                                                exactRevalidator,
+                                                firstSlot(exactReference),
+                                                0,
+                                                deadline)));
+                    });
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -506,18 +521,34 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
             BookKeeperOperationDeadline deadline) {
         return scanProtections(target.ledgerId(), Optional.empty(), new ArrayList<>(), deadline)
                 .thenApply(values -> {
-                    List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> matches = values.stream()
+                    List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> exactAnchors =
+                            values.stream()
                             .filter(value -> value.value().protectionSlot() == 1)
                             .filter(value -> value.value().protectionType()
                                     == BookKeeperProtectionType.VISIBLE_GENERATION)
-                            .filter(value -> value.value().lifecycle() == ProtectionLifecycle.ACTIVE)
                             .filter(value -> sameSource(value.value(), streamId, source, target))
                             .toList();
-                    if (matches.size() != 1) {
-                        throw condition(
-                                "BookKeeper generation-zero visible protection is absent or ambiguous");
+                    List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> active =
+                            exactAnchors.stream()
+                                    .filter(value -> value.value().lifecycle()
+                                            == ProtectionLifecycle.ACTIVE)
+                                    .toList();
+                    if (active.size() == 1) {
+                        return active.get(0);
                     }
-                    return matches.get(0);
+                    if (active.isEmpty()
+                            && exactAnchors.size() == 1
+                            && exactAnchors.get(0).value().lifecycle()
+                                    == ProtectionLifecycle.RETIRED) {
+                        throw new MaterializationSourceRetiredException(
+                                "BookKeeper generation-zero visible protection was retired");
+                    }
+                    if (active.isEmpty()) {
+                        throw condition(
+                                "BookKeeper generation-zero visible protection is absent");
+                    }
+                    throw invariant(
+                            "BookKeeper generation-zero visible protection is ambiguous");
                 });
     }
 

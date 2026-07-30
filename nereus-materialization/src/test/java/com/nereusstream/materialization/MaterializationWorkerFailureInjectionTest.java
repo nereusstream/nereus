@@ -6,6 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.core.physical.ObjectProtection;
+import com.nereusstream.core.physical.ObjectProtectionManager;
+import com.nereusstream.core.physical.ObjectProtectionOwner;
+import com.nereusstream.core.physical.ObjectProtectionRequest;
 import com.nereusstream.metadata.oxia.F4MetadataConditionFailedException;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
@@ -35,6 +39,88 @@ import org.junit.jupiter.api.io.TempDir;
 class MaterializationWorkerFailureInjectionTest {
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void typedSourceRetirementCancelsInsteadOfRetryingTheImmutableTask() {
+        var scenario = MaterializationWorkerTestHarness.scenario(delegate -> delegate);
+        var exactReader = new MaterializationWorkerTestHarness.TrackingExactReader();
+        AtomicInteger writerCalls = new AtomicInteger();
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        ObjectProtectionManager retiredSource = new ObjectProtectionManager() {
+            @Override
+            public CompletableFuture<ObjectProtection> acquire(
+                    ObjectProtectionRequest request,
+                    OwnerRevalidator ownerRevalidator) {
+                return CompletableFuture.failedFuture(
+                        new MaterializationSourceRetiredException(
+                                "injected exact source retirement"));
+            }
+
+            @Override
+            public CompletableFuture<ObjectProtection> acquireOrTransfer(
+                    ObjectProtectionRequest request,
+                    OwnerRevalidator ownerRevalidator) {
+                return acquire(request, ownerRevalidator);
+            }
+
+            @Override
+            public CompletableFuture<ObjectProtection> revalidate(
+                    ObjectProtection protection,
+                    OwnerRevalidator ownerRevalidator) {
+                return CompletableFuture.completedFuture(protection);
+            }
+
+            @Override
+            public CompletableFuture<ObjectProtection> transfer(
+                    ObjectProtection protection,
+                    ObjectProtectionOwner newOwner,
+                    OwnerRevalidator newOwnerRevalidator) {
+                return CompletableFuture.completedFuture(protection);
+            }
+
+            @Override
+            public CompletableFuture<Void> release(
+                    ObjectProtection protection,
+                    RemovalAuthorizer removalAuthorizer) {
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        try (LocalFileObjectStore objects = new LocalFileObjectStore(
+                temporaryDirectory.resolve("source-retired-objects"))) {
+            DefaultMaterializationWorker worker = MaterializationWorkerTestHarness.worker(
+                    "r".repeat(26),
+                    scenario,
+                    retiredSource,
+                    exactReader,
+                    (request, rows) -> {
+                        writerCalls.incrementAndGet();
+                        return CompletableFuture.failedFuture(
+                                new AssertionError("writer must not run"));
+                    },
+                    objects,
+                    (task, output, timeout) -> CompletableFuture.completedFuture(null),
+                    () -> "c".repeat(26),
+                    scheduler);
+
+            assertThatThrownBy(() -> worker.execute(scenario.task()).join())
+                    .hasRootCauseMessage("injected exact source retirement");
+
+            MaterializationTaskRecord durable = task(scenario);
+            assertThat(durable.lifecycle()).isEqualTo(TaskLifecycle.CANCELLED);
+            assertThat(durable.failureClassId())
+                    .isEqualTo(TaskFailureClass.SOURCE_RETIRED.wireId());
+            assertThat(durable.workerClaim()).isEmpty();
+            assertThat(durable.output()).isEmpty();
+            assertThat(writerCalls).hasValue(0);
+            assertThat(exactReader.completedSources()).isZero();
+        } finally {
+            scheduler.shutdownNow();
+        }
+    }
 
     @Test
     void sourceChangeAfterProtectionCancelsAndReleasesTheExactClaim() {

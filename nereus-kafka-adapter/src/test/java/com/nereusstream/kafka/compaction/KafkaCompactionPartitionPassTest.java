@@ -47,6 +47,8 @@ import com.nereusstream.materialization.ExactSourceSet;
 import com.nereusstream.materialization.GenerationCommitResult;
 import com.nereusstream.materialization.KafkaCompactionTaskTestSupport;
 import com.nereusstream.materialization.MaterializationFailure;
+import com.nereusstream.materialization.MaterializationSourceRetiredException;
+import com.nereusstream.materialization.MaterializationTaskProtections;
 import com.nereusstream.materialization.MaterializationPolicy;
 import com.nereusstream.materialization.MaterializationPolicyFactory;
 import com.nereusstream.materialization.MaterializationTask;
@@ -120,6 +122,7 @@ class KafkaCompactionPartitionPassTest {
     VersionedKafkaPartitionBinding binding =
         createActiveBinding(partitions, partition, fixture.outputTask(), fixture.plan());
     AtomicInteger sourceCloses = new AtomicInteger();
+    List<String> executionOrder = new ArrayList<>();
     ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     Path stagingPath = Files.createDirectory(temporaryDirectory.resolve("staging"));
@@ -135,7 +138,12 @@ class KafkaCompactionPartitionPassTest {
             new LocalFileObjectStore(temporaryDirectory.resolve("objects"))) {
       KafkaCompactionBatchSource batchSource =
           new KafkaCompactionBatchSource(
-              exactReader(fixture, sourceCloses), readOptions(), Runnable::run);
+              ignored -> {
+                executionOrder.add("source-open");
+                return exactReader(fixture, sourceCloses);
+              },
+              readOptions(),
+              Runnable::run);
       KafkaCompactionStreamingExecutor executor =
           new KafkaCompactionStreamingExecutor(
               new KafkaTopicCompactionCodecV1(),
@@ -208,10 +216,20 @@ class KafkaCompactionPartitionPassTest {
               new KafkaCompactionPlanCoordinator(planStore, tasks, CLOCK),
               planStore,
               tasks,
+              durable -> {
+                executionOrder.add("source-protection");
+                return CompletableFuture.completedFuture(
+                    new MaterializationTaskProtections(
+                        durable, List.of(), Optional.empty()));
+              },
               batchSource,
               parquet,
               publication,
-              new KafkaCompactionTerminalRetirer(planStore, tasks),
+              new KafkaCompactionTerminalRetirer(
+                  planStore,
+                  tasks,
+                  (terminalTask, guard) ->
+                      guard.revalidate().thenApply(ignored -> 0)),
               new KafkaActivatedGenerationSetResolver(CLUSTER, generationMetadata),
               "b".repeat(26),
               () -> "a".repeat(26),
@@ -235,6 +253,7 @@ class KafkaCompactionPartitionPassTest {
       assertThat(result.retirement()).isPresent();
       assertThat(sourceCloses).hasValue(3);
       assertThat(generationPublications).hasValue(1);
+      assertThat(executionOrder).containsSubsequence("source-protection", "source-open");
       assertThat(
               partitions
                   .get(partition)
@@ -260,6 +279,10 @@ class KafkaCompactionPartitionPassTest {
             KafkaCompactionPartitionPass.classifyFailure(
                 new TestMaterializationFailure(TaskFailureClass.SOURCE_CHANGED)))
         .isEqualTo(TaskFailureClass.SOURCE_CHANGED);
+    assertThat(
+            KafkaCompactionPartitionPass.classifyFailure(
+                new MaterializationSourceRetiredException("retired exact source")))
+        .isEqualTo(TaskFailureClass.SOURCE_RETIRED);
   }
 
   private static Fixture fixture() {

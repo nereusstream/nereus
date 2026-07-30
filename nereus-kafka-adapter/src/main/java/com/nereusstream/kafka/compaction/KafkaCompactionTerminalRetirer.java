@@ -20,6 +20,7 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.materialization.MaterializationTask;
 import com.nereusstream.materialization.MaterializationTaskMutationGuard;
 import com.nereusstream.materialization.MaterializationTaskStore;
+import com.nereusstream.materialization.TerminalMaterializationSourceProtectionReleaser;
 import com.nereusstream.metadata.oxia.KafkaCompactionPlanMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaPartitionId;
 import com.nereusstream.metadata.oxia.VersionedKafkaCompactionPlan;
@@ -32,21 +33,25 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Retires one terminal materialization task and its immutable KCP1 attachment.
  *
- * <p>The task root is always deleted first. Only after an exact reload proves the task absent does
- * this class conditionally delete KCP1. Therefore every state exposed during cleanup is either both
- * roots present or a harmless plan-only orphan; it never deliberately exposes a task without its
- * restart image. The supplied guard must represent a stable authority fence that also rejects
- * concurrent task admission for this partition.
+ * <p>Every exact task-owned source protection is released while the terminal task remains its
+ * durable removal authority. The task root is then deleted first. Only after an exact reload proves
+ * the task absent does this class conditionally delete KCP1. Therefore every state exposed during
+ * cleanup is either both roots present or a harmless plan-only orphan; it never deliberately
+ * exposes a task without its restart image. The supplied guard must represent a stable authority
+ * fence that also rejects concurrent task admission for this partition.
  */
 public final class KafkaCompactionTerminalRetirer {
   private static final int MAX_DELETE_RECOVERY_ATTEMPTS = 8;
 
   private final KafkaCompactionPlanMetadataStore plans;
   private final TaskRoots tasks;
+  private final TerminalMaterializationSourceProtectionReleaser sourceProtections;
   private final KafkaCompactionPlanRecordMapper mapper;
 
   public KafkaCompactionTerminalRetirer(
-      KafkaCompactionPlanMetadataStore plans, MaterializationTaskStore tasks) {
+      KafkaCompactionPlanMetadataStore plans,
+      MaterializationTaskStore tasks,
+      TerminalMaterializationSourceProtectionReleaser sourceProtections) {
     this(
         plans,
         new TaskRoots() {
@@ -68,15 +73,18 @@ public final class KafkaCompactionTerminalRetirer {
             return delegate.requireTask(durable);
           }
         },
+        sourceProtections,
         new KafkaCompactionPlanRecordMapper());
   }
 
   KafkaCompactionTerminalRetirer(
       KafkaCompactionPlanMetadataStore plans,
       TaskRoots tasks,
+      TerminalMaterializationSourceProtectionReleaser sourceProtections,
       KafkaCompactionPlanRecordMapper mapper) {
     this.plans = Objects.requireNonNull(plans, "plans");
     this.tasks = Objects.requireNonNull(tasks, "tasks");
+    this.sourceProtections = Objects.requireNonNull(sourceProtections, "sourceProtections");
     this.mapper = Objects.requireNonNull(mapper, "mapper");
   }
 
@@ -122,7 +130,7 @@ public final class KafkaCompactionTerminalRetirer {
                 throw invariant(
                     "Kafka compaction task remains after its KCP1 attachment disappeared", null);
               }
-              return new RetirementResult(false, false, 0, 0);
+              return new RetirementResult(0, false, false, 0, 0);
             });
   }
 
@@ -139,23 +147,35 @@ public final class KafkaCompactionTerminalRetirer {
             currentTask -> {
               if (currentTask.isEmpty()) {
                 return retirePlan(
-                    partition, expectedTask, expectedPlan, authorityGuard, false, 0, 0);
+                    partition,
+                    expectedTask,
+                    expectedPlan,
+                    authorityGuard,
+                    0,
+                    false,
+                    0,
+                    0);
               }
               VersionedMaterializationTask exactTask = currentTask.orElseThrow();
               if (!exactTask.equals(expectedTaskRoot)) {
                 throw invariant("Kafka compaction terminal task changed before retirement", null);
               }
-              return deleteTask(expectedTask, exactTask, 0)
+              return sourceProtections
+                  .release(exactTask, authorityGuard)
                   .thenCompose(
-                      attempts ->
-                          retirePlan(
-                              partition,
-                              expectedTask,
-                              expectedPlan,
-                              authorityGuard,
-                              true,
-                              attempts,
-                              0));
+                      released ->
+                          deleteTask(expectedTask, exactTask, 0)
+                              .thenCompose(
+                                  attempts ->
+                                      retirePlan(
+                                          partition,
+                                          expectedTask,
+                                          expectedPlan,
+                                          authorityGuard,
+                                          released,
+                                          true,
+                                          attempts,
+                                          0)));
             });
   }
 
@@ -196,6 +216,7 @@ public final class KafkaCompactionTerminalRetirer {
       MaterializationTask expectedTask,
       VersionedKafkaCompactionPlan expectedPlan,
       MaterializationTaskMutationGuard authorityGuard,
+      int sourceProtectionsReleased,
       boolean taskWasPresent,
       int taskDeleteAttempts,
       int planDeleteAttempt) {
@@ -211,7 +232,11 @@ public final class KafkaCompactionTerminalRetirer {
               if (current.isEmpty()) {
                 return CompletableFuture.completedFuture(
                     new RetirementResult(
-                        taskWasPresent, true, taskDeleteAttempts, planDeleteAttempt));
+                        sourceProtectionsReleased,
+                        taskWasPresent,
+                        true,
+                        taskDeleteAttempts,
+                        planDeleteAttempt));
               }
               VersionedKafkaCompactionPlan exact = current.orElseThrow();
               return deletePlanRoot(exact)
@@ -220,7 +245,11 @@ public final class KafkaCompactionTerminalRetirer {
                         if (failure == null) {
                           return CompletableFuture.completedFuture(
                               new RetirementResult(
-                                  taskWasPresent, true, taskDeleteAttempts, planDeleteAttempt + 1));
+                                  sourceProtectionsReleased,
+                                  taskWasPresent,
+                                  true,
+                                  taskDeleteAttempts,
+                                  planDeleteAttempt + 1));
                         }
                         Throwable original = unwrap(failure);
                         return plans
@@ -230,6 +259,7 @@ public final class KafkaCompactionTerminalRetirer {
                                   if (reloaded.isEmpty()) {
                                     return CompletableFuture.completedFuture(
                                         new RetirementResult(
+                                            sourceProtectionsReleased,
                                             taskWasPresent,
                                             true,
                                             taskDeleteAttempts,
@@ -247,6 +277,7 @@ public final class KafkaCompactionTerminalRetirer {
                                       expectedTask,
                                       expectedPlan,
                                       authorityGuard,
+                                      sourceProtectionsReleased,
                                       taskWasPresent,
                                       taskDeleteAttempts,
                                       planDeleteAttempt + 1);
@@ -380,12 +411,14 @@ public final class KafkaCompactionTerminalRetirer {
 
   /** Bounded convergence evidence for one exact dual-root retirement. */
   public record RetirementResult(
+      int sourceProtectionsReleased,
       boolean taskWasPresent,
       boolean planWasPresent,
       int taskDeleteAttempts,
       int planDeleteAttempts) {
     public RetirementResult {
-      if (taskDeleteAttempts < 0
+      if (sourceProtectionsReleased < 0
+          || taskDeleteAttempts < 0
           || taskDeleteAttempts > MAX_DELETE_RECOVERY_ATTEMPTS
           || planDeleteAttempts < 0
           || planDeleteAttempts > MAX_DELETE_RECOVERY_ATTEMPTS

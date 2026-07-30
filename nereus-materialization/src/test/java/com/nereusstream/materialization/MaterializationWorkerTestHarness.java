@@ -66,7 +66,7 @@ final class MaterializationWorkerTestHarness {
     static DefaultMaterializationWorker worker(
             String processRunId,
             Scenario scenario,
-            TrackingProtections protections,
+            ObjectProtectionManager protections,
             TrackingExactReader exactReader,
             CompactedObjectWriter writer,
             ObjectStore objectStore,

@@ -30,6 +30,7 @@ import com.nereusstream.materialization.MaterializationFailure;
 import com.nereusstream.materialization.MaterializationPolicy;
 import com.nereusstream.materialization.MaterializationTask;
 import com.nereusstream.materialization.MaterializationTaskMutationGuard;
+import com.nereusstream.materialization.MaterializationTaskProtectionReconciler;
 import com.nereusstream.materialization.MaterializationTaskStore;
 import com.nereusstream.materialization.SecureWorkerClaimIdGenerator;
 import com.nereusstream.materialization.WorkerClaimIdGenerator;
@@ -85,6 +86,7 @@ public final class KafkaCompactionPartitionPass {
   private final KafkaCompactionPlanCoordinator planCoordinator;
   private final KafkaCompactionPlanMetadataStore plans;
   private final MaterializationTaskStore tasks;
+  private final MaterializationTaskProtectionReconciler taskProtections;
   private final KafkaCompactionBatchSource batches;
   private final KafkaCompactionParquetPublisher parquet;
   private final KafkaCompactionPublicationCoordinator publications;
@@ -107,6 +109,7 @@ public final class KafkaCompactionPartitionPass {
       KafkaCompactionPlanCoordinator planCoordinator,
       KafkaCompactionPlanMetadataStore plans,
       MaterializationTaskStore tasks,
+      MaterializationTaskProtectionReconciler taskProtections,
       KafkaCompactionBatchSource batches,
       KafkaCompactionParquetPublisher parquet,
       KafkaCompactionPublicationCoordinator publications,
@@ -125,6 +128,7 @@ public final class KafkaCompactionPartitionPass {
         planCoordinator,
         plans,
         tasks,
+        taskProtections,
         batches,
         parquet,
         publications,
@@ -147,6 +151,7 @@ public final class KafkaCompactionPartitionPass {
       KafkaCompactionPlanCoordinator planCoordinator,
       KafkaCompactionPlanMetadataStore plans,
       MaterializationTaskStore tasks,
+      MaterializationTaskProtectionReconciler taskProtections,
       KafkaCompactionBatchSource batches,
       KafkaCompactionParquetPublisher parquet,
       KafkaCompactionPublicationCoordinator publications,
@@ -166,6 +171,7 @@ public final class KafkaCompactionPartitionPass {
     this.planCoordinator = Objects.requireNonNull(planCoordinator, "planCoordinator");
     this.plans = Objects.requireNonNull(plans, "plans");
     this.tasks = Objects.requireNonNull(tasks, "tasks");
+    this.taskProtections = Objects.requireNonNull(taskProtections, "taskProtections");
     this.batches = Objects.requireNonNull(batches, "batches");
     this.parquet = Objects.requireNonNull(parquet, "parquet");
     this.publications = Objects.requireNonNull(publications, "publications");
@@ -445,11 +451,19 @@ public final class KafkaCompactionPartitionPass {
     }
     CompletableFuture<PublicationResult> operation;
     try {
-      Input input = writeInput(capture, work.task(), claimId);
-      KafkaCompactionBatchSource.PassStreams streams = batches.open(work.plan());
       CompletableFuture<KafkaCompactionParquetPublisher.PreparedObject> preparing =
-          parquet.prepare(
-              work.plan(), streams, input, capture.writeSettings().allowUncompressedFallback());
+          taskProtections
+              .reconcile(work.durableTask())
+              .thenCompose(
+                  ignored -> {
+                    Input input = writeInput(capture, work.task(), claimId);
+                    KafkaCompactionBatchSource.PassStreams streams = batches.open(work.plan());
+                    return parquet.prepare(
+                        work.plan(),
+                        streams,
+                        input,
+                        capture.writeSettings().allowUncompressedFallback());
+                  });
       operation =
           lease
               .guard(preparing)
