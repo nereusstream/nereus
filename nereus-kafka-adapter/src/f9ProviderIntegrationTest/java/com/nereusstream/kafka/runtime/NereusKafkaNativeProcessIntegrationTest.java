@@ -5077,10 +5077,13 @@ class NereusKafkaNativeProcessIntegrationTest {
                 brokerOnePaused = true;
                 removeToxic(objectProxy, toxicName);
                 toxicInstalled = false;
-
                 try (Admin admin =
-                        Admin.create(longRunningAdminProperties(
-                                brokerTwoBootstrap + "," + controllerBootstrap))) {
+                        awaitTakeoverAdmin(
+                                brokerTwoBootstrap + "," + controllerBootstrap,
+                                partition,
+                                1,
+                                controllerServerLog,
+                                brokerTwoServerLog)) {
                     admin.alterPartitionReassignments(Map.of(
                                     partition,
                                     Optional.of(new NewPartitionReassignment(
@@ -5924,11 +5927,12 @@ class NereusKafkaNativeProcessIntegrationTest {
                         brokerOneServerLog);
                 brokerOnePaused = true;
                 try (Admin admin =
-                        Admin.create(
-                                longRunningAdminProperties(
-                                        brokerTwoBootstrap
-                                                + ","
-                                                + controllerBootstrap))) {
+                        awaitTakeoverAdmin(
+                                brokerTwoBootstrap + "," + controllerBootstrap,
+                                partition,
+                                1,
+                                controllerServerLog,
+                                brokerTwoServerLog)) {
                     admin.alterPartitionReassignments(
                                     Map.of(
                                             partition,
@@ -5960,6 +5964,10 @@ class NereusKafkaNativeProcessIntegrationTest {
                             .isEmpty();
                     assertOffsets(admin, partition, 0, 1);
                 }
+                assertThat(staleProduce.future().isDone())
+                        .as(
+                                "the provider-applied old Produce must remain pending until its fenced completion is released")
+                        .isFalse();
                 ConsumerRecord<byte[], byte[]> recovered =
                         fetch(
                                 brokerTwoBootstrap,
@@ -6006,6 +6014,11 @@ class NereusKafkaNativeProcessIntegrationTest {
                         .as(
                                 "the provider-applied old BookKeeper append must fail after takeover")
                         .isNotNull();
+                assertThat(staleFailure)
+                        .as(
+                                "the BookKeeper fencing proof must not be satisfied by a client request timeout")
+                        .isNotInstanceOf(
+                                org.apache.kafka.common.errors.TimeoutException.class);
                 assertThat(brokerOne.isAlive())
                         .as(
                                 "the old process survives stale BookKeeper completion")
@@ -8212,6 +8225,8 @@ class NereusKafkaNativeProcessIntegrationTest {
         Properties properties = producerProperties(bootstrapServers);
         properties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "false");
         properties.setProperty(ProducerConfig.RETRIES_CONFIG, "0");
+        properties.setProperty(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, "120000");
+        properties.setProperty(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, "130000");
         KafkaProducer<byte[], byte[]> producer =
                 new KafkaProducer<>(properties);
         try {
@@ -9675,6 +9690,74 @@ class NereusKafkaNativeProcessIntegrationTest {
                 AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG,
                 "30000");
         return properties;
+    }
+
+    private static Admin awaitTakeoverAdmin(
+            String bootstrapServers,
+            TopicPartition partition,
+            int stoppedBrokerId,
+            Path... serverLogs
+    ) throws Exception {
+        long deadline =
+                System.nanoTime() + Duration.ofSeconds(45).toNanos();
+        Throwable lastFailure = null;
+        while (System.nanoTime() < deadline) {
+            Admin candidate =
+                    Admin.create(
+                            longRunningAdminProperties(
+                                    bootstrapServers));
+            boolean keep = false;
+            try {
+                var cluster = candidate.describeCluster();
+                List<Integer> brokerIds =
+                        cluster.nodes()
+                                .get(5, TimeUnit.SECONDS)
+                                .stream()
+                                .map(node -> node.id())
+                                .sorted()
+                                .toList();
+                int forwardingBrokerId =
+                        cluster.controller()
+                                .get(5, TimeUnit.SECONDS)
+                                .id();
+                if (!brokerIds.contains(stoppedBrokerId)
+                        && forwardingBrokerId != stoppedBrokerId) {
+                    Map<TopicPartition, ?> reassignments =
+                            candidate.listPartitionReassignments(
+                                            Set.of(partition))
+                                    .reassignments()
+                                    .get(5, TimeUnit.SECONDS);
+                    if (reassignments.isEmpty()) {
+                        keep = true;
+                        return candidate;
+                    }
+                    lastFailure =
+                            new AssertionError(
+                                    "unexpected in-progress reassignment "
+                                            + reassignments);
+                } else {
+                    lastFailure =
+                            new AssertionError(
+                                    "stopped broker "
+                                            + stoppedBrokerId
+                                            + " is still advertised for Admin forwarding; brokers="
+                                            + brokerIds
+                                            + ", forwardingBroker="
+                                            + forwardingBrokerId);
+                }
+            } catch (Throwable failure) {
+                lastFailure = failure;
+            } finally {
+                if (!keep) {
+                    candidate.close(Duration.ZERO);
+                }
+            }
+            Thread.sleep(250);
+        }
+        throw new AssertionError(
+                "KRaft did not fence the stopped broker and expose a live Admin forwarding path:\n"
+                        + joinedLogs(serverLogs),
+                lastFailure);
     }
 
     private static Properties controllerAdminProperties(
