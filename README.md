@@ -148,6 +148,10 @@ The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets�
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation
 publication、binding coverage activation、generation-constrained no-resurrection reads and task-first terminal retirement。
+The current F9 compaction runtime additionally reconstructs every deterministic Object/BookKeeper source protection before
+opening either KCP1 source stream。A fixed BookKeeper generation-zero anchor retired by a concurrent higher generation now
+cancels the stale immutable task with typed `SOURCE_RETIRED` unless its already-created dynamic task protection can be
+replayed；terminal cleanup releases all exact task-owned source protections before task-first/KCP1-second deletion。
 `KafkaCompactionPartitionPass` now recovers or admits one partition's durable workflow and composes claim heartbeat、two-pass
 execution、restart publication and dual-root retirement。`KafkaCompactionRuntime` now performs bounded fork-owned partition
 enumeration、internal-topic-first scheduling、process-current leader revalidation、cross-partition concurrency and

@@ -1,5 +1,15 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
+> 2026-07-30 immutable-source retirement correction：the clean final aggregate exposed a real overlap between ordinary
+> async materialization and a KCP1 task frozen on BookKeeper generation zero。Product `main@03f0601` now reconstructs
+> deterministic Object/BookKeeper task protections before any compaction source IO；an absent dynamic protection plus
+> a retired fixed gen0 anchor becomes typed `CANCELLED/SOURCE_RETIRED` instead of an infinite retry。An existing dynamic
+> protection remains a valid GC veto and can be replayed/transferred after anchor retirement。Terminal cleanup reloads
+> exact task/KCP1 authority，releases every task-owned source protection，then deletes task before plan；plan-only restart
+> remains convergent。Focused final-order tests pass 32/32 tasks，four modules pass 34/34 tasks before the final
+> plan-only adjustment，and a fresh four-profile mandatory-NTC2 process rerun on the committed source passes 64/64 tasks
+> in 5m39s。The complete `phase9FinalCheck` remains pending
+
 > 2026-07-30 final-evidence implementation slice：product `main@2ad7b6c` adds `phase9M3FinalCheck` through
 > `phase9M7FinalCheck`、the clean-source `phase9PrepareFinalEvidence` receipt、the 146-result
 > `Phase9EvidenceAggregatorTest` and deterministic `phase9FinalEvidenceReport`。The implementation refuses dirty or

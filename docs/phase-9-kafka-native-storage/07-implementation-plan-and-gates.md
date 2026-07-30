@@ -1547,6 +1547,34 @@ not copied into `LedgerInfo.properties`。`ManagedCursorPublicSurfaceClassificat
 from the locked interface。`ParquetCompactedTargetReader.keys()` returns an immutable two-key set for
 `NCP1 + OPAQUE_RECORD_BATCH` and `NCP1 + PULSAR_ENTRY_BATCH`，while `requireTarget` still rejects every other exact key。
 
+The third clean final attempt reached the real four-profile mandatory-NTC2 process matrix and exposed a different current-
+source bug rather than a gate artifact：in `BOOKKEEPER_WAL_ASYNC_OBJECT`，ordinary materialization could publish a higher
+Object generation and retire the fixed generation-zero anchor after KCP1 had frozen the old source but before compaction
+opened it。The original adapter returned a generic retriable condition；once the task had advanced into publication recovery，
+the same immutable source could retry forever。
+
+`main@03f0601` closes that race with the following executable protocol：
+
+- `KafkaCompactionPartitionPass.executeClaimed` invokes
+  `DefaultMaterializationTaskProtectionReconciler.reconcile` before `writeInput`、`KafkaCompactionBatchSource.open` or
+  parquet preparation；
+- `BookKeeperMaterializationSourceProtectionAdapter` first replays/transfers an existing deterministic
+  `MATERIALIZATION_SOURCE` protection；only an absent protection requires an ACTIVE fixed anchor，and a sole RETIRED
+  anchor raises typed `MaterializationSourceRetiredException/SOURCE_RETIRED`；
+- `DefaultMaterializationWorker` preserves any provider-neutral `MaterializationFailure.failureClass`，so the stale
+  immutable task becomes `CANCELLED` and a fresh plan may select live higher generations；
+- `DefaultTerminalMaterializationSourceProtectionReleaser` reloads exact terminal task plus Kafka authority before every
+  Object/BookKeeper release；`KafkaCompactionTerminalRetirer` releases sources before task-first/KCP1-second deletion，
+  while a plan-only recovery skips the no-longer-authorizable release and converges the orphan；
+- `KafkaCompactionProductionRuntimeFactory` shares one source-protection registry among pre-IO reconciliation、
+  Generation publication and terminal release。
+
+Evidence after the final recovery-order adjustment：focused Object lookup/materialization/terminal/partition tests pass
+32/32 tasks；the earlier four-module forced rerun passed 34/34 tasks；the clean committed
+`:nereus-kafka-adapter:f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest --rerun-tasks` rerun passes
+64/64 tasks in 5m39s across Object async and BookKeeper WAL-only/async/sync。The full clean final aggregate must still rerun
+all predecessors and issue the 146-result receipt before any status promotion。
+
 ## 12. Gate implementation in Gradle
 
 Root target additions：

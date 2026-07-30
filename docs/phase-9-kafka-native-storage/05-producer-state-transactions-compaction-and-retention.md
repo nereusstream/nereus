@@ -1145,6 +1145,60 @@ protected for both passes just like object slices。`GenerationReadResolver` per
 `TOPIC_COMPACTED` even under WAL-only because that is a derived object view；the unchanged COMMITTED-view branch continues
 to reject a higher generation for primary-WAL-only profiles。
 
+Implementation correction at `main@03f0601` closes the source-retirement race exposed by the four-profile mandatory-NTC2
+process gate。The executable ordering is now：
+
+```text
+claim exact KCP1-rooted task
+  -> start claim lease
+  -> DefaultMaterializationTaskProtectionReconciler.reconcile(claimed task)
+       -> acquire/replay every deterministic MATERIALIZATION_SOURCE reference
+       -> revalidate exact source candidate and exact task owner
+  -> KafkaCompactionWriteRequestFactory.Input
+  -> KafkaCompactionBatchSource.open(recovered KCP1)
+  -> KCSR/KCRS/NTC2 source IO and publication
+```
+
+`KafkaCompactionPartitionPass.executeClaimed` must not call `writeInput`、`batches.open` or
+`KafkaCompactionParquetPublisher.prepare` before the protection future succeeds。The production factory constructs one
+shared `MaterializationSourceProtectionRegistry` and passes the same registry to the pre-IO reconciler、
+`DefaultGenerationCommitter` and terminal protection releaser；a provider cannot be protected under one adapter and
+retired under another。
+
+BookKeeper has an additional immutable-source boundary。`BookKeeperMaterializationSourceProtectionAdapter` first looks up
+the deterministic dynamic `MATERIALIZATION_SOURCE` reference。If it exists，that reference is already a durable ledger-GC
+veto and may be revalidated or monotonically transferred to the recovered task owner even when the original fixed
+generation-zero `VISIBLE_GENERATION` anchor has since become `RETIRED`。Only creation of an absent dynamic reference requires
+one exact ACTIVE fixed anchor。Exactly one matching RETIRED anchor raises
+`MaterializationSourceRetiredException`，which implements `MaterializationFailure` with
+`TaskFailureClass.SOURCE_RETIRED`；absence remains a retriable metadata condition and multiple ACTIVE anchors remain an
+invariant failure。`DefaultMaterializationWorker` and the Kafka pass preserve every provider-neutral
+`MaterializationFailure.failureClass()` instead of recognizing only an internal exception subtype。A claimed immutable task
+that observes `SOURCE_RETIRED` is therefore durably `CANCELLED` and a later pass may plan from fresh higher-generation
+sources；it is never retried against bytes that the frozen task can no longer reopen。
+
+Terminal cleanup is part of the same protocol。`DefaultTerminalMaterializationSourceProtectionReleaser` enumerates the
+terminal task's frozen sources、derives each canonical reference ID、performs provider-neutral `findExisting` and accepts
+only a protection whose `ownerKey` is the task key and whose owner metadata version is not ahead of the terminal task。
+Immediately before every release it reloads the byte-exact terminal task and revalidates the Kafka partition mutation
+guard。The Object adapter now implements the same read-only exact lookup through
+`ObjectProtectionManager.findExisting`；BookKeeper continues to resolve the deterministic ledger protection slot。
+`KafkaCompactionTerminalRetirer` then executes：
+
+```text
+exact terminal task + exact KCP1 + partition authority
+  -> release all existing task-owned source protections
+  -> conditionally delete exact task
+  -> reload and prove task absent
+  -> revalidate partition authority
+  -> conditionally delete exact KCP1
+```
+
+If recovery sees only the harmless plan orphan after an applied task delete，it skips source release because the task is no
+longer available as removal authority and converges the exact KCP1 delete。`RetirementResult.sourceProtectionsReleased`
+records the first-pass release count；a repeated release observes absence and returns zero。This ordering prevents both a
+source-read window without a GC veto and a provider protection orphan after task/KCP1 retirement。
+
 ### 10.4 Two-pass algorithm
 
 Pass 1 over decision horizon：
@@ -1398,7 +1452,9 @@ components。`KafkaCompactionPartitionPass` composes them into one recoverable p
    become terminal；
 7. reconstruct INITIAL/EXTEND/REPLACE and the exact previous generation set from KCP1's frozen previous mandatory coverage，
    never from a newer mutable binding snapshot；
-8. after publication，reload exact PUBLISHED task/KCP1 roots and retire task first、plan second under the same authority。
+8. after publication or typed terminal cancellation，reload exact task/KCP1 roots，release every task-owned source
+   protection while the task remains removal authority，then retire task first、plan second under the same partition
+   authority；plan-only crash recovery never requires a deleted task to authorize a second release。
 
 Concurrent `runOnce` callers receive cancellation-isolated views of one in-flight pass。The deterministic integration test
 uses actual Parquet NTC2 write/read verification、local-file object storage、in-memory Generation/binding metadata and exact

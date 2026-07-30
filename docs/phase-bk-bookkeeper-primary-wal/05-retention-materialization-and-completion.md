@@ -510,6 +510,38 @@ never justified merely because an upload once succeeded.
 | physical ledger appears for ABORTED/DELETED tombstone | conditional escalation to QUARANTINED；no automatic delete/reuse |
 | reference appears after MARKED | unmark to SEALED; no physical delete |
 
+### 10.1 F9 immutable-source retirement correction
+
+F9's Kafka compaction process gate exposed a valid overlap with ordinary async Object materialization：a KCP1 task can freeze
+BookKeeper generation zero，then a higher Object generation becomes visible and legally retires the fixed
+`VISIBLE_GENERATION` anchor before that KCP1 task begins source IO。The BookKeeper protection adapter now distinguishes three
+states at code level：
+
+1. deterministic dynamic `MATERIALIZATION_SOURCE` exists：revalidate or owner-transfer that exact protection；it remains a
+   sufficient ledger-GC veto even if the fixed anchor is already `RETIRED`；
+2. dynamic protection is absent and exactly one matching fixed anchor is ACTIVE：create/reconcile the dynamic slot；
+3. dynamic protection is absent and the sole matching fixed anchor is RETIRED：raise typed
+   `MaterializationSourceRetiredException` / `TaskFailureClass.SOURCE_RETIRED`，cancel the immutable task and admit a fresh
+   plan；do not reopen the retired source or spin in retry。
+
+Absent anchors remain retriable metadata conditions；multiple ACTIVE anchors are invariant violations。Kafka compaction
+invokes protection reconstruction before any source-reader/parquet preparation。Its terminal path uses the shared
+provider-neutral registry to find/release exact dynamic protections while the terminal task and partition guard still
+authorize removal，then deletes task and KCP1。A restart that sees only KCP1 skips release and converges the plan orphan。
+
+Executable evidence at product `03f0601de65012a94a24237819139f688e0cd62b`：
+
+- `BookKeeperMaterializationSourceProtectionAdapterTest` proves replay/owner transfer after fixed-anchor retirement and
+  typed retirement when no dynamic protection exists；
+- `MaterializationWorkerFailureInjectionTest` proves typed source retirement persists
+  `CANCELLED/SOURCE_RETIRED` without opening a reader or writer；
+- `TerminalMaterializationSourceProtectionReleaserTest` proves exact multi-source release and idempotent absence；
+- `KafkaCompactionTerminalRetirerTest` proves release-before-task-before-KCP1 ordering、response-loss convergence and
+  plan-only restart；
+- fresh
+  `:nereus-kafka-adapter:f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest --rerun-tasks` passes
+  64/64 tasks in 5m39s across Object and all three BookKeeper mandatory-NTC2 profiles。
+
 ## 11. Metrics
 
 Expose profile-labelled metrics without using them as authority：

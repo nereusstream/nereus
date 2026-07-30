@@ -963,6 +963,19 @@ Fresh results on 2026-07-22 at
 
 BK-M6 and the whole BookKeeper Primary WAL Delivery are complete/final-gated. No online profile migration is included。
 
+Post-final compatibility checkpoint（2026-07-30，consumed by F9）：
+
+- product `main@03f0601` makes retired generation-zero sources a typed
+  `MaterializationSourceRetiredException/SOURCE_RETIRED` outcome rather than a generic retry loop；
+- `BookKeeperMaterializationSourceProtectionAdapter` replays an existing deterministic task protection without reopening a
+  retired fixed anchor，but requires an exact ACTIVE anchor before creating a missing task protection；
+- Kafka compaction reconstructs task protection before source IO and releases exact provider protections before terminal
+  task/KCP1 deletion；the shared terminal releaser also covers Object-slice protections；
+- focused source-protection/worker/terminal/pass tests pass 32/32 tasks after the final plan-only recovery adjustment，and
+  the fresh four-profile mandatory-NTC2 process gate passes 64/64 tasks in 5m39s。
+
+This is a compatibility hardening of the completed BK contract，not a new profile or an online migration claim。
+
 ## 10. Test source sets
 
 Suggested bounded source sets：
