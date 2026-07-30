@@ -1534,12 +1534,16 @@ Production jitter is random；tests inject a deterministic value source.
 under a configured owner-only
 directory, opens a new regular file with
 no-follow/exclusive-create semantics, streams Parquet/NRC1 bytes while calculating CRC32C/SHA-256 and is sealed before
-`openPublisher`. Seal records file identity and exact length；publisher open/re-read mismatch fails before upload.
-Closing deletes the staging file best-effort, and startup cleanup removes only valid product-prefixed files older than
-the orphan staging grace. The manager's global byte semaphore bounds sealed + in-progress staging bytes across
-compacted/checkpoint writers and topic-compaction spill runs. A sealed spill exposes one active verified input stream；
-EOF validates its exact length and SHA-256, and close deletes it and releases exactly its reserved bytes. Staging files are never
-durable recovery truth；a process crash simply causes task replay and object-store orphan reconciliation.
+`openPublisher`. The create-time read/write handle remains open through seal and every replay；seal records that opened
+identity and exact length, and a pathname mismatch before reader creation fails closed. A pathname replacement after
+publisher/reader validation cannot redirect IO because object publishers、verified spill streams and spill random
+readers all use the retained handle rather than reopening the path. Close unlinks only when the current directory entry
+still has the opened identity, so it never deletes a replacement file；startup cleanup removes only valid
+product-prefixed files older than the orphan staging grace. The manager's global byte semaphore bounds sealed +
+in-progress staging bytes across compacted/checkpoint writers and topic-compaction spill runs. A sealed spill exposes
+one active verified input stream；EOF validates its exact length and SHA-256, and close releases exactly its reserved
+bytes. Staging files are never durable recovery truth；a process crash simply causes task replay and object-store orphan
+reconciliation.
 
 List is bounded to at most 1,000 logical keys per call and the continuation token is opaque. Because canonical S3
 keys use base64url, an arbitrary UTF-8 logical prefix is represented by one exact physical prefix when its byte
