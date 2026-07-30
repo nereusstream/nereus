@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.StreamId;
+import com.nereusstream.metadata.oxia.CursorMetadataConditionFailedException;
 import com.nereusstream.metadata.oxia.ManagedLedgerCursorProtocol;
 import com.nereusstream.metadata.oxia.records.CursorRecordLifecycle;
 import java.util.Map;
@@ -105,6 +106,60 @@ class CursorRetentionCoordinatorTest {
             assertThat(root.cursorProperties()).containsExactly(Map.entry("cursor", "value"));
             assertThatThrownBy(() -> context.retention.completeProtection(lease).join())
                     .hasCauseInstanceOf(ManagedLedgerException.ManagedLedgerFencedException.class);
+        }
+    }
+
+    @Test
+    void staleRecreateIsRejectedBeforePublishingAnotherProtectionIntent() {
+        try (CursorStorageTestSupport.Context context =
+                new CursorStorageTestSupport.Context(0, 20)) {
+            CursorOwnerSession owner = context.owner(CursorStorageTestSupport.OWNER_1);
+            CursorHandle first = context.storage.open(
+                            owner,
+                            "subscription-a",
+                            new CursorOpenRequest(
+                                    new InitialCursorPosition.Earliest(),
+                                    Map.of(),
+                                    Map.of(),
+                                    0,
+                                    20))
+                    .join();
+            context.storage.delete(owner, first.identity().cursorName()).join();
+            CursorRetentionCoordinator.ProtectionRequest stale =
+                    new CursorRetentionCoordinator.ProtectionRequest(
+                            CursorRetentionView.PendingProtection.Kind.RECREATE,
+                            first.identity().cursorName(),
+                            first.identity().cursorNameHash(),
+                            first.identity().cursorGeneration(),
+                            first.identity().cursorGeneration() + 1,
+                            0,
+                            Optional.empty(),
+                            Map.of(),
+                            Map.of());
+
+            CursorRetentionCoordinator.ProtectionLease winner = context.retention
+                    .beginProtection(owner, stale)
+                    .join();
+            context.retention.completeProtection(winner).join();
+
+            assertThatThrownBy(() -> context.retention.beginProtection(owner, stale).join())
+                    .hasCauseInstanceOf(CursorMetadataConditionFailedException.class);
+            CursorRetentionView retention = context.storage.retentionView(owner).join();
+            assertThat(retention.lifecycle()).isEqualTo(CursorRetentionView.Lifecycle.ACTIVE);
+            assertThat(retention.pendingProtection()).isEmpty();
+            assertThat(context.metadataStore
+                            .getCursor(
+                                    CursorStorageTestSupport.CLUSTER,
+                                    new StreamId(context.ledger.projection().streamId()),
+                                    first.identity().cursorName())
+                            .join())
+                    .hasValueSatisfying(root -> {
+                        assertThat(root.value().lifecycle())
+                                .isEqualTo(CursorRecordLifecycle.ACTIVE);
+                        assertThat(root.value().cursorGeneration()).isEqualTo(2);
+                        assertThat(root.value().lastProtectionAttemptId())
+                                .isEqualTo(winner.attemptId());
+                    });
         }
     }
 

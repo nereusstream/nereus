@@ -310,18 +310,11 @@ public final class DefaultCursorRetentionCoordinator implements CursorRetentionC
                         } catch (Throwable error) {
                             return CompletableFuture.failedFuture(error);
                         }
-                        CompletableFuture<Void> countCheck = request.kind()
-                                        == CursorRetentionView.PendingProtection.Kind.CREATE
-                                ? scanAll(owner.ledger()).thenCompose(records -> {
-                                    if (records.size() >= config.cursorRecordsPerStreamMax()) {
-                                        return CompletableFuture.failedFuture(
-                                                new ManagedLedgerException.TooManyRequestsException(
-                                                        "durable cursor record limit is exhausted"));
-                                    }
-                                    return CompletableFuture.completedFuture(null);
-                                })
-                                : CompletableFuture.completedFuture(null);
-                        return countCheck.thenCompose(ignored -> {
+                        CompletableFuture<Void> precondition =
+                                requireProtectionTarget(owner, request)
+                                .thenCompose(ignored ->
+                                        requireCursorRecordCapacity(owner, request));
+                        return precondition.thenCompose(ignored -> {
                             final String attemptId;
                             final CursorProtectionIntentRecord intent;
                             final CursorRetentionRecord candidate;
@@ -1342,6 +1335,54 @@ public final class DefaultCursorRetentionCoordinator implements CursorRetentionC
                 && cursor.cursorNameHash().equals(intent.cursorNameHash())
                 && cursor.cursorGeneration() == intent.targetCursorGeneration()
                 && cursor.lastProtectionAttemptId().equals(intent.attemptId());
+    }
+
+    private CompletableFuture<Void> requireProtectionTarget(
+            CursorOwnerSession owner, ProtectionRequest request) {
+        return metadataStore
+                .getCursor(cluster, streamId(owner), request.cursorName())
+                .thenApply(cursor -> {
+                    CursorStateRecord target =
+                            cursor.map(VersionedCursorState::value).orElse(null);
+                    if (target != null) {
+                        if (!target.projection().equals(owner.ledger().projection())
+                                || !target.cursorName().equals(request.cursorName())
+                                || !target.cursorNameHash().equals(request.cursorNameHash())) {
+                            throw invariant("cursor protection target identity mismatch");
+                        }
+                    }
+                    boolean compatible = switch (request.kind()) {
+                        case CREATE -> target == null;
+                        case RECREATE -> target != null
+                                && target.lifecycle() == CursorRecordLifecycle.DELETED
+                                && target.cursorGeneration()
+                                        == request.expectedCursorGeneration();
+                        case BACKWARD_RESET -> target != null
+                                && target.lifecycle() == CursorRecordLifecycle.ACTIVE
+                                && target.cursorGeneration()
+                                        == request.expectedCursorGeneration();
+                    };
+                    if (!compatible) {
+                        throw new CursorMetadataConditionFailedException(
+                                "cursor protection target changed before intent publication");
+                    }
+                    return null;
+                });
+    }
+
+    private CompletableFuture<Void> requireCursorRecordCapacity(
+            CursorOwnerSession owner, ProtectionRequest request) {
+        if (request.kind() != CursorRetentionView.PendingProtection.Kind.CREATE) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return scanAll(owner.ledger()).thenCompose(records -> {
+            if (records.size() >= config.cursorRecordsPerStreamMax()) {
+                return CompletableFuture.failedFuture(
+                        new ManagedLedgerException.TooManyRequestsException(
+                                "durable cursor record limit is exhausted"));
+            }
+            return CompletableFuture.completedFuture(null);
+        });
     }
 
     private CursorProtectionIntentRecord toIntent(
