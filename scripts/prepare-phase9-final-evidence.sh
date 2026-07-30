@@ -3,8 +3,9 @@ set -euo pipefail
 
 repo="${1:?repository path is required}"
 kafka_fork="${2:?Kafka fork path is required}"
-output="${3:?output path is required}"
-rerun_tasks="${4:?rerun flag is required}"
+pulsar_fork="${3:?Pulsar fork path is required}"
+output="${4:?output path is required}"
+rerun_tasks="${5:?rerun flag is required}"
 
 manifest="$repo/docs/phase-9-kafka-native-storage/f9-scenarios.json"
 matrix="$repo/docs/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md"
@@ -40,6 +41,9 @@ product_status="$(git -C "$repo" status --porcelain)"
 kafka_branch="$(git -C "$kafka_fork" branch --show-current)"
 kafka_commit="$(git -C "$kafka_fork" rev-parse HEAD)"
 kafka_status="$(git -C "$kafka_fork" status --porcelain)"
+pulsar_branch="$(git -C "$pulsar_fork" branch --show-current)"
+pulsar_commit="$(git -C "$pulsar_fork" rev-parse HEAD)"
+pulsar_status="$(git -C "$pulsar_fork" status --porcelain)"
 
 [[ "$product_branch" == "main" ]] \
     || fail "product branch must be main, found $product_branch"
@@ -51,6 +55,12 @@ kafka_status="$(git -C "$kafka_fork" status --porcelain)"
     || fail "Kafka commit mismatch: $kafka_commit"
 [[ -z "$kafka_status" ]] \
     || fail "Kafka fork tree must be clean: $kafka_status"
+[[ "$pulsar_branch" == "5.0.0-M1-nereus" ]] \
+    || fail "Pulsar branch mismatch: $pulsar_branch"
+[[ "$pulsar_commit" == "50fc70fe4620febcf0fd31d97ff7d2be447af3d4" ]] \
+    || fail "Pulsar commit mismatch: $pulsar_commit"
+[[ -z "$pulsar_status" ]] \
+    || fail "Pulsar fork tree must be clean: $pulsar_status"
 
 scenario_ids="$(rg -o '"id": "KF-[A-Z0-9]+-[0-9]{3}"' "$manifest" \
     | sed -E 's/^"id": "([^"]+)"$/\1/' \
@@ -213,6 +223,9 @@ temporary_output="$output.tmp"
     printf '  "kafkaFork":{"branch":%s,"commit":%s,"clean":true},\n' \
         "$(json_quote "$kafka_branch")" \
         "$(json_quote "$kafka_commit")"
+    printf '  "pulsarFork":{"branch":%s,"commit":%s,"clean":true},\n' \
+        "$(json_quote "$pulsar_branch")" \
+        "$(json_quote "$pulsar_commit")"
     printf '  "services":["kraft","oxia","object-store","bookkeeper"],\n'
     printf '  "passedTasks":[\n'
     first_task=true

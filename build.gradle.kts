@@ -2877,6 +2877,21 @@ tasks.register<Exec>("checkPhase9ScenarioManifest") {
 val autoMqCheckoutPath = providers.gradleProperty("autoMqCheckout")
     .orElse(providers.environmentVariable("NEREUS_AUTOMQ_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../automq").asFile.absolutePath)
+val phase9PulsarExpectedHead =
+    "50fc70fe4620febcf0fd31d97ff7d2be447af3d4"
+
+tasks.register<Exec>("phase9PulsarSourceLockCheck") {
+    group = "verification"
+    description =
+        "Verify the exact clean Pulsar 5.0.0-M1 Nereus fork consumed by the inherited F9 foundation."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-pulsar-source-lock.sh",
+        pulsarCheckoutPath.get(),
+        phase9PulsarExpectedHead,
+    )
+}
 
 tasks.register<Exec>("phase9SourceLockCheck") {
     group = "verification"
@@ -3284,7 +3299,7 @@ tasks.register("phase9M1FinalCheck") {
     group = "verification"
     description = "Run F9-M1 plus inherited protocol-neutral regression and real-object-store gates."
     dependsOn("phase9M1Check")
-    dependsOn("checkPulsarSourceLock")
+    dependsOn("phase9PulsarSourceLockCheck")
     dependsOn("phase1FinalCheck")
     dependsOn("phase15FinalCheck")
     dependsOn(":nereus-managed-ledger:test")
@@ -3493,6 +3508,7 @@ val phase9PrepareFinalEvidence =
             "scripts/prepare-phase9-final-evidence.sh",
             layout.projectDirectory.asFile.absolutePath,
             kafkaForkCheckoutPath.get(),
+            pulsarCheckoutPath.get(),
             phase9PreEvidence.get().asFile.absolutePath,
             gradle.startParameter.isRerunTasks.toString(),
         )

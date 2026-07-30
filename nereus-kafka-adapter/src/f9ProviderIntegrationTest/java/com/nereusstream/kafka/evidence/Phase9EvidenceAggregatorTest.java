@@ -111,6 +111,12 @@ final class Phase9EvidenceAggregatorTest {
                 .isEqualTo("76f62f3b83e882105219b6c7687dbde594a8b8a2");
         assertThat(evidence.preEvidence().path("kafkaFork").path("clean").asBoolean())
                 .isTrue();
+        assertThat(evidence.preEvidence().path("pulsarFork").path("branch").asText())
+                .isEqualTo("5.0.0-M1-nereus");
+        assertThat(evidence.preEvidence().path("pulsarFork").path("commit").asText())
+                .isEqualTo("50fc70fe4620febcf0fd31d97ff7d2be447af3d4");
+        assertThat(evidence.preEvidence().path("pulsarFork").path("clean").asBoolean())
+                .isTrue();
         assertThat(evidence.preEvidence().path("junit").path("suites").asInt())
                 .isGreaterThanOrEqualTo(30);
         assertThat(evidence.preEvidence().path("junit").path("tests").asInt())
