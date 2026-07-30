@@ -350,11 +350,20 @@ class BookKeeperPrimaryWalAppenderTest {
                 long ledgerId, BookKeeperWalConfiguration configuration, byte[] password,
                 Map<String, byte[]> customMetadata, BookKeeperOperationDeadline deadline) {
             observedDeadlineNanos.add(deadline.remaining().toNanos());
-            if (createDelayNanos > 0) java.util.concurrent.locks.LockSupport.parkNanos(createDelayNanos);
+            delayCreate();
             createCalls++;
             LedgerState state = new LedgerState(configuration, customMetadata);
             ledgers.put(ledgerId, state);
             return CompletableFuture.completedFuture(writeHandle(ledgerId, state));
+        }
+
+        private void delayCreate() {
+            long startedAt = System.nanoTime();
+            long remaining = createDelayNanos;
+            while (remaining > 0) {
+                java.util.concurrent.locks.LockSupport.parkNanos(remaining);
+                remaining = createDelayNanos - (System.nanoTime() - startedAt);
+            }
         }
 
         @Override
