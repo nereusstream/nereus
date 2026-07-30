@@ -89,7 +89,6 @@ class ManagedCursorPublicSurfaceClassificationTest {
                     "hasMoreEntries",
                     "getNumberOfEntries",
                     "getNumberOfEntriesInBacklog",
-                    "hasBacklog",
                     "findNewestMatching",
                     "scan",
                     "asyncFindNewestMatching",
@@ -109,7 +108,6 @@ class ManagedCursorPublicSurfaceClassificationTest {
             Map.entry("readEntriesOrWait", 2L),
             Map.entry("asyncReadEntriesOrWait", 2L),
             Map.entry("asyncReadEntriesWithSkipOrWait", 2L),
-            Map.entry("hasBacklog", 2L),
             Map.entry("markDelete", 2L),
             Map.entry("asyncMarkDelete", 2L),
             Map.entry("delete", 2L),
@@ -148,9 +146,8 @@ class ManagedCursorPublicSurfaceClassificationTest {
     }
 
     private static boolean isIntentionallyInheritedDefault(Method method) {
-        return method.getName().equals("hasBacklog")
-                || (method.getName().equals("seek")
-                        && Arrays.equals(method.getParameterTypes(), new Class<?>[] {Position.class}));
+        return method.getName().equals("seek")
+                && Arrays.equals(method.getParameterTypes(), new Class<?>[] {Position.class});
     }
 
     private static String signature(Method method) {

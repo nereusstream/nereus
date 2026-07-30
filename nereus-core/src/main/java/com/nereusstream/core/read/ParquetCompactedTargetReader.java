@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /** Exact NCP1 adapter that maps one dense Parquet row back to one unchanged logical ReadBatch. */
@@ -41,6 +42,14 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
             Optional.of(ObjectType.STREAM_COMPACTED_OBJECT),
             Optional.of(CompactedObjectFormatV1.COMMITTED_PHYSICAL_FORMAT),
             Optional.of(com.nereusstream.api.PayloadFormat.PULSAR_ENTRY_BATCH.name()));
+    public static final ReadTargetReaderKey LEGACY_OPAQUE_KEY = new ReadTargetReaderKey(
+            ReadTargetType.OBJECT_SLICE,
+            1,
+            Optional.of(ObjectType.STREAM_COMPACTED_OBJECT),
+            Optional.of(CompactedObjectFormatV1.COMMITTED_PHYSICAL_FORMAT),
+            Optional.of(com.nereusstream.api.PayloadFormat.OPAQUE_RECORD_BATCH.name()));
+    private static final Set<ReadTargetReaderKey> KEYS =
+            Set.of(KEY, LEGACY_OPAQUE_KEY);
 
     private final CompactedObjectReader reader;
 
@@ -51,6 +60,11 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
     @Override
     public ReadTargetReaderKey key() {
         return KEY;
+    }
+
+    @Override
+    public Set<ReadTargetReaderKey> keys() {
+        return KEYS;
     }
 
     @Override
@@ -244,7 +258,7 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
     private static ObjectSliceReadTarget requireTarget(ResolvedRange range) {
         Objects.requireNonNull(range, "range");
         if (!(range.readTarget() instanceof ObjectSliceReadTarget target)
-                || !ReadTargetReaderKey.from(target).equals(KEY)
+                || !KEYS.contains(ReadTargetReaderKey.from(target))
                 || target.objectOffset() != 0
                 || !target.logicalFormat().equals(range.payloadFormat().name())) {
             throw new NereusException(

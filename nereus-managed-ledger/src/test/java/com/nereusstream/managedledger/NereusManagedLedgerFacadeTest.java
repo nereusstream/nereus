@@ -216,9 +216,11 @@ class NereusManagedLedgerFacadeTest {
                     .isEqualTo(position);
             ManagedLedgerInternalStats internal = ledger.getManagedLedgerInternalStats(true).join();
             assertThat(internal.numberOfEntries).isEqualTo(1);
+            assertThat(ledger.getProperties()).containsEntry("source", "test");
             assertThat(internal.ledgers).singleElement().satisfies(info -> {
                 assertThat(info.ledgerId).isEqualTo(position.getLedgerId());
                 assertThat(info.metadata).contains("nereus{streamId=");
+                assertThat(info.properties).isEmpty();
             });
             assertThat(factory.asyncExists(NAME).join()).isTrue();
             assertThat(factory.getManagedLedgerInfo(NAME).ledgers).singleElement()
