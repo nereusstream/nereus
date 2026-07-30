@@ -30,10 +30,13 @@ F9 inherited-compatibility correction（2026-07-30）：the second final attempt
 removed `ManagedLedgerInternalStats.properties` and `ManagedCursor.hasBacklog` surfaces，then the full
 managed-ledger regression exposed a pre-existing F9 exact-key regression that had hidden legacy F2 NCP1
 `OPAQUE_RECORD_BATCH` generations。Product `main@4d8d627` removes the deleted stats assignment without moving
-managed-ledger properties into physical-ledger properties，updates the audited cursor surface and registers exactly
-two NCP1 logical keys（legacy `OPAQUE_RECORD_BATCH` plus current `PULSAR_ENTRY_BATCH`，no wildcard）。Focused core
-reader tests pass 22/22 tasks；focused managed-ledger tests pass 53/53 tasks；all 223 managed-ledger tests pass in
-44/44 tasks。Final aggregate passage remains pending。
+managed-ledger properties into physical-ledger properties and updates the audited current-source cursor surface。It
+registers exactly two NCP1 logical keys（legacy `OPAQUE_RECORD_BATCH` plus current `PULSAR_ENTRY_BATCH`，no wildcard）。
+Focused core reader tests pass 22/22 tasks；focused managed-ledger tests pass 53/53 tasks；all 223 managed-ledger
+tests pass in 44/44 tasks。The ordinary build remains compatible with the historical `100d3ef0` source lock by
+admitting only its exact two inherited `hasBacklog` default overloads when present；the current `50fc70fe` surface
+still requires them to be absent, and no unknown cursor method or overload is admitted。Final aggregate passage remains
+pending。
 
 F9 current-source performance update（2026-07-30）：product `main@33c889c` adds canonical
 `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` and root `phase9PerformanceCheck`。The gate runs

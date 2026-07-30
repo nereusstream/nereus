@@ -1561,8 +1561,10 @@ The first two clean final attempts are retained as negative evidence rather than
 
 `main@4d8d627` closes the latter two without weakening the final graph。`NereusManagedLedger` no longer tries to
 populate a field absent from the public Pulsar DTO；topic properties remain available from `getProperties()` and are
-not copied into `LedgerInfo.properties`。`ManagedCursorPublicSurfaceClassificationTest` removes only the method absent
-from the locked interface。`ParquetCompactedTargetReader.keys()` returns an immutable two-key set for
+not copied into `LedgerInfo.properties`。The current-source cursor audit omits the removed `hasBacklog` method；the
+ordinary-build compatibility gate additionally recognizes only the exact two inherited default overloads when the
+historical `100d3ef0` interface exposes them, while preserving exhaustive method/count/signature checks on both
+baselines。`ParquetCompactedTargetReader.keys()` returns an immutable two-key set for
 `NCP1 + OPAQUE_RECORD_BATCH` and `NCP1 + PULSAR_ENTRY_BATCH`，while `requireTarget` still rejects every other exact key。
 
 The third clean final attempt reached the real four-profile mandatory-NTC2 process matrix and exposed a different current-

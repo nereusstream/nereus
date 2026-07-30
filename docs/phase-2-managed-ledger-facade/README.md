@@ -1,10 +1,11 @@
 # Phase 2 ManagedLedger Facade Detailed Design
 
-> 2026-07-30 current-source compatibility：product `main@4d8d627` adapts the facade to Pulsar
-> `5.0.0-M1-nereus@50fc70fe` by removing the unavailable internal-stats properties assignment and the removed
-> `ManagedCursor.hasBacklog` surface classification。It also restores F2's durable NCP1 `OPAQUE_RECORD_BATCH` reader
-> key alongside F9's `PULSAR_ENTRY_BATCH` key without adding a wildcard。Focused core/managed-ledger gates and all 223
-> managed-ledger tests pass
+> 2026-07-30 dual-source compatibility：product `main` adapts the facade to current Pulsar
+> `5.0.0-M1-nereus@50fc70fe` by removing the unavailable internal-stats properties assignment。The cursor surface gate
+> accepts the exact two legacy `ManagedCursor.hasBacklog` default overloads only when the historical F2/ordinary-build
+> baseline `100d3ef0` exposes them；their absence on `50fc70fe` remains valid, and unknown methods, overload counts,
+> signatures or non-default implementations still fail。The same compatibility slice restores F2's durable NCP1
+> `OPAQUE_RECORD_BATCH` reader key alongside F9's `PULSAR_ENTRY_BATCH` key without adding a wildcard。
 
 本文档目录是 Future 2 的 implemented/final-gated code-level contract。F2-M0 在 2026-07-11 完成第一轮 API spike；
 F2-M0R 补齐 append recovery、topic incarnation、role-aware Position、interface matrix 和 broker runtime
