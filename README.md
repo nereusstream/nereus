@@ -1,5 +1,15 @@
 # Nereus
 
+F9 final current-source result（2026-07-30，supersedes the open wording in the incremental notes below）：clean
+`main@efd9142fc5ff991ec78dccda3b6ec7347714ef31` completed
+`./gradlew phase9FinalCheck --rerun-tasks` against Kafka fork
+`nereus/future9-native-kafka-storage@76f62f3b83e882105219b6c7687dbde594a8b8a2`、Pulsar fork
+`5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4` and AutoMQ reference
+`main@1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）。The final receipt records 218 JUnit suites
+and 798 tests；the evidence aggregator emits exactly 146/146 results with zero skipped、failures or errors，and
+`build/f9-final-evidence/final-report.json` reports `PASS`。All 146 manifest rows are now
+`PASSED_CURRENT_SOURCE`；F9 implementation and its current-source completion gate are closed。
+
 F9 final-evidence implementation update（2026-07-30）：product `main@2ad7b6c` adds the missing M3–M7 final
 gate graph、`phase9PrepareFinalEvidence`、`Phase9EvidenceAggregatorTest` and `phase9FinalEvidenceReport`。The
 pre-evidence step rejects a non-`main`/dirty product tree、a dirty or unpinned Kafka fork、a run without

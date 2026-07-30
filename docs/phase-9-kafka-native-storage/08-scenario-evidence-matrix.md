@@ -1,9 +1,14 @@
 # 08 — Scenario and Evidence Matrix
 
-> 状态：Active scenario contract；146-row JSON manifest synchronized；134 rows are `IMPLEMENTED_NOT_RUN` and 12 retain
-> prior focused `PASSED_CURRENT_SOURCE` evidence；only a clean final aggregate may promote the complete matrix
+> 状态：Current-source final PASS。Clean product `main@efd9142fc5ff991ec78dccda3b6ec7347714ef31` completed
+> `phase9FinalCheck --rerun-tasks` against Kafka `76f62f3b83e882105219b6c7687dbde594a8b8a2`、Pulsar
+> `50fc70fe4620febcf0fd31d97ff7d2be447af3d4` and AutoMQ
+> `1c648d84819d5c3fef2af585f02149c397584870`。The receipt contains 218 JUnit suites / 798 tests；the final
+> aggregator maps all 146 unique IDs to PASS with zero skipped、failures or errors。All 146 JSON rows are
+> `PASSED_CURRENT_SOURCE`；the dated incremental lines below are retained as audit history and their older open wording
+> is superseded by this result
 > 规则：一个 requirement 至少一个稳定 ID；release report 必须给每个 ID 一个实际执行结果
-> 当前 F9-M1/M2 implementation 与 direct real-service gates 已通过；F9-M3 codec、bounded Produce 与 whole-request async Fetch、M4 transaction、M5 virtual-log/DeleteRecords/periodic-retention rows have deterministic partial evidence；native DeleteRecords checkpoint-before-trim + forced-restart recovery adds one R/P/C/K slice；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 milestone rows 暂不升级为 final-gated
+> 历史 pre-final baseline：F9-M1/M2 and direct real-service gates had passed while later rows still held partial evidence；the final result above supersedes that earlier status。
 > 2026-07-29 增量：product `7c25d2e` adds a live two-release-process completed-state migration slice for KF-TXN-011/012/013；ongoing/aborted transaction takeover、mandatory internal-topic NTC2 and final aggregate remain open
 > 2026-07-29 ongoing transaction 增量：product `efe782d` adds bidirectional live OPEN-state COMMIT/ABORT migration evidence for KF-TXN-007/012/014；injected transaction-resolution failure、mandatory NTC2、profile expansion and final aggregate remain open
 > 2026-07-29 mandatory NTC2 deterministic 增量：product `b6b02f4` + fork `89b66ab03b` add deterministic KF-TXN-016 evidence：all untrimmed activated generations are probed only through constrained `TOPIC_COMPACTED` reads before coordinator storage installation/election；same-view unavailability cancels/resigns open。Physical repair evidence is recorded in the next increment

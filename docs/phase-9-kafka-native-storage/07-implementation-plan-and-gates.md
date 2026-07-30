@@ -1,5 +1,13 @@
 # 07 — Implementation Plan and Gates
 
+> 2026-07-30 final current-source result（supersedes the historical open-state notes below）：clean product
+> `main@efd9142fc5ff991ec78dccda3b6ec7347714ef31` passed `phase9FinalCheck --rerun-tasks` with Kafka
+> `76f62f3b83e882105219b6c7687dbde594a8b8a2`、Pulsar
+> `50fc70fe4620febcf0fd31d97ff7d2be447af3d4` and AutoMQ
+> `1c648d84819d5c3fef2af585f02149c397584870`。Pre-evidence covers 218 JUnit suites / 798 tests；the final
+> evidence owner maps all 146 unique scenario IDs to PASS with zero skipped、failures or errors。Every manifest row is
+> `PASSED_CURRENT_SOURCE`，including KF-SCL-010；F9 has no remaining implementation gate at these source locks
+
 > 2026-07-30 final-evidence implementation slice：product `main@2ad7b6c` installs the missing M3–M7 final gates，
 > strict clean-source/predecessor receipt generation，the exact 146-result JUnit aggregator and deterministic final
 > report。All 146 manifest rows are runnable，but this implementation-only increment leaves KF-SCL-010 and every
@@ -19,7 +27,7 @@
 > fail-closed dispatch。Core reader/registry pass 22/22 tasks；three focused managed-ledger owners pass 53/53 tasks；
 > the complete 223-test managed-ledger suite passes in 44/44 tasks。Final aggregate passage remains open
 
-> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss、release-process physical-deletion/fresh-JVM NCP2 fallback、Object/BookKeeper process takeover cuts、real-Oxia two-runtime Object-WAL live leader takeover、ACTIVE-state three-voter controller failover、the complete six-way readiness/PREPARED/ACTIVE store-publication cuts、four-way initial proof cuts and all-five-profile trim-response-loss forced restart are implemented；remaining M4 internal-topic cuts、DeleteRecords boundary/oracle work and inherited final gates remain open
+> 当前状态：F9-M1–M7 implemented and final-gated for the exact source locks recorded above；all 146 scenario rows are `PASSED_CURRENT_SOURCE`。The dated lines below retain milestone-level evidence and historical open-item descriptions。
 > 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton takeover、Object/BookKeeper in-flight cuts、three-profile handoff、ACTIVE multi-controller failover、activation store/proof cuts 与 Oxia transport recovery 已进入 M6 process aggregate；`f9CheckpointTrimRecoveryProcessIntegrationTest` 闭合 native DeleteRecords -> rooted NKC1 -> durable trim -> forced restart -> pre-trim checkpoint hydration/current-trim pruning -> continued IO；`f9TrimResponseLossProcessIntegrationTest` 与 `f9TrimProfileMatrixProcessIntegrationTest` 又在五种 profile 闭合 provider-applied/caller-unobserved -> forced restart -> same-target no-op/no-repeat；仍 open 的 takeover 边界是 coordinator/internal topics 与更广 chaos
 > 2026-07-29 coordinator migration 增量：`f9CoordinatorMigrationProcessIntegrationTest` 已在两个 live release brokers 闭合 completed group/transaction internal-topic state 的 `[1] -> [2]` recovery/continuation；仍 open 的 M4 coordinator 边界缩小为 ongoing/aborted transaction takeover、mandatory NTC2 与 final/upstream aggregate
 > 2026-07-29 ongoing transaction migration 增量：product `efe782d` 的独立 process gate 已闭合 Object-WAL OPEN transaction 跨双向 coordinator handoff 的 COMMIT/ABORT、LSO、same-ID continuation 与 READ_COMMITTED filtering；仍 open 的 M4 coordinator 边界缩小为 injected resolution failure、mandatory NTC2、profile expansion 与 final/upstream aggregate
@@ -1538,6 +1546,12 @@ a generated build artifact，not a committed evergreen claim；documentation and
 ```bash
 ./gradlew phase9FinalCheck --rerun-tasks
 ```
+
+The clean current-source execution at product `efd9142fc5ff991ec78dccda3b6ec7347714ef31` completed this path. Its
+`pre-evidence.json` records 218 JUnit suites / 798 tests and the exact four source locks above；
+`final-report.json` records `status=PASS`、146 tests、zero skipped/failures/errors and the exact sorted 146-ID set。
+Accordingly every manifest row, including KF-SCL-010, is `PASSED_CURRENT_SOURCE`。The following failed-attempt record is
+retained only as diagnostic history and does not describe the current completion state。
 
 The first two clean final attempts are retained as negative evidence rather than hidden：
 
