@@ -1,5 +1,10 @@
 # 07 — Implementation Plan and Gates
 
+> 2026-07-30 final-evidence implementation slice：product `main@2ad7b6c` installs the missing M3–M7 final gates，
+> strict clean-source/predecessor receipt generation，the exact 146-result JUnit aggregator and deterministic final
+> report。All 146 manifest rows are runnable，but this implementation-only increment leaves KF-SCL-010 and every
+> previously unaggregated row at `IMPLEMENTED_NOT_RUN` until a clean `phase9FinalCheck --rerun-tasks` completes
+
 > 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss、release-process physical-deletion/fresh-JVM NCP2 fallback、Object/BookKeeper process takeover cuts、real-Oxia two-runtime Object-WAL live leader takeover、ACTIVE-state three-voter controller failover、the complete six-way readiness/PREPARED/ACTIVE store-publication cuts、four-way initial proof cuts and all-five-profile trim-response-loss forced restart are implemented；remaining M4 internal-topic cuts、DeleteRecords boundary/oracle work and inherited final gates remain open
 > 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton takeover、Object/BookKeeper in-flight cuts、three-profile handoff、ACTIVE multi-controller failover、activation store/proof cuts 与 Oxia transport recovery 已进入 M6 process aggregate；`f9CheckpointTrimRecoveryProcessIntegrationTest` 闭合 native DeleteRecords -> rooted NKC1 -> durable trim -> forced restart -> pre-trim checkpoint hydration/current-trim pruning -> continued IO；`f9TrimResponseLossProcessIntegrationTest` 与 `f9TrimProfileMatrixProcessIntegrationTest` 又在五种 profile 闭合 provider-applied/caller-unobserved -> forced restart -> same-target no-op/no-repeat；仍 open 的 takeover 边界是 coordinator/internal topics 与更广 chaos
 > 2026-07-29 coordinator migration 增量：`f9CoordinatorMigrationProcessIntegrationTest` 已在两个 live release brokers 闭合 completed group/transaction internal-topic state 的 `[1] -> [2]` recovery/continuation；仍 open 的 M4 coordinator 边界缩小为 ongoing/aborted transaction takeover、mandatory NTC2 与 final/upstream aggregate
@@ -1466,6 +1471,53 @@ following current-host observations；these are reproducibility evidence，not r
 KF-SCL-009 therefore moves from `PLANNED` to `IMPLEMENTED_NOT_RUN`：its P/A-shaped report is current and complete，but
 only KF-SCL-010 may consume it together with all other 145 rows and promote release status through a clean
 `phase9FinalCheck --rerun-tasks`。
+
+### Implemented exact-source final aggregator at `main@2ad7b6c`
+
+The final aggregate is an executable receipt pipeline rather than a documentation-only alias：
+
+1. root `phase9M3FinalCheck` composes M2、fork codec/provider gates and all five real release-process storage profiles；
+2. `phase9M4FinalCheck` adds producer/checkpoint state、the complete M6 process transaction/coordinator matrix and the
+   fork compatibility suite；
+3. `phase9M5FinalCheck` adds compaction、retention and provider response-loss chaos；
+4. `phase9M6FinalCheck` adds activation metadata、durable checkpoint quarantine、all fork feature buckets and the
+   complete process matrix；
+5. `phase9M7Check` composes scale、leader/provider chaos、four-version client compatibility and the five-profile
+   observation-only performance run；
+6. `phase9PrepareFinalEvidence` depends on M1–M6 final plus M7 and invokes
+   `scripts/prepare-phase9-final-evidence.sh`；
+7. adapter `f9EvidenceAggregatorTest` consumes the receipt，then root `phase9FinalEvidenceReport` invokes
+   `scripts/finalize-phase9-evidence.sh`；
+8. `phase9M7FinalCheck` and `phase9FinalCheck` expose the only release-completion path。
+
+`prepare-phase9-final-evidence.sh` enforces these code-level conditions before JUnit starts：
+
+- Gradle received `--rerun-tasks`；the product checkout is clean `main`，and the clean Kafka checkout is exactly
+  `nereus/future9-native-kafka-storage@76f62f3b83e882105219b6c7687dbde594a8b8a2`；
+- the manifest has exactly 146 unique IDs and only `IMPLEMENTED_NOT_RUN`/`PASSED_CURRENT_SOURCE` statuses；
+- every manifest owner task belongs to the closed final graph；
+- compatibility evidence contains four `PASS` rows，performance evidence contains five `PASS` rows and
+  `thresholdPolicy=OBSERVATION_ONLY`；
+- 50 explicitly named predecessor result directories exist；every XML suite has non-zero tests and zero
+  skipped/failures/errors；the sorted `path|class|method|PASS` receipts are SHA-256 hashed；
+- the generated `build/f9-final-evidence/pre-evidence.json` records exact product/Kafka commits、services、owner
+  tasks、JUnit totals/hash and SHA-256 for the manifest、Markdown matrix and both M7 reports。
+
+`Phase9EvidenceAggregatorTest.scenarioEvidence` emits one dynamic JUnit result for each row except KF-SCL-010。Each
+result is named `ID|testClass#testMethod` and verifies runnable status、the freshly executed owner task、required services、
+canonical `scenarioKf<Group><NNN>` name and exact source lock。The separate
+`scenarioKfScl010` verifies the complete 146-row uniqueness/canonical-owner contract、Markdown/JSON ID equality and all
+four artifact hashes。This yields exactly 146 JUnit results without treating the aggregate row as its own predecessor。
+
+`finalize-phase9-evidence.sh` parses the aggregator XML independently，requires exactly 146 tests with zero
+skipped/failures/errors，extracts 146 unique IDs，byte-compares their sorted set with the manifest and only then writes
+`build/f9-final-evidence/final-report.json` with `status=PASS` and the embedded pre-evidence receipt。The final report is
+a generated build artifact，not a committed evergreen claim；documentation and manifest status may move to
+`PASSED_CURRENT_SOURCE` only after this exact clean command succeeds：
+
+```bash
+./gradlew phase9FinalCheck --rerun-tasks
+```
 
 ## 12. Gate implementation in Gradle
 

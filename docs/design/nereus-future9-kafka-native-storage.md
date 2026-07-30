@@ -1,5 +1,13 @@
 # Future 9 — Native Kafka Shared-Storage Integration
 
+> 2026-07-30 final-evidence implementation slice：product `main@2ad7b6c` closes the missing executable
+> M3–M7 final-task graph and adds the strict pre-evidence/JUnit/final-report pipeline。It accepts only clean
+> `main` plus exact clean Kafka fork `76f62f3b83`、requires `--rerun-tasks`、parses a fixed set of predecessor JUnit
+> directories with zero skipped/failure/error results、hashes the manifest/matrix/compatibility/performance artifacts，
+> then emits exactly 146 scenario receipts and rejects any ID difference。All manifest rows are now runnable
+> (`IMPLEMENTED_NOT_RUN` or prior `PASSED_CURRENT_SOURCE`)；KF-SCL-010 itself remains
+> `IMPLEMENTED_NOT_RUN` until the clean `phase9FinalCheck --rerun-tasks` succeeds
+
 > 2026-07-30 F9-M7 performance slice：product `main@33c889c` implements canonical
 > `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` behind `phase9PerformanceCheck`。All five storage profiles
 > run synchronous-ack Produce、READ_COMMITTED Fetch、actual broker-JVM resource sampling and fresh-process cold recovery

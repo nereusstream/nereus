@@ -1,5 +1,13 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
+> 2026-07-30 final-evidence implementation slice：product `main@2ad7b6c` adds `phase9M3FinalCheck` through
+> `phase9M7FinalCheck`、the clean-source `phase9PrepareFinalEvidence` receipt、the 146-result
+> `Phase9EvidenceAggregatorTest` and deterministic `phase9FinalEvidenceReport`。The implementation refuses dirty or
+> unpinned sources、a run without `--rerun-tasks`、non-runnable manifest rows、missing/zero/skipped/failed predecessor
+> suites and incomplete M7 machine reports。The manifest now contains 134 `IMPLEMENTED_NOT_RUN` and 12 prior
+> `PASSED_CURRENT_SOURCE` rows；the implementation commit does not claim final passage。Only a fresh
+> `./gradlew phase9FinalCheck --rerun-tasks` may close KF-SCL-010 and promote the complete matrix
+
 > 2026-07-30 M7 performance slice：product `main@33c889c` adds
 > `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` and root `phase9PerformanceCheck`。Five storage profiles
 > each execute first-process Produce/Fetch/resource sampling and a second-process identity-only-cache recovery，for ten

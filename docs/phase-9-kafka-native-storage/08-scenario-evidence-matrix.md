@@ -1,6 +1,7 @@
 # 08 — Scenario and Evidence Matrix
 
-> 状态：Active scenario contract；146-row JSON manifest synchronized；rows remain `PLANNED` until owning milestone evidence
+> 状态：Active scenario contract；146-row JSON manifest synchronized；134 rows are `IMPLEMENTED_NOT_RUN` and 12 retain
+> prior focused `PASSED_CURRENT_SOURCE` evidence；only a clean final aggregate may promote the complete matrix
 > 规则：一个 requirement 至少一个稳定 ID；release report 必须给每个 ID 一个实际执行结果
 > 当前 F9-M1/M2 implementation 与 direct real-service gates 已通过；F9-M3 codec、bounded Produce 与 whole-request async Fetch、M4 transaction、M5 virtual-log/DeleteRecords/periodic-retention rows have deterministic partial evidence；native DeleteRecords checkpoint-before-trim + forced-restart recovery adds one R/P/C/K slice；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 milestone rows 暂不升级为 final-gated
 > 2026-07-29 增量：product `7c25d2e` adds a live two-release-process completed-state migration slice for KF-TXN-011/012/013；ongoing/aborted transaction takeover、mandatory internal-topic NTC2 and final aggregate remain open
@@ -39,6 +40,11 @@
 > written only after every profile passes and is marked `OBSERVATION_ONLY`。Fresh rerun passes 75/75 executed tasks in
 > 3m28s；the owner reports one test、zero skipped and zero failures。KF-SCL-009 moves to `IMPLEMENTED_NOT_RUN`；
 > KF-SCL-010 remains `PLANNED`
+> 2026-07-30 final-evidence implementation slice：product `main@2ad7b6c` adds the complete M3–M7 final dependency
+> graph、clean-source/predecessor receipt scripts and `Phase9EvidenceAggregatorTest`。The aggregator emits exactly one
+> JUnit receipt per manifest/Markdown ID，while an independent finalizer rejects missing、duplicate or extra IDs before
+> writing the machine report。All formerly `PLANNED` rows now move only to `IMPLEMENTED_NOT_RUN`；the final aggregate
+> has not yet run，so no new row is promoted to `PASSED_CURRENT_SOURCE`
 
 ## 1. Evidence tiers
 
@@ -815,7 +821,7 @@ composition/restart evidence only；the real-provider fresh-process restart tier
 | KF-SCL-007 | Oxia/Object/BK/network response-loss matrix converges after fresh process restart | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl007` through `phase9ChaosCheck`，combined with `f9TrimResponseLossProcessIntegrationTest` and `f9TrimProfileMatrixProcessIntegrationTest`（actual Oxia reset + fresh controller/broker；provider-applied trim response loss/no-repeat across Object sync/async and all three BookKeeper profiles；focused current-source pass，final aggregate pending） | P,C | M7 |
 | KF-SCL-008 | supported Kafka client/protocol versions pass Produce/Fetch/group/txn/admin compatibility | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl008` through `phase9CompatibilityCheck`（isolated exact clients `3.9.0`/`4.0.1`/`4.1.1`/`4.3.0-SNAPSHOT`；Admin、offset-0 Produce/Fetch、group offset 1、committed/aborted transaction and READ_COMMITTED offsets `0,1`；20 focused current-fork tests；machine JSON report；focused current-source pass，final aggregate pending） | P,K | M7 |
 | KF-SCL-009 | performance report records per-profile latency/throughput/recovery/resource baselines without skipped samples | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` through `phase9PerformanceCheck`（all five storage profiles；8 warm-up + 32 sampled 4-KiB records；ack-all Produce percentiles/throughput；40-record committed Fetch latency/throughput；actual JVM RSS/CPU/live threads；identity-only-cache fresh-process recovery from latest `40` through continued latest `41`；all-or-nothing `OBSERVATION_ONLY` JSON report；focused current-source pass，final aggregate pending） | P,A | M7 |
-| KF-SCL-010 | clean `phase9FinalCheck --rerun-tasks` maps every Markdown/JSON ID to one passing result and exact sources | `Phase9EvidenceAggregatorTest` | A | M7 |
+| KF-SCL-010 | clean `phase9FinalCheck --rerun-tasks` maps every Markdown/JSON ID to one passing result and exact sources | product `Phase9EvidenceAggregatorTest.scenarioKfScl010` through `phase9M7FinalCheck`/`phase9FinalCheck`（145 per-row dynamic receipts + one aggregate receipt；clean `main` and exact Kafka commit；50 predecessor result directories with no skip/failure；manifest/Markdown/report hashes；independent exact-146 ID finalizer；implemented，clean aggregate pending） | A | M7 |
 
 ## 13. Coverage audit
 

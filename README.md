@@ -1,5 +1,15 @@
 # Nereus
 
+F9 final-evidence implementation update（2026-07-30）：product `main@2ad7b6c` adds the missing M3–M7 final
+gate graph、`phase9PrepareFinalEvidence`、`Phase9EvidenceAggregatorTest` and `phase9FinalEvidenceReport`。The
+pre-evidence step rejects a non-`main`/dirty product tree、a dirty or unpinned Kafka fork、a run without
+`--rerun-tasks`、any non-runnable manifest row、missing/failed/skipped predecessor JUnit XML and incomplete
+compatibility/performance reports。The JUnit owner emits exactly 146 results（145 per-row dynamic receipts plus the
+canonical `scenarioKfScl010`）and the finalizer rejects missing/duplicate/extra IDs before writing
+`build/f9-final-evidence/final-report.json`。All 146 manifest rows are now executable and are represented only as
+`IMPLEMENTED_NOT_RUN` or prior focused `PASSED_CURRENT_SOURCE`；none is promoted by this implementation-only commit。
+A clean `./gradlew phase9FinalCheck --rerun-tasks` remains the sole F9 completion gate。
+
 F9 current-source performance update（2026-07-30）：product `main@33c889c` adds canonical
 `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` and root `phase9PerformanceCheck`。The gate runs
 `OBJECT_WAL_SYNC_OBJECT`、`OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、
