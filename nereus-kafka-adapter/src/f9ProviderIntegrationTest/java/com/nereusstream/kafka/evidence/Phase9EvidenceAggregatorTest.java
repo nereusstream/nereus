@@ -33,6 +33,8 @@ final class Phase9EvidenceAggregatorTest {
             Set.of("IMPLEMENTED_NOT_RUN", "PASSED_CURRENT_SOURCE");
     private static final Set<String> KNOWN_SERVICES =
             Set.of("kraft", "oxia", "object-store", "bookkeeper");
+    private static final Set<String> KNOWN_SOURCE_LOCKS =
+            Set.of("nereus", "automq", "kafka");
     private static final Map<String, String> METHOD_SEGMENTS =
             Map.of(
                     "SRC", "Src",
@@ -79,7 +81,7 @@ final class Phase9EvidenceAggregatorTest {
                             .isEqualTo(canonicalMethod(scenario.id()));
                     assertThat(scenario.task()).isNotBlank();
                     assertThat(scenario.sourceLocks())
-                            .allMatch(lock -> lock.equals("nereus") || lock.equals("kafka"));
+                            .allMatch(KNOWN_SOURCE_LOCKS::contains);
                     assertThat(scenario.requiredServices())
                             .allMatch(KNOWN_SERVICES::contains);
                 });
@@ -105,6 +107,21 @@ final class Phase9EvidenceAggregatorTest {
                 .matches("[0-9a-f]{40}");
         assertThat(evidence.preEvidence().path("product").path("clean").asBoolean())
                 .isTrue();
+        assertThat(evidence.preEvidence()
+                        .path("autoMqReference")
+                        .path("branch")
+                        .asText())
+                .isEqualTo("main");
+        assertThat(evidence.preEvidence()
+                        .path("autoMqReference")
+                        .path("commit")
+                        .asText())
+                .isEqualTo("1c648d84819d5c3fef2af585f02149c397584870");
+        assertThat(evidence.preEvidence()
+                        .path("autoMqReference")
+                        .path("version")
+                        .asText())
+                .isEqualTo("3.9.0-SNAPSHOT");
         assertThat(evidence.preEvidence().path("kafkaFork").path("branch").asText())
                 .isEqualTo("nereus/future9-native-kafka-storage");
         assertThat(evidence.preEvidence().path("kafkaFork").path("commit").asText())
@@ -165,6 +182,18 @@ final class Phase9EvidenceAggregatorTest {
                             .path("clean")
                             .asBoolean())
                     .isTrue();
+        }
+        if (scenario.sourceLocks().contains("automq")) {
+            assertThat(evidence.preEvidence()
+                            .path("autoMqReference")
+                            .path("commit")
+                            .asText())
+                    .isEqualTo("1c648d84819d5c3fef2af585f02149c397584870");
+            assertThat(evidence.preEvidence()
+                            .path("autoMqReference")
+                            .path("version")
+                            .asText())
+                    .isEqualTo("3.9.0-SNAPSHOT");
         }
         if (scenario.sourceLocks().contains("kafka")) {
             assertThat(evidence.preEvidence()

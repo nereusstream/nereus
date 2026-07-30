@@ -3507,6 +3507,7 @@ val phase9PrepareFinalEvidence =
             "bash",
             "scripts/prepare-phase9-final-evidence.sh",
             layout.projectDirectory.asFile.absolutePath,
+            autoMqCheckoutPath.get(),
             kafkaForkCheckoutPath.get(),
             pulsarCheckoutPath.get(),
             phase9PreEvidence.get().asFile.absolutePath,

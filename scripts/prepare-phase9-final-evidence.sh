@@ -2,10 +2,11 @@
 set -euo pipefail
 
 repo="${1:?repository path is required}"
-kafka_fork="${2:?Kafka fork path is required}"
-pulsar_fork="${3:?Pulsar fork path is required}"
-output="${4:?output path is required}"
-rerun_tasks="${5:?rerun flag is required}"
+automq_reference="${2:?AutoMQ reference path is required}"
+kafka_fork="${3:?Kafka fork path is required}"
+pulsar_fork="${4:?Pulsar fork path is required}"
+output="${5:?output path is required}"
+rerun_tasks="${6:?rerun flag is required}"
 
 manifest="$repo/docs/phase-9-kafka-native-storage/f9-scenarios.json"
 matrix="$repo/docs/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md"
@@ -38,6 +39,10 @@ sha256_file() {
 product_branch="$(git -C "$repo" branch --show-current)"
 product_commit="$(git -C "$repo" rev-parse HEAD)"
 product_status="$(git -C "$repo" status --porcelain)"
+automq_branch="$(git -C "$automq_reference" branch --show-current)"
+automq_commit="$(git -C "$automq_reference" rev-parse HEAD)"
+automq_version="$(git -C "$automq_reference" show HEAD:gradle.properties \
+    | sed -n 's/^version=//p' | head -n 1)"
 kafka_branch="$(git -C "$kafka_fork" branch --show-current)"
 kafka_commit="$(git -C "$kafka_fork" rev-parse HEAD)"
 kafka_status="$(git -C "$kafka_fork" status --porcelain)"
@@ -49,6 +54,12 @@ pulsar_status="$(git -C "$pulsar_fork" status --porcelain)"
     || fail "product branch must be main, found $product_branch"
 [[ -z "$product_status" ]] \
     || fail "product tree must be clean: $product_status"
+[[ "$automq_branch" == "main" ]] \
+    || fail "AutoMQ reference branch mismatch: $automq_branch"
+[[ "$automq_commit" == "1c648d84819d5c3fef2af585f02149c397584870" ]] \
+    || fail "AutoMQ reference commit mismatch: $automq_commit"
+[[ "$automq_version" == "3.9.0-SNAPSHOT" ]] \
+    || fail "AutoMQ reference version mismatch: $automq_version"
 [[ "$kafka_branch" == "nereus/future9-native-kafka-storage" ]] \
     || fail "Kafka branch mismatch: $kafka_branch"
 [[ "$kafka_commit" == "76f62f3b83e882105219b6c7687dbde594a8b8a2" ]] \
@@ -220,6 +231,10 @@ temporary_output="$output.tmp"
     printf '  "product":{"branch":%s,"commit":%s,"clean":true},\n' \
         "$(json_quote "$product_branch")" \
         "$(json_quote "$product_commit")"
+    printf '  "autoMqReference":{"branch":%s,"commit":%s,"version":%s},\n' \
+        "$(json_quote "$automq_branch")" \
+        "$(json_quote "$automq_commit")" \
+        "$(json_quote "$automq_version")"
     printf '  "kafkaFork":{"branch":%s,"commit":%s,"clean":true},\n' \
         "$(json_quote "$kafka_branch")" \
         "$(json_quote "$kafka_commit")"
