@@ -1,5 +1,5 @@
 name: Build
-run-name: Build (${{ github.event_name }})
+run-name: "Build (${{ github.event_name }})${{ github.event_name == 'push' && format(' - {0}', github.event.head_commit.message) || github.event_name == 'pull_request' && format(' - PR #{0}', github.event.pull_request.number) || '' }}"
 
 on:
   push:
