@@ -16,8 +16,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -135,7 +137,7 @@ class S3CompatibleObjectStoreTest {
         CompletableFuture<HeadObjectResult> timed = store.headObject(
                 new ObjectKey("timeout-key"), new HeadObjectOptions(Duration.ofMillis(10)));
         assertCode(() -> timed.join(), ErrorCode.TIMEOUT);
-        assertThat(timeoutSdk.isCancelled()).isTrue();
+        assertCancelled(timeoutSdk);
         store.close();
 
         StubClient cancelStub = new StubClient();
@@ -146,7 +148,7 @@ class S3CompatibleObjectStoreTest {
                 new ObjectKey("cancel-key"), new HeadObjectOptions(Duration.ofSeconds(1)));
         assertThat(cancelled.cancel(true)).isTrue();
         assertCode(() -> cancelled.join(), ErrorCode.CANCELLED);
-        assertThat(cancelSdk.isCancelled()).isTrue();
+        assertCancelled(cancelSdk);
     }
 
     @Test
@@ -179,6 +181,13 @@ class S3CompatibleObjectStoreTest {
     private static void assertCode(Runnable operation, ErrorCode code) {
         assertThatThrownBy(operation::run).satisfies(error ->
                 assertThat(unwrap(error).code()).isEqualTo(code));
+    }
+
+    private static void assertCancelled(CompletableFuture<?> future) throws InterruptedException {
+        CountDownLatch completed = new CountDownLatch(1);
+        future.whenComplete((ignored, failure) -> completed.countDown());
+        assertThat(completed.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(future.isCancelled()).isTrue();
     }
 
     private static NereusException unwrap(Throwable error) {
