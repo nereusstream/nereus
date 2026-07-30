@@ -245,8 +245,8 @@ final class ProductionBookKeeperPrimaryWalRuntime implements AutoCloseable {
                         manager);
         return Optional.of(new BookKeeperLedgerRetentionService(
                 scanner,
-                configuration.retentionScanInterval(),
-                configuration.operationTimeout(),
+                runtime.configuration().retentionScanInterval(),
+                runtime.configuration().operationTimeout(),
                 scheduler,
                 callbackExecutor));
     }
