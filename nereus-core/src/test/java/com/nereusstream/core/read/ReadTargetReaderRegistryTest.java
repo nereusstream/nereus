@@ -13,9 +13,11 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectType;
+import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.objectstore.compacted.CompactedObjectFormatV1;
 import com.nereusstream.objectstore.wal.WalReadResult;
 import java.util.List;
 import java.util.Optional;
@@ -73,6 +75,32 @@ class ReadTargetReaderRegistryTest {
                 "KAFKA_RECORD_BATCH_V1");
         assertThat(registry.require(kafkaTarget)).isSameAs(kafka);
         assertThatThrownBy(() -> registry.require(withLogicalFormat(kafkaTarget, "UNKNOWN_LOGICAL")))
+                .isInstanceOfSatisfying(NereusException.class,
+                        error -> assertThat(error.code()).isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET));
+    }
+
+    @Test
+    void registersOnlyTheTwoExactNcp1PulsarPayloadFormats() {
+        ParquetCompactedTargetReader reader = new ParquetCompactedTargetReader(
+                request -> CompletableFuture.failedFuture(
+                        new AssertionError("registry lookup must not read the object")));
+        ReadTargetReaderRegistry registry = new ReadTargetReaderRegistry(List.of(reader));
+        ObjectSliceReadTarget ncp1Target = target(
+                ObjectType.STREAM_COMPACTED_OBJECT,
+                CompactedObjectFormatV1.COMMITTED_PHYSICAL_FORMAT);
+        ObjectSliceReadTarget pulsarEntryTarget = withLogicalFormat(
+                ncp1Target, PayloadFormat.PULSAR_ENTRY_BATCH.name());
+        ObjectSliceReadTarget legacyOpaqueTarget = withLogicalFormat(
+                ncp1Target, PayloadFormat.OPAQUE_RECORD_BATCH.name());
+
+        assertThat(reader.keys()).containsExactlyInAnyOrder(
+                ParquetCompactedTargetReader.KEY,
+                ParquetCompactedTargetReader.LEGACY_OPAQUE_KEY);
+        assertThat(registry.size()).isEqualTo(2);
+        assertThat(registry.require(pulsarEntryTarget)).isSameAs(reader);
+        assertThat(registry.require(legacyOpaqueTarget)).isSameAs(reader);
+        assertThatThrownBy(() -> registry.require(withLogicalFormat(
+                        ncp1Target, PayloadFormat.KAFKA_RECORD_BATCH.name())))
                 .isInstanceOfSatisfying(NereusException.class,
                         error -> assertThat(error.code()).isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET));
     }

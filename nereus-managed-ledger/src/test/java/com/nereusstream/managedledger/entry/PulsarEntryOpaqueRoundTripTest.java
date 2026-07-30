@@ -110,6 +110,11 @@ class PulsarEntryOpaqueRoundTripTest {
             ObjectSliceReadTarget target = CompactedObjectVerificationRequest.from(
                             request, written, Duration.ofSeconds(10))
                     .target();
+            // F2 deliberately persists exact Pulsar Entry bytes through Phase 1's durable
+            // opaque mapping. Relabeling this fixture as PULSAR_ENTRY_BATCH would hide the
+            // legacy NCP1 compatibility regression.
+            assertThat(target.logicalFormat())
+                    .isEqualTo(PayloadFormat.OPAQUE_RECORD_BATCH.name());
             ResolvedRange range = new ResolvedRange(
                     COVERAGE,
                     3,
