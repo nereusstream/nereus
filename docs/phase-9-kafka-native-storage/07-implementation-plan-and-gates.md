@@ -1678,7 +1678,7 @@ Review stop is not satisfied by author self-approval or passing unit tests alone
 
 ## 17. Definition of done
 
-F9 can change from `Designed/In progress` to `Implemented/final-gated` only when：
+The recorded F9 `Implemented/final-gated` state is valid only when one clean exact-source receipt satisfies：
 
 - all documents match final code/durable goldens；
 - every scenario row has executable passing evidence at required environment；
@@ -1692,4 +1692,6 @@ F9 can change from `Designed/In progress` to `Implemented/final-gated` only when
 - metrics/alerts/runbooks/security review complete；
 - release aggregate runs fresh with no mandatory skipped/up-to-date tasks。
 
-Design document completion alone satisfies none of the implementation bullets。
+The clean 2026-07-30 receipt recorded at the top of this document satisfies these conditions for its exact product、
+Kafka、Pulsar and AutoMQ source tuple。Design document completion alone satisfies none of the implementation bullets；
+later source changes reopen the final gate until a new clean receipt passes。

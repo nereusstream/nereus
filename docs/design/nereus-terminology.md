@@ -1,7 +1,7 @@
 # Nereus Terminology
 
 > 状态：Current
-> 适用范围：总体设计、Future 1-9、Phase 1/1.5/2/3/4 实现合同、F1-BK target contract、F9 Designed contract 和实现注释
+> 适用范围：总体设计、Future 1-9、Phase 1/1.5/2/3/4 实现合同、F1-BK target contract、F9 implemented/final-gated contract 和实现注释
 
 Nereus 以 stream 术语描述内部正确性。Pulsar ledger、Kafka log、对象和表都是投影或物理
 承载，不能取代逻辑 truth。
@@ -34,7 +34,7 @@ Phase 1 中 append 线性化 truth 是 stream head，offset index 是读路径�
 | --- | --- |
 | Append session | stream-scoped writer session；epoch/token 被 stream-head CAS 校验，不等于 durable ownership |
 | Fencing token | 拒绝 stale writer 的单调 session identity |
-| Append authority | Designed F9 protocol-neutral preemption tuple；把外部 leader term/owner epoch 绑定到同一 stream-head append session。它扩展 fencing 判断但不把 Kafka 类型放入 L0，也不改变现有 Pulsar lease 默认语义 |
+| Append authority | Implemented/final-gated F9 protocol-neutral preemption tuple for the recorded exact-source receipt；把外部 leader term/owner epoch 绑定到同一 stream-head append session。它扩展 fencing 判断但不把 Kafka 类型放入 L0，也不改变现有 Pulsar lease 默认语义 |
 | Ranged entry | 一个 physical/logical entry 覆盖 `[baseOffset, endOffset)` 且 `recordCount > 0`；F9 一个 Kafka `RecordBatch` 对应一个 ranged entry。它不是把 batch 内 records 拆成多个 payload objects |
 | Commit intent | head CAS 前写入的 immutable commit-log record；单独存在时不可见 |
 | Append linearization point | stream-head `putIfVersion` 成功 |
@@ -137,7 +137,7 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 | --- | --- |
 | Kafka offset | 在明确的 Kafka mapping version 中等于 Nereus logical record offset；不能直接套用到 `PULSAR_ENTRY_V1` batch entry。F5 和 F9 使用不同 mapping/version authority |
 | F5 KoP projection | `Kafka client -> KoP -> Pulsar facade -> Nereus`；其 payload、coordinator 和 retention contract 由 Future 5 单独定义 |
-| F9 native Kafka projection | `Kafka client -> KRaft Kafka fork -> nereus-kafka-adapter -> Nereus`；F9-M1/M2 and substantial M3–M6 slices implemented，including explicit CLI/log selection、activation-backed Object-WAL runtime、real single-node recovery、multi-broker Object/BookKeeper takeover、ACTIVE-state three-voter controller failover、the complete store-publication and initial snapshot-proof/capability-aggregation before-provider/after-provider matrices，and actual first-activation Oxia transport reset/retry；checkpoint/virtual-segment、coordinator and aggregate gates remain open |
+| F9 native Kafka projection | `Kafka client -> KRaft Kafka fork -> nereus-kafka-adapter -> Nereus`；F9-M1–M7 are implemented/final-gated for the exact product/Kafka/Pulsar/AutoMQ tuple recorded by the 2026-07-30 clean final receipt，including native coordinator/internal-topic recovery、retention/compaction、five-profile process coverage and scale/chaos/compatibility/performance evidence；later product source changes require a fresh final receipt before receiving current-source PASS |
 | Kafka partition binding | F9 Oxia record keyed by Kafka cluster id、topic UUID and partition；binds exactly one incarnation to one Nereus stream and never uses topic name as identity |
 | Log end/high watermark | F5 由其 mapping 派生；F9 首版只在 stable Nereus append 后推进 native LEO/HW，不由本地文件或 checkpoint 单独推进 |
 | Fetch target | offset resolver 选择的 current physical generation |
@@ -158,8 +158,8 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 
 ## 7. Delivery terms
 
-- **Future 1-9**：稳定的 capability-track 编号，不代表统一处于未来。F9 是 2026-07-23 追加的 Designed track，
-  不重编号 F1–F8。
+- **Future 1-9**：稳定的 capability-track 编号，不代表统一处于未来。F9 是 2026-07-23 追加的 capability
+  track，已在 2026-07-30 exact-source receipt 上 implemented/final-gated；不重编号 F1–F8。
 - **Phase 1**：已完成的 Future 1 代码级交付阶段。
 - **Phase 1.5 / P15-M0-M6**：F1 与 F2 production 之间已完成并 final-gated 的 L0 foundation delivery；
   它不是新的 Future 编号，也没有扩张 executable profile support。

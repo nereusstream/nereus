@@ -36,7 +36,7 @@ protocol/table state = projection
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
 | F8 Advanced Pulsar | later phase | Designed | F2/F3/F4/F7 foundations |
-| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7 | In progress；M1/M2 and substantial M3–M6 code complete；real Object-WAL P/C takeover、BookKeeper three-profile P/C takeover、ACTIVE-state three-voter controller failover、the complete store-publication and initial snapshot-proof/capability-aggregation before-provider/after-provider matrices，and actual first-activation Oxia transport reset/retry pass | close remaining coordinator、checkpoint/virtual-segment、chaos and final aggregate gates |
+| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7 | Implemented/final-gated for the exact 2026-07-30 product/Kafka/Pulsar/AutoMQ source tuple；native coordinator/internal-topic recovery、retention/compaction、five-profile process coverage、scale/chaos/compatibility/performance and all 146 scenarios pass | newer product source must produce a fresh clean final receipt before inheriting current-source PASS |
 
 Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes the L0 abstraction/recovery/lifecycle
 foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL
@@ -342,23 +342,16 @@ Detailed design: `nereus-future9-kafka-native-storage.md`
 Code-level target contract: `../phase-9-kafka-native-storage/README.md`
 
 F9-M0 source/design review completed on 2026-07-23；the dated evidence is
-`../phase-9-kafka-native-storage/09-f9-m0-design-review-2026-07-23.md`. F9-M1/M2 and substantial M3–M6 slices are now
-implemented；the published Kafka fork has exact-record/async ListOffsets bridges、metadata lifecycle、typed configuration、
-explicit native-storage CLI/log selection and deferred activation-backed Object-WAL context composition。The product process
-gate now proves a real combined-node KRaft/Oxia/S3 start plus same-node fresh-JVM recovery of user data、
-`__consumer_offsets` and `__transaction_state`，including committed group offset resume and same-transactional-ID continuation。
-It also proves forced-process-loss recovery of stable open-transaction data into an ABORT marker before the next committed
-transaction。Real release processes now also prove atomic Object-WAL singleton handoff、an already-dispatched stale
-Object-WAL append fenced before upload，WAL-only/async/sync BookKeeper post-handoff recovery/continuation with exact
-profile Object invariants，and a Bookie-acked/metadata-`WRITING` BookKeeper append abandoned/sealed by the new leader before
-the stale JVM can publish。A three-voter release cluster now also proves ACTIVE-state controller kill、higher-epoch
-reconciliation and native IO continuation。A separate three-controller/one-broker release gate deterministically withholds
-the real Oxia completion before or after readiness create、PREPARED create and the ACTIVE CAS，kills the exact active
-controller and proves a higher-epoch controller preserves empty/readiness-only/PREPARED/ACTIVE durable state before native
-IO begins。A second Oxia-proxied gate proves the same controller epoch retries raw transport resets to ACTIVE and native IO。
-M4 coordinator/checkpoint/virtual-segment cuts、M5 provider retention/compaction completion and broader
-chaos/aggregate evidence remain open，so F9 remains in
-progress rather than production-ready.
+`../phase-9-kafka-native-storage/09-f9-m0-design-review-2026-07-23.md`。The clean 2026-07-30 final receipt at product
+`efd9142fc5ff991ec78dccda3b6ec7347714ef31`、Kafka fork
+`76f62f3b83e882105219b6c7687dbde594a8b8a2`、Pulsar
+`50fc70fe4620febcf0fd31d97ff7d2be447af3d4` and AutoMQ
+`1c648d84819d5c3fef2af585f02149c397584870` closes F9-M1–M7。It covers exact ranged-log IO、binding/session/checkpoint
+recovery、native coordinator/internal-topic continuation、retention/compaction、Object and BookKeeper five-profile
+takeover/recovery、controller/store-publication failure cuts、scale、chaos、client compatibility、performance observation
+and the exact 146-row final aggregate。The full gate reports 218 JUnit suites / 798 tests and 146/146 scenario PASS with
+zero skipped、failures or errors。This completion is source-qualified：later product source changes must rerun
+`./gradlew phase9FinalCheck --rerun-tasks` before a newer HEAD may claim `PASSED_CURRENT_SOURCE`.
 
 F9 is deliberately separate from F5. F5 projects the Kafka protocol through KoP on the Pulsar facade；F9 integrates
 a KRaft Kafka broker fork directly with Nereus as the partition log. The two tracks share logical storage primitives

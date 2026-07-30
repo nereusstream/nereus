@@ -31,9 +31,9 @@ Nereus shared data plane 需要多类 immutable objects：
 | Index object | large entry/projection index | offset-index reference | Reserved |
 | Stream compacted object (`NCP1`) | per-stream lossless higher-generation `COMMITTED` target | generation index `PREPARED -> COMMITTED` CAS | F4-M3 writer/reader/full verifier/core adapter + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar exact-byte round trip + terminal metadata retirement implemented/final-gated；real Oxia/LocalStack two-worker/restart/full-byte evidence passed |
 | Topic-compacted object (`NTC1`) | sparse lossy `TOPIC_COMPACTED` target | separate view generation index CAS | F4-M3 schema/writer/strict-reader/full verifier + neutral SPI/registry + COMMITTED-source planner bootstrap + tagged-v1 key encoding + sorted-spill two-pass engine/worker/publication implemented/final-gated；broker admission remains F8 |
-| Ranged stream compacted object (`NCP2`) | lossless higher generation preserving multi-record entry ranges | generation index `PREPARED -> COMMITTED` CAS | F9 Designed；distinct magic/version，never reinterpret `NCP1` |
-| Ranged topic-compacted object (`NTC2`) | sparse Kafka-key compaction with explicit source/coverage ranges | topic-compacted generation CAS plus irreversible binding coverage | F9 Designed；distinct magic/version，never reinterpret `NTC1` |
-| Native Kafka recovery checkpoint (`NKC1`) | immutable derived producer/txn/epoch/virtual-segment/time/byte indexes at an exact stable end | versioned F9 partition binding reference；up to three retained roots | F9 Designed；acceleration only，never append/coordinator truth |
+| Ranged stream compacted object (`NCP2`) | lossless higher generation preserving multi-record entry ranges | generation index `PREPARED -> COMMITTED` CAS | F9 implemented/final-gated for the recorded exact-source tuple；distinct magic/version，never reinterpret `NCP1` |
+| Ranged topic-compacted object (`NTC2`) | sparse Kafka-key compaction with explicit source/coverage ranges | topic-compacted generation CAS plus irreversible binding coverage | F9 implemented/final-gated for the recorded exact-source tuple；distinct magic/version，never reinterpret `NTC1` |
+| Native Kafka recovery checkpoint (`NKC1`) | immutable derived producer/txn/epoch/virtual-segment/time/byte indexes at an exact stable end | versioned F9 partition binding reference；up to three retained roots | F9 implemented/final-gated for the recorded exact-source tuple；acceleration only，never append/coordinator truth |
 | Recovery checkpoint (`NRC1` + `NRF1`) | replace append-replay/index-repair role of a committed prefix | recovery-root CAS | Designed / F4-M0 frozen |
 | Cursor snapshot | large ack state | cursor-state CAS ref | Implemented/final-gated through F3-M6 |
 | Transaction snapshot | large txn/pending-ack state | txn-state ref | Designed |
@@ -396,7 +396,7 @@ catalog snapshot or delivery id
 SBT may reuse compacted objects。SDT can create target-specific files。Catalog commits never change stream
 offsets or producer acknowledgement。
 
-## 13. F9 ranged and checkpoint families（Designed）
+## 13. F9 ranged and checkpoint families（exact-source final-gated）
 
 F9 does not alter or heuristically reinterpret any existing bytes. `NCP1`/`NTC1` retain their one-record-per-row
 contract；ranged entries require the new `NCP2`/`NTC2` major families，and native Kafka recovery uses a separate
@@ -421,8 +421,9 @@ Common F9 format invariants：
 - implementing any writer requires its strict reader、whole-file verifier、golden bytes、truncation/bit-flip/limit
   matrix and legacy compatibility suite in the same milestone.
 
-These families remain unavailable until F9-M1/M2 executable gates land. Listing them here is a format reservation and
-cross-document boundary，not an implementation or broker-admission claim.
+These families are implemented/final-gated by F9-M1–M7 for the exact source tuple recorded in the 2026-07-30 clean
+final receipt。They remain versioned cross-document boundaries rather than permission to decode one family as another；
+later product source changes require a fresh final receipt before inheriting current-source PASS.
 
 ## 14. Format evolution
 

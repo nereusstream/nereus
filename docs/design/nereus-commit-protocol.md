@@ -666,8 +666,8 @@ delete response loss converges only after the exact unchanged root authority pro
 | SDT delivery visibility | target catalog idempotent commit |
 | Routing change | routing-ring/version CAS；does not change data truth |
 | GC | reference-validated delete protocol |
-| F9 native Kafka producer acknowledgement（Designed） | exact stable Nereus append result validated against the requested range；initial RF=1 LEO/HW advance only after this point |
-| F9 newer KRaft leader preemption（Designed） | stream-head CAS installs a strictly higher protocol-neutral append authority and invalidates the prior session before new writes are admitted |
+| F9 native Kafka producer acknowledgement（exact-source final-gated） | exact stable Nereus append result validated against the requested range；initial RF=1 LEO/HW advance only after this point |
+| F9 newer KRaft leader preemption（exact-source final-gated） | stream-head CAS installs a strictly higher protocol-neutral append authority and invalidates the prior session before new writes are admitted |
 
 ## 17. Repair priority
 
@@ -709,10 +709,11 @@ F4-M0 has frozen the async task/checkpoint/idempotence、higher-generation publi
 - provide fault injection at every irreversible boundary；
 - keep code/docs/golden bytes updated together。
 
-## 19. F9 designed append and leadership extension
+## 19. F9 append and leadership extension
 
-> Status: F9-M1 in progress. Public precondition/read value objects and binary-safe default overloads are implemented；
-> production conditional append/read semantics and leader authority remain unavailable until their M1/M2 gates land.
+> Status: F9-M1–M7 implemented/final-gated for the exact product/Kafka/Pulsar/AutoMQ tuple in the 2026-07-30 clean
+> final receipt。Public precondition/read values、binary-safe ranged IO、conditional append/read and leader authority are
+> implemented；later product source changes require a fresh final receipt before inheriting current-source PASS.
 
 Native Kafka needs one Nereus entry to consume the complete offset range of one Kafka `RecordBatch`. F9 therefore
 extends the protocol-neutral contract instead of teaching L0 about Kafka classes：
@@ -758,4 +759,4 @@ recovery and failure mapping are in `../phase-9-kafka-native-storage/03-kafka-fo
 - `../phase-1-core-stream-storage/02-oxia-metadata-and-commit.md`
 - `../phase-1.5-core-storage-foundation/README.md`
 - `../phase-1-core-stream-storage/09-legacy-oxia-multi-key-commit-design.md`（Historical）
-- `../phase-9-kafka-native-storage/README.md`（F9 Designed code-level target）
+- `../phase-9-kafka-native-storage/README.md`（F9 implemented/final-gated exact-source code-level contract）

@@ -1,7 +1,7 @@
 # Nereus Design Index
 
 > 状态：当前设计索引
-> 最近一次设计/实现同步：2026-07-23
+> 最近一次设计/实现同步：2026-07-30
 > 当前交付阶段：Future 2、Future 3 与 Future 4 均 complete/final-gated；Future 4 M3 format、
 > planner/worker、protection/checkpoint/service、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction SPI/registry、
 > terminal workflow-metadata retirement、COMMITTED-source topic bootstrap、tagged-v1/sorted-spill two-pass engine
@@ -84,13 +84,14 @@ streamId + offset
 4. **当前 F1-BK 代码级 contract + BK-M1–M6 evidence**：`docs/phase-bk-bookkeeper-primary-wal/` 的 BK-M0–M6
    implementation contract；the complete BookKeeper Primary WAL Delivery is final-gated，while online profile
    migration remains explicitly outside this delivery；
-5. **F9 native Kafka code-level target + in-progress evidence**：`docs/phase-9-kafka-native-storage/` 的代码级合同；
-   F9-M1/M2 与 substantial M3–M6 slices 已实现，真实 single-node KRaft/Oxia/S3 user/group/transaction-state
-   graceful cold-restart、Object/BookKeeper multi-broker takeover、ACTIVE-state three-voter controller-failover 与
-   before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store-publication gates 与 actual
-   first-activation Oxia transport reset/retry，以及 initial snapshot-proof/capability-aggregation 四切点矩阵已通过；
-   未闭合的 checkpoint/virtual-segment、coordinator 和 aggregate rows
-   仍不得描述为 production capability；
+5. **F9 native Kafka code-level contract + exact-source final evidence**：
+   `docs/phase-9-kafka-native-storage/` 的代码级合同；F9-M1–M7 已在 product
+   `efd9142fc5ff991ec78dccda3b6ec7347714ef31`、Kafka fork
+   `76f62f3b83e882105219b6c7687dbde594a8b8a2`、Pulsar
+   `50fc70fe4620febcf0fd31d97ff7d2be447af3d4` 和 AutoMQ
+   `1c648d84819d5c3fef2af585f02149c397584870` 上 complete/final-gated，146/146 scenario rows
+   `PASSED_CURRENT_SOURCE`。该结论只属于这组精确源码；later product source changes 必须重新产生 clean
+   `phase9FinalCheck --rerun-tasks` receipt，不能自动继承 current-source PASS；
 6. **已接受决策**：`docs/decisions/`；
 7. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
 8. **能力轨道设计**：文件名以 `nereus-futureN-` 开头；
@@ -126,7 +127,7 @@ streamId + offset
 | `nereus-managed-ledger` | `Implemented`（F2-M1-M4 + F3-M1-M6 + F4-M1-M6） | F2 ledger facade/cursor boundary plus F3 state machines、F4 projection/cursor reference domains、strict NPR1 authority、restart-reconstructable cursor candidates、AL ownerless snapshot-key inverse、AM exact cursor/retention retirement authority、durable registration/proof/activation、AR exact-scope deletion guard and factory/runtime activation surface、AS shared projection/global-scope interpretation、AT durable DELETING restart evidence、BC bounded atomic readiness-rollover handoff、pre-I/O async admission、versioned stable retention planner/F3 trim service、shared bounded lane、durable backlog accounting、per-ledger facade and registration-backed policy admission are implemented/tested；safe defaults do not activate physical deletion |
 | `nereus-pulsar-adapter` | `Implemented`（F2 + F3 + F4 complete/final-gated） | typed runtime/S3 provider plus fork binding/admission/capability/policy/admin compatibility、durable generation registration/readiness/activation、checkpoint-AF coupled Object-WAL composition、checkpoint-AH retention runtime/config mapping、checkpoint-AI exact policy/admin admission、checkpoint-AN metadata-first root/registration/inventory lifecycle、checkpoint-AO broker physical-GC config mapping、checkpoint-AQ ordered proof/atomic delete activation、checkpoint-AR provider/Pulsar/restart-scope composition、checkpoint-AS exact shared reference-domain assembly、checkpoint-AT real post-DELETE independent recovery、checkpoint-AU applied-DELETED-CAS response-loss exact reload、checkpoint-AV two-worker shared-intent convergence、checkpoint-AW all-256-shard mixed-state recovery/opaque LIST progress、checkpoint-AX real-Oxia hot-shard bounded pagination、checkpoint-AY remove-on-cancel shared runtime scheduler、checkpoint-AZ 10,000-cursor-root exact GC、checkpoint-BA source/protection post-delete recovery、checkpoint-BB real post-root external-reappearance inventory/GC、checkpoint-BC atomic deletion-active readiness rollover and checkpoint-BI real two-broker process-wide worker contention/exact read coexistence are implemented/tested；safe defaults keep destructive execution disabled |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
-| `nereus-kafka-adapter` | `In progress`（F9-M1/M2 + substantial M3–M6 slices） | ranged API、binding/checkpoint/recovery、raw batch codec、partition runtime、activation、retention/compaction composition and real single-node restart、multi-broker Object/BookKeeper takeover、ACTIVE-state three-voter controller failover、the complete store-publication and initial snapshot-proof/capability-aggregation before-provider/after-provider matrices，and actual first-activation Oxia transport reset/retry are implemented/tested；checkpoint/virtual-segment、coordinator and aggregate gates remain open |
+| `nereus-kafka-adapter` | `Implemented / final-gated`（F9-M1–M7，exact-source receipt） | ranged API、binding/checkpoint/recovery、raw batch codec、partition runtime、activation、retention/compaction、native coordinator/internal-topic semantics、five-profile process coverage、scale/chaos/compatibility/performance and exact 146-row final aggregation are implemented/final-gated for the recorded source tuple；later product source changes require a fresh clean final receipt before receiving `PASSED_CURRENT_SOURCE` |
 | Future 3 cursor/subscription | `Implemented / final-gated`（F3-M0-M6） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration、M5 recovery/retention/scale and M6 compatibility/incarnation/F4 handoff pass their gates |
 | Future 4 materialization/compaction | `Implemented / final-gated`（F4-M1–M6） | M4 NRC1/recovery、retirement/GC fences、activation/global domains、scale/failure/late-PUT cuts and retry-disabled real source-deletion acceptance are implemented/tested；M5 final-gates async/retention compatibility；M6 covers 32-ref merge、4,096/4,097 candidates、million-entry NRC1、1,000+1,000 references、the 128-source/1,048,576-record task with schema V2/capability V2、exact 16,448-stream registry restart、real two-broker/two-worker compressed exact-read convergence、protected-intent retirement、partitioned admin routes、provider-neutral Hadoop/Oxia logging composition、bounded Docker release scheduling、exclusive and fresh locked-Pulsar checkout builds、inherited cursor TTL expiry-monitor convergence and executable 52/52 traceability；checkpoint BQ passes the BP-source-lock aggregate with 203/203 tasks executed |
 | Routing、lakehouse、高级语义 | `Designed` | design docs only |
@@ -284,11 +285,11 @@ decision behind items 14 and 16-18。
 | `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | implemented / final-gated（M0/M0R + M1-M6） |
 | `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | implemented / final-gated（F4-M1–M6 + checkpoint BQ） |
 | `../phase-bk-bookkeeper-primary-wal/README.md` | F1-BK writer/reader/ledger lifecycle/retention/profile rollout code-level target | implemented / final-gated（BK-M0–M6；online profile migration excluded） |
-| `../phase-9-kafka-native-storage/README.md` | F9 native Kafka ranged-entry/log/fork/metadata/recovery/rollout code-level target | in progress；F9-M1/M2 and substantial M3–M6 product/published-fork slices implemented；real single-node native Kafka user/group/committed-transaction restart and forced open-transaction abort recovery pass，final rollout gates remain open |
+| `../phase-9-kafka-native-storage/README.md` | F9 native Kafka ranged-entry/log/fork/metadata/recovery/rollout code-level contract | implemented / final-gated for the exact product/Kafka/Pulsar/AutoMQ source tuple recorded by the clean 2026-07-30 receipt；later product source changes require a fresh final receipt |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | implemented / final-gated（F4-M5 profile + F4-M6 aggregate） |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |
-| `../decisions/0005-native-kafka-fork-and-adapter-boundary.md` | F9 dedicated Apache Kafka fork、adapter and F5 isolation boundary | accepted；F9 implementation in progress |
+| `../decisions/0005-native-kafka-fork-and-adapter-boundary.md` | F9 dedicated Apache Kafka fork、adapter and F5 isolation boundary | accepted；F9 implementation final-gated for the recorded exact-source tuple |
 
 ## 7. 能力轨道文档
 
@@ -304,7 +305,7 @@ decision behind items 14 and 16-18。
 | `nereus-future6-lakehouse-sbt-sdt.md` | F6 SBT/SDT | `Designed` |
 | `nereus-future7-routing-brownout-elasticity.md` | F7 routing/brown-out/elasticity | `Designed` |
 | `nereus-future8-advanced-pulsar-semantics.md` | F8 advanced Pulsar semantics | `Designed` |
-| `nereus-future9-kafka-native-storage.md` | F9 native Kafka shared storage | `In progress`；M1/M2 and substantial M3–M6 slices implemented，精确 target/evidence 见 `../phase-9-kafka-native-storage/` |
+| `nereus-future9-kafka-native-storage.md` | F9 native Kafka shared storage | `Implemented / final-gated`（F9-M1–M7，exact-source receipt）；精确 target/evidence 见 `../phase-9-kafka-native-storage/`，newer product HEAD must rerun the final gate before inheriting current-source PASS |
 
 ## 8. 阅读路线
 

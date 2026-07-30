@@ -1,7 +1,7 @@
 # Nereus 总体架构设计
 
 > 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3、Future 4 F4-M1–M6 and F1-BK BK-M0–M6 complete/final-gated
-> 最近设计/实现同步：2026-07-23（追加 Designed F9；实现状态未改变）
+> 最近设计/实现同步：2026-07-30（F9 exact-source final receipt synchronized）
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
 ## 1. 摘要
@@ -343,14 +343,14 @@ flowchart TB
         Runtime["PersistentTopic / dispatch / auth / policy"]
         Cache["Discardable caches"]
     end
-    subgraph KafkaBroker["Native Kafka fork runtime (F9 Designed)"]
+    subgraph KafkaBroker["Native Kafka fork runtime (F9 exact-source final-gated)"]
         KP["Kafka protocol / KRaft"]
         KRuntime["ReplicaManager / Partition / UnifiedLog"]
     end
     subgraph Adapters["Compatibility projections"]
         MLF["ManagedLedger facade (F2-M1-M6 final-gated)"]
         KAF5["KoP Kafka projection (F5 Designed)"]
-        KAF9["Native Kafka adapter (F9 in progress)"]
+        KAF9["Native Kafka adapter (F9 exact-source final-gated)"]
     end
     subgraph L0["Core Stream Storage"]
         API["StreamStorage API"]
@@ -419,7 +419,7 @@ flowchart TB
 | `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；F4 snapshot inventory/NPR1 authority、restart-reconstructable cursor candidates、durable registration/proof/activation、AR exact-scope deletion guard and typed factory/runtime activation surface、BC bounded atomic readiness-rollover handoff、pre-I/O async admission、checkpoint-AF materialization ownership、checkpoint-AN physical-GC lifecycle ownership and checkpoints AG–AI retention planner/F3 trim/shared-lane/per-ledger facade/policy admission complete；safe defaults keep physical deletion disabled |
 | `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider、fork binding/admission/capability/policy/admin paths、shared generation/registration/proof/activation ownership、checkpoint-AF coupled Object-WAL/NRC1 checkpoint composition、checkpoint-AH retention runtime/config mapping、checkpoint-AI exact policy/admin mapping、checkpoint-AN metadata-first cursor/referenced/ownerless GC lifecycle、checkpoint-AO exact physical-GC config、checkpoint-AQ atomic activation、checkpoint-AR provider/Pulsar/restart-scope composition and checkpoint-BC atomic deletion-active readiness rollover implemented；M4/M5 retry-disabled and M6 aggregate broker gates are complete；safe defaults keep destructive execution disabled |
 | `nereus-kop-adapter` | Kafka projection | marker only |
-| `nereus-kafka-adapter` | F9 native Kafka binding/runtime/checkpoint/codec | In progress；M1/M2 plus substantial M3–M6 adapter/runtime/recovery/retention/compaction/activation slices implemented，with real single-node recovery、multi-broker Object/BookKeeper takeover、ACTIVE-state three-voter controller failover、the complete store-publication and initial snapshot-proof/capability-aggregation before-provider/after-provider matrices，and actual first-activation Oxia transport reset/retry；checkpoint/virtual-segment、coordinator and aggregate gates remain open；must not be inferred from `nereus-kop-adapter` |
+| `nereus-kafka-adapter` | F9 native Kafka binding/runtime/checkpoint/codec | Implemented/final-gated for the exact 2026-07-30 source tuple：M1–M7、native coordinator/internal-topic recovery、retention/compaction、five-profile process coverage、scale/chaos/compatibility/performance and the 146-row final aggregate pass；later product source changes require a fresh clean final receipt；must not be inferred from `nereus-kop-adapter` |
 
 Phase 1.5 已实现 tagged `ReadTarget`、generic `AppendResult/ResolvedRange`、primary-WAL registry、
 generic durable target records、exact recovery 和 lifecycle。BookKeeper profile 在其真实 writer/reader 注册前
@@ -573,10 +573,10 @@ record consumes one L0 record offset. An F2 `PULSAR_ENTRY_V1` stream containing 
 is not automatically a Kafka-compatible stream; mixed-protocol access is rejected until Future 5 freezes a
 mapping and migration contract.
 
-### 12.3 Native Kafka fork（F9 Designed）
+### 12.3 Native Kafka fork（F9 exact-source final-gated）
 
-F9 is not a second implementation of the F5 mapping. A KRaft Kafka fork keeps native Kafka request、controller、
-partition、producer and coordinator semantics while replacing the partition data plane with a planned
+F9 is not a second implementation of the F5 mapping. The final-gated KRaft Kafka fork keeps native Kafka request、
+controller、partition、producer and coordinator semantics while replacing the partition data plane with the
 `nereus-kafka-adapter`：
 
 ```text
@@ -695,7 +695,7 @@ and secondary materialization lag；这些故障的 correctness 和恢复路径�
 | F6 | SBT/SDT lakehouse | Designed |
 | F7 | Routing/brown-out/elasticity | Designed |
 | F8 | Advanced Pulsar semantics | Designed |
-| F9 | Native KRaft Kafka fork backed directly by Nereus | In progress；F9-M1/M2 and substantial M3–M6 product/fork slices implemented；explicit launcher and real process gates pass initial IO、fresh-JVM user/group/transaction recovery、Object/BookKeeper takeover、ACTIVE-state three-voter controller failover、the complete store-publication and initial snapshot-proof/capability-aggregation before-provider/after-provider matrices，and actual first-activation Oxia transport reset/retry；checkpoint/virtual-segment、coordinator、retention/compaction and aggregate gates remain open |
+| F9 | Native KRaft Kafka fork backed directly by Nereus | Implemented/final-gated for the exact product/Kafka/Pulsar/AutoMQ source tuple recorded by the clean 2026-07-30 receipt；F9-M1–M7 and all 146 scenarios pass there，while a newer product HEAD must produce a fresh final receipt before inheriting current-source PASS |
 
 Dependencies and implementation gates live in `nereus-futures.md`。Future numbers are capability IDs, not
 claims that all work is unstarted.
