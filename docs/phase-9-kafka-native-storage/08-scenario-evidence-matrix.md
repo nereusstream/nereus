@@ -45,6 +45,10 @@
 > JUnit receipt per manifest/Markdown ID，while an independent finalizer rejects missing、duplicate or extra IDs before
 > writing the machine report。All formerly `PLANNED` rows now move only to `IMPLEMENTED_NOT_RUN`；the final aggregate
 > has not yet run，so no new row is promoted to `PASSED_CURRENT_SOURCE`
+> 2026-07-30 inherited-source-lock correction：the first full-final attempt was rejected at historical Pulsar source
+> lock `2f9c1eb9` before F9 scenario execution。Product `main@4efa103` adds a F9-only exact clean lock and receipt for
+> `5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4` without changing other futures' historical lock。
+> KF-SCL-010 remains `IMPLEMENTED_NOT_RUN` until the rerun completes
 
 ## 1. Evidence tiers
 
@@ -821,7 +825,7 @@ composition/restart evidence only；the real-provider fresh-process restart tier
 | KF-SCL-007 | Oxia/Object/BK/network response-loss matrix converges after fresh process restart | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl007` through `phase9ChaosCheck`，combined with `f9TrimResponseLossProcessIntegrationTest` and `f9TrimProfileMatrixProcessIntegrationTest`（actual Oxia reset + fresh controller/broker；provider-applied trim response loss/no-repeat across Object sync/async and all three BookKeeper profiles；focused current-source pass，final aggregate pending） | P,C | M7 |
 | KF-SCL-008 | supported Kafka client/protocol versions pass Produce/Fetch/group/txn/admin compatibility | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl008` through `phase9CompatibilityCheck`（isolated exact clients `3.9.0`/`4.0.1`/`4.1.1`/`4.3.0-SNAPSHOT`；Admin、offset-0 Produce/Fetch、group offset 1、committed/aborted transaction and READ_COMMITTED offsets `0,1`；20 focused current-fork tests；machine JSON report；focused current-source pass，final aggregate pending） | P,K | M7 |
 | KF-SCL-009 | performance report records per-profile latency/throughput/recovery/resource baselines without skipped samples | product `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` through `phase9PerformanceCheck`（all five storage profiles；8 warm-up + 32 sampled 4-KiB records；ack-all Produce percentiles/throughput；40-record committed Fetch latency/throughput；actual JVM RSS/CPU/live threads；identity-only-cache fresh-process recovery from latest `40` through continued latest `41`；all-or-nothing `OBSERVATION_ONLY` JSON report；focused current-source pass，final aggregate pending） | P,A | M7 |
-| KF-SCL-010 | clean `phase9FinalCheck --rerun-tasks` maps every Markdown/JSON ID to one passing result and exact sources | product `Phase9EvidenceAggregatorTest.scenarioKfScl010` through `phase9M7FinalCheck`/`phase9FinalCheck`（145 per-row dynamic receipts + one aggregate receipt；clean `main` and exact Kafka commit；50 predecessor result directories with no skip/failure；manifest/Markdown/report hashes；independent exact-146 ID finalizer；implemented，clean aggregate pending） | A | M7 |
+| KF-SCL-010 | clean `phase9FinalCheck --rerun-tasks` maps every Markdown/JSON ID to one passing result and exact sources | product `Phase9EvidenceAggregatorTest.scenarioKfScl010` through `phase9M7FinalCheck`/`phase9FinalCheck`（145 per-row dynamic receipts + one aggregate receipt；clean `main`、exact Kafka commit and exact F9 Pulsar commit；50 predecessor result directories with no skip/failure；manifest/Markdown/report hashes；independent exact-146 ID finalizer；implemented，clean aggregate pending） | A | M7 |
 
 ## 13. Coverage audit
 

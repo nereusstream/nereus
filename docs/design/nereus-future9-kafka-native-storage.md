@@ -8,6 +8,12 @@
 > (`IMPLEMENTED_NOT_RUN` or prior `PASSED_CURRENT_SOURCE`)；KF-SCL-010 itself remains
 > `IMPLEMENTED_NOT_RUN` until the clean `phase9FinalCheck --rerun-tasks` succeeds
 
+> 2026-07-30 inherited-source-lock correction：the first full-final attempt was rejected before F9 test execution
+> because `phase9M1FinalCheck` still consumed the historical global Pulsar lock。Product `main@4efa103` adds a
+> F9-only `phase9PulsarSourceLockCheck` for clean
+> `5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4`，leaves F2/F3/F4 historical locks untouched and
+> includes the Pulsar branch/SHA/clean receipt in both pre-evidence and aggregator assertions。Final passage remains open
+
 > 2026-07-30 F9-M7 performance slice：product `main@33c889c` implements canonical
 > `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` behind `phase9PerformanceCheck`。All five storage profiles
 > run synchronous-ack Produce、READ_COMMITTED Fetch、actual broker-JVM resource sampling and fresh-process cold recovery

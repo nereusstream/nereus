@@ -8,6 +8,12 @@
 > `PASSED_CURRENT_SOURCE` rows；the implementation commit does not claim final passage。Only a fresh
 > `./gradlew phase9FinalCheck --rerun-tasks` may close KF-SCL-010 and promote the complete matrix
 
+> 2026-07-30 inherited-source-lock correction：the first final run stopped in the historical
+> `checkPulsarSourceLock`（expected `2f9c1eb9`，current clean F9-compatible checkout `50fc70fe`）before executing F9
+> scenarios。Product `main@4efa103` changes only `phase9M1FinalCheck` to a new F9-specific lock for
+> `5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4` and adds that exact clean receipt to the final
+> evidence；other future locks are not rewritten。Final aggregate passage remains pending
+
 > 2026-07-30 M7 performance slice：product `main@33c889c` adds
 > `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` and root `phase9PerformanceCheck`。Five storage profiles
 > each execute first-process Produce/Fetch/resource sampling and a second-process identity-only-cache recovery，for ten

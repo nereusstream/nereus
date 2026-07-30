@@ -10,6 +10,12 @@ canonical `scenarioKfScl010`）and the finalizer rejects missing/duplicate/extra
 `IMPLEMENTED_NOT_RUN` or prior focused `PASSED_CURRENT_SOURCE`；none is promoted by this implementation-only commit。
 A clean `./gradlew phase9FinalCheck --rerun-tasks` remains the sole F9 completion gate。
 
+F9 inherited-source-lock correction（2026-07-30）：product `main@4efa103` replaces only
+`phase9M1FinalCheck`'s stale global Pulsar lock with `phase9PulsarSourceLockCheck` pinned to the clean current
+`5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4` checkout。F2/F3/F4 historical locks remain unchanged。
+The SCL010 pre-evidence and JUnit aggregator now also record and assert this Pulsar branch/SHA/clean receipt；the first
+full-final attempt stopped at the old lock before any F9 scenario failed，and final passage remains pending。
+
 F9 current-source performance update（2026-07-30）：product `main@33c889c` adds canonical
 `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` and root `phase9PerformanceCheck`。The gate runs
 `OBJECT_WAL_SYNC_OBJECT`、`OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、

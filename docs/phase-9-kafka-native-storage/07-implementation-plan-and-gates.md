@@ -5,6 +5,12 @@
 > report。All 146 manifest rows are runnable，but this implementation-only increment leaves KF-SCL-010 and every
 > previously unaggregated row at `IMPLEMENTED_NOT_RUN` until a clean `phase9FinalCheck --rerun-tasks` completes
 
+> 2026-07-30 inherited-source-lock correction：the first final run failed before F9 scenario execution because
+> `phase9M1FinalCheck` still depended on historical `checkPulsarSourceLock@2f9c1eb9`。Product `main@4efa103` replaces
+> only that dependency with F9-specific `phase9PulsarSourceLockCheck` at clean
+> `5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4` and carries this third exact-source receipt into
+> pre-evidence/JUnit assertions。The historical global lock remains unchanged；final aggregate passage is still open
+
 > 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss、release-process physical-deletion/fresh-JVM NCP2 fallback、Object/BookKeeper process takeover cuts、real-Oxia two-runtime Object-WAL live leader takeover、ACTIVE-state three-voter controller failover、the complete six-way readiness/PREPARED/ACTIVE store-publication cuts、four-way initial proof cuts and all-five-profile trim-response-loss forced restart are implemented；remaining M4 internal-topic cuts、DeleteRecords boundary/oracle work and inherited final gates remain open
 > 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton takeover、Object/BookKeeper in-flight cuts、three-profile handoff、ACTIVE multi-controller failover、activation store/proof cuts 与 Oxia transport recovery 已进入 M6 process aggregate；`f9CheckpointTrimRecoveryProcessIntegrationTest` 闭合 native DeleteRecords -> rooted NKC1 -> durable trim -> forced restart -> pre-trim checkpoint hydration/current-trim pruning -> continued IO；`f9TrimResponseLossProcessIntegrationTest` 与 `f9TrimProfileMatrixProcessIntegrationTest` 又在五种 profile 闭合 provider-applied/caller-unobserved -> forced restart -> same-target no-op/no-repeat；仍 open 的 takeover 边界是 coordinator/internal topics 与更广 chaos
 > 2026-07-29 coordinator migration 增量：`f9CoordinatorMigrationProcessIntegrationTest` 已在两个 live release brokers 闭合 completed group/transaction internal-topic state 的 `[1] -> [2]` recovery/continuation；仍 open 的 M4 coordinator 边界缩小为 ongoing/aborted transaction takeover、mandatory NTC2 与 final/upstream aggregate
@@ -1492,16 +1498,18 @@ The final aggregate is an executable receipt pipeline rather than a documentatio
 
 `prepare-phase9-final-evidence.sh` enforces these code-level conditions before JUnit starts：
 
-- Gradle received `--rerun-tasks`；the product checkout is clean `main`，and the clean Kafka checkout is exactly
-  `nereus/future9-native-kafka-storage@76f62f3b83e882105219b6c7687dbde594a8b8a2`；
+- Gradle received `--rerun-tasks`；the product checkout is clean `main`，the clean Kafka checkout is exactly
+  `nereus/future9-native-kafka-storage@76f62f3b83e882105219b6c7687dbde594a8b8a2` and the inherited clean Pulsar
+  checkout is exactly `5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4`；
 - the manifest has exactly 146 unique IDs and only `IMPLEMENTED_NOT_RUN`/`PASSED_CURRENT_SOURCE` statuses；
 - every manifest owner task belongs to the closed final graph；
 - compatibility evidence contains four `PASS` rows，performance evidence contains five `PASS` rows and
   `thresholdPolicy=OBSERVATION_ONLY`；
 - 50 explicitly named predecessor result directories exist；every XML suite has non-zero tests and zero
   skipped/failures/errors；the sorted `path|class|method|PASS` receipts are SHA-256 hashed；
-- the generated `build/f9-final-evidence/pre-evidence.json` records exact product/Kafka commits、services、owner
-  tasks、JUnit totals/hash and SHA-256 for the manifest、Markdown matrix and both M7 reports。
+- the generated `build/f9-final-evidence/pre-evidence.json` records exact product/Kafka/Pulsar branches and commits、
+  clean-tree state、services、owner tasks、JUnit totals/hash and SHA-256 for the manifest、Markdown matrix and both M7
+  reports。
 
 `Phase9EvidenceAggregatorTest.scenarioEvidence` emits one dynamic JUnit result for each row except KF-SCL-010。Each
 result is named `ID|testClass#testMethod` and verifies runnable status、the freshly executed owner task、required services、
