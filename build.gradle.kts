@@ -68,7 +68,16 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "phase9ChaosCheck"
         || task == "phase9CompatibilityCheck"
         || task == "phase9PerformanceCheck"
+        || task == "phase9M4FinalCheck"
+        || task == "phase9M5FinalCheck"
+        || task == "phase9M6FinalCheck"
+        || task == "phase9M7Check"
+        || task == "phase9M7FinalCheck"
+        || task == "phase9PrepareFinalEvidence"
+        || task == "phase9FinalEvidenceReport"
+        || task == "phase9FinalCheck"
         || task == "phase9KafkaForkCompatibilityCheck"
+        || task == "f9EvidenceAggregatorTest"
         || task == "f9M6KafkaProcessIntegrationTest"
         || task == "f9CheckpointTrimRecoveryProcessIntegrationTest"
         || task == "f9DeleteRecordsBoundaryProcessIntegrationTest"
@@ -3406,4 +3415,152 @@ tasks.register("phase9PerformanceCheck") {
     dependsOn("checkPhase9ScenarioManifest")
     dependsOn("phase9SourceLockCheck")
     dependsOn(":nereus-kafka-adapter:f9PerformanceProfileProcessIntegrationTest")
+}
+
+tasks.register("phase9M3FinalCheck") {
+    group = "verification"
+    description =
+        "Run the complete F9-M3 product, provider, Kafka-fork, and release-process Produce/Fetch gate."
+    dependsOn("phase9M2FinalCheck")
+    dependsOn("phase9M3KafkaForkCheck")
+    dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalAsyncObjectProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalSyncObjectProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9ObjectWalAsyncObjectProcessIntegrationTest")
+}
+
+tasks.register("phase9M4FinalCheck") {
+    group = "verification"
+    description =
+        "Run the complete F9-M4 checkpoint, producer-state, transaction, coordinator, and profile gate."
+    dependsOn("phase9M3FinalCheck")
+    dependsOn("phase9M4ProducerStateCheck")
+    dependsOn("phase9M6KafkaProcessCheck")
+    dependsOn("phase9KafkaForkCompatibilityCheck")
+}
+
+tasks.register("phase9M5FinalCheck") {
+    group = "verification"
+    description =
+        "Run the complete F9-M5 retention, compaction, provider response-loss, and restart gate."
+    dependsOn("phase9M4FinalCheck")
+    dependsOn("phase9M5CompactionCoreCheck")
+    dependsOn("phase9ChaosCheck")
+}
+
+tasks.register("phase9M6FinalCheck") {
+    group = "verification"
+    description =
+        "Run the complete F9-M6 activation, configuration, quarantine, fork-feature, and process gate."
+    dependsOn("phase9M5FinalCheck")
+    dependsOn("phase9M6ActivationMetadataCheck")
+    dependsOn("phase9M6CheckpointQuarantineCheck")
+    dependsOn("phase9M6KafkaFeatureCheck")
+    dependsOn("phase9M6KafkaProcessCheck")
+}
+
+tasks.register("phase9M7Check") {
+    group = "verification"
+    description =
+        "Run every F9-M7 scale, chaos, compatibility, and observation-only performance slice."
+    dependsOn("phase9ScaleCheck")
+    dependsOn("phase9ChaosCheck")
+    dependsOn("phase9CompatibilityCheck")
+    dependsOn("phase9PerformanceCheck")
+}
+
+val phase9PreEvidence =
+    layout.buildDirectory.file("f9-final-evidence/pre-evidence.json")
+val phase9FinalEvidence =
+    layout.buildDirectory.file("f9-final-evidence/final-report.json")
+
+val phase9PrepareFinalEvidence =
+    tasks.register<Exec>("phase9PrepareFinalEvidence") {
+        group = "verification"
+        description =
+            "Verify every F9 predecessor ran fresh and write the exact source/artifact input for KF-SCL-010."
+        dependsOn("phase9M1FinalCheck")
+        dependsOn("phase9M2FinalCheck")
+        dependsOn("phase9M3FinalCheck")
+        dependsOn("phase9M4FinalCheck")
+        dependsOn("phase9M5FinalCheck")
+        dependsOn("phase9M6FinalCheck")
+        dependsOn("phase9M7Check")
+        workingDir = layout.projectDirectory.asFile
+        commandLine(
+            "bash",
+            "scripts/prepare-phase9-final-evidence.sh",
+            layout.projectDirectory.asFile.absolutePath,
+            kafkaForkCheckoutPath.get(),
+            phase9PreEvidence.get().asFile.absolutePath,
+            gradle.startParameter.isRerunTasks.toString(),
+        )
+        inputs.file("scripts/prepare-phase9-final-evidence.sh")
+        inputs.file("docs/phase-9-kafka-native-storage/f9-scenarios.json")
+        inputs.file("docs/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md")
+        outputs.file(phase9PreEvidence)
+        outputs.upToDateWhen { false }
+    }
+
+gradle.projectsEvaluated {
+    project(":nereus-kafka-adapter")
+        .tasks
+        .named("f9EvidenceAggregatorTest") {
+            dependsOn(phase9PrepareFinalEvidence)
+        }
+}
+
+val phase9FinalEvidenceReport =
+    tasks.register<Exec>("phase9FinalEvidenceReport") {
+        group = "verification"
+        description =
+            "Verify 146 unique KF-SCL-010 JUnit mappings and write the deterministic final F9 evidence report."
+        dependsOn(":nereus-kafka-adapter:f9EvidenceAggregatorTest")
+        workingDir = layout.projectDirectory.asFile
+        commandLine(
+            "bash",
+            "scripts/finalize-phase9-evidence.sh",
+            layout.projectDirectory.asFile.absolutePath,
+            phase9PreEvidence.get().asFile.absolutePath,
+            layout.projectDirectory
+                .dir(
+                    "nereus-kafka-adapter/build/test-results/"
+                        + "f9EvidenceAggregatorTest",
+                )
+                .asFile
+                .absolutePath,
+            phase9FinalEvidence.get().asFile.absolutePath,
+        )
+        inputs.file("scripts/finalize-phase9-evidence.sh")
+        inputs.file(phase9PreEvidence)
+        inputs.dir(
+            layout.projectDirectory.dir(
+                "nereus-kafka-adapter/build/test-results/"
+                    + "f9EvidenceAggregatorTest",
+            ),
+        )
+        outputs.file(phase9FinalEvidence)
+        outputs.upToDateWhen { false }
+    }
+
+tasks.register("phase9M7FinalCheck") {
+    group = "verification"
+    description =
+        "Run every F9-M7 slice and the 146-scenario exact-source evidence aggregator."
+    dependsOn("phase9M7Check")
+    dependsOn(phase9FinalEvidenceReport)
+}
+
+tasks.register("phase9FinalCheck") {
+    group = "verification"
+    description =
+        "Run the clean F9-M1 through F9-M7 release aggregate; this is the only F9 completion claim."
+    dependsOn("phase9M1FinalCheck")
+    dependsOn("phase9M2FinalCheck")
+    dependsOn("phase9M3FinalCheck")
+    dependsOn("phase9M4FinalCheck")
+    dependsOn("phase9M5FinalCheck")
+    dependsOn("phase9M6FinalCheck")
+    dependsOn("phase9M7FinalCheck")
 }

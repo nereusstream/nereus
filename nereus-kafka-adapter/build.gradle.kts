@@ -58,6 +58,10 @@ dependencies {
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.toxiproxy)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.junit.jupiter)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.assertj)
+    add(
+        f9ProviderIntegrationTest.implementationConfigurationName,
+        "com.fasterxml.jackson.core:jackson-databind:2.21.1",
+    )
     add(f9ProviderIntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
     add(f9BookKeeperFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
     add(f9ActivationFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
@@ -578,6 +582,48 @@ tasks.register<Test>("f9PerformanceProfileProcessIntegrationTest") {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
                 "scenarioKfScl009",
+        )
+    }
+}
+
+tasks.register<Test>("f9EvidenceAggregatorTest") {
+    group = "verification"
+    description =
+        "Map every F9 Markdown/manifest ID to one fresh passing owner task and exact-source evidence result."
+    shouldRunAfter(tasks.named("f9PerformanceProfileProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.f9.repository",
+        rootProject.layout.projectDirectory.asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.f9.manifest",
+        rootProject.layout.projectDirectory
+            .file("docs/phase-9-kafka-native-storage/f9-scenarios.json")
+            .asFile
+            .absolutePath,
+    )
+    systemProperty(
+        "nereus.f9.matrix",
+        rootProject.layout.projectDirectory
+            .file("docs/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md")
+            .asFile
+            .absolutePath,
+    )
+    systemProperty(
+        "nereus.f9.pre.evidence",
+        rootProject.layout.buildDirectory
+            .file("f9-final-evidence/pre-evidence.json")
+            .get()
+            .asFile
+            .absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.evidence.Phase9EvidenceAggregatorTest",
         )
     }
 }
