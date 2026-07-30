@@ -238,7 +238,10 @@ class DefaultStreamStorageReadTest {
     void repairBudgetExhaustionIsRetriableAndALargerBudgetCanRecover() {
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
-        DefaultStreamStorage first = storage(config(false, 1, 1, 8L << 20), metadata, objectStore,
+        DefaultStreamStorage first = storage(
+                config(false, 1, 1, 8L << 20),
+                failGenerationZeroMaterialization(metadata),
+                objectStore,
                 new DefaultWalObjectReader(objectStore), new RecordingReadMetrics());
         DefaultStreamStorage second = storage(defaultConfig(false), metadata, objectStore,
                 new DefaultWalObjectReader(objectStore), new RecordingReadMetrics());
@@ -249,6 +252,9 @@ class DefaultStreamStorageReadTest {
             metadata.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
             failure(first.append(streamId, batch(List.of(), "first"), appendOptions()));
             second.append(streamId, batch(List.of(), "second"), appendOptions()).join();
+            assertThat(metadata.scanOffsetIndex("cluster/a", streamId, 0, 10).join())
+                    .extracting(OffsetIndexEntry::range)
+                    .containsExactly(new OffsetRange(1, 2));
 
             NereusException exhausted = failure(first.read(
                     streamId, 0, readOptions(10, 64, Duration.ofSeconds(5))));
@@ -763,6 +769,26 @@ class DefaultStreamStorageReadTest {
                 (proxy, method, args) -> {
                     if (method.getName().equals("scanOffsetIndex")) {
                         return CompletableFuture.completedFuture(records);
+                    }
+                    try {
+                        return method.invoke(delegate, args);
+                    } catch (InvocationTargetException e) {
+                        throw e.getCause();
+                    }
+                });
+    }
+
+    private static OxiaMetadataStore failGenerationZeroMaterialization(OxiaMetadataStore delegate) {
+        return (OxiaMetadataStore) Proxy.newProxyInstance(
+                OxiaMetadataStore.class.getClassLoader(),
+                new Class<?>[] {OxiaMetadataStore.class, PhysicalObjectMetadataStore.class},
+                (proxy, method, args) -> {
+                    if (method.getName().equals("materializeGenerationZero")) {
+                        return NereusException.failedAppendFuture(
+                                ErrorCode.METADATA_UNAVAILABLE,
+                                false,
+                                AppendOutcome.KNOWN_COMMITTED,
+                                "test isolates read repair from automatic append recovery");
                     }
                     try {
                         return method.invoke(delegate, args);
