@@ -319,7 +319,7 @@ public final class KafkaCompactionScheduler implements AutoCloseable {
   }
 
   private static Duration requirePositive(Duration value, String field) {
-    Objects.requireNonNull(value, "value");
+    Objects.requireNonNull(value, field);
     if (value.isZero() || value.isNegative()) {
       throw new IllegalArgumentException(field + " must be positive");
     }
