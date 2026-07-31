@@ -120,7 +120,9 @@ class KafkaCompactionRuntimeTest {
       operations.get(userOne).complete(KafkaCompactionPartitionPass.RunResult.noCandidate());
       operations.get(userTwo).complete(KafkaCompactionPartitionPass.RunResult.noCandidate());
 
+      close.orTimeout(5, java.util.concurrent.TimeUnit.SECONDS).join();
       assertThat(close).isCompletedWithValue(null);
+      assertThat(active).hasValue(0);
       assertThat(timer.isShutdown()).isFalse();
     } finally {
       timer.shutdownNow();
