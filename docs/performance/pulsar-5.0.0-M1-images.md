@@ -72,6 +72,17 @@ normal user and elevate only nerdctl:
   --sudo-nerdctl
 ```
 
+When the build host reaches external sources through a proxy, export the
+proxy variables before invoking the script. The script forwards the set
+uppercase and lowercase variables as Docker build arguments so native
+dependency steps such as the Snappy build use the same route:
+
+```bash
+export HTTP_PROXY=http://<build-host-reachable-proxy>:<port>
+export HTTPS_PROXY="${HTTP_PROXY}"
+export NO_PROXY=localhost,127.0.0.1
+```
+
 The script creates/verifies the two detached Pulsar worktrees, publishes Nereus
 artifacts against the exact selected fork commit, builds both Pulsar
 distributions, and builds:

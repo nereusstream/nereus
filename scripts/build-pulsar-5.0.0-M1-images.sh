@@ -43,6 +43,7 @@ nerdctl_bin="${NERDCTL_BIN:-nerdctl}"
 target_platform=""
 push_images=false
 sudo_nerdctl=false
+proxy_build_args=()
 
 usage() {
   cat <<'EOF'
@@ -76,6 +77,9 @@ Output and image options:
   --nerdctl PATH              nerdctl executable.
   --sudo-nerdctl              Elevate only nerdctl commands.
   --push                      Push all three images after building.
+  HTTP_PROXY, HTTPS_PROXY,
+  NO_PROXY (and lowercase)    Forward set proxy variables to Docker build
+                              stages, including native dependency downloads.
   -h, --help                  Show this help.
 
 Immutable-image safety:
@@ -122,6 +126,18 @@ run_nerdctl() {
     "${nerdctl_bin}" "${global_args[@]}" "$@"
   fi
 }
+
+append_proxy_build_arg() {
+  local variable_name="$1"
+  local variable_value="${!variable_name-}"
+  if [[ -n "${variable_value}" ]]; then
+    proxy_build_args+=(--build-arg "${variable_name}=${variable_value}")
+  fi
+}
+
+for proxy_variable in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy; do
+  append_proxy_build_arg "${proxy_variable}"
+done
 
 resolve_commit() {
   local repository="$1"
@@ -387,6 +403,7 @@ run_nerdctl build \
   --build-arg "PULSAR_CLIENT_PYTHON_VERSION=${PULSAR_CLIENT_PYTHON_VERSION}" \
   --build-arg "SNAPPY_VERSION=${SNAPPY_VERSION}" \
   --build-arg "IMAGE_JDK_MAJOR_VERSION=${IMAGE_JDK_MAJOR_VERSION}" \
+  "${proxy_build_args[@]}" \
   "${apache_context}"
 
 echo "building ${nereus_tag}"
@@ -409,6 +426,7 @@ run_nerdctl build \
   --build-arg "PULSAR_CLIENT_PYTHON_VERSION=${PULSAR_CLIENT_PYTHON_VERSION}" \
   --build-arg "SNAPPY_VERSION=${SNAPPY_VERSION}" \
   --build-arg "IMAGE_JDK_MAJOR_VERSION=${IMAGE_JDK_MAJOR_VERSION}" \
+  "${proxy_build_args[@]}" \
   "${nereus_context}"
 
 echo "building ${admin_tag}"
@@ -420,6 +438,7 @@ run_nerdctl build \
   --tag "${admin_tag}" \
   --build-arg "NEREUS_ADMIN_BASE_IMAGE=${admin_base_image}" \
   --build-arg "NEREUS_COMMIT=${nereus_source_sha}" \
+  "${proxy_build_args[@]}" \
   --label "org.opencontainers.image.title=Nereus-Admin" \
   --label "org.opencontainers.image.version=v0.1.0" \
   --label "org.opencontainers.image.revision=${nereus_source_sha}" \
