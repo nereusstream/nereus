@@ -212,21 +212,22 @@ public final class KafkaCompactionScheduler implements AutoCloseable {
     } catch (Throwable failure) {
       source = CompletableFuture.failedFuture(failure);
     }
+    boolean cancelAfterPublish;
     synchronized (monitor) {
-      if (active != target || state != State.RUNNING) {
+      if (active != target) {
         source.cancel(true);
         target.completion.completeExceptionally(
-            closed("Kafka compaction scheduler closed before launching the pass"));
-        if (active == target) {
-          active = null;
-          completeCloseLocked();
-        }
+            closed("Kafka compaction scheduler no longer owns the pass"));
         return;
       }
       activeSource = source;
+      cancelAfterPublish = state != State.RUNNING;
     }
     source.whenComplete(
         (ignored, failure) -> executeCallback(() -> finish(target, unwrapNullable(failure))));
+    if (cancelAfterPublish) {
+      source.cancel(true);
+    }
   }
 
   private void finish(PendingPass target, Throwable failure) {
