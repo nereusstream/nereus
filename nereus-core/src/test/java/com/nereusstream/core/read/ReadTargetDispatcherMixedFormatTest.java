@@ -1,12 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
-import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.ObjectType;
+import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.PhysicalReadResult;
 import com.nereusstream.api.ReadBatch;
@@ -27,38 +27,26 @@ class ReadTargetDispatcherMixedFormatTest {
     @Test
     void stopsWhenTheNextReaderRunCannotFitItsFirstEntry() {
         RecordingReader wal = new RecordingReader(
-                ReadTargetReaderRegistryTest.key(
-                        ObjectType.MULTI_STREAM_WAL_OBJECT,
-                        "WAL_OBJECT_V1"),
-                false);
+                ReadTargetReaderRegistryTest.key(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"), false);
         RecordingReader compacted = new RecordingReader(
-                ReadTargetReaderRegistryTest.key(
-                        ObjectType.STREAM_COMPACTED_OBJECT,
-                        "NEREUS_COMPACTED_PARQUET_V1"),
+                ReadTargetReaderRegistryTest.key(ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1"),
                 true);
-        ReadTargetDispatcher dispatcher = new ReadTargetDispatcher(
-                new ReadTargetReaderRegistry(List.of(wal, compacted)));
+        ReadTargetDispatcher dispatcher =
+                new ReadTargetDispatcher(new ReadTargetReaderRegistry(List.of(wal, compacted)));
         List<ResolvedRange> ranges = List.of(
                 range(0, ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"),
-                range(
-                        1,
-                        ObjectType.STREAM_COMPACTED_OBJECT,
-                        "NEREUS_COMPACTED_PARQUET_V1"));
+                range(1, ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1"));
 
-        PhysicalReadResult result = dispatcher.read(
+        PhysicalReadResult result = dispatcher
+                .read(
                         new StreamId("cross-run-limit"),
                         0,
                         ranges,
-                        new ReadOptions(
-                                10,
-                                2,
-                                ReadIsolation.COMMITTED,
-                                Duration.ofSeconds(1)))
+                        new ReadOptions(10, 2, ReadIsolation.COMMITTED, Duration.ofSeconds(1)))
                 .join();
 
-        assertThat(result.batches()).singleElement()
-                .satisfies(batch ->
-                        assertThat(batch.range()).isEqualTo(new OffsetRange(0, 1)));
+        assertThat(result.batches()).singleElement().satisfies(batch -> assertThat(batch.range())
+                .isEqualTo(new OffsetRange(0, 1)));
         assertThat(result.sourceCoverageEndOffset()).hasValue(1);
         assertThat(wal.runSizes).containsExactly(1);
         assertThat(compacted.runSizes).containsExactly(1);
@@ -66,19 +54,20 @@ class ReadTargetDispatcherMixedFormatTest {
 
     @Test
     void groupsOnlyAdjacentRangesWithTheSameExactReaderKey() {
-        RecordingReader wal = new RecordingReader(ReadTargetReaderRegistryTest.key(
-                ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"));
-        RecordingReader compacted = new RecordingReader(ReadTargetReaderRegistryTest.key(
-                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1"));
-        ReadTargetDispatcher dispatcher = new ReadTargetDispatcher(
-                new ReadTargetReaderRegistry(List.of(wal, compacted)));
+        RecordingReader wal = new RecordingReader(
+                ReadTargetReaderRegistryTest.key(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"));
+        RecordingReader compacted = new RecordingReader(
+                ReadTargetReaderRegistryTest.key(ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1"));
+        ReadTargetDispatcher dispatcher =
+                new ReadTargetDispatcher(new ReadTargetReaderRegistry(List.of(wal, compacted)));
         List<ResolvedRange> ranges = List.of(
                 range(0, ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"),
                 range(1, ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"),
                 range(2, ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1"),
                 range(3, ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"));
 
-        PhysicalReadResult result = dispatcher.read(
+        PhysicalReadResult result = dispatcher
+                .read(
                         new StreamId("stream"),
                         0,
                         ranges,
@@ -113,9 +102,7 @@ class ReadTargetDispatcherMixedFormatTest {
             this(key, false);
         }
 
-        private RecordingReader(
-                ReadTargetReaderKey key,
-                boolean rejectReadLimit) {
+        private RecordingReader(ReadTargetReaderKey key, boolean rejectReadLimit) {
             this.key = key;
             this.rejectReadLimit = rejectReadLimit;
         }
@@ -132,30 +119,27 @@ class ReadTargetDispatcherMixedFormatTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
-                StreamId streamId,
-                long startOffset,
-                List<ResolvedRange> ranges,
-                ReadOptions options) {
+                StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
             runSizes.add(ranges.size());
             if (rejectReadLimit) {
                 return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.READ_LIMIT_TOO_SMALL,
-                        false,
-                        "next reader run cannot fit its first entry"));
+                        ErrorCode.READ_LIMIT_TOO_SMALL, false, "next reader run cannot fit its first entry"));
             }
-            List<ReadBatch> batches = ranges.stream().map(range -> {
-                ObjectSliceReadTarget target = (ObjectSliceReadTarget) range.readTarget();
-                return new ReadBatch(
-                        range.offsetRange(),
-                        range.payloadFormat(),
-                        new byte[] {1},
-                        range.schemaRefs(),
-                        target.entryIndexRef(),
-                        range.projectionRef(),
-                        target.objectId(),
-                        target.objectOffset(),
-                        target.objectLength());
-            }).toList();
+            List<ReadBatch> batches = ranges.stream()
+                    .map(range -> {
+                        ObjectSliceReadTarget target = (ObjectSliceReadTarget) range.readTarget();
+                        return new ReadBatch(
+                                range.offsetRange(),
+                                range.payloadFormat(),
+                                new byte[] {1},
+                                range.schemaRefs(),
+                                target.entryIndexRef(),
+                                range.projectionRef(),
+                                target.objectId(),
+                                target.objectOffset(),
+                                target.objectLength());
+                    })
+                    .toList();
             return CompletableFuture.completedFuture(new WalReadResult(batches, List.of()));
         }
     }

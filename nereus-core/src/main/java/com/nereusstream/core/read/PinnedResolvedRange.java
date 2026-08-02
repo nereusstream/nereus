@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.ObjectKeyHash;
@@ -9,7 +10,9 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** One resolved candidate whose physical object remains protected until release completes. */
+/**
+ * One resolved candidate whose physical object remains protected until release completes.
+ */
 public final class PinnedResolvedRange implements AutoCloseable {
     private final GenerationReadCandidate candidate;
     private final ObjectReadLease objectLease;
@@ -24,16 +27,13 @@ public final class PinnedResolvedRange implements AutoCloseable {
     public PinnedResolvedRange(GenerationReadCandidate candidate) {
         this.candidate = Objects.requireNonNull(candidate, "candidate");
         this.objectLease = null;
-        if (!candidate.generationZero()
-                || candidate.resolvedRange().readTarget() instanceof ObjectSliceReadTarget) {
+        if (!candidate.generationZero() || candidate.resolvedRange().readTarget() instanceof ObjectSliceReadTarget) {
             throw new IllegalArgumentException(
                     "only non-Object generation-zero ranges may use provider-owned read protection");
         }
     }
 
-    public PinnedResolvedRange(
-            GenerationReadCandidate candidate,
-            ObjectReadLease objectLease) {
+    public PinnedResolvedRange(GenerationReadCandidate candidate, ObjectReadLease objectLease) {
         this.candidate = Objects.requireNonNull(candidate, "candidate");
         this.objectLease = Objects.requireNonNull(objectLease, "objectLease");
         if (!(candidate.resolvedRange().readTarget() instanceof ObjectSliceReadTarget object)) {
@@ -65,14 +65,13 @@ public final class PinnedResolvedRange implements AutoCloseable {
             CompletableFuture<Void> providerRelease = objectLease == null
                     ? CompletableFuture.completedFuture(null)
                     : Objects.requireNonNull(objectLease.release(), "object lease release future");
-            providerRelease
-                    .whenComplete((ignored, failure) -> {
-                        if (failure == null) {
-                            completion.complete(null);
-                        } else {
-                            completion.completeExceptionally(failure);
-                        }
-                    });
+            providerRelease.whenComplete((ignored, failure) -> {
+                if (failure == null) {
+                    completion.complete(null);
+                } else {
+                    completion.completeExceptionally(failure);
+                }
+            });
         } catch (Throwable failure) {
             completion.completeExceptionally(failure);
         }

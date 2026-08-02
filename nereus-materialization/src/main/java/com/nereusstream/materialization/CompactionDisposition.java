@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
-/** Closed NTC1 row disposition registry; wire ids are durable and never enum ordinals. */
+/**
+ * Closed NTC1 row disposition registry; wire ids are durable and never enum ordinals.
+ */
 public enum CompactionDisposition {
     VALUE(1),
     TOMBSTONE(2);

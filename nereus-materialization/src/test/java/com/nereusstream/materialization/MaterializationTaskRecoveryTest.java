@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.CLUSTER;
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.STREAM;
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStoreTestFactory;
@@ -33,28 +33,28 @@ class MaterializationTaskRecoveryTest {
                 MaterializationPlannerTestSupport.zero("/index/z-2", 0, 2, 0, 100, 2),
                 MaterializationPlannerTestSupport.zero("/index/z-4", 2, 4, 100, 100, 4));
         MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
-        MaterializationTask task = MaterializationPlannerTestSupport.planner(
-                        candidates, List.of(), 0, 4)
+        MaterializationTask task = MaterializationPlannerTestSupport.planner(candidates, List.of(), 0, 4)
                 .plan(STREAM, new OffsetRange(0, 4), policy, 1)
                 .join()
                 .get(0);
-        GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(
-                Clock.fixed(Instant.ofEpochMilli(400), ZoneOffset.UTC));
+        GenerationMetadataStore durable =
+                GenerationMetadataStoreTestFactory.inMemory(Clock.fixed(Instant.ofEpochMilli(400), ZoneOffset.UTC));
         MaterializationTaskStore taskStore = new MaterializationTaskStore(
                 CLUSTER,
                 MaterializationPlannerTestSupport.generationStore(candidates, List.of(), durable),
                 Clock.fixed(Instant.ofEpochMilli(100), ZoneOffset.UTC));
         VersionedMaterializationTask planned = taskStore.create(task).join();
         MaterializationTaskRecord claimedRecord = claimed(planned.value(), 120, 300);
-        VersionedMaterializationTask claimed = taskStore.compareAndSet(
-                claimedRecord, planned.metadataVersion()).join();
+        VersionedMaterializationTask claimed = taskStore
+                .compareAndSet(claimedRecord, planned.metadataVersion())
+                .join();
         AtomicInteger dispatches = new AtomicInteger();
         AtomicInteger guardCalls = new AtomicInteger();
         MaterializationTaskRecovery recovery = new MaterializationTaskRecovery(
                 taskStore,
                 MaterializationTaskRecoveryTest::noProtections,
-                new GenerationPublicationReconciler((ignoredTask, ignoredOutput) ->
-                        CompletableFuture.completedFuture(null)),
+                new GenerationPublicationReconciler(
+                        (ignoredTask, ignoredOutput) -> CompletableFuture.completedFuture(null)),
                 (ignoredDurable, ignoredTask) -> {
                     dispatches.incrementAndGet();
                     return CompletableFuture.completedFuture(null);
@@ -64,14 +64,16 @@ class MaterializationTaskRecoveryTest {
                 Duration.ofMillis(100));
 
         MaterializationTaskRecoveryAction action = recovery.recover(claimed, () -> {
-            guardCalls.incrementAndGet();
-            return CompletableFuture.completedFuture(null);
-        }).join();
+                    guardCalls.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                })
+                .join();
 
         assertThat(action).isEqualTo(MaterializationTaskRecoveryAction.EXPIRED_CLAIM_REQUEUED);
         assertThat(dispatches).hasValue(0);
         assertThat(guardCalls).hasValue(1);
-        VersionedMaterializationTask retry = taskStore.get(STREAM, task.taskId()).join().orElseThrow();
+        VersionedMaterializationTask retry =
+                taskStore.get(STREAM, task.taskId()).join().orElseThrow();
         assertThat(retry.value().lifecycle()).isEqualTo(TaskLifecycle.RETRY_WAIT);
         assertThat(retry.value().failureClassId()).isEqualTo(TaskFailureClass.CLOSED.wireId());
         assertThat(retry.value().retryNotBeforeMillis()).isEqualTo(500);
@@ -84,29 +86,25 @@ class MaterializationTaskRecoveryTest {
         List<VersionedGenerationCandidate> candidates = List.of(
                 MaterializationPlannerTestSupport.zero("/index/z-2", 0, 2, 0, 100, 2),
                 MaterializationPlannerTestSupport.zero("/index/z-4", 2, 4, 100, 100, 4));
-        MaterializationTask task = MaterializationPlannerTestSupport.planner(
-                        candidates, List.of(), 0, 4)
-                .plan(
-                        STREAM,
-                        new OffsetRange(0, 4),
-                        MaterializationPlannerTestSupport.policy(),
-                        1)
+        MaterializationTask task = MaterializationPlannerTestSupport.planner(candidates, List.of(), 0, 4)
+                .plan(STREAM, new OffsetRange(0, 4), MaterializationPlannerTestSupport.policy(), 1)
                 .join()
                 .get(0);
-        GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(
-                Clock.fixed(Instant.ofEpochMilli(400), ZoneOffset.UTC));
+        GenerationMetadataStore durable =
+                GenerationMetadataStoreTestFactory.inMemory(Clock.fixed(Instant.ofEpochMilli(400), ZoneOffset.UTC));
         MaterializationTaskStore taskStore = new MaterializationTaskStore(
                 CLUSTER,
                 MaterializationPlannerTestSupport.generationStore(candidates, List.of(), durable),
                 Clock.fixed(Instant.ofEpochMilli(100), ZoneOffset.UTC));
         VersionedMaterializationTask planned = taskStore.create(task).join();
-        VersionedMaterializationTask claimed = taskStore.compareAndSet(
-                claimed(planned.value(), 120, 300), planned.metadataVersion()).join();
+        VersionedMaterializationTask claimed = taskStore
+                .compareAndSet(claimed(planned.value(), 120, 300), planned.metadataVersion())
+                .join();
         MaterializationTaskRecovery recovery = new MaterializationTaskRecovery(
                 taskStore,
                 MaterializationTaskRecoveryTest::noProtections,
-                new GenerationPublicationReconciler((ignoredTask, ignoredOutput) ->
-                        CompletableFuture.completedFuture(null)),
+                new GenerationPublicationReconciler(
+                        (ignoredTask, ignoredOutput) -> CompletableFuture.completedFuture(null)),
                 (ignoredDurable, ignoredTask) -> CompletableFuture.completedFuture(null),
                 Clock.fixed(Instant.ofEpochMilli(400), ZoneOffset.UTC),
                 Duration.ofMillis(50),
@@ -115,12 +113,10 @@ class MaterializationTaskRecoveryTest {
         CompletableFuture<MaterializationTaskRecoveryAction> first = recovery.recover(claimed);
         CompletableFuture<MaterializationTaskRecoveryAction> duplicate = recovery.recover(claimed);
 
-        assertThat(first.join())
-                .isEqualTo(MaterializationTaskRecoveryAction.EXPIRED_CLAIM_REQUEUED);
-        assertThat(duplicate.join())
-                .isEqualTo(MaterializationTaskRecoveryAction.EXPIRED_CLAIM_REQUEUED);
-        VersionedMaterializationTask retry = taskStore.get(
-                STREAM, task.taskId()).join().orElseThrow();
+        assertThat(first.join()).isEqualTo(MaterializationTaskRecoveryAction.EXPIRED_CLAIM_REQUEUED);
+        assertThat(duplicate.join()).isEqualTo(MaterializationTaskRecoveryAction.EXPIRED_CLAIM_REQUEUED);
+        VersionedMaterializationTask retry =
+                taskStore.get(STREAM, task.taskId()).join().orElseThrow();
         assertThat(retry.value().lifecycle()).isEqualTo(TaskLifecycle.RETRY_WAIT);
         assertThat(retry.value().attempt()).isOne();
         assertThat(retry.value().retryNotBeforeMillis()).isEqualTo(500);
@@ -133,8 +129,8 @@ class MaterializationTaskRecoveryTest {
                     GenerationPublicationTestSupport.CLUSTER,
                     context.generations(),
                     GenerationPublicationTestSupport.CLOCK);
-            VersionedMaterializationTask ready = taskStore.get(
-                            context.task().streamId(), context.task().taskId())
+            VersionedMaterializationTask ready = taskStore
+                    .get(context.task().streamId(), context.task().taskId())
                     .join()
                     .orElseThrow();
             AtomicReference<MaterializationTask> recoveredTask = new AtomicReference<>();
@@ -167,19 +163,18 @@ class MaterializationTaskRecoveryTest {
 
     @Test
     void publishedRecoveryDoesNotRecreateRetirableTaskProtections() {
-        try (GenerationPublicationTestSupport.Context context =
-                GenerationPublicationTestSupport.context()) {
-            context.committer(
-                            context.generations(),
-                            GenerationPublicationTestSupport.successfulGuard())
+        try (GenerationPublicationTestSupport.Context context = GenerationPublicationTestSupport.context()) {
+            context.committer(context.generations(), GenerationPublicationTestSupport.successfulGuard())
                     .publish(context.task(), context.output())
                     .join();
             MaterializationTaskStore taskStore = new MaterializationTaskStore(
                     GenerationPublicationTestSupport.CLUSTER,
                     context.generations(),
                     GenerationPublicationTestSupport.CLOCK);
-            VersionedMaterializationTask published = taskStore.get(
-                    context.task().streamId(), context.task().taskId()).join().orElseThrow();
+            VersionedMaterializationTask published = taskStore
+                    .get(context.task().streamId(), context.task().taskId())
+                    .join()
+                    .orElseThrow();
             AtomicInteger protectionReconciles = new AtomicInteger();
             MaterializationTaskRecovery recovery = new MaterializationTaskRecovery(
                     taskStore,
@@ -187,39 +182,50 @@ class MaterializationTaskRecoveryTest {
                         protectionReconciles.incrementAndGet();
                         return noProtections(durable);
                     },
-                    new GenerationPublicationReconciler((ignoredTask, ignoredOutput) ->
-                            CompletableFuture.failedFuture(new AssertionError(
-                                    "published task must not reenter publication"))),
+                    new GenerationPublicationReconciler((ignoredTask, ignoredOutput) -> CompletableFuture.failedFuture(
+                            new AssertionError("published task must not reenter publication"))),
                     (ignoredDurable, ignoredTask) -> CompletableFuture.failedFuture(
                             new AssertionError("published task must not be worker-dispatched")),
                     GenerationPublicationTestSupport.CLOCK,
                     Duration.ZERO,
                     Duration.ofSeconds(1));
 
-            assertThat(recovery.recover(published).join())
-                    .isEqualTo(MaterializationTaskRecoveryAction.NONE);
+            assertThat(recovery.recover(published).join()).isEqualTo(MaterializationTaskRecoveryAction.NONE);
             assertThat(protectionReconciles).hasValue(0);
         }
     }
 
-    private static MaterializationTaskRecord claimed(
-            MaterializationTaskRecord source,
-            long claimedAt,
-            long expiresAt) {
+    private static MaterializationTaskRecord claimed(MaterializationTaskRecord source, long claimedAt, long expiresAt) {
         return new MaterializationTaskRecord(
-                source.schemaVersion(), source.taskId(), source.taskSequence(), source.streamId(),
-                source.readViewId(), source.taskKindId(), source.offsetStart(), source.offsetEnd(),
-                source.sources(), source.sourceSetSha256(), source.policyId(), source.policyVersion(),
-                source.policySha256(), source.policy(), TaskLifecycle.CLAIMED, 1,
-                Optional.of(new WorkerClaimRecord(
-                        "c".repeat(26), "d".repeat(26), 1, claimedAt, expiresAt)),
-                Optional.empty(), OptionalLong.empty(), "", TaskFailureClass.NONE.wireId(), "", 0,
-                source.createdAtMillis(), Math.max(source.updatedAtMillis(), claimedAt), 0);
+                source.schemaVersion(),
+                source.taskId(),
+                source.taskSequence(),
+                source.streamId(),
+                source.readViewId(),
+                source.taskKindId(),
+                source.offsetStart(),
+                source.offsetEnd(),
+                source.sources(),
+                source.sourceSetSha256(),
+                source.policyId(),
+                source.policyVersion(),
+                source.policySha256(),
+                source.policy(),
+                TaskLifecycle.CLAIMED,
+                1,
+                Optional.of(new WorkerClaimRecord("c".repeat(26), "d".repeat(26), 1, claimedAt, expiresAt)),
+                Optional.empty(),
+                OptionalLong.empty(),
+                "",
+                TaskFailureClass.NONE.wireId(),
+                "",
+                0,
+                source.createdAtMillis(),
+                Math.max(source.updatedAtMillis(), claimedAt),
+                0);
     }
 
-    private static CompletableFuture<MaterializationTaskProtections> noProtections(
-            VersionedMaterializationTask task) {
-        return CompletableFuture.completedFuture(new MaterializationTaskProtections(
-                task, List.of(), Optional.empty()));
+    private static CompletableFuture<MaterializationTaskProtections> noProtections(VersionedMaterializationTask task) {
+        return CompletableFuture.completedFuture(new MaterializationTaskProtections(task, List.of(), Optional.empty()));
     }
 }

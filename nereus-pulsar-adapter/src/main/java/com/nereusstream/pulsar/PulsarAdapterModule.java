@@ -14,8 +14,9 @@
 
 package com.nereusstream.pulsar;
 
-/** Boundary for Pulsar broker integration. */
+/**
+ * Boundary for Pulsar broker integration.
+ */
 public final class PulsarAdapterModule {
-    private PulsarAdapterModule() {
-    }
+    private PulsarAdapterModule() {}
 }

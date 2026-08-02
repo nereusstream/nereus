@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -15,7 +16,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** One-to-one streaming map from exact ranged source entries to dense NCP2 rows. */
+/**
+ * One-to-one streaming map from exact ranged source entries to dense NCP2 rows.
+ */
 public final class RangedLosslessMaterializationRowPublisher
         implements Flow.Publisher<RangedCompactedObjectRow>, AutoCloseable {
     private final ExactSourceBatchPublisher batches;
@@ -28,10 +31,9 @@ public final class RangedLosslessMaterializationRowPublisher
             Executor callbackExecutor) {
         MaterializationTask exactTask = Objects.requireNonNull(task, "task");
         if (exactTask.taskKind() != TaskKind.LOSSLESS_REWRITE
-                || exactTask.sources().stream().anyMatch(
-                        source -> source.payloadFormat() != PayloadFormat.KAFKA_RECORD_BATCH)) {
-            throw new IllegalArgumentException(
-                    "ranged lossless publisher requires a Kafka LOSSLESS_REWRITE task");
+                || exactTask.sources().stream()
+                        .anyMatch(source -> source.payloadFormat() != PayloadFormat.KAFKA_RECORD_BATCH)) {
+            throw new IllegalArgumentException("ranged lossless publisher requires a Kafka LOSSLESS_REWRITE task");
         }
         batches = new ExactSourceBatchPublisher(
                 exactTask,
@@ -46,8 +48,8 @@ public final class RangedLosslessMaterializationRowPublisher
         Objects.requireNonNull(subscriber, "subscriber");
         if (!subscribed.compareAndSet(false, true)) {
             subscriber.onSubscribe(NoopSubscription.INSTANCE);
-            subscriber.onError(new IllegalStateException(
-                    "ranged lossless row publisher permits exactly one subscriber"));
+            subscriber.onError(
+                    new IllegalStateException("ranged lossless row publisher permits exactly one subscriber"));
             return;
         }
         batches.subscribe(new MappingSubscriber(subscriber));
@@ -62,9 +64,7 @@ public final class RangedLosslessMaterializationRowPublisher
         ReadBatch exact = Objects.requireNonNull(batch, "batch");
         if (exact.payloadFormat() != PayloadFormat.KAFKA_RECORD_BATCH) {
             throw new NereusException(
-                    ErrorCode.UNSUPPORTED_FORMAT,
-                    false,
-                    "NCP2 publisher accepts only exact Kafka record batches");
+                    ErrorCode.UNSUPPORTED_FORMAT, false, "NCP2 publisher accepts only exact Kafka record batches");
         }
         byte[] payload = exact.payload();
         return new RangedCompactedObjectRow(
@@ -80,12 +80,10 @@ public final class RangedLosslessMaterializationRowPublisher
         INSTANCE;
 
         @Override
-        public void request(long count) {
-        }
+        public void request(long count) {}
 
         @Override
-        public void cancel() {
-        }
+        public void cancel() {}
     }
 
     private static final class MappingSubscriber implements Flow.Subscriber<ReadBatch> {

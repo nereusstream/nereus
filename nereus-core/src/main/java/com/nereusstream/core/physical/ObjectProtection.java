@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
 import java.util.Objects;
 
-/** Exact durable protection version returned only after its root and owner post-checks. */
+/**
+ * Exact durable protection version returned only after its root and owner post-checks.
+ */
 public record ObjectProtection(
         PhysicalObjectIdentity object,
         ObjectProtectionIdentity identity,
@@ -29,8 +32,7 @@ public record ObjectProtection(
         if (pending != (expiresAtMillis > createdAtMillis)) {
             throw new IllegalArgumentException("protection expiry does not match its type");
         }
-        durableValueSha256 = GcReferenceQuery.requireSha256(
-                durableValueSha256, "durableValueSha256");
+        durableValueSha256 = GcReferenceQuery.requireSha256(durableValueSha256, "durableValueSha256");
     }
 
     public boolean isPending() {

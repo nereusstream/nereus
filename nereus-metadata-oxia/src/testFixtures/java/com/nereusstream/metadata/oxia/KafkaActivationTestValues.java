@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
@@ -8,15 +9,16 @@ import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationReco
 import com.nereusstream.metadata.oxia.records.KafkaStorageReadinessRecord;
 import java.util.List;
 
-/** Canonical F9 activation values shared by deterministic and real-Oxia contracts. */
+/**
+ * Canonical F9 activation values shared by deterministic and real-Oxia contracts.
+ */
 public final class KafkaActivationTestValues {
     public static final String KAFKA_CLUSTER = "kraft";
 
-    private KafkaActivationTestValues() { }
+    private KafkaActivationTestValues() {}
 
     public static KafkaStorageProtocolActivationRecord activation(
-            KafkaStorageActivationLifecycle lifecycle,
-            long activatedAtMillis) {
+            KafkaStorageActivationLifecycle lifecycle, long activatedAtMillis) {
         return new KafkaStorageProtocolActivationRecord(
                 1,
                 lifecycle.wireId(),
@@ -43,9 +45,7 @@ public final class KafkaActivationTestValues {
                 0);
     }
 
-    public static KafkaBrokerCapabilityRecord capability(
-            long heartbeatAtMillis,
-            long expiresAtMillis) {
+    public static KafkaBrokerCapabilityRecord capability(long heartbeatAtMillis, long expiresAtMillis) {
         return new KafkaBrokerCapabilityRecord(
                 1,
                 KAFKA_CLUSTER,
@@ -77,12 +77,8 @@ public final class KafkaActivationTestValues {
     }
 
     public static KafkaStorageReadinessRecord readiness(
-            long readinessEpoch,
-            long kraftMetadataOffset,
-            long createdAtMillis) {
-        List<KafkaBrokerIdentity> brokers = List.of(
-                new KafkaBrokerIdentity(1, 11),
-                new KafkaBrokerIdentity(2, 12));
+            long readinessEpoch, long kraftMetadataOffset, long createdAtMillis) {
+        List<KafkaBrokerIdentity> brokers = List.of(new KafkaBrokerIdentity(1, 11), new KafkaBrokerIdentity(2, 12));
         return new KafkaStorageReadinessRecord(
                 1,
                 KAFKA_CLUSTER,

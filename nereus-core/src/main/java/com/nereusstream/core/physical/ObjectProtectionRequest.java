@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import java.util.Objects;
 
-/** Stable caller-owned identity and owner fields for an idempotent protection acquisition. */
+/**
+ * Stable caller-owned identity and owner fields for an idempotent protection acquisition.
+ */
 public record ObjectProtectionRequest(
         PhysicalObjectIdentity object,
         ObjectProtectionType type,

@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** View-scoped, monotonically allocated physical generation identifier. */
+/**
+ * View-scoped, monotonically allocated physical generation identifier.
+ */
 public record GenerationId(long value) {
     public GenerationId {
         if (value < 0) {

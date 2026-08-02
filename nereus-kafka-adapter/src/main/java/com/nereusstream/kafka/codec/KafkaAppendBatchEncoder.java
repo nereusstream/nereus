@@ -29,7 +29,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.zip.CRC32C;
 
-/** Converts stock Kafka-validated raw batches to one offset-conditional Nereus append. */
+/**
+ * Converts stock Kafka-validated raw batches to one offset-conditional Nereus append.
+ */
 public final class KafkaAppendBatchEncoder {
     private final KafkaRecordBatchCodec codec;
 
@@ -55,8 +57,8 @@ public final class KafkaAppendBatchEncoder {
         int totalBytes = 0;
         for (KafkaRecordBatch batch : recordBatches) {
             if (batch.baseOffset() != expectedBase) {
-                throw new IllegalArgumentException(
-                        "Kafka batches are not dense: expected base " + expectedBase + " but found " + batch.baseOffset());
+                throw new IllegalArgumentException("Kafka batches are not dense: expected base " + expectedBase
+                        + " but found " + batch.baseOffset());
             }
             int recordCount = batch.logicalRecordCount();
             long eventTimeMillis = Math.max(0, batch.maxTimestamp());
@@ -81,8 +83,7 @@ public final class KafkaAppendBatchEncoder {
                 List.of(),
                 Map.of(),
                 Optional.of(new Checksum(
-                        ChecksumType.CRC32C,
-                        String.format(Locale.ROOT, "%08x", concatenatedChecksum.getValue()))));
+                        ChecksumType.CRC32C, String.format(Locale.ROOT, "%08x", concatenatedChecksum.getValue()))));
         return new EncodedKafkaAppend(appendBatch, range, totalBytes, recordBatches);
     }
 }

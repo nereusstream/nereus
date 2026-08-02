@@ -240,7 +240,7 @@ tasks.register<Test>("f9M3ProviderIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
-                "activatesThenRoundTripsStableKafkaBatchThroughRealOxiaProviderGraph",
+                    "activatesThenRoundTripsStableKafkaBatchThroughRealOxiaProviderGraph",
         )
     }
 }
@@ -256,7 +256,7 @@ tasks.register<Test>("f9MultiBrokerTakeoverProviderIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
-                "higherLeaderEpochTakesOverLiveBrokerAndRecoversCommittedKafkaBatch",
+                    "higherLeaderEpochTakesOverLiveBrokerAndRecoversCommittedKafkaBatch",
         )
     }
 }
@@ -272,7 +272,7 @@ tasks.register<Test>("f9BookKeeperWalOnlyProviderIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
-                "activatesThenRoundTripsKafkaBatchThroughRealBookKeeperWalOnlyGraph",
+                    "activatesThenRoundTripsKafkaBatchThroughRealBookKeeperWalOnlyGraph",
         )
     }
 }
@@ -289,7 +289,7 @@ tasks.register<Test>("f9BookKeeperLedgerDeletionProviderIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
-                "activatesKafkaProofThenPhysicallyDeletesSealedBookKeeperLedger",
+                    "activatesKafkaProofThenPhysicallyDeletesSealedBookKeeperLedger",
         )
     }
 }
@@ -316,7 +316,7 @@ tasks.register<Test>("f9M6KafkaProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "productProcessRecoversUserGroupAndTransactionStateAcrossGracefulAndForcedRestarts",
+                    "productProcessRecoversUserGroupAndTransactionStateAcrossGracefulAndForcedRestarts",
         )
     }
 }
@@ -345,7 +345,7 @@ tasks.register<Test>("f9CheckpointTrimRecoveryProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "deleteRecordsPublishesCheckpointAndRecoversVirtualSegmentsAfterForcedRestart",
+                    "deleteRecordsPublishesCheckpointAndRecoversVirtualSegmentsAfterForcedRestart",
         )
     }
 }
@@ -374,7 +374,7 @@ tasks.register<Test>("f9DeleteRecordsBoundaryProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "deleteRecordsMapsBatchStartMiddleEndAndHighWatermarkExactly",
+                    "deleteRecordsMapsBatchStartMiddleEndAndHighWatermarkExactly",
         )
     }
 }
@@ -408,7 +408,7 @@ tasks.register<Test>("f9TrimResponseLossProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "trimResponseLossConvergesAfterForcedRestartWithoutRepeatingTrim",
+                    "trimResponseLossConvergesAfterForcedRestartWithoutRepeatingTrim",
         )
     }
 }
@@ -443,7 +443,7 @@ tasks.register<Test>("f9TrimProfileMatrixProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "remainingStorageProfilesConvergeAfterTrimResponseLoss",
+                    "remainingStorageProfilesConvergeAfterTrimResponseLoss",
         )
     }
 }
@@ -472,7 +472,7 @@ tasks.register<Test>("f9MultiBrokerTakeoverProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "twoReleaseProcessesAtomicallyReassignLiveSharedStorageLeader",
+                    "twoReleaseProcessesAtomicallyReassignLiveSharedStorageLeader",
         )
     }
 }
@@ -501,7 +501,7 @@ tasks.register<Test>("f9LeaderChurnChaosProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "scenarioKfScl006",
+                    "scenarioKfScl006",
         )
     }
 }
@@ -551,7 +551,7 @@ tasks.register<Test>("f9ClientCompatibilityProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "scenarioKfScl008",
+                    "scenarioKfScl008",
         )
     }
 }
@@ -581,7 +581,7 @@ tasks.register<Test>("f9PerformanceProfileProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "scenarioKfScl009",
+                    "scenarioKfScl009",
         )
     }
 }
@@ -632,7 +632,7 @@ tasks.register<Test>("f9CoordinatorMigrationProcessIntegrationTest") {
     group = "verification"
     description =
         "Migrate user, group, and transaction partitions across two live release Kafka processes " +
-            "and recover both coordinators."
+                "and recover both coordinators."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
     shouldRunAfter(tasks.named("f9MultiBrokerTakeoverProcessIntegrationTest"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
@@ -653,7 +653,7 @@ tasks.register<Test>("f9CoordinatorMigrationProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "twoReleaseProcessesMigrateRecoveredGroupAndTransactionCoordinators",
+                    "twoReleaseProcessesMigrateRecoveredGroupAndTransactionCoordinators",
         )
     }
 }
@@ -662,7 +662,7 @@ tasks.register<Test>("f9OngoingTransactionMigrationProcessIntegrationTest") {
     group = "verification"
     description =
         "Commit and abort open transactions while user and transaction-state partitions migrate " +
-            "between two live release Kafka processes."
+                "between two live release Kafka processes."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
     shouldRunAfter(tasks.named("f9CoordinatorMigrationProcessIntegrationTest"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
@@ -683,7 +683,7 @@ tasks.register<Test>("f9OngoingTransactionMigrationProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "ongoingTransactionsCommitAndAbortAcrossLiveCoordinatorMigrations",
+                    "ongoingTransactionsCommitAndAbortAcrossLiveCoordinatorMigrations",
         )
     }
 }
@@ -692,7 +692,7 @@ tasks.register<Test>("f9TransactionResolutionCutProcessIntegrationTest") {
     group = "verification"
     description =
         "Kill a release broker before and after durable transaction-marker append completion, " +
-            "then prove fresh-process abort resolution."
+                "then prove fresh-process abort resolution."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
     dependsOn(f9TransactionResolutionFaultAgentJar)
     shouldRunAfter(tasks.named("f9OngoingTransactionMigrationProcessIntegrationTest"))
@@ -722,7 +722,7 @@ tasks.register<Test>("f9TransactionResolutionCutProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "preparedAbortRecoversAcrossTransactionMarkerProcessCuts",
+                    "preparedAbortRecoversAcrossTransactionMarkerProcessCuts",
         )
     }
 }
@@ -765,7 +765,7 @@ tasks.register<Test>("f9TransactionResolutionProfileMatrixProcessIntegrationTest
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "remainingStorageProfilesRecoverAcrossTransactionMarkerProcessCuts",
+                    "remainingStorageProfilesRecoverAcrossTransactionMarkerProcessCuts",
         )
     }
 }
@@ -774,7 +774,7 @@ tasks.register<Test>("f9MandatoryInternalTopicNtc2ProcessIntegrationTest") {
     group = "verification"
     description =
         "Delete and corrupt activated internal-topic NTC2 objects, prove coordinator election fails closed, " +
-            "then restore the exact bytes and prove ordinary re-election."
+                "then restore the exact bytes and prove ordinary re-election."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
     shouldRunAfter(tasks.named("f9TransactionResolutionProfileMatrixProcessIntegrationTest"))
     testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
@@ -795,7 +795,7 @@ tasks.register<Test>("f9MandatoryInternalTopicNtc2ProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "mandatoryInternalTopicNtc2FailureBlocksElectionUntilPhysicalRepair",
+                    "mandatoryInternalTopicNtc2FailureBlocksElectionUntilPhysicalRepair",
         )
     }
 }
@@ -829,7 +829,7 @@ tasks.register<Test>("f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegratio
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "remainingStorageProfilesBlockInternalTopicElectionUntilNtc2Repair",
+                    "remainingStorageProfilesBlockInternalTopicElectionUntilNtc2Repair",
         )
     }
 }
@@ -858,7 +858,7 @@ tasks.register<Test>("f9MultiControllerFailoverProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "threeCombinedNodesKeepNativeIoThroughControllerLeaderKill",
+                    "threeCombinedNodesKeepNativeIoThroughControllerLeaderKill",
         )
     }
 }
@@ -892,7 +892,7 @@ tasks.register<Test>("f9ActivationCutFailoverProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "threeControllersRecoverEveryActivationStorePublicationCut",
+                    "threeControllersRecoverEveryActivationStorePublicationCut",
         )
     }
 }
@@ -921,7 +921,7 @@ tasks.register<Test>("f9ActivationTransportRecoveryProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "scenarioKfScl007",
+                    "scenarioKfScl007",
         )
     }
 }
@@ -955,7 +955,7 @@ tasks.register<Test>("f9ActivationProofCutFailoverProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "threeControllersRecoverEveryInitialActivationProofCut",
+                    "threeControllersRecoverEveryInitialActivationProofCut",
         )
     }
 }
@@ -988,7 +988,7 @@ tasks.register<Test>("f9InFlightTakeoverProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "threeReleaseProcessesFenceAlreadyDispatchedOldLeaderAppend",
+                    "threeReleaseProcessesFenceAlreadyDispatchedOldLeaderAppend",
         )
     }
 }
@@ -1018,7 +1018,7 @@ tasks.register<Test>("f9BookKeeperProfileTakeoverProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "threeBookKeeperProfilesAtomicallyReassignLiveSharedStorageLeader",
+                    "threeBookKeeperProfilesAtomicallyReassignLiveSharedStorageLeader",
         )
     }
 }
@@ -1053,7 +1053,7 @@ tasks.register<Test>("f9BookKeeperInFlightTakeoverProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "threeReleaseProcessesFenceAppliedBookKeeperWriteBeforePublication",
+                    "threeReleaseProcessesFenceAppliedBookKeeperWriteBeforePublication",
         )
     }
 }
@@ -1082,7 +1082,7 @@ tasks.register<Test>("f9BookKeeperWalOnlyProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "bookKeeperWalOnlyProcessRecoversAcrossFreshJvmRestart",
+                    "bookKeeperWalOnlyProcessRecoversAcrossFreshJvmRestart",
         )
     }
 }
@@ -1112,7 +1112,7 @@ tasks.register<Test>("f9BookKeeperWalAsyncObjectProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "bookKeeperWalAsyncObjectProcessMaterializesAndRecoversAcrossFreshJvmRestart",
+                    "bookKeeperWalAsyncObjectProcessMaterializesAndRecoversAcrossFreshJvmRestart",
         )
     }
 }
@@ -1141,7 +1141,7 @@ tasks.register<Test>("f9BookKeeperWalSyncObjectProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "bookKeeperWalSyncObjectProcessMaterializesBeforeAppendAndRecoversAcrossFreshJvmRestart",
+                    "bookKeeperWalSyncObjectProcessMaterializesBeforeAppendAndRecoversAcrossFreshJvmRestart",
         )
     }
 }
@@ -1169,7 +1169,7 @@ tasks.register<Test>("f9ObjectWalAsyncObjectProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "objectWalAsyncObjectProcessRecoversAcrossFreshJvmRestart",
+                    "objectWalAsyncObjectProcessRecoversAcrossFreshJvmRestart",
         )
     }
 }

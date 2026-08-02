@@ -17,13 +17,11 @@ package com.nereusstream.api;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** External monotonic leadership identity used to preempt an append session without waiting for TTL. */
+/**
+ * External monotonic leadership identity used to preempt an append session without waiting for TTL.
+ */
 public record AppendAuthority(
-        String authorityType,
-        String authorityId,
-        long authorityEpoch,
-        String ownerId,
-        long ownerEpoch) {
+        String authorityType, String authorityId, long authorityEpoch, String ownerId, long ownerEpoch) {
     private static final int MAX_COMPONENT_BYTES = 16 * 1024;
 
     public AppendAuthority {

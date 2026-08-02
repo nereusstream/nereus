@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.kafka.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -25,16 +26,15 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.zip.CRC32C;
 
-/** Strict streaming NKC1 encoder and bounded decoder. */
+/**
+ * Strict streaming NKC1 encoder and bounded decoder.
+ */
 public final class KafkaCheckpointCodecV1 {
     private static final int HEADER_LENGTH_OFFSET = 4 + Short.BYTES * 2 + Integer.BYTES;
 
     public EncodedKafkaCheckpoint encodeToStaging(
-            StagingFileManager stagingFiles,
-            KafkaCheckpointHeader header,
-            List<KafkaCheckpointSection> sections) {
+            StagingFileManager stagingFiles, KafkaCheckpointHeader header, List<KafkaCheckpointSection> sections) {
         Objects.requireNonNull(stagingFiles, "stagingFiles");
         Objects.requireNonNull(header, "header");
         List<KafkaCheckpointSection> exact = List.copyOf(Objects.requireNonNull(sections, "sections"));
@@ -67,7 +67,9 @@ public final class KafkaCheckpointCodecV1 {
             return new EncodedKafkaCheckpoint(staged, contentLength, contentSha256);
         } catch (IOException | RuntimeException failure) {
             staged.close();
-            if (failure instanceof KafkaCheckpointFormatException exactFailure) throw exactFailure;
+            if (failure instanceof KafkaCheckpointFormatException exactFailure) {
+                throw exactFailure;
+            }
             throw new KafkaCheckpointFormatException("failed to encode NKC1", failure);
         }
     }
@@ -116,10 +118,12 @@ public final class KafkaCheckpointCodecV1 {
                     cursor.readLong("stableEndOffset", headerLength),
                     cursor.readLong("sourceCommitVersion", headerLength),
                     cursor.readString("sourceLastCommitId", headerLength),
-                    new Checksum(ChecksumType.SHA256,
+                    new Checksum(
+                            ChecksumType.SHA256,
                             HexFormat.of().formatHex(cursor.readBytes("sourceHeadSha256", 32, headerLength))));
             int sectionCount = cursor.readInt("sectionCount", headerLength);
-            if (sectionCount < 0 || sectionCount > KafkaCheckpointFormatV1.MAX_SECTION_COUNT
+            if (sectionCount < 0
+                    || sectionCount > KafkaCheckpointFormatV1.MAX_SECTION_COUNT
                     || cursor.position() != headerLength) {
                 throw malformed("NKC1 header length or section count is invalid");
             }
@@ -131,14 +135,17 @@ public final class KafkaCheckpointCodecV1 {
                 long payloadLength = cursor.readLong("payloadLength");
                 int expectedCrc = cursor.readInt("payloadCrc32c");
                 byte[] expectedSha = cursor.readBytes("payloadSha256", 32);
-                if (payloadLength < 0 || payloadLength > KafkaCheckpointFormatV1.MAX_SECTION_BYTES
+                if (payloadLength < 0
+                        || payloadLength > KafkaCheckpointFormatV1.MAX_SECTION_BYTES
                         || payloadLength > cursor.remaining()) {
                     throw malformed("NKC1 section payload length is invalid");
                 }
                 byte[] payload = cursor.readBytes("sectionPayload", Math.toIntExact(payloadLength));
                 int actualCrc = Crc32cChecksums.intValue(Crc32cChecksums.checksum(payload));
                 if (actualCrc != expectedCrc
-                        || !Arrays.equals(expectedSha, HexFormat.of().parseHex(sha256(payload).value()))) {
+                        || !Arrays.equals(
+                                expectedSha,
+                                HexFormat.of().parseHex(sha256(payload).value()))) {
                     throw malformed("NKC1 section checksum mismatch");
                 }
                 sections.add(new KafkaCheckpointSection(type, version, sectionFlags, payload));
@@ -148,11 +155,7 @@ public final class KafkaCheckpointCodecV1 {
             }
             validateSections(header.flags(), sections);
             return new Decoded(
-                    header,
-                    sections,
-                    Crc32cChecksums.checksum(bytes),
-                    sha256(bytes),
-                    trailer.contentSha256());
+                    header, sections, Crc32cChecksums.checksum(bytes), sha256(bytes), trailer.contentSha256());
         } catch (KafkaCheckpointFormatException failure) {
             throw failure;
         } catch (RuntimeException failure) {
@@ -188,8 +191,7 @@ public final class KafkaCheckpointCodecV1 {
             if (encoded.length > KafkaCheckpointFormatV1.MAX_HEADER_BYTES) {
                 throw new KafkaCheckpointFormatException("NKC1 header exceeds its hard limit");
             }
-            ByteBuffer.wrap(encoded).order(ByteOrder.BIG_ENDIAN)
-                    .putInt(HEADER_LENGTH_OFFSET, encoded.length);
+            ByteBuffer.wrap(encoded).order(ByteOrder.BIG_ENDIAN).putInt(HEADER_LENGTH_OFFSET, encoded.length);
             return encoded;
         } catch (IOException failure) {
             throw new KafkaCheckpointFormatException("failed to encode NKC1 header", failure);
@@ -209,26 +211,28 @@ public final class KafkaCheckpointCodecV1 {
     }
 
     private static byte[] encodeTrailer(long contentLength, Checksum contentSha256) {
-        ByteBuffer trailer = ByteBuffer.allocate(KafkaCheckpointFormatV1.TRAILER_BYTES)
-                .order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer trailer =
+                ByteBuffer.allocate(KafkaCheckpointFormatV1.TRAILER_BYTES).order(ByteOrder.BIG_ENDIAN);
         trailer.putLong(contentLength);
         trailer.put(HexFormat.of().parseHex(contentSha256.value()));
-        int crc = Crc32cChecksums.intValue(Crc32cChecksums.checksum(
-                Arrays.copyOf(trailer.array(), Long.BYTES + 32)));
+        int crc = Crc32cChecksums.intValue(Crc32cChecksums.checksum(Arrays.copyOf(trailer.array(), Long.BYTES + 32)));
         trailer.putInt(crc);
         return trailer.array();
     }
 
     private static Trailer decodeTrailer(byte[] bytes, int offset) {
         ByteBuffer trailer = ByteBuffer.wrap(bytes, offset, KafkaCheckpointFormatV1.TRAILER_BYTES)
-                .slice().order(ByteOrder.BIG_ENDIAN);
+                .slice()
+                .order(ByteOrder.BIG_ENDIAN);
         long contentLength = trailer.getLong();
         byte[] contentSha = new byte[32];
         trailer.get(contentSha);
         int expectedCrc = trailer.getInt();
-        int actualCrc = Crc32cChecksums.intValue(Crc32cChecksums.checksum(
-                Arrays.copyOfRange(bytes, offset, offset + Long.BYTES + 32)));
-        if (expectedCrc != actualCrc) throw malformed("NKC1 trailer CRC32C mismatch");
+        int actualCrc = Crc32cChecksums.intValue(
+                Crc32cChecksums.checksum(Arrays.copyOfRange(bytes, offset, offset + Long.BYTES + 32)));
+        if (expectedCrc != actualCrc) {
+            throw malformed("NKC1 trailer CRC32C mismatch");
+        }
         return new Trailer(contentLength, sha256Checksum(contentSha));
     }
 
@@ -262,8 +266,8 @@ public final class KafkaCheckpointCodecV1 {
         }
     }
 
-    private static long writeContent(
-            OutputStream output, MessageDigest digest, byte[] bytes, long current) throws IOException {
+    private static long writeContent(OutputStream output, MessageDigest digest, byte[] bytes, long current)
+            throws IOException {
         long next = Math.addExact(current, bytes.length);
         if (next > KafkaCheckpointFormatV1.MAX_OBJECT_BYTES - KafkaCheckpointFormatV1.TRAILER_BYTES) {
             throw new KafkaCheckpointFormatException("NKC1 content exceeds its hard limit");
@@ -320,7 +324,7 @@ public final class KafkaCheckpointCodecV1 {
         }
     }
 
-    private record Trailer(long contentLength, Checksum contentSha256) { }
+    private record Trailer(long contentLength, Checksum contentSha256) {}
 
     private static final class Cursor {
         private final byte[] bytes;
@@ -333,8 +337,13 @@ public final class KafkaCheckpointCodecV1 {
             this.limit = limit;
         }
 
-        int position() { return position; }
-        int remaining() { return limit - position; }
+        int position() {
+            return position;
+        }
+
+        int remaining() {
+            return limit - position;
+        }
 
         void requireMagic(byte[] expected) {
             if (!Arrays.equals(readBytes("magic", expected.length), expected)) {
@@ -345,25 +354,34 @@ public final class KafkaCheckpointCodecV1 {
         int readUnsignedShort(String name) {
             require(Short.BYTES, name, limit);
             int value = Short.toUnsignedInt(ByteBuffer.wrap(bytes, position, Short.BYTES)
-                    .order(ByteOrder.BIG_ENDIAN).getShort());
+                    .order(ByteOrder.BIG_ENDIAN)
+                    .getShort());
             position += Short.BYTES;
             return value;
         }
 
-        int readInt(String name) { return readInt(name, limit); }
+        int readInt(String name) {
+            return readInt(name, limit);
+        }
 
         int readInt(String name, int boundary) {
             require(Integer.BYTES, name, boundary);
-            int value = ByteBuffer.wrap(bytes, position, Integer.BYTES).order(ByteOrder.BIG_ENDIAN).getInt();
+            int value = ByteBuffer.wrap(bytes, position, Integer.BYTES)
+                    .order(ByteOrder.BIG_ENDIAN)
+                    .getInt();
             position += Integer.BYTES;
             return value;
         }
 
-        long readLong(String name) { return readLong(name, limit); }
+        long readLong(String name) {
+            return readLong(name, limit);
+        }
 
         long readLong(String name, int boundary) {
             require(Long.BYTES, name, boundary);
-            long value = ByteBuffer.wrap(bytes, position, Long.BYTES).order(ByteOrder.BIG_ENDIAN).getLong();
+            long value = ByteBuffer.wrap(bytes, position, Long.BYTES)
+                    .order(ByteOrder.BIG_ENDIAN)
+                    .getLong();
             position += Long.BYTES;
             return value;
         }
@@ -375,10 +393,12 @@ public final class KafkaCheckpointCodecV1 {
             }
             byte[] value = readBytes(name, length, boundary);
             try {
-                String decoded = StandardCharsets.UTF_8.newDecoder()
+                String decoded = StandardCharsets.UTF_8
+                        .newDecoder()
                         .onMalformedInput(CodingErrorAction.REPORT)
                         .onUnmappableCharacter(CodingErrorAction.REPORT)
-                        .decode(ByteBuffer.wrap(value)).toString();
+                        .decode(ByteBuffer.wrap(value))
+                        .toString();
                 if (!Arrays.equals(decoded.getBytes(StandardCharsets.UTF_8), value)) {
                     throw malformed("NKC1 " + name + " is not canonical UTF-8");
                 }
@@ -388,10 +408,14 @@ public final class KafkaCheckpointCodecV1 {
             }
         }
 
-        byte[] readBytes(String name, int length) { return readBytes(name, length, limit); }
+        byte[] readBytes(String name, int length) {
+            return readBytes(name, length, limit);
+        }
 
         byte[] readBytes(String name, int length, int boundary) {
-            if (length < 0) throw malformed("negative NKC1 " + name + " length");
+            if (length < 0) {
+                throw malformed("negative NKC1 " + name + " length");
+            }
             require(length, name, boundary);
             byte[] value = Arrays.copyOfRange(bytes, position, position + length);
             position += length;

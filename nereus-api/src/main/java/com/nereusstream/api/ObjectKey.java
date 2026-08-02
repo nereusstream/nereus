@@ -16,7 +16,9 @@ package com.nereusstream.api;
 
 import java.util.Objects;
 
-/** Object-store key for immutable object bytes. */
+/**
+ * Object-store key for immutable object bytes.
+ */
 public record ObjectKey(String value) {
     public ObjectKey {
         Objects.requireNonNull(value, "value");

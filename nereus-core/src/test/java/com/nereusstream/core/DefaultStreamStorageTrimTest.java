@@ -15,13 +15,12 @@
 package com.nereusstream.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendResult;
-import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.DeleteOptions;
+import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.PayloadFormat;
@@ -81,15 +80,21 @@ class DefaultStreamStorageTrimTest {
             StreamId streamId = context.createStream("sealed").streamId();
             context.storage.append(streamId, batch("a"), appendOptions()).join();
 
-            assertThat(context.storage.seal(
-                    streamId, new SealOptions(Duration.ofSeconds(1), "producer closed")).join().state())
+            assertThat(context.storage
+                            .seal(streamId, new SealOptions(Duration.ofSeconds(1), "producer closed"))
+                            .join()
+                            .state())
                     .isEqualTo(StreamState.SEALED);
-            assertThat(context.storage.seal(
-                    streamId, new SealOptions(Duration.ofSeconds(1), "retry")).join().state())
+            assertThat(context.storage
+                            .seal(streamId, new SealOptions(Duration.ofSeconds(1), "retry"))
+                            .join()
+                            .state())
                     .isEqualTo(StreamState.SEALED);
-            assertThat(failure(context.storage.append(streamId, batch("b"), appendOptions())).code())
+            assertThat(failure(context.storage.append(streamId, batch("b"), appendOptions()))
+                            .code())
                     .isEqualTo(ErrorCode.STREAM_NOT_ACTIVE);
-            assertThat(context.storage.read(streamId, 0, readOptions()).join().batches()).hasSize(1);
+            assertThat(context.storage.read(streamId, 0, readOptions()).join().batches())
+                    .hasSize(1);
         }
     }
 
@@ -97,21 +102,31 @@ class DefaultStreamStorageTrimTest {
     void logicalDeleteFinishesTwoStepStateWithoutDeletingObjectBytes() {
         try (TestContext context = context(new FakeOxiaMetadataStore(CLOCK::millis), new RecordingTrimMetrics())) {
             StreamId streamId = context.createStream("deleted").streamId();
-            AppendResult append = context.storage.append(streamId, batch("a"), appendOptions()).join();
+            AppendResult append = context.storage
+                    .append(streamId, batch("a"), appendOptions())
+                    .join();
             ObjectSliceReadTarget target = (ObjectSliceReadTarget) append.readTarget();
-            long objectLength = context.objectStore.headObject(
-                    target.objectKey(), new HeadObjectOptions(Duration.ofSeconds(1))).join().objectLength();
+            long objectLength = context.objectStore
+                    .headObject(target.objectKey(), new HeadObjectOptions(Duration.ofSeconds(1)))
+                    .join()
+                    .objectLength();
 
-            assertThat(context.storage.delete(
-                    streamId, new DeleteOptions(Duration.ofSeconds(1), "topic deleted")).join().state())
+            assertThat(context.storage
+                            .delete(streamId, new DeleteOptions(Duration.ofSeconds(1), "topic deleted"))
+                            .join()
+                            .state())
                     .isEqualTo(StreamState.DELETED);
-            assertThat(context.storage.delete(
-                    streamId, new DeleteOptions(Duration.ofSeconds(1), "retry")).join().state())
+            assertThat(context.storage
+                            .delete(streamId, new DeleteOptions(Duration.ofSeconds(1), "retry"))
+                            .join()
+                            .state())
                     .isEqualTo(StreamState.DELETED);
             assertThat(failure(context.storage.read(streamId, 0, readOptions())).code())
                     .isEqualTo(ErrorCode.STREAM_NOT_FOUND);
-            assertThat(context.objectStore.headObject(
-                    target.objectKey(), new HeadObjectOptions(Duration.ofSeconds(1))).join().objectLength())
+            assertThat(context.objectStore
+                            .headObject(target.objectKey(), new HeadObjectOptions(Duration.ofSeconds(1)))
+                            .join()
+                            .objectLength())
                     .isEqualTo(objectLength);
         }
     }
@@ -121,25 +136,40 @@ class DefaultStreamStorageTrimTest {
         RecordingTrimMetrics metrics = new RecordingTrimMetrics();
         try (TestContext context = context(new FakeOxiaMetadataStore(CLOCK::millis), metrics)) {
             StreamId streamId = context.createStream("trim-preserves-data").streamId();
-            AppendResult append = context.storage.append(
-                    streamId, batch("a", "bb", "ccc"), appendOptions()).join();
-            context.storage.resolve(streamId, 0, new ResolveOptions(10, true, true)).join();
+            AppendResult append = context.storage
+                    .append(streamId, batch("a", "bb", "ccc"), appendOptions())
+                    .join();
+            context.storage
+                    .resolve(streamId, 0, new ResolveOptions(10, true, true))
+                    .join();
 
-            int indexCount = context.metadata.scanOffsetIndex(CLUSTER, streamId, 0, 10).join().size();
+            int indexCount = context.metadata
+                    .scanOffsetIndex(CLUSTER, streamId, 0, 10)
+                    .join()
+                    .size();
             ObjectSliceReadTarget target = (ObjectSliceReadTarget) append.readTarget();
-            long objectLength = context.objectStore.headObject(
-                    target.objectKey(), new HeadObjectOptions(Duration.ofSeconds(1))).join().objectLength();
+            long objectLength = context.objectStore
+                    .headObject(target.objectKey(), new HeadObjectOptions(Duration.ofSeconds(1)))
+                    .join()
+                    .objectLength();
 
-            context.storage.trim(
-                    streamId, 2, new TrimOptions(Duration.ofSeconds(1), "consumer-retention")).join();
+            context.storage
+                    .trim(streamId, 2, new TrimOptions(Duration.ofSeconds(1), "consumer-retention"))
+                    .join();
 
-            assertThat(context.metadata.getTrim(CLUSTER, streamId).join().trimOffset()).isEqualTo(2);
-            assertThat(context.metadata.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).hasSize(indexCount);
-            assertThat(context.objectStore.headObject(
-                    target.objectKey(), new HeadObjectOptions(Duration.ofSeconds(1))).join().objectLength())
+            assertThat(context.metadata.getTrim(CLUSTER, streamId).join().trimOffset())
+                    .isEqualTo(2);
+            assertThat(context.metadata
+                            .scanOffsetIndex(CLUSTER, streamId, 0, 10)
+                            .join())
+                    .hasSize(indexCount);
+            assertThat(context.objectStore
+                            .headObject(target.objectKey(), new HeadObjectOptions(Duration.ofSeconds(1)))
+                            .join()
+                            .objectLength())
                     .isEqualTo(objectLength);
-            assertThat(failure(context.storage.read(
-                    streamId, 1, readOptions())).code()).isEqualTo(ErrorCode.OFFSET_TRIMMED);
+            assertThat(failure(context.storage.read(streamId, 1, readOptions())).code())
+                    .isEqualTo(ErrorCode.OFFSET_TRIMMED);
             assertThat(context.storage.read(streamId, 2, readOptions()).join().batches())
                     .extracting(value -> text(value.payload()))
                     .containsExactly("ccc");
@@ -155,19 +185,21 @@ class DefaultStreamStorageTrimTest {
             StreamId streamId = context.createStream("trim-bounds").streamId();
             context.storage.append(streamId, batch("a", "b"), appendOptions()).join();
 
-            assertThat(failure(context.storage.trim(
-                    streamId, -1, new TrimOptions(Duration.ofSeconds(1), "bad"))).code())
+            assertThat(failure(context.storage.trim(streamId, -1, new TrimOptions(Duration.ofSeconds(1), "bad")))
+                            .code())
                     .isEqualTo(ErrorCode.INVALID_ARGUMENT);
-            assertThat(failure(context.storage.trim(streamId, 1, null)).code())
+            assertThat(failure(context.storage.trim(streamId, 1, null)).code()).isEqualTo(ErrorCode.INVALID_ARGUMENT);
+            context.storage
+                    .trim(streamId, 1, new TrimOptions(Duration.ofSeconds(1), "advance"))
+                    .join();
+            assertThat(failure(context.storage.trim(streamId, 0, new TrimOptions(Duration.ofSeconds(1), "decrease")))
+                            .code())
                     .isEqualTo(ErrorCode.INVALID_ARGUMENT);
-            context.storage.trim(streamId, 1, new TrimOptions(Duration.ofSeconds(1), "advance")).join();
-            assertThat(failure(context.storage.trim(
-                    streamId, 0, new TrimOptions(Duration.ofSeconds(1), "decrease"))).code())
+            assertThat(failure(context.storage.trim(streamId, 3, new TrimOptions(Duration.ofSeconds(1), "past-end")))
+                            .code())
                     .isEqualTo(ErrorCode.INVALID_ARGUMENT);
-            assertThat(failure(context.storage.trim(
-                    streamId, 3, new TrimOptions(Duration.ofSeconds(1), "past-end"))).code())
-                    .isEqualTo(ErrorCode.INVALID_ARGUMENT);
-            assertThat(context.metadata.getTrim(CLUSTER, streamId).join().trimOffset()).isEqualTo(1);
+            assertThat(context.metadata.getTrim(CLUSTER, streamId).join().trimOffset())
+                    .isEqualTo(1);
         }
     }
 
@@ -180,13 +212,13 @@ class DefaultStreamStorageTrimTest {
         try (TestContext context = context(metadata, delayed, metrics, config(Duration.ofSeconds(1)))) {
             StreamId streamId = context.createStream("trim-deadline").streamId();
 
-            NereusException timeout = failure(context.storage.trim(
-                    streamId, 0, new TrimOptions(Duration.ofMillis(10), "timeout")));
+            NereusException timeout =
+                    failure(context.storage.trim(streamId, 0, new TrimOptions(Duration.ofMillis(10), "timeout")));
             assertThat(timeout.code()).isEqualTo(ErrorCode.TIMEOUT);
             assertThat(timeout.retriable()).isTrue();
 
-            CompletableFuture<Void> cancelled = context.storage.trim(
-                    streamId, 0, new TrimOptions(Duration.ofSeconds(1), "cancel"));
+            CompletableFuture<Void> cancelled =
+                    context.storage.trim(streamId, 0, new TrimOptions(Duration.ofSeconds(1), "cancel"));
             assertThat(cancelled.cancel(false)).isTrue();
             assertThat(failure(cancelled).code()).isEqualTo(ErrorCode.CANCELLED);
             assertThat(metrics.failures).hasValue(2);
@@ -202,23 +234,23 @@ class DefaultStreamStorageTrimTest {
         TestContext context = context(metadata, delayed, TrimMetricsObserver.noop(), config(Duration.ofSeconds(2)));
         try {
             StreamId streamId = context.createStream("trim-close").streamId();
-            CompletableFuture<Void> trim = context.storage.trim(
-                    streamId, 0, new TrimOptions(Duration.ofSeconds(2), "close"));
+            CompletableFuture<Void> trim =
+                    context.storage.trim(streamId, 0, new TrimOptions(Duration.ofSeconds(2), "close"));
             CompletableFuture<Void> close = CompletableFuture.runAsync(context.storage::close);
 
             TimeUnit.MILLISECONDS.sleep(50);
             assertThat(close).isNotDone();
             assertThat(failure(context.storage.read(streamId, 0, readOptions())).code())
                     .isEqualTo(ErrorCode.STORAGE_CLOSED);
-            NereusException appendAfterClose = failure(context.storage.append(
-                    streamId, batch("late"), appendOptions()));
+            NereusException appendAfterClose =
+                    failure(context.storage.append(streamId, batch("late"), appendOptions()));
             assertThat(appendAfterClose.code()).isEqualTo(ErrorCode.STORAGE_CLOSED);
             pending.complete(new TrimRecord(streamId.value(), 0, "close", NOW.toEpochMilli(), 1));
             trim.get(1, TimeUnit.SECONDS);
             close.get(1, TimeUnit.SECONDS);
 
-            assertThat(failure(context.storage.trim(
-                    streamId, 0, new TrimOptions(Duration.ofSeconds(1), "closed"))).code())
+            assertThat(failure(context.storage.trim(streamId, 0, new TrimOptions(Duration.ofSeconds(1), "closed")))
+                            .code())
                     .isEqualTo(ErrorCode.STORAGE_CLOSED);
         } finally {
             context.close();
@@ -232,8 +264,7 @@ class DefaultStreamStorageTrimTest {
         try (TestContext context = context(metadata, TrimMetricsObserver.noop())) {
             StreamId streamId = context.createStream("trim-expired").streamId();
 
-            returned.set(context.storage.trim(
-                    streamId, 0, new TrimOptions(Duration.ofNanos(1), "expired")));
+            returned.set(context.storage.trim(streamId, 0, new TrimOptions(Duration.ofNanos(1), "expired")));
 
             assertThat(failure(returned.get()).code()).isEqualTo(ErrorCode.TIMEOUT);
             CompletableFuture.runAsync(context.storage::close).get(1, TimeUnit.SECONDS);
@@ -265,20 +296,31 @@ class DefaultStreamStorageTrimTest {
     private static StreamStorageConfig config(Duration shutdownGrace) {
         StreamStorageConfig defaults = StreamStorageConfig.defaults(CLUSTER, "writer-a");
         return new StreamStorageConfig(
-                defaults.cluster(), defaults.writerId(), defaults.appendSessionTtl(),
-                defaults.appendSessionRenewBefore(), defaults.appendSessionMinCommitRemaining(),
-                defaults.appendTimeout(), defaults.readTimeout(), shutdownGrace,
-                defaults.maxResolveRanges(), defaults.maxCommitChainScan(),
-                defaults.maxDerivedIndexRepairCommitsPerCall(), defaults.maxCachedStreams(),
+                defaults.cluster(),
+                defaults.writerId(),
+                defaults.appendSessionTtl(),
+                defaults.appendSessionRenewBefore(),
+                defaults.appendSessionMinCommitRemaining(),
+                defaults.appendTimeout(),
+                defaults.readTimeout(),
+                shutdownGrace,
+                defaults.maxResolveRanges(),
+                defaults.maxCommitChainScan(),
+                defaults.maxDerivedIndexRepairCommitsPerCall(),
+                defaults.maxCachedStreams(),
                 defaults.maxInFlightAppends(),
-                defaults.maxBufferedBytes(), defaults.maxConcurrentObjectReads(),
-                defaults.maxReadBufferBytes(), defaults.maxObjectBytes(), defaults.maxAppendBatchRecords(),
-                defaults.offsetIndexCacheTtl(), defaults.autoAcquireAppendSession(), false, true);
+                defaults.maxBufferedBytes(),
+                defaults.maxConcurrentObjectReads(),
+                defaults.maxReadBufferBytes(),
+                defaults.maxObjectBytes(),
+                defaults.maxAppendBatchRecords(),
+                defaults.offsetIndexCacheTtl(),
+                defaults.autoAcquireAppendSession(),
+                false,
+                true);
     }
 
-    private static OxiaMetadataStore delayTrim(
-            OxiaMetadataStore delegate,
-            CompletableFuture<TrimRecord> pending) {
+    private static OxiaMetadataStore delayTrim(OxiaMetadataStore delegate, CompletableFuture<TrimRecord> pending) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class, PhysicalObjectMetadataStore.class},
@@ -296,8 +338,7 @@ class DefaultStreamStorageTrimTest {
 
     private static AppendBatch batch(String... values) {
         List<AppendEntry> entries = Arrays.stream(values)
-                .map(value -> new AppendEntry(
-                        value.getBytes(StandardCharsets.UTF_8), 1, NOW.toEpochMilli(), Map.of()))
+                .map(value -> new AppendEntry(value.getBytes(StandardCharsets.UTF_8), 1, NOW.toEpochMilli(), Map.of()))
                 .toList();
         return new AppendBatch(
                 PayloadFormat.OPAQUE_RECORD_BATCH,
@@ -356,13 +397,13 @@ class DefaultStreamStorageTrimTest {
     }
 
     private record TestContext(
-            DefaultStreamStorage storage,
-            FakeOxiaMetadataStore metadata,
-            LocalFileObjectStore objectStore) implements AutoCloseable {
+            DefaultStreamStorage storage, FakeOxiaMetadataStore metadata, LocalFileObjectStore objectStore)
+            implements AutoCloseable {
         StreamMetadata createStream(String name) {
             return storage.createOrGetStream(
-                    new StreamName(name),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join();
+                            new StreamName(name),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join();
         }
 
         @Override

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -6,7 +7,6 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.ProjectionIdentity;
-
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -15,7 +15,9 @@ import java.util.HexFormat;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Canonical identity for a projection-free native stream registration. */
+/**
+ * Canonical identity for a projection-free native stream registration.
+ */
 public final class DirectMaterializationStreamAuthority {
     private static final String DOMAIN = "nereus-direct-materialization-stream-v1";
     private static final String ABSENT_PROJECTION = ProjectionIdentity.encode(Optional.empty());

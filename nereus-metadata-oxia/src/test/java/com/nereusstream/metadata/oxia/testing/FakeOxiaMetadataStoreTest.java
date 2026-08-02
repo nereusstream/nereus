@@ -16,7 +16,6 @@ package com.nereusstream.metadata.oxia.testing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
@@ -82,12 +81,13 @@ class FakeOxiaMetadataStoreTest {
 
         StreamMetadataRecord created = createStream(streamName);
         StreamMetadataRecord loaded = store.createOrGetStream(
-                CLUSTER,
-                streamName,
-                new StreamCreateOptions(StorageProfile.OBJECT_WAL, Map.of("alias", "topic")))
+                        CLUSTER,
+                        streamName,
+                        new StreamCreateOptions(StorageProfile.OBJECT_WAL, Map.of("alias", "topic")))
                 .join();
 
-        assertThat(created.streamId()).isEqualTo(DeterministicIds.streamIdFor(streamName).value());
+        assertThat(created.streamId())
+                .isEqualTo(DeterministicIds.streamIdFor(streamName).value());
         assertThat(loaded.streamId()).isEqualTo(created.streamId());
         assertThat(loaded.streamName()).isEqualTo(streamName.value());
         assertThat(loaded.streamNameHash()).isEqualTo(DeterministicIds.streamNameHash(streamName));
@@ -100,9 +100,9 @@ class FakeOxiaMetadataStoreTest {
         StreamName streamName = new StreamName("tenant/ns/async-topic");
 
         StreamMetadataRecord created = store.createOrGetStream(
-                CLUSTER,
-                streamName,
-                new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT, Map.of("alias", "topic")))
+                        CLUSTER,
+                        streamName,
+                        new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT, Map.of("alias", "topic")))
                 .join();
 
         assertThat(created.profile()).isEqualTo(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT.name());
@@ -113,17 +113,10 @@ class FakeOxiaMetadataStoreTest {
         StreamId streamId = new StreamId(createStream(new StreamName("s")).streamId());
 
         AppendSessionRecord acquired = store.acquireAppendSession(
-                CLUSTER,
-                streamId,
-                new AppendSessionOptions(WRITER_ID, Duration.ofMillis(100), false))
+                        CLUSTER, streamId, new AppendSessionOptions(WRITER_ID, Duration.ofMillis(100), false))
                 .join();
         AppendSessionRecord renewed = store.renewAppendSession(
-                CLUSTER,
-                streamId,
-                WRITER_ID,
-                acquired.epoch(),
-                acquired.fencingToken(),
-                Duration.ofMillis(200))
+                        CLUSTER, streamId, WRITER_ID, acquired.epoch(), acquired.fencingToken(), Duration.ofMillis(200))
                 .join();
 
         assertThat(renewed.epoch()).isEqualTo(acquired.epoch());
@@ -134,18 +127,15 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void appendSessionFencingExpiryAndStealFollowPublicErrorContract() {
-        StreamId streamId = new StreamId(createStream(new StreamName("session-fencing")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("session-fencing")).streamId());
         AppendSessionRecord sessionA = store.acquireAppendSession(
-                        CLUSTER,
-                        streamId,
-                        new AppendSessionOptions("writer-a", Duration.ofMillis(10), false))
+                        CLUSTER, streamId, new AppendSessionOptions("writer-a", Duration.ofMillis(10), false))
                 .join();
 
         assertNereusFailureWithoutAppendOutcome(
                 () -> store.acquireAppendSession(
-                                CLUSTER,
-                                streamId,
-                                new AppendSessionOptions("writer-b", Duration.ofMillis(10), true))
+                                CLUSTER, streamId, new AppendSessionOptions("writer-b", Duration.ofMillis(10), true))
                         .join(),
                 ErrorCode.FENCED_APPEND,
                 true);
@@ -197,26 +187,20 @@ class FakeOxiaMetadataStoreTest {
                 true);
         assertNereusFailureWithoutAppendOutcome(
                 () -> store.acquireAppendSession(
-                                CLUSTER,
-                                streamId,
-                                new AppendSessionOptions("writer-b", Duration.ofMillis(10), false))
+                                CLUSTER, streamId, new AppendSessionOptions("writer-b", Duration.ofMillis(10), false))
                         .join(),
                 ErrorCode.APPEND_SESSION_EXPIRED,
                 true);
 
         AppendSessionRecord sessionB = store.acquireAppendSession(
-                        CLUSTER,
-                        streamId,
-                        new AppendSessionOptions("writer-b", Duration.ofMillis(10), true))
+                        CLUSTER, streamId, new AppendSessionOptions("writer-b", Duration.ofMillis(10), true))
                 .join();
         assertThat(sessionB.epoch()).isEqualTo(sessionA.epoch() + 1);
         assertThat(sessionB.fencingToken()).isNotEqualTo(sessionA.fencingToken());
 
         clock.addAndGet(11);
         AppendSessionRecord reacquired = store.acquireAppendSession(
-                        CLUSTER,
-                        streamId,
-                        new AppendSessionOptions("writer-b", Duration.ofMillis(10), false))
+                        CLUSTER, streamId, new AppendSessionOptions("writer-b", Duration.ofMillis(10), false))
                 .join();
         assertThat(reacquired.epoch()).isEqualTo(sessionB.epoch() + 1);
         assertThat(reacquired.fencingToken()).isNotEqualTo(sessionB.fencingToken());
@@ -224,12 +208,10 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void guardedUploadSessionProofSurvivesRenewalButRejectsExpiryAndSteal() {
-        StreamId streamId = new StreamId(createStream(
-                new StreamName("guarded-upload-session-proof")).streamId());
+        StreamId streamId = new StreamId(
+                createStream(new StreamName("guarded-upload-session-proof")).streamId());
         AppendSessionRecord acquired = store.acquireAppendSession(
-                        CLUSTER,
-                        streamId,
-                        new AppendSessionOptions("writer-a", Duration.ofMillis(100), false))
+                        CLUSTER, streamId, new AppendSessionOptions("writer-a", Duration.ofMillis(100), false))
                 .join();
         AppendSession captured = appendSession(streamId, acquired);
 
@@ -247,47 +229,43 @@ class FakeOxiaMetadataStoreTest {
 
         clock.addAndGet(201);
         assertNereusFailureWithoutAppendOutcome(
-                () -> store.revalidateAppendSession(CLUSTER, captured).join(),
-                ErrorCode.APPEND_SESSION_EXPIRED,
-                true);
+                () -> store.revalidateAppendSession(CLUSTER, captured).join(), ErrorCode.APPEND_SESSION_EXPIRED, true);
 
         store.acquireAppendSession(
-                        CLUSTER,
-                        streamId,
-                        new AppendSessionOptions("writer-b", Duration.ofMillis(100), true))
+                        CLUSTER, streamId, new AppendSessionOptions("writer-b", Duration.ofMillis(100), true))
                 .join();
         assertNereusFailureWithoutAppendOutcome(
-                () -> store.revalidateAppendSession(CLUSTER, captured).join(),
-                ErrorCode.FENCED_APPEND,
-                false);
+                () -> store.revalidateAppendSession(CLUSTER, captured).join(), ErrorCode.FENCED_APPEND, false);
     }
 
     @Test
     void invalidTrimInputFailsBeforeHeadMutation() {
-        StreamId streamId = new StreamId(createStream(new StreamName("trim-validation")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("trim-validation")).streamId());
 
         assertNereusFailureWithoutAppendOutcome(
-                () -> store.updateTrim(CLUSTER, streamId, 0, null).join(),
-                ErrorCode.INVALID_ARGUMENT,
-                false);
+                () -> store.updateTrim(CLUSTER, streamId, 0, null).join(), ErrorCode.INVALID_ARGUMENT, false);
         assertNereusFailureWithoutAppendOutcome(
-                () -> store.updateTrim(CLUSTER, streamId, 1, "beyond-end").join(),
-                ErrorCode.INVALID_ARGUMENT,
-                false);
+                () -> store.updateTrim(CLUSTER, streamId, 1, "beyond-end").join(), ErrorCode.INVALID_ARGUMENT, false);
 
         assertThat(store.getTrim(CLUSTER, streamId).join().trimOffset()).isZero();
     }
 
     @Test
     void watcherFailureNeverChangesMetadataOperationOutcome() {
-        StreamId streamId = new StreamId(createStream(new StreamName("watcher-failure")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("watcher-failure")).streamId());
         store.watchStream(CLUSTER, streamId, new ThrowingWatcher());
 
         AppendSessionRecord session = acquireSession(streamId);
-        assertThat(store.updateTrim(CLUSTER, streamId, 0, "watcher-failure").join().trimOffset()).isZero();
+        assertThat(store.updateTrim(CLUSTER, streamId, 0, "watcher-failure")
+                        .join()
+                        .trimOffset())
+                .isZero();
         CommitSliceRequest request = request(streamId, session, "watcher-object", "slice-1", 0, 1);
         store.putObjectManifest(CLUSTER, manifest(request)).join();
-        assertThat(store.commitStreamSlice(CLUSTER, request).join().commitVersion()).isEqualTo(1);
+        assertThat(store.commitStreamSlice(CLUSTER, request).join().commitVersion())
+                .isEqualTo(1);
 
         assertThat(store.watchDeliveryFailureCount()).isEqualTo(3);
     }
@@ -295,9 +273,8 @@ class FakeOxiaMetadataStoreTest {
     @Test
     void closedStoreRejectsNewWatchRegistration() {
         FakeOxiaMetadataStore localStore = new FakeOxiaMetadataStore(clock::get);
-        StreamId streamId = new StreamId(createStream(
-                localStore,
-                new StreamName("closed-watch")).streamId());
+        StreamId streamId = new StreamId(
+                createStream(localStore, new StreamName("closed-watch")).streamId());
         localStore.close();
 
         assertThatThrownBy(() -> localStore.watchStream(CLUSTER, streamId, new RecordingWatcher()))
@@ -309,29 +286,35 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void commitStreamSliceUsesHeadCasAndMaterializesOffsetIndex() {
-        StreamId streamId = new StreamId(createStream(new StreamName("commit-stream")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("commit-stream")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-1", "slice-1", 0, 1);
         store.putObjectManifest(CLUSTER, manifest(request)).join();
 
         CommitSliceResult result = store.commitStreamSlice(CLUSTER, request).join();
-        List<OffsetIndexEntry> indexes = store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join();
+        List<OffsetIndexEntry> indexes =
+                store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join();
 
         assertThat(result.range().startOffset()).isEqualTo(0);
         assertThat(result.range().endOffset()).isEqualTo(1);
         assertThat(result.commitVersion()).isEqualTo(1);
         assertThat(indexes).hasSize(1);
         assertThat(indexes.get(0).commitVersion()).isEqualTo(result.commitVersion());
-        assertThat(((ObjectSliceReadTarget) indexes.get(0).readTarget()).sliceChecksum().value())
+        assertThat(((ObjectSliceReadTarget) indexes.get(0).readTarget())
+                        .sliceChecksum()
+                        .value())
                 .isEqualTo(request.sliceChecksum().value());
-        assertThat(store.getObjectReferences(CLUSTER, request.objectId()).join()).isPresent();
-        assertThat(store.accessLog()).allSatisfy(access ->
-                assertThat(access.partitionKey()).isNotBlank());
+        assertThat(store.getObjectReferences(CLUSTER, request.objectId()).join())
+                .isPresent();
+        assertThat(store.accessLog())
+                .allSatisfy(access -> assertThat(access.partitionKey()).isNotBlank());
     }
 
     @Test
     void sameSliceRetryRepairsDerivedIndexesAfterHeadCasFailure() {
-        StreamId streamId = new StreamId(createStream(new StreamName("repair-stream")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("repair-stream")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-2", "slice-1", 0, 1);
         store.putObjectManifest(CLUSTER, manifest(request)).join();
@@ -344,14 +327,17 @@ class FakeOxiaMetadataStoreTest {
                 AppendOutcome.KNOWN_COMMITTED);
         assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).isEmpty();
 
-        DerivedIndexRepairResult repair = store.repairDerivedStreamIndexes(CLUSTER, streamId, 0, 10).join();
+        DerivedIndexRepairResult repair =
+                store.repairDerivedStreamIndexes(CLUSTER, streamId, 0, 10).join();
         assertThat(repair.targetCovered()).isTrue();
         assertThat(repair.scannedRecords()).isEqualTo(1);
         assertThat(repair.repairedRecords()).isEqualTo(1);
         assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).hasSize(1);
-        assertThat(store.getObjectReferences(CLUSTER, request.objectId()).join()).isEmpty();
+        assertThat(store.getObjectReferences(CLUSTER, request.objectId()).join())
+                .isEmpty();
 
-        ObjectReferenceRecord references = store.repairObjectReferences(CLUSTER, request.objectId()).join();
+        ObjectReferenceRecord references =
+                store.repairObjectReferences(CLUSTER, request.objectId()).join();
         assertThat(references.visibleSlices()).hasSize(1);
         assertThat(references.visibleSlices().get(0).streamId()).isEqualTo(streamId.value());
         assertThat(references.visibleSlices().get(0).offsetStart()).isEqualTo(0);
@@ -365,7 +351,8 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void manifestValidationRejectsCrossStreamSliceBeforeHeadCommit() {
-        StreamId streamId = new StreamId(createStream(new StreamName("manifest-stream-mismatch")).streamId());
+        StreamId streamId = new StreamId(
+                createStream(new StreamName("manifest-stream-mismatch")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-stream-mismatch", "slice-1", 0, 1);
         ObjectManifestRecord valid = manifest(request);
@@ -374,7 +361,8 @@ class FakeOxiaMetadataStoreTest {
                 valid,
                 valid.state(),
                 valid.formatMajorVersion(),
-                List.of(copySlice(slice, 0, "different-stream", slice.sliceId(), slice.objectOffset(), slice.objectLength())));
+                List.of(copySlice(
+                        slice, 0, "different-stream", slice.sliceId(), slice.objectOffset(), slice.objectLength())));
         store.putObjectManifest(CLUSTER, mismatched).join();
 
         assertNereusFailure(
@@ -382,39 +370,40 @@ class FakeOxiaMetadataStoreTest {
                 ErrorCode.METADATA_INVARIANT_VIOLATION,
                 false,
                 AppendOutcome.KNOWN_NOT_COMMITTED);
-        assertThat(store.getCommittedEndOffset(CLUSTER, streamId).join().committedEndOffset()).isZero();
+        assertThat(store.getCommittedEndOffset(CLUSTER, streamId).join().committedEndOffset())
+                .isZero();
         assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).isEmpty();
     }
 
     @Test
     void sharedManifestValidationRejectsMismatchedObjectIdAndAggregateState() {
-        StreamId streamId = new StreamId(createStream(new StreamName("manifest-object-id-mismatch")).streamId());
+        StreamId streamId = new StreamId(
+                createStream(new StreamName("manifest-object-id-mismatch")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-id-mismatch", "slice-1", 0, 1);
         ObjectManifestRecord valid = manifest(request);
         ObjectManifestRecord mismatched = copyManifestWithObjectId(valid, "different-object-id");
 
         assertThatThrownBy(() -> Phase1ObjectManifestValidator.validateCommitCandidate(mismatched, request, false))
-                .isInstanceOfSatisfying(NereusException.class, exception ->
-                        assertThat(exception.code()).isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
+                .isInstanceOfSatisfying(NereusException.class, exception -> assertThat(exception.code())
+                        .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
         assertThatThrownBy(() -> Phase1ObjectManifestValidator.validateStoredManifest(
                         copyManifest(valid, "PARTIALLY_VISIBLE", 1, valid.slices())))
-                .isInstanceOfSatisfying(NereusException.class, exception ->
-                        assertThat(exception.code()).isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
+                .isInstanceOfSatisfying(NereusException.class, exception -> assertThat(exception.code())
+                        .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
     }
 
     @Test
     void newManifestRejectsUnsupportedFormatAndInvalidSliceLayout() {
-        StreamId streamId = new StreamId(createStream(new StreamName("manifest-shape-validation")).streamId());
+        StreamId streamId = new StreamId(
+                createStream(new StreamName("manifest-shape-validation")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-shape", "slice-1", 0, 1);
         ObjectManifestRecord valid = manifest(request);
         StreamSliceManifestRecord slice = valid.slices().get(0);
 
         assertNereusCode(
-                () -> store.putObjectManifest(
-                                CLUSTER,
-                                copyManifest(valid, "VISIBLE", 1, valid.slices()))
+                () -> store.putObjectManifest(CLUSTER, copyManifest(valid, "VISIBLE", 1, valid.slices()))
                         .join(),
                 ErrorCode.METADATA_INVARIANT_VIOLATION);
         assertNereusCode(
@@ -424,9 +413,7 @@ class FakeOxiaMetadataStoreTest {
                                         valid,
                                         valid.state(),
                                         1,
-                                        List.of(
-                                                slice,
-                                                copySlice(slice, 2, slice.streamId(), "slice-2", 30, 20))))
+                                        List.of(slice, copySlice(slice, 2, slice.streamId(), "slice-2", 30, 20))))
                         .join(),
                 ErrorCode.METADATA_INVARIANT_VIOLATION);
         assertNereusCode(
@@ -436,27 +423,11 @@ class FakeOxiaMetadataStoreTest {
                                         valid,
                                         valid.state(),
                                         1,
-                                        List.of(
-                                                slice,
-                                                copySlice(slice, 1, slice.streamId(), "slice-2", 20, 20))))
+                                        List.of(slice, copySlice(slice, 1, slice.streamId(), "slice-2", 20, 20))))
                         .join(),
                 ErrorCode.METADATA_INVARIANT_VIOLATION);
         assertNereusCode(
-                () -> store.putObjectManifest(
-                                CLUSTER,
-                                copyManifest(valid, valid.state(), 2, valid.slices()))
-                        .join(),
-                ErrorCode.METADATA_INVARIANT_VIOLATION);
-        assertNereusCode(
-                () -> store.putObjectManifest(
-                                CLUSTER,
-                                copyManifest(
-                                        valid,
-                                        valid.state(),
-                                        1,
-                                        List.of(
-                                                slice,
-                                                copySlice(slice, 1, slice.streamId(), slice.sliceId(), 30, 20))))
+                () -> store.putObjectManifest(CLUSTER, copyManifest(valid, valid.state(), 2, valid.slices()))
                         .join(),
                 ErrorCode.METADATA_INVARIANT_VIOLATION);
         assertNereusCode(
@@ -466,9 +437,7 @@ class FakeOxiaMetadataStoreTest {
                                         valid,
                                         valid.state(),
                                         1,
-                                        List.of(
-                                                slice,
-                                                copySlice(slice, 0, slice.streamId(), "slice-2", 30, 20))))
+                                        List.of(slice, copySlice(slice, 1, slice.streamId(), slice.sliceId(), 30, 20))))
                         .join(),
                 ErrorCode.METADATA_INVARIANT_VIOLATION);
         assertNereusCode(
@@ -478,20 +447,25 @@ class FakeOxiaMetadataStoreTest {
                                         valid,
                                         valid.state(),
                                         1,
-                                        List.of(copySlice(
-                                                slice,
-                                                0,
-                                                slice.streamId(),
-                                                slice.sliceId(),
-                                                120,
-                                                20))))
+                                        List.of(slice, copySlice(slice, 0, slice.streamId(), "slice-2", 30, 20))))
+                        .join(),
+                ErrorCode.METADATA_INVARIANT_VIOLATION);
+        assertNereusCode(
+                () -> store.putObjectManifest(
+                                CLUSTER,
+                                copyManifest(
+                                        valid,
+                                        valid.state(),
+                                        1,
+                                        List.of(copySlice(slice, 0, slice.streamId(), slice.sliceId(), 120, 20))))
                         .join(),
                 ErrorCode.METADATA_INVARIANT_VIOLATION);
     }
 
     @Test
     void manifestRetryIgnoresPostCommitAuditStateButKeepsImmutableIdentityStrict() {
-        StreamId streamId = new StreamId(createStream(new StreamName("manifest-audit-retry")).streamId());
+        StreamId streamId = new StreamId(
+                createStream(new StreamName("manifest-audit-retry")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-audit-retry", "slice-1", 0, 1);
         ObjectManifestRecord uploaded = manifest(request);
@@ -506,7 +480,8 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void sameSliceRetryChecksCommittedSliceMarkerBeforeHeadChain() {
-        StreamId streamId = new StreamId(createStream(new StreamName("marker-replay-stream")).streamId());
+        StreamId streamId = new StreamId(
+                createStream(new StreamName("marker-replay-stream")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-marker", "slice-1", 0, 1);
         store.putObjectManifest(CLUSTER, manifest(request)).join();
@@ -514,8 +489,8 @@ class FakeOxiaMetadataStoreTest {
         int accessCountBeforeRetry = store.accessLog().size();
 
         CommitSliceResult replayed = store.commitStreamSlice(CLUSTER, request).join();
-        List<FakeOxiaMetadataStore.PartitionedAccess> retryAccesses =
-                store.accessLog().subList(accessCountBeforeRetry, store.accessLog().size());
+        List<FakeOxiaMetadataStore.PartitionedAccess> retryAccesses = store.accessLog()
+                .subList(accessCountBeforeRetry, store.accessLog().size());
 
         assertThat(replayed.commitVersion()).isEqualTo(1);
         assertThat(retryAccesses).isNotEmpty();
@@ -525,7 +500,8 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void postCommitObjectAuditFailureLeavesVisibleDataAndRepairableReferences() {
-        StreamId streamId = new StreamId(createStream(new StreamName("object-audit-failure-stream")).streamId());
+        StreamId streamId = new StreamId(
+                createStream(new StreamName("object-audit-failure-stream")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-audit-failure", "slice-1", 0, 1);
         store.putObjectManifest(CLUSTER, manifest(request)).join();
@@ -535,10 +511,12 @@ class FakeOxiaMetadataStoreTest {
 
         assertThat(result.commitVersion()).isEqualTo(1);
         assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).hasSize(1);
-        assertThat(store.getObjectReferences(CLUSTER, request.objectId()).join()).isEmpty();
+        assertThat(store.getObjectReferences(CLUSTER, request.objectId()).join())
+                .isEmpty();
         assertThat(store.objectAuditFailureCount()).isEqualTo(1);
 
-        ObjectReferenceRecord repaired = store.repairObjectReferences(CLUSTER, request.objectId()).join();
+        ObjectReferenceRecord repaired =
+                store.repairObjectReferences(CLUSTER, request.objectId()).join();
         assertThat(repaired.visibleSlices()).hasSize(1);
         assertThat(repaired.visibleSlices().get(0).offsetStart()).isEqualTo(0);
         assertThat(repaired.visibleSlices().get(0).offsetEnd()).isEqualTo(1);
@@ -546,7 +524,8 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void fakeStorePersistsMetadataValuesThroughSharedCodec() {
-        StreamId streamId = new StreamId(createStream(new StreamName("codec-backed-stream")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("codec-backed-stream")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-codec", "slice-1", 0, 1);
         store.putObjectManifest(CLUSTER, manifest(request)).join();
@@ -573,7 +552,8 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void offsetConflictIsDistinctFromStaleSession() {
-        StreamId streamId = new StreamId(createStream(new StreamName("conflict-stream")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("conflict-stream")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest first = request(streamId, session, "object-3", "slice-1", 0, 1);
         CommitSliceRequest conflict = request(streamId, session, "object-4", "slice-2", 0, 1);
@@ -590,12 +570,14 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void objectReferenceRepairDoesNotCreateVisibilityFromManifestOnlySlices() {
-        StreamId streamId = new StreamId(createStream(new StreamName("manifest-only-stream")).streamId());
+        StreamId streamId = new StreamId(
+                createStream(new StreamName("manifest-only-stream")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-5", "slice-1", 0, 1);
         store.putObjectManifest(CLUSTER, manifest(request)).join();
 
-        ObjectReferenceRecord repaired = store.repairObjectReferences(CLUSTER, request.objectId()).join();
+        ObjectReferenceRecord repaired =
+                store.repairObjectReferences(CLUSTER, request.objectId()).join();
 
         assertThat(repaired.visibleSlices()).isEmpty();
         assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).isEmpty();
@@ -603,7 +585,8 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void watchEventsCanBeMissedDuplicatedStaleCollapsedAndReconnectBeforeCurrent() {
-        StreamId streamId = new StreamId(createStream(new StreamName("watch-stream")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("watch-stream")).streamId());
         RecordingWatcher watcher = new RecordingWatcher();
         try (WatchRegistration ignored = store.watchStream(CLUSTER, streamId, watcher)) {
             store.setNextWatchDelivery(FakeOxiaMetadataStore.WatchDelivery.DROP_NEXT);
@@ -645,7 +628,8 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void sameWriterRenewIsCompatibleHeadVersionChange() {
-        StreamId streamId = new StreamId(createStream(new StreamName("renew-head-conflict")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("renew-head-conflict")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-renew", "slice-1", 0, 1);
         store.putObjectManifest(CLUSTER, manifest(request)).join();
@@ -667,7 +651,8 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void sameWriterTrimIsCompatibleHeadVersionChange() {
-        StreamId streamId = new StreamId(createStream(new StreamName("trim-head-conflict")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("trim-head-conflict")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest first = request(streamId, session, "object-trim-1", "slice-1", 0, 1);
         CommitSliceRequest second = request(streamId, session, "object-trim-2", "slice-2", 1, 1);
@@ -689,33 +674,29 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void repairBudgetExhaustionStopsAtMaxScannedCommitsAndContinues() {
-        StreamId streamId = new StreamId(createStream(new StreamName("repair-budget-exhaustion")).streamId());
+        StreamId streamId = new StreamId(
+                createStream(new StreamName("repair-budget-exhaustion")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
 
         CommitSliceRequest req1 = request(streamId, session, "object-repair-1", "slice-1", 0, 1);
         store.putObjectManifest(CLUSTER, manifest(req1)).join();
         store.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
-        assertNereusCode(
-                () -> store.commitStreamSlice(CLUSTER, req1).join(),
-                ErrorCode.METADATA_UNAVAILABLE);
+        assertNereusCode(() -> store.commitStreamSlice(CLUSTER, req1).join(), ErrorCode.METADATA_UNAVAILABLE);
 
         CommitSliceRequest req2 = request(streamId, session, "object-repair-2", "slice-2", 1, 1);
         store.putObjectManifest(CLUSTER, manifest(req2)).join();
         store.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
-        assertNereusCode(
-                () -> store.commitStreamSlice(CLUSTER, req2).join(),
-                ErrorCode.METADATA_UNAVAILABLE);
+        assertNereusCode(() -> store.commitStreamSlice(CLUSTER, req2).join(), ErrorCode.METADATA_UNAVAILABLE);
 
         CommitSliceRequest req3 = request(streamId, session, "object-repair-3", "slice-3", 2, 1);
         store.putObjectManifest(CLUSTER, manifest(req3)).join();
         store.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
-        assertNereusCode(
-                () -> store.commitStreamSlice(CLUSTER, req3).join(),
-                ErrorCode.METADATA_UNAVAILABLE);
+        assertNereusCode(() -> store.commitStreamSlice(CLUSTER, req3).join(), ErrorCode.METADATA_UNAVAILABLE);
 
         assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).isEmpty();
 
-        DerivedIndexRepairResult repair = store.repairDerivedStreamIndexes(CLUSTER, streamId, 0, 1).join();
+        DerivedIndexRepairResult repair =
+                store.repairDerivedStreamIndexes(CLUSTER, streamId, 0, 1).join();
 
         assertThat(repair.scannedRecords()).isEqualTo(1);
         assertThat(repair.repairedRecords()).isEqualTo(1);
@@ -728,11 +709,7 @@ class FakeOxiaMetadataStoreTest {
                 .containsExactly(2L);
 
         DerivedIndexRepairResult secondRepair = store.repairDerivedStreamIndexes(
-                        CLUSTER,
-                        streamId,
-                        0,
-                        repair.continuation(),
-                        1)
+                        CLUSTER, streamId, 0, repair.continuation(), 1)
                 .join();
         assertThat(secondRepair.scannedRecords()).isEqualTo(1);
         assertThat(secondRepair.repairedRecords()).isEqualTo(1);
@@ -742,11 +719,7 @@ class FakeOxiaMetadataStoreTest {
         assertThat(secondRepair.repairedToOffset()).isEqualTo(2);
 
         DerivedIndexRepairResult thirdRepair = store.repairDerivedStreamIndexes(
-                        CLUSTER,
-                        streamId,
-                        0,
-                        secondRepair.continuation(),
-                        1)
+                        CLUSTER, streamId, 0, secondRepair.continuation(), 1)
                 .join();
         assertThat(thirdRepair.scannedRecords()).isEqualTo(1);
         assertThat(thirdRepair.repairedRecords()).isEqualTo(1);
@@ -762,9 +735,8 @@ class FakeOxiaMetadataStoreTest {
     @Test
     void replayBudgetExhaustionIsUnknownAndRepairContinuationMakesProgressAcrossExistingIndexes() {
         FakeOxiaMetadataStore boundedStore = new FakeOxiaMetadataStore(clock::get, 2);
-        StreamId streamId = new StreamId(createStream(
-                boundedStore,
-                new StreamName("bounded-replay-search")).streamId());
+        StreamId streamId = new StreamId(createStream(boundedStore, new StreamName("bounded-replay-search"))
+                .streamId());
         AppendSessionRecord session = acquireSession(boundedStore, streamId);
 
         CommitSliceRequest first = request(streamId, session, "bounded-object-1", "slice-1", 0, 1);
@@ -789,35 +761,19 @@ class FakeOxiaMetadataStoreTest {
                 true,
                 AppendOutcome.MAY_HAVE_COMMITTED);
 
-        DerivedIndexRepairResult page1 = boundedStore.repairDerivedStreamIndexes(
-                        CLUSTER,
-                        streamId,
-                        0,
-                        Optional.empty(),
-                        1)
+        DerivedIndexRepairResult page1 = boundedStore
+                .repairDerivedStreamIndexes(CLUSTER, streamId, 0, Optional.empty(), 1)
                 .join();
         assertNereusCode(
-                () -> boundedStore.repairDerivedStreamIndexes(
-                                CLUSTER,
-                                streamId,
-                                1,
-                                page1.continuation(),
-                                1)
+                () -> boundedStore
+                        .repairDerivedStreamIndexes(CLUSTER, streamId, 1, page1.continuation(), 1)
                         .join(),
                 ErrorCode.METADATA_INVARIANT_VIOLATION);
-        DerivedIndexRepairResult page2 = boundedStore.repairDerivedStreamIndexes(
-                        CLUSTER,
-                        streamId,
-                        0,
-                        page1.continuation(),
-                        1)
+        DerivedIndexRepairResult page2 = boundedStore
+                .repairDerivedStreamIndexes(CLUSTER, streamId, 0, page1.continuation(), 1)
                 .join();
-        DerivedIndexRepairResult page3 = boundedStore.repairDerivedStreamIndexes(
-                        CLUSTER,
-                        streamId,
-                        0,
-                        page2.continuation(),
-                        1)
+        DerivedIndexRepairResult page3 = boundedStore
+                .repairDerivedStreamIndexes(CLUSTER, streamId, 0, page2.continuation(), 1)
                 .join();
 
         assertThat(page1.scannedRecords()).isEqualTo(1);
@@ -837,12 +793,8 @@ class FakeOxiaMetadataStoreTest {
                 firstCursor.nextCumulativeSize() - 1,
                 firstCursor.nextCommitVersion());
         assertNereusCode(
-                () -> boundedStore.repairDerivedStreamIndexes(
-                                CLUSTER,
-                                streamId,
-                                0,
-                                Optional.of(tamperedCursor),
-                                1)
+                () -> boundedStore
+                        .repairDerivedStreamIndexes(CLUSTER, streamId, 0, Optional.of(tamperedCursor), 1)
                         .join(),
                 ErrorCode.METADATA_INVARIANT_VIOLATION);
         assertThat(page2.scannedRecords()).isEqualTo(1);
@@ -856,26 +808,20 @@ class FakeOxiaMetadataStoreTest {
         assertThat(page3.targetCovered()).isTrue();
         assertThat(page3.continuation()).isEmpty();
 
-        CommitSliceResult replayed = boundedStore.commitStreamSlice(CLUSTER, first).join();
+        CommitSliceResult replayed =
+                boundedStore.commitStreamSlice(CLUSTER, first).join();
         assertThat(replayed.commitVersion()).isEqualTo(1);
     }
 
     @Test
     void newAppendSkipsHistoryAndReplayStopsWhenExpectedOffsetIsProvenOccupied() {
         FakeOxiaMetadataStore boundedStore = new FakeOxiaMetadataStore(clock::get, 2);
-        StreamId streamId = new StreamId(createStream(
-                boundedStore,
-                new StreamName("new-append-bounded-history")).streamId());
+        StreamId streamId = new StreamId(createStream(boundedStore, new StreamName("new-append-bounded-history"))
+                .streamId());
         AppendSessionRecord session = acquireSession(boundedStore, streamId);
 
         for (int index = 0; index < 3; index++) {
-            CommitSliceRequest request = request(
-                    streamId,
-                    session,
-                    "new-object-" + index,
-                    "slice-" + index,
-                    index,
-                    1);
+            CommitSliceRequest request = request(streamId, session, "new-object-" + index, "slice-" + index, index, 1);
             boundedStore.putObjectManifest(CLUSTER, manifest(request)).join();
             assertThat(boundedStore.commitStreamSlice(CLUSTER, request).join().commitVersion())
                     .isEqualTo(index + 1);
@@ -885,18 +831,13 @@ class FakeOxiaMetadataStoreTest {
         boundedStore.putObjectManifest(CLUSTER, manifest(fourth)).join();
         boundedStore.interleaveBeforeNextHeadCasWithSameWriterRenew(Duration.ofMillis(200));
 
-        CommitSliceResult result = boundedStore.commitStreamSlice(CLUSTER, fourth).join();
+        CommitSliceResult result =
+                boundedStore.commitStreamSlice(CLUSTER, fourth).join();
 
         assertThat(result.commitVersion()).isEqualTo(4);
         assertThat(result.committedEndOffset()).isEqualTo(4);
 
-        CommitSliceRequest displaced = request(
-                streamId,
-                session,
-                "displaced-object",
-                "displaced-slice",
-                2,
-                1);
+        CommitSliceRequest displaced = request(streamId, session, "displaced-object", "displaced-slice", 2, 1);
         boundedStore.putObjectManifest(CLUSTER, manifest(displaced)).join();
         assertNereusFailure(
                 () -> boundedStore.commitStreamSlice(CLUSTER, displaced).join(),
@@ -907,7 +848,8 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void commitVersionIsMonotonicAcrossSequentialCommits() {
-        StreamId streamId = new StreamId(createStream(new StreamName("monotonic-version")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("monotonic-version")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
 
         CommitSliceRequest req1 = request(streamId, session, "object-mono-1", "slice-1", 0, 1);
@@ -925,22 +867,23 @@ class FakeOxiaMetadataStoreTest {
         assertThat(second.commitVersion()).isEqualTo(2);
         assertThat(third.commitVersion()).isEqualTo(3);
 
-        CommittedEndOffsetRecord committedEnd = store.getCommittedEndOffset(CLUSTER, streamId).join();
+        CommittedEndOffsetRecord committedEnd =
+                store.getCommittedEndOffset(CLUSTER, streamId).join();
         assertThat(committedEnd.committedEndOffset()).isEqualTo(3);
         assertThat(committedEnd.commitVersion()).isEqualTo(3);
         assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join())
                 .extracting(OffsetIndexEntry::commitVersion)
                 .containsExactly(1L, 2L, 3L);
         assertThat(storedRecords(StreamCommitRecord.class).stream()
-                .map(StreamCommitRecord::commitVersion)
-                .distinct()
-                .sorted()
-                .toList())
+                        .map(StreamCommitRecord::commitVersion)
+                        .distinct()
+                        .sorted()
+                        .toList())
                 .containsExactly(1L, 2L, 3L);
         assertThat(storedRecords(CommittedSliceRecord.class).stream()
-                .map(CommittedSliceRecord::commitVersion)
-                .sorted()
-                .toList())
+                        .map(CommittedSliceRecord::commitVersion)
+                        .sorted()
+                        .toList())
                 .containsExactly(1L, 2L, 3L);
     }
 
@@ -948,19 +891,17 @@ class FakeOxiaMetadataStoreTest {
     void staleEpochIsFencedBeforeOffsetConflict() {
         String writerA = "writerA";
         String writerB = "writerB";
-        StreamId streamId = new StreamId(createStream(new StreamName("fenced-before-conflict")).streamId());
+        StreamId streamId = new StreamId(
+                createStream(new StreamName("fenced-before-conflict")).streamId());
         AppendSessionRecord sessionA = store.acquireAppendSession(
-                CLUSTER, streamId,
-                new AppendSessionOptions(writerA, Duration.ofMillis(10), false))
+                        CLUSTER, streamId, new AppendSessionOptions(writerA, Duration.ofMillis(10), false))
                 .join();
         clock.set(clock.get() + 11);
 
         AppendSessionRecord sessionB = store.acquireAppendSession(
-                CLUSTER, streamId,
-                new AppendSessionOptions(writerB, Duration.ofMillis(1), true))
+                        CLUSTER, streamId, new AppendSessionOptions(writerB, Duration.ofMillis(1), true))
                 .join();
-        CommitSliceRequest winner = request(
-                streamId, sessionB, writerB, "object-winner", "slice-winner", 0, 1);
+        CommitSliceRequest winner = request(streamId, sessionB, writerB, "object-winner", "slice-winner", 0, 1);
         store.putObjectManifest(CLUSTER, manifest(winner)).join();
         store.commitStreamSlice(CLUSTER, winner).join();
 
@@ -1000,20 +941,9 @@ class FakeOxiaMetadataStoreTest {
     void appendInfrastructureRejectionsStillCarryKnownNotCommittedOutcome() {
         FakeOxiaMetadataStore localStore = new FakeOxiaMetadataStore(clock::get);
         StreamId missingStream = new StreamId("missing-stream");
-        AppendSessionRecord syntheticSession = new AppendSessionRecord(
-                missingStream.value(),
-                WRITER_ID,
-                1,
-                "synthetic-token",
-                1,
-                clock.get() + 100);
-        CommitSliceRequest request = request(
-                missingStream,
-                syntheticSession,
-                "object-missing-stream",
-                "slice-1",
-                0,
-                1);
+        AppendSessionRecord syntheticSession =
+                new AppendSessionRecord(missingStream.value(), WRITER_ID, 1, "synthetic-token", 1, clock.get() + 100);
+        CommitSliceRequest request = request(missingStream, syntheticSession, "object-missing-stream", "slice-1", 0, 1);
 
         assertNereusFailure(
                 () -> localStore.commitStreamSlice(CLUSTER, request).join(),
@@ -1031,7 +961,8 @@ class FakeOxiaMetadataStoreTest {
 
     @Test
     void retryReusesStoredCommitLogAfterFirstAttemptFailedHeadCasAndSessionRenew() {
-        StreamId streamId = new StreamId(createStream(new StreamName("retry-commit-log")).streamId());
+        StreamId streamId =
+                new StreamId(createStream(new StreamName("retry-commit-log")).streamId());
         AppendSessionRecord session = acquireSession(streamId);
         CommitSliceRequest request = request(streamId, session, "object-retry-cl", "slice-1", 0, 1);
         store.putObjectManifest(CLUSTER, manifest(request)).join();
@@ -1060,9 +991,9 @@ class FakeOxiaMetadataStoreTest {
         assertThat(result.commitVersion()).isEqualTo(1);
         assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).hasSize(1);
         assertThat(storedRecords(StreamCommitRecord.class).stream()
-                .map(StreamCommitRecord::commitId)
-                .distinct()
-                .toList())
+                        .map(StreamCommitRecord::commitId)
+                        .distinct()
+                        .toList())
                 .containsExactly(request.commitId());
     }
 
@@ -1071,10 +1002,11 @@ class FakeOxiaMetadataStoreTest {
     }
 
     private StreamMetadataRecord createStream(FakeOxiaMetadataStore metadataStore, StreamName streamName) {
-        return metadataStore.createOrGetStream(
-                CLUSTER,
-                streamName,
-                new StreamCreateOptions(StorageProfile.OBJECT_WAL, Map.of("alias", streamName.value())))
+        return metadataStore
+                .createOrGetStream(
+                        CLUSTER,
+                        streamName,
+                        new StreamCreateOptions(StorageProfile.OBJECT_WAL, Map.of("alias", streamName.value())))
                 .join();
     }
 
@@ -1083,16 +1015,13 @@ class FakeOxiaMetadataStoreTest {
     }
 
     private AppendSessionRecord acquireSession(FakeOxiaMetadataStore metadataStore, StreamId streamId) {
-        return metadataStore.acquireAppendSession(
-                CLUSTER,
-                streamId,
-                new AppendSessionOptions(WRITER_ID, Duration.ofMillis(1_000), false))
+        return metadataStore
+                .acquireAppendSession(
+                        CLUSTER, streamId, new AppendSessionOptions(WRITER_ID, Duration.ofMillis(1_000), false))
                 .join();
     }
 
-    private static AppendSession appendSession(
-            StreamId streamId,
-            AppendSessionRecord record) {
+    private static AppendSession appendSession(StreamId streamId, AppendSessionRecord record) {
         return new AppendSession(
                 streamId,
                 record.writerId(),
@@ -1296,15 +1225,12 @@ class FakeOxiaMetadataStoreTest {
         assertThatThrownBy(runnable::run)
                 .isInstanceOf(CompletionException.class)
                 .cause()
-                .isInstanceOfSatisfying(NereusException.class, exception ->
-                        assertThat(exception.code()).isEqualTo(code));
+                .isInstanceOfSatisfying(NereusException.class, exception -> assertThat(exception.code())
+                        .isEqualTo(code));
     }
 
     private void assertNereusFailure(
-            Runnable runnable,
-            ErrorCode code,
-            boolean retriable,
-            AppendOutcome appendOutcome) {
+            Runnable runnable, ErrorCode code, boolean retriable, AppendOutcome appendOutcome) {
         assertThatThrownBy(runnable::run)
                 .isInstanceOf(CompletionException.class)
                 .cause()
@@ -1315,10 +1241,7 @@ class FakeOxiaMetadataStoreTest {
                 });
     }
 
-    private void assertNereusFailureWithoutAppendOutcome(
-            Runnable runnable,
-            ErrorCode code,
-            boolean retriable) {
+    private void assertNereusFailureWithoutAppendOutcome(Runnable runnable, ErrorCode code, boolean retriable) {
         assertThatThrownBy(runnable::run)
                 .isInstanceOf(CompletionException.class)
                 .cause()

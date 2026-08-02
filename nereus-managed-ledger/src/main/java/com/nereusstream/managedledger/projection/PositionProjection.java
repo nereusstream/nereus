@@ -22,15 +22,14 @@ import java.util.Objects;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.PositionFactory;
 
-/** Role-specific conversion between Pulsar Positions and F2 stream offsets. */
+/**
+ * Role-specific conversion between Pulsar Positions and F2 stream offsets.
+ */
 public final class PositionProjection {
     private static final Map<String, String> REQUIRED_ATTRIBUTES = Map.of(
-            ManagedLedgerProjectionNames.PAYLOAD_MAPPING_ATTRIBUTE,
-            ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1);
+            ManagedLedgerProjectionNames.PAYLOAD_MAPPING_ATTRIBUTE, ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1);
 
-    public StreamPositionBounds bounds(
-            VirtualLedgerProjection projection,
-            StreamMetadata snapshot) {
+    public StreamPositionBounds bounds(VirtualLedgerProjection projection, StreamMetadata snapshot) {
         validateProjectionSnapshot(projection, snapshot);
         long ledgerId = projection.virtualLedgerId();
         return new StreamPositionBounds(
@@ -51,9 +50,7 @@ public final class PositionProjection {
     }
 
     public long requireReadableEntryOffset(
-            VirtualLedgerProjection projection,
-            Position position,
-            StreamMetadata snapshot) {
+            VirtualLedgerProjection projection, Position position, StreamMetadata snapshot) {
         StreamPositionBounds current = bounds(projection, snapshot);
         long entryId = requireCurrentLedger(projection, position);
         if (entryId < current.trimOffset() || entryId >= current.committedEndOffset()) {
@@ -63,9 +60,7 @@ public final class PositionProjection {
     }
 
     public long requireReadPositionOffset(
-            VirtualLedgerProjection projection,
-            Position position,
-            StreamMetadata snapshot) {
+            VirtualLedgerProjection projection, Position position, StreamMetadata snapshot) {
         StreamPositionBounds current = bounds(projection, snapshot);
         long entryId = requireCurrentLedger(projection, position);
         if (entryId < current.trimOffset() || entryId > current.committedEndOffset()) {
@@ -82,10 +77,7 @@ public final class PositionProjection {
      * first retained offset, matching BookKeeper ManagedLedger's
      * getNextValidPosition behavior after ledger trimming.
      */
-    public long cursorReadOffsetAfter(
-            VirtualLedgerProjection projection,
-            Position position,
-            StreamMetadata snapshot) {
+    public long cursorReadOffsetAfter(VirtualLedgerProjection projection, Position position, StreamMetadata snapshot) {
         StreamPositionBounds current = bounds(projection, snapshot);
         long entryId = requireCurrentLedger(projection, position);
         if (entryId < -1 || entryId >= current.committedEndOffset()) {
@@ -99,25 +91,20 @@ public final class PositionProjection {
         }
     }
 
-    /** Normalizes a direct reset read position to the retained/tail range. */
+    /**
+     * Normalizes a direct reset read position to the retained/tail range.
+     */
     public long normalizeResetReadPositionOffset(
-            VirtualLedgerProjection projection,
-            Position position,
-            StreamMetadata snapshot) {
+            VirtualLedgerProjection projection, Position position, StreamMetadata snapshot) {
         StreamPositionBounds current = bounds(projection, snapshot);
         long entryId = requireCurrentLedger(projection, position);
         if (entryId < -1) {
             throw new ProjectionValidationException("reset read position is before the coordinate origin");
         }
-        return Math.max(
-                current.trimOffset(),
-                Math.min(entryId, current.committedEndOffset()));
+        return Math.max(current.trimOffset(), Math.min(entryId, current.committedEndOffset()));
     }
 
-    public long markDeleteOffsetAfter(
-            VirtualLedgerProjection projection,
-            Position position,
-            StreamMetadata snapshot) {
+    public long markDeleteOffsetAfter(VirtualLedgerProjection projection, Position position, StreamMetadata snapshot) {
         StreamPositionBounds current = bounds(projection, snapshot);
         long entryId = requireCurrentLedger(projection, position);
         long beforeFirst = current.trimOffset() - 1;
@@ -132,10 +119,7 @@ public final class PositionProjection {
         }
     }
 
-    public Position readPosition(
-            VirtualLedgerProjection projection,
-            long nextOffset,
-            StreamMetadata snapshot) {
+    public Position readPosition(VirtualLedgerProjection projection, long nextOffset, StreamMetadata snapshot) {
         StreamPositionBounds current = bounds(projection, snapshot);
         if (nextOffset < current.trimOffset() || nextOffset > current.committedEndOffset()) {
             throw new ProjectionValidationException("next read offset is outside the retained/tail range");
@@ -144,9 +128,7 @@ public final class PositionProjection {
     }
 
     public Position normalizeInclusiveMaxPosition(
-            VirtualLedgerProjection projection,
-            Position position,
-            StreamMetadata snapshot) {
+            VirtualLedgerProjection projection, Position position, StreamMetadata snapshot) {
         StreamPositionBounds current = bounds(projection, snapshot);
         if (position == null || samePosition(position, PositionFactory.LATEST)) {
             return current.lastConfirmed();
@@ -167,40 +149,30 @@ public final class PositionProjection {
         return PositionFactory.create(projection.virtualLedgerId(), entryId);
     }
 
-    private static void validateProjectionSnapshot(
-            VirtualLedgerProjection projection,
-            StreamMetadata snapshot) {
+    private static void validateProjectionSnapshot(VirtualLedgerProjection projection, StreamMetadata snapshot) {
         Objects.requireNonNull(projection, "projection");
         Objects.requireNonNull(snapshot, "snapshot");
         if (!projection.streamId().equals(snapshot.streamId())) {
             throw new ProjectionValidationException("projection and stream snapshot have different stream IDs");
         }
-        if (!ManagedLedgerProjectionNames.streamName(
-                        projection.managedLedgerName(), projection.incarnation())
+        if (!ManagedLedgerProjectionNames.streamName(projection.managedLedgerName(), projection.incarnation())
                 .equals(snapshot.streamName())) {
             throw new ProjectionValidationException("projection and stream snapshot have different stream names");
         }
         StorageProfile profile = snapshot.profile().canonical();
         if (profile != StorageProfile.OBJECT_WAL_SYNC_OBJECT
-                && profile
-                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
-                && profile
-                        != StorageProfile.BOOKKEEPER_WAL_ONLY
-                && profile
-                        != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
-                && profile
-                        != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT) {
-            throw new ProjectionValidationException(
-                    "F2 has no executable mapping for the storage profile");
+                && profile != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
+                && profile != StorageProfile.BOOKKEEPER_WAL_ONLY
+                && profile != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
+                && profile != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT) {
+            throw new ProjectionValidationException("F2 has no executable mapping for the storage profile");
         }
         if (!snapshot.attributes().equals(REQUIRED_ATTRIBUTES)) {
             throw new ProjectionValidationException("stream payload mapping attributes do not match F2");
         }
     }
 
-    private static long requireCurrentLedger(
-            VirtualLedgerProjection projection,
-            Position position) {
+    private static long requireCurrentLedger(VirtualLedgerProjection projection, Position position) {
         Objects.requireNonNull(position, "position");
         if (position.getLedgerId() != projection.virtualLedgerId()) {
             throw new ProjectionValidationException("position belongs to a different virtual ledger");

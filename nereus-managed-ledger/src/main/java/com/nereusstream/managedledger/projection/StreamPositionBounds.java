@@ -17,7 +17,9 @@ package com.nereusstream.managedledger.projection;
 import java.util.Objects;
 import org.apache.bookkeeper.mledger.Position;
 
-/** One internally consistent Position view over a captured L0 stream snapshot. */
+/**
+ * One internally consistent Position view over a captured L0 stream snapshot.
+ */
 public record StreamPositionBounds(
         long trimOffset,
         long committedEndOffset,

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import com.nereusstream.api.AppendAttemptId;
@@ -76,21 +77,23 @@ final class KafkaPartitionStreamStorageFake implements StreamStorage {
         List<ReadBatch> newBatches = new ArrayList<>();
         for (var entry : append.batch.entries()) {
             var decoded = codec.decode(entry.payload());
-            if (decoded.baseOffset() != cursor) throw new AssertionError("fake append is not contiguous");
+            if (decoded.baseOffset() != cursor) {
+                throw new AssertionError("fake append is not contiguous");
+            }
             OffsetRange range = new OffsetRange(decoded.baseOffset(), decoded.nextOffset());
             newBatches.add(KafkaPartitionStorageTestSupport.readBatch(range, entry.payload(), ++objectOrdinal));
             cursor = range.endOffset();
             logicalBytes = Math.addExact(logicalBytes, entry.payload().length);
         }
-        if (start != endOffset) throw new AssertionError("fake expected-start mismatch");
+        if (start != endOffset) {
+            throw new AssertionError("fake expected-start mismatch");
+        }
         endOffset = cursor;
         cumulativeBytes = Math.addExact(cumulativeBytes, logicalBytes);
         commitVersion++;
         committed.addAll(newBatches);
         ReadBatch first = newBatches.get(0);
-        StreamId resultStreamId = corruptNextResultStream
-                ? new StreamId("wrong-kafka-partition-stream")
-                : streamId;
+        StreamId resultStreamId = corruptNextResultStream ? new StreamId("wrong-kafka-partition-stream") : streamId;
         corruptNextResultStream = false;
         append.result.complete(new AppendResult(
                 resultStreamId,
@@ -130,11 +133,10 @@ final class KafkaPartitionStreamStorageFake implements StreamStorage {
 
     @Override
     public synchronized CompletableFuture<AppendResult> append(
-            StreamId requestedStreamId,
-            AppendBatch batch,
-            AppendOptions options,
-            AppendPrecondition precondition) {
-        if (!streamId.equals(requestedStreamId)) throw new AssertionError("wrong stream");
+            StreamId requestedStreamId, AppendBatch batch, AppendOptions options, AppendPrecondition precondition) {
+        if (!streamId.equals(requestedStreamId)) {
+            throw new AssertionError("wrong stream");
+        }
         appendCalls++;
         PendingAppend append = new PendingAppend(batch, options, precondition);
         pending.addLast(append);
@@ -142,14 +144,17 @@ final class KafkaPartitionStreamStorageFake implements StreamStorage {
     }
 
     @Override
-    public synchronized CompletableFuture<SemanticReadResult> read(
-            StreamId requestedStreamId, ReadRequest request) {
-        if (!streamId.equals(requestedStreamId)) throw new AssertionError("wrong stream");
+    public synchronized CompletableFuture<SemanticReadResult> read(StreamId requestedStreamId, ReadRequest request) {
+        if (!streamId.equals(requestedStreamId)) {
+            throw new AssertionError("wrong stream");
+        }
         List<ReadBatch> selected = new ArrayList<>();
         int bytes = 0;
         long records = 0;
         for (ReadBatch batch : committed) {
-            if (batch.range().endOffset() <= request.startOffset()) continue;
+            if (batch.range().endOffset() <= request.startOffset()) {
+                continue;
+            }
             int nextBytes = Math.addExact(bytes, batch.payload().length);
             long nextRecords = Math.addExact(records, batch.range().recordCount());
             boolean firstOverflow = selected.isEmpty()
@@ -161,7 +166,9 @@ final class KafkaPartitionStreamStorageFake implements StreamStorage {
             selected.add(batch);
             bytes = nextBytes;
             records = nextRecords;
-            if (bytes >= request.options().maxBytes()) break;
+            if (bytes >= request.options().maxBytes()) {
+                break;
+            }
         }
         long next = selected.isEmpty()
                 ? request.startOffset()

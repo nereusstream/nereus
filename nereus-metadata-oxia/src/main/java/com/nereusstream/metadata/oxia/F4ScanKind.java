@@ -14,7 +14,9 @@
 
 package com.nereusstream.metadata.oxia;
 
-/** Process-local continuation-token scope for one bounded Phase 4 scan. */
+/**
+ * Process-local continuation-token scope for one bounded Phase 4 scan.
+ */
 public enum F4ScanKind {
     GENERATION_INDEX,
     MATERIALIZATION_TASK,

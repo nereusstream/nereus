@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.metadata;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.kafka.partition.KafkaPartitionIdentity;
@@ -12,23 +12,20 @@ import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStoreTestFactory;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
 import com.nereusstream.metadata.oxia.testing.FakeKafkaPartitionMetadataStore;
-
-import org.junit.jupiter.api.Test;
-
 import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Base64;
+import org.junit.jupiter.api.Test;
 
 class KafkaPartitionLifecycleCoordinatorTest {
     private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
 
     @Test
     void createsOneDeterministicBindingAndDeletesItIdempotently() {
-        FakeKafkaPartitionMetadataStore metadata =
-                new FakeKafkaPartitionMetadataStore("nereus", "kraft");
+        FakeKafkaPartitionMetadataStore metadata = new FakeKafkaPartitionMetadataStore("nereus", "kraft");
         TestStreamStorage streams = new TestStreamStorage();
         KafkaPartitionLifecycleCoordinator coordinator = coordinator(metadata, streams);
         KafkaPartitionIdentity identity = identity(1, 3, "orders");
@@ -40,42 +37,30 @@ class KafkaPartitionLifecycleCoordinatorTest {
         assertThat(second.streamId()).isEqualTo(first.streamId());
         assertThat(second.streamName()).isEqualTo(first.streamName());
         assertThat(streams.creates()).isEqualTo(1);
-        assertThat(first.durableRoot().value().lifecycle())
-                .isEqualTo(KafkaPartitionLifecycle.ACTIVE);
+        assertThat(first.durableRoot().value().lifecycle()).isEqualTo(KafkaPartitionLifecycle.ACTIVE);
         assertThat(first.durableRoot().value().bindingEpoch()).isEqualTo(2);
         assertThat(streams.getStreamMetadata(first.streamId()).join().attributes())
-                .isEqualTo(
-                        KafkaPartitionLifecycleCoordinator.streamAttributes(identity.durableId()));
+                .isEqualTo(KafkaPartitionLifecycleCoordinator.streamAttributes(identity.durableId()));
 
         coordinator
-                .delete(
-                        identity,
-                        30,
-                        "broker-run",
-                        1,
-                        Duration.ofSeconds(30),
-                        Duration.ofSeconds(5))
+                .delete(identity, 30, "broker-run", 1, Duration.ofSeconds(30), Duration.ofSeconds(5))
                 .join();
         coordinator
-                .delete(
-                        identity,
-                        30,
-                        "broker-run",
-                        1,
-                        Duration.ofSeconds(30),
-                        Duration.ofSeconds(5))
+                .delete(identity, 30, "broker-run", 1, Duration.ofSeconds(30), Duration.ofSeconds(5))
                 .join();
 
-        assertThat(metadata.get(identity.durableId()).join().orElseThrow().value().lifecycle())
+        assertThat(metadata.get(identity.durableId())
+                        .join()
+                        .orElseThrow()
+                        .value()
+                        .lifecycle())
                 .isEqualTo(KafkaPartitionLifecycle.DELETED);
-        assertThat(streams.getStreamMetadata(first.streamId()).join().state())
-                .isEqualTo(StreamState.DELETED);
+        assertThat(streams.getStreamMetadata(first.streamId()).join().state()).isEqualTo(StreamState.DELETED);
     }
 
     @Test
     void topicNameReuseWithANewTopicIdCreatesAnotherStream() {
-        FakeKafkaPartitionMetadataStore metadata =
-                new FakeKafkaPartitionMetadataStore("nereus", "kraft");
+        FakeKafkaPartitionMetadataStore metadata = new FakeKafkaPartitionMetadataStore("nereus", "kraft");
         TestStreamStorage streams = new TestStreamStorage();
         KafkaPartitionLifecycleCoordinator coordinator = coordinator(metadata, streams);
 
@@ -91,44 +76,36 @@ class KafkaPartitionLifecycleCoordinatorTest {
 
     @Test
     void installsDirectMaterializationAuthorityBeforePublishingTheBinding() {
-        FakeKafkaPartitionMetadataStore metadata =
-                new FakeKafkaPartitionMetadataStore("nereus", "kraft");
+        FakeKafkaPartitionMetadataStore metadata = new FakeKafkaPartitionMetadataStore("nereus", "kraft");
         TestStreamStorage streams = new TestStreamStorage();
         GenerationMetadataStore generations = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
         try {
-            KafkaPartitionLifecycleCoordinator coordinator =
-                    new KafkaPartitionLifecycleCoordinator(
-                            metadata,
-                            streams,
-                            metadata.keyspace(),
-                            CLOCK,
-                            new KafkaMaterializationStreamRegistration(
-                                    "nereus", generations, CLOCK));
+            KafkaPartitionLifecycleCoordinator coordinator = new KafkaPartitionLifecycleCoordinator(
+                    metadata,
+                    streams,
+                    metadata.keyspace(),
+                    CLOCK,
+                    new KafkaMaterializationStreamRegistration("nereus", generations, CLOCK));
 
-            KafkaPartitionBinding binding =
-                    coordinator
-                            .ensureBinding(request(identity(4, 2, "compacted-orders"), 42))
-                            .join();
-            var registration =
-                    generations
-                            .getStreamRegistration("nereus", binding.streamId())
-                            .join()
-                            .orElseThrow();
+            KafkaPartitionBinding binding = coordinator
+                    .ensureBinding(request(identity(4, 2, "compacted-orders"), 42))
+                    .join();
+            var registration = generations
+                    .getStreamRegistration("nereus", binding.streamId())
+                    .join()
+                    .orElseThrow();
 
             assertThat(registration.value().projectionRef())
                     .isEqualTo(DirectMaterializationStreamAuthority.encodedProjectionRef());
             assertThat(registration.value().projectionIdentitySha256())
-                    .isEqualTo(
-                            DirectMaterializationStreamAuthority.identitySha256(
-                                            binding.streamId(),
-                                            StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT)
-                                    .value());
-            assertThat(
-                            metadata.get(binding.identity().durableId())
-                                    .join()
-                                    .orElseThrow()
-                                    .value()
-                                    .lifecycle())
+                    .isEqualTo(DirectMaterializationStreamAuthority.identitySha256(
+                                    binding.streamId(), StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT)
+                            .value());
+            assertThat(metadata.get(binding.identity().durableId())
+                            .join()
+                            .orElseThrow()
+                            .value()
+                            .lifecycle())
                     .isEqualTo(KafkaPartitionLifecycle.ACTIVE);
         } finally {
             generations.close();
@@ -137,22 +114,16 @@ class KafkaPartitionLifecycleCoordinatorTest {
 
     @Test
     void bookKeeperWalOnlyBindingDoesNotCreateObjectMaterializationAuthority() {
-        FakeKafkaPartitionMetadataStore metadata =
-                new FakeKafkaPartitionMetadataStore("nereus", "kraft");
+        FakeKafkaPartitionMetadataStore metadata = new FakeKafkaPartitionMetadataStore("nereus", "kraft");
         TestStreamStorage streams = new TestStreamStorage();
-        GenerationMetadataStore generations =
-                GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        GenerationMetadataStore generations = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
         try {
-            KafkaPartitionLifecycleCoordinator coordinator =
-                    new KafkaPartitionLifecycleCoordinator(
-                            metadata,
-                            streams,
-                            metadata.keyspace(),
-                            CLOCK,
-                            new KafkaMaterializationStreamRegistration(
-                                    "nereus",
-                                    generations,
-                                    CLOCK));
+            KafkaPartitionLifecycleCoordinator coordinator = new KafkaPartitionLifecycleCoordinator(
+                    metadata,
+                    streams,
+                    metadata.keyspace(),
+                    CLOCK,
+                    new KafkaMaterializationStreamRegistration("nereus", generations, CLOCK));
             KafkaBindingRequest request = new KafkaBindingRequest(
                     identity(5, 1, "bookkeeper-only"),
                     StorageProfile.BOOKKEEPER_WAL_ONLY,
@@ -161,17 +132,13 @@ class KafkaPartitionLifecycleCoordinatorTest {
                     1,
                     Duration.ofSeconds(30));
 
-            KafkaPartitionBinding binding =
-                    coordinator.ensureBinding(request).join();
+            KafkaPartitionBinding binding = coordinator.ensureBinding(request).join();
 
             assertThat(generations
-                            .getStreamRegistration(
-                                    "nereus",
-                                    binding.streamId())
+                            .getStreamRegistration("nereus", binding.streamId())
                             .join())
                     .isEmpty();
-            assertThat(binding.durableRoot().value().lifecycle())
-                    .isEqualTo(KafkaPartitionLifecycle.ACTIVE);
+            assertThat(binding.durableRoot().value().lifecycle()).isEqualTo(KafkaPartitionLifecycle.ACTIVE);
         } finally {
             generations.close();
         }
@@ -179,8 +146,7 @@ class KafkaPartitionLifecycleCoordinatorTest {
 
     static KafkaPartitionLifecycleCoordinator coordinator(
             FakeKafkaPartitionMetadataStore metadata, TestStreamStorage streams) {
-        return new KafkaPartitionLifecycleCoordinator(
-                metadata, streams, metadata.keyspace(), CLOCK);
+        return new KafkaPartitionLifecycleCoordinator(metadata, streams, metadata.keyspace(), CLOCK);
     }
 
     static KafkaBindingRequest request(KafkaPartitionIdentity identity, long metadataOffset) {
@@ -194,7 +160,8 @@ class KafkaPartitionLifecycleCoordinatorTest {
     }
 
     static KafkaPartitionIdentity identity(long value, int partition, String name) {
-        ByteBuffer bytes = ByteBuffer.allocate(16).putLong(0x1234_5678_9abc_def0L).putLong(value);
+        ByteBuffer bytes =
+                ByteBuffer.allocate(16).putLong(0x1234_5678_9abc_def0L).putLong(value);
         String topicId = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes.array());
         return new KafkaPartitionIdentity("kraft", topicId, partition, name);
     }

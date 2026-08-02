@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -23,7 +24,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.zip.CRC32C;
 
-/** Full-file checksum plus closed-schema verification required before NCP2/NTC2 publication. */
+/**
+ * Full-file checksum plus closed-schema verification required before NCP2/NTC2 publication.
+ */
 public final class RangedCompactedObjectVerifier {
     private static final int HASH_CHUNK_BYTES = 8 << 20;
 
@@ -40,11 +43,10 @@ public final class RangedCompactedObjectVerifier {
         this.ntc2Reader = Objects.requireNonNull(ntc2Reader, "ntc2Reader");
     }
 
-    public CompletableFuture<RangedCompactedObjectMetadata> verify(
-            RangedCompactedObjectVerificationRequest request) {
+    public CompletableFuture<RangedCompactedObjectMetadata> verify(RangedCompactedObjectVerificationRequest request) {
         if (request == null) {
-            return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.INVALID_ARGUMENT, false, "V2 verification request is required"));
+            return CompletableFuture.failedFuture(
+                    new NereusException(ErrorCode.INVALID_ARGUMENT, false, "V2 verification request is required"));
         }
         try {
             Deadline deadline = new Deadline(request.timeout());
@@ -59,28 +61,26 @@ public final class RangedCompactedObjectVerifier {
     }
 
     public CompletableFuture<Void> verifyExact(
-            RangedCompactedObjectVerificationRequest request,
-            RangedCompactedObjectWriteRequest expected) {
+            RangedCompactedObjectVerificationRequest request, RangedCompactedObjectWriteRequest expected) {
         return verify(request).thenAccept(metadata -> requireExpected(metadata, expected));
     }
 
     public CompletableFuture<Void> verifyExact(
-            RangedCompactedObjectVerificationRequest request,
-            KafkaTopicCompactedObjectWriteRequest expected) {
+            RangedCompactedObjectVerificationRequest request, KafkaTopicCompactedObjectWriteRequest expected) {
         return verify(request).thenAccept(metadata -> requireExpected(metadata, expected));
     }
 
     private CompletableFuture<Void> hashNext(
-            RangedCompactedObjectVerificationRequest request,
-            Deadline deadline,
-            HashState hashes,
-            long offset) {
+            RangedCompactedObjectVerificationRequest request, Deadline deadline, HashState hashes, long offset) {
         if (offset == request.target().objectLength()) {
             return CompletableFuture.completedFuture(null);
         }
         int count = Math.toIntExact(Math.min(HASH_CHUNK_BYTES, request.target().objectLength() - offset));
-        return objectStore.readRange(
-                        request.target().objectKey(), offset, count,
+        return objectStore
+                .readRange(
+                        request.target().objectKey(),
+                        offset,
+                        count,
                         new RangeReadOptions(Optional.empty(), deadline.remaining()))
                 .thenCompose(result -> {
                     requireRange(request, offset, count, result);
@@ -90,26 +90,38 @@ public final class RangedCompactedObjectVerifier {
     }
 
     private CompletableFuture<RangedCompactedObjectMetadata> verifyRows(
-            RangedCompactedObjectVerificationRequest request,
-            Deadline deadline) {
+            RangedCompactedObjectVerificationRequest request, Deadline deadline) {
         if (request.view() == ReadView.COMMITTED) {
-            return ncp2Reader.read(new RangedCompactedObjectReadRequest(
-                            request.streamId(), request.sourceCoverage(), request.sourceCoverage().startOffset(),
-                            request.target(), request.payloadFormat(), ReadBoundaryMode.EXACT_START,
-                            FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW, Integer.MAX_VALUE, Integer.MAX_VALUE,
+            return ncp2Reader
+                    .read(new RangedCompactedObjectReadRequest(
+                            request.streamId(),
+                            request.sourceCoverage(),
+                            request.sourceCoverage().startOffset(),
+                            request.target(),
+                            request.payloadFormat(),
+                            ReadBoundaryMode.EXACT_START,
+                            FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
+                            Integer.MAX_VALUE,
+                            Integer.MAX_VALUE,
                             deadline.remaining()))
                     .thenApply(RangedCompactedObjectReadResult::metadata);
         }
-        return ntc2Reader.read(new KafkaTopicCompactedObjectReadRequest(
-                        request.streamId(), request.sourceCoverage(), request.sourceCoverage().startOffset(),
-                        request.target(), ReadBoundaryMode.EXACT_START, FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
-                        Integer.MAX_VALUE, Integer.MAX_VALUE, deadline.remaining()))
+        return ntc2Reader
+                .read(new KafkaTopicCompactedObjectReadRequest(
+                        request.streamId(),
+                        request.sourceCoverage(),
+                        request.sourceCoverage().startOffset(),
+                        request.target(),
+                        ReadBoundaryMode.EXACT_START,
+                        FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
+                        Integer.MAX_VALUE,
+                        Integer.MAX_VALUE,
+                        deadline.remaining()))
                 .thenApply(KafkaTopicCompactedObjectReadResult::metadata);
     }
 
     private static void requireExpected(
-            RangedCompactedObjectMetadata actual,
-            KafkaTopicCompactedObjectWriteRequest expected) {
+            RangedCompactedObjectMetadata actual, KafkaTopicCompactedObjectWriteRequest expected) {
         if (actual.view() != ReadView.TOPIC_COMPACTED
                 || !actual.streamId().equals(expected.streamId())
                 || !actual.sourceCoverage().equals(expected.sourceCoverage())
@@ -129,8 +141,7 @@ public final class RangedCompactedObjectVerifier {
     }
 
     private static void requireExpected(
-            RangedCompactedObjectMetadata actual,
-            RangedCompactedObjectWriteRequest expected) {
+            RangedCompactedObjectMetadata actual, RangedCompactedObjectWriteRequest expected) {
         if (actual.view() != ReadView.COMMITTED
                 || !actual.streamId().equals(expected.streamId())
                 || !actual.sourceCoverage().equals(expected.sourceCoverage())
@@ -153,10 +164,7 @@ public final class RangedCompactedObjectVerifier {
     }
 
     private static void requireRange(
-            RangedCompactedObjectVerificationRequest request,
-            long offset,
-            int count,
-            RangeReadResult result) {
+            RangedCompactedObjectVerificationRequest request, long offset, int count, RangeReadResult result) {
         if (!result.key().equals(request.target().objectKey())
                 || result.offset() != offset
                 || result.length() != count
@@ -231,9 +239,7 @@ public final class RangedCompactedObjectVerifier {
         }
 
         private Duration remaining() {
-            long nanos = deadlineNanos == Long.MAX_VALUE
-                    ? Long.MAX_VALUE
-                    : deadlineNanos - System.nanoTime();
+            long nanos = deadlineNanos == Long.MAX_VALUE ? Long.MAX_VALUE : deadlineNanos - System.nanoTime();
             if (nanos <= 0) {
                 throw new NereusException(ErrorCode.TIMEOUT, true, "V2 verification deadline expired");
             }

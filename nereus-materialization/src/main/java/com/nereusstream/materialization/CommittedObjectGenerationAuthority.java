@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -38,7 +39,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 
-/** Reconstructs and revalidates the exact F4 metadata proof used before a primary-WAL source is released. */
+/**
+ * Reconstructs and revalidates the exact F4 metadata proof used before a primary-WAL source is released.
+ */
 public final class CommittedObjectGenerationAuthority implements CommittedGenerationRetirementAuthority {
     private static final int MAX_SCAN_ENTRIES = 4_096;
     private static final ReadTargetCodecRegistry TARGET_CODECS = ReadTargetCodecRegistry.phase15();
@@ -74,9 +77,7 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
     }
 
     public CompletableFuture<Optional<CommittedObjectGenerationProof>> prove(
-            StreamId streamId,
-            OffsetRange sourceRange,
-            long sourceCommitVersion) {
+            StreamId streamId, OffsetRange sourceRange, long sourceCommitVersion) {
         try {
             StreamId stream = Objects.requireNonNull(streamId, "streamId");
             OffsetRange range = Objects.requireNonNull(sourceRange, "sourceRange");
@@ -86,8 +87,8 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
             MaterializationDeadline deadline = new MaterializationDeadline(operationTimeout, scheduler);
             CompletableFuture<Optional<CommittedObjectGenerationProof>> result = scanIndexes(
                             stream, range, Optional.empty(), new ArrayList<>(), 0, deadline)
-                    .thenCompose(candidates -> proveCandidate(
-                            stream, range, sourceCommitVersion, candidates, 0, deadline));
+                    .thenCompose(
+                            candidates -> proveCandidate(stream, range, sourceCommitVersion, candidates, 0, deadline));
             result.whenComplete((ignored, failure) -> deadline.close());
             return result;
         } catch (Throwable failure) {
@@ -105,7 +106,8 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
             CompletableFuture<Optional<VersionedGenerationIndex>> index = deadline.bound(
                     () -> generations.getIndex(cluster, identity), "revalidate committed replacement index");
             CompletableFuture<Optional<VersionedPhysicalObjectRoot>> root = deadline.bound(
-                    () -> physical.getRoot(cluster, ObjectKeyHash.from(proof.target().objectKey())),
+                    () -> physical.getRoot(
+                            cluster, ObjectKeyHash.from(proof.target().objectKey())),
                     "revalidate committed replacement root");
             CompletableFuture<Optional<VersionedMaterializationCheckpoint>> checkpoint = deadline.bound(
                     () -> generations.getMaterializationCheckpoint(
@@ -155,8 +157,8 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
                 throw condition("committed Object replacement index key does not cover the source");
             }
             MaterializationDeadline deadline = new MaterializationDeadline(operationTimeout, scheduler);
-            GenerationIndexIdentity identity = new GenerationIndexIdentity(
-                    stream, decoded.view(), decoded.offsetEnd(), decoded.generation());
+            GenerationIndexIdentity identity =
+                    new GenerationIndexIdentity(stream, decoded.view(), decoded.offsetEnd(), decoded.generation());
             CompletableFuture<Optional<CommittedObjectGenerationProof>> result = deadline.bound(
                             () -> generations.getIndex(cluster, identity),
                             "load exact committed Object replacement index")
@@ -171,13 +173,7 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
                                 || !covers(index.value(), stream, range)) {
                             return CompletableFuture.completedFuture(Optional.empty());
                         }
-                        return proveCandidate(
-                                stream,
-                                range,
-                                sourceCommitVersion,
-                                List.of(index),
-                                0,
-                                deadline);
+                        return proveCandidate(stream, range, sourceCommitVersion, List.of(index), 0, deadline);
                     });
             result.whenComplete((ignored, failure) -> deadline.close());
             return result;
@@ -188,9 +184,7 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
 
     @Override
     public CompletableFuture<Optional<CommittedGenerationRetirementProof>> proveRetirement(
-            StreamId streamId,
-            OffsetRange sourceRange,
-            long sourceCommitVersion) {
+            StreamId streamId, OffsetRange sourceRange, long sourceCommitVersion) {
         return prove(streamId, sourceRange, sourceCommitVersion)
                 .thenApply(optional -> optional.map(CommittedGenerationRetirementProof::from));
     }
@@ -203,19 +197,12 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
             String indexKey,
             long indexMetadataVersion,
             Checksum indexSha256) {
-        return proveExact(
-                        streamId,
-                        sourceRange,
-                        sourceCommitVersion,
-                        indexKey,
-                        indexMetadataVersion,
-                        indexSha256)
+        return proveExact(streamId, sourceRange, sourceCommitVersion, indexKey, indexMetadataVersion, indexSha256)
                 .thenApply(optional -> optional.map(CommittedGenerationRetirementProof::from));
     }
 
     @Override
-    public CompletableFuture<Void> revalidateRetirement(
-            CommittedGenerationRetirementProof expected) {
+    public CompletableFuture<Void> revalidateRetirement(CommittedGenerationRetirementProof expected) {
         CommittedGenerationRetirementProof proof = Objects.requireNonNull(expected, "expected");
         return proveExactRetirement(
                         proof.streamId(),
@@ -251,8 +238,8 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
                 .thenCompose(page -> {
                     int nextObserved = Math.addExact(observed, page.values().size());
                     if (nextObserved > MAX_SCAN_ENTRIES) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "committed Object replacement scan exceeded its hard bound"));
+                        return CompletableFuture.failedFuture(
+                                invariant("committed Object replacement scan exceeded its hard bound"));
                     }
                     for (VersionedGenerationCandidate candidate : page.values()) {
                         if (candidate instanceof VersionedGenerationIndex higher
@@ -261,11 +248,10 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
                         }
                     }
                     if (page.continuation().isPresent()) {
-                        return scanIndexes(
-                                stream, range, page.continuation(), values, nextObserved, deadline);
+                        return scanIndexes(stream, range, page.continuation(), values, nextObserved, deadline);
                     }
-                    values.sort(Comparator
-                            .comparingLong((VersionedGenerationIndex value) -> value.value().generation())
+                    values.sort(Comparator.comparingLong((VersionedGenerationIndex value) ->
+                                    value.value().generation())
                             .reversed()
                             .thenComparingLong(value -> value.value().offsetEnd()));
                     return CompletableFuture.completedFuture(List.copyOf(values));
@@ -297,12 +283,10 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
                 return proveCandidate(stream, range, commitVersion, candidates, index + 1, deadline);
             }
             VersionedPhysicalObjectRoot exactRoot = root.orElseThrow();
-            return findVisibleProtection(
-                            candidate, exactRoot, Optional.empty(), new ArrayList<>(), 0, deadline)
+            return findVisibleProtection(candidate, exactRoot, Optional.empty(), new ArrayList<>(), 0, deadline)
                     .thenCompose(protection -> {
                         if (protection.isEmpty()) {
-                            return proveCandidate(
-                                    stream, range, commitVersion, candidates, index + 1, deadline);
+                            return proveCandidate(stream, range, commitVersion, candidates, index + 1, deadline);
                         }
                         return findCheckpoint(
                                         stream,
@@ -316,23 +300,17 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
                                 .thenCompose(checkpoint -> {
                                     if (checkpoint.isEmpty()) {
                                         return proveCandidate(
-                                                stream,
-                                                range,
-                                                commitVersion,
-                                                candidates,
-                                                index + 1,
-                                                deadline);
+                                                stream, range, commitVersion, candidates, index + 1, deadline);
                                     }
-                                    CommittedObjectGenerationProof proof =
-                                            new CommittedObjectGenerationProof(
-                                                    stream,
-                                                    range,
-                                                    commitVersion,
-                                                    candidate,
-                                                    target,
-                                                    exactRoot,
-                                                    protection.orElseThrow(),
-                                                    checkpoint.orElseThrow());
+                                    CommittedObjectGenerationProof proof = new CommittedObjectGenerationProof(
+                                            stream,
+                                            range,
+                                            commitVersion,
+                                            candidate,
+                                            target,
+                                            exactRoot,
+                                            protection.orElseThrow(),
+                                            checkpoint.orElseThrow());
                                     return deadline.bound(
                                                     () -> readVerifier.verify(proof, deadline.remaining()),
                                                     "verify committed Object replacement through normal read path")
@@ -351,8 +329,7 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
     }
 
     private CompletableFuture<Void> requireReadable(
-            CommittedObjectGenerationProof proof,
-            MaterializationDeadline deadline) {
+            CommittedObjectGenerationProof proof, MaterializationDeadline deadline) {
         return deadline.bound(
                         () -> readVerifier.verify(proof, deadline.remaining()),
                         "revalidate committed Object replacement through normal read path")
@@ -363,19 +340,16 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
                 });
     }
 
-    private Optional<ObjectSliceReadTarget> canonicalTarget(
-            VersionedGenerationIndex candidate,
-            StreamId stream) {
+    private Optional<ObjectSliceReadTarget> canonicalTarget(VersionedGenerationIndex candidate, StreamId stream) {
         GenerationIndexRecord value = candidate.value();
         try {
             ReadTarget decoded = TARGET_CODECS.decode(value.readTarget());
             if (!(decoded instanceof ObjectSliceReadTarget target)) {
                 return Optional.empty();
             }
-            String expectedKey = keys.generationIndexKey(
-                    stream, ReadView.COMMITTED, value.offsetEnd(), value.generation());
-            Checksum expectedDigest = GenerationIndexDigests.durableValueSha256(
-                    value.withMetadataVersion(0));
+            String expectedKey =
+                    keys.generationIndexKey(stream, ReadView.COMMITTED, value.offsetEnd(), value.generation());
+            Checksum expectedDigest = GenerationIndexDigests.durableValueSha256(value.withMetadataVersion(0));
             String targetIdentity = TARGET_CODECS.encode(target).identityChecksumValue();
             if (!candidate.key().equals(expectedKey)
                     || !candidate.durableValueSha256().equals(expectedDigest)
@@ -391,35 +365,29 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
     }
 
     private CompletableFuture<Optional<VersionedPhysicalObjectRoot>> loadHealthyRoot(
-            VersionedGenerationIndex index,
-            ObjectSliceReadTarget target,
-            MaterializationDeadline deadline) {
+            VersionedGenerationIndex index, ObjectSliceReadTarget target, MaterializationDeadline deadline) {
         ObjectKeyHash object = ObjectKeyHash.from(target.objectKey());
-        return deadline.bound(
-                        () -> physical.getRoot(cluster, object),
-                        "load committed Object replacement root")
+        return deadline.bound(() -> physical.getRoot(cluster, object), "load committed Object replacement root")
                 .thenApply(optional -> optional.filter(root -> healthyRoot(index, target, root)));
     }
 
     private boolean healthyRoot(
-            VersionedGenerationIndex index,
-            ObjectSliceReadTarget target,
-            VersionedPhysicalObjectRoot root) {
+            VersionedGenerationIndex index, ObjectSliceReadTarget target, VersionedPhysicalObjectRoot root) {
         PhysicalObjectIdentity identity;
         try {
             identity = PhysicalObjectIdentity.from(root.value());
         } catch (RuntimeException failure) {
             throw invariant("committed Object replacement root is malformed");
         }
-        PhysicalObjectKind expectedKind = switch (target.objectType()) {
-            case MULTI_STREAM_WAL_OBJECT -> PhysicalObjectKind.OBJECT_WAL;
-            case STREAM_COMPACTED_OBJECT -> PhysicalObjectKind.COMMITTED_COMPACTED;
-            default -> throw invariant("committed Object replacement type is unsupported");
-        };
+        PhysicalObjectKind expectedKind =
+                switch (target.objectType()) {
+                    case MULTI_STREAM_WAL_OBJECT -> PhysicalObjectKind.OBJECT_WAL;
+                    case STREAM_COMPACTED_OBJECT -> PhysicalObjectKind.COMMITTED_COMPACTED;
+                    default -> throw invariant("committed Object replacement type is unsupported");
+                };
         long requiredEnd = Math.addExact(target.objectOffset(), target.objectLength());
         if (target.objectType() == ObjectType.STREAM_COMPACTED_OBJECT
-                && !MaterializationPolicy.isLosslessCommittedFormat(
-                        target.physicalFormat())) {
+                && !MaterializationPolicy.isLosslessCommittedFormat(target.physicalFormat())) {
             return false;
         }
         return root.key().equals(keys.physicalRootKey(identity.objectKeyHash()))
@@ -445,32 +413,26 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
                 .thenCompose(page -> {
                     int nextObserved = Math.addExact(observed, page.values().size());
                     if (nextObserved > MAX_SCAN_ENTRIES) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "committed Object replacement protection scan exceeded its hard bound"));
+                        return CompletableFuture.failedFuture(
+                                invariant("committed Object replacement protection scan exceeded its hard bound"));
                     }
                     for (VersionedObjectProtection protection : page.values()) {
                         var value = protection.value();
                         if (value.protectionTypeId() == ObjectProtectionType.VISIBLE_GENERATION.wireId()
                                 && value.ownerKey().equals(index.key())
                                 && value.ownerMetadataVersion() == index.metadataVersion()
-                                && value.ownerIdentitySha256().equals(
-                                        index.durableValueSha256().value())
+                                && value.ownerIdentitySha256()
+                                        .equals(index.durableValueSha256().value())
                                 && value.rootLifecycleEpoch() == root.value().lifecycleEpoch()) {
                             matches.add(protection);
                         }
                     }
                     if (matches.size() > 1) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "committed Object replacement visible protection is ambiguous"));
+                        return CompletableFuture.failedFuture(
+                                invariant("committed Object replacement visible protection is ambiguous"));
                     }
                     return page.continuation().isPresent()
-                            ? findVisibleProtection(
-                                    index,
-                                    root,
-                                    page.continuation(),
-                                    matches,
-                                    nextObserved,
-                                    deadline)
+                            ? findVisibleProtection(index, root, page.continuation(), matches, nextObserved, deadline)
                             : CompletableFuture.completedFuture(matches.stream().findFirst());
                 });
     }
@@ -485,14 +447,13 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
             int observed,
             MaterializationDeadline deadline) {
         return deadline.bound(
-                        () -> generations.scanMaterializationCheckpoints(
-                                cluster, stream, continuation, pageSize),
+                        () -> generations.scanMaterializationCheckpoints(cluster, stream, continuation, pageSize),
                         "scan committed Object replacement checkpoints")
                 .thenCompose(page -> {
                     int nextObserved = Math.addExact(observed, page.values().size());
                     if (nextObserved > MAX_SCAN_ENTRIES) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "committed Object replacement checkpoint scan exceeded its hard bound"));
+                        return CompletableFuture.failedFuture(
+                                invariant("committed Object replacement checkpoint scan exceeded its hard bound"));
                     }
                     for (VersionedMaterializationCheckpoint checkpoint : page.values()) {
                         var value = checkpoint.value();
@@ -513,8 +474,7 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
                                 nextObserved,
                                 deadline);
                     }
-                    matches.sort(Comparator
-                            .comparingLong((VersionedMaterializationCheckpoint value) ->
+                    matches.sort(Comparator.comparingLong((VersionedMaterializationCheckpoint value) ->
                                     value.value().policyVersion())
                             .reversed()
                             .thenComparing(VersionedMaterializationCheckpoint::key));
@@ -522,10 +482,7 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
                 });
     }
 
-    private static boolean covers(
-            GenerationIndexRecord value,
-            StreamId stream,
-            OffsetRange range) {
+    private static boolean covers(GenerationIndexRecord value, StreamId stream, OffsetRange range) {
         return value.streamId().equals(stream.value())
                 && value.readViewId() == ReadView.COMMITTED.wireId()
                 && value.lifecycle() == GenerationLifecycle.COMMITTED

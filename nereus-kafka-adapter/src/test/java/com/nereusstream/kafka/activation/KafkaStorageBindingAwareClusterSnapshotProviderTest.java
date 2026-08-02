@@ -1,11 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
@@ -25,20 +25,13 @@ import org.junit.jupiter.api.Test;
 
 class KafkaStorageBindingAwareClusterSnapshotProviderTest {
     private static final KafkaStorageClusterSnapshot EMPTY = new KafkaStorageClusterSnapshot(
-            "kafka-a",
-            17,
-            1,
-            List.of(new KafkaBrokerIdentity(1, 9)),
-            false,
-            false,
-            false);
+            "kafka-a", 17, 1, List.of(new KafkaBrokerIdentity(1, 9)), false, false, false);
 
     @Test
     void provesAllRegistryShardsEmpty() {
         StubStore store = new StubStore(-1);
-        KafkaStorageBindingAwareClusterSnapshotProvider provider =
-                new KafkaStorageBindingAwareClusterSnapshotProvider(
-                        () -> CompletableFuture.completedFuture(EMPTY), store);
+        KafkaStorageBindingAwareClusterSnapshotProvider provider = new KafkaStorageBindingAwareClusterSnapshotProvider(
+                () -> CompletableFuture.completedFuture(EMPTY), store);
 
         KafkaStorageClusterSnapshot snapshot =
                 provider.currentSnapshot().toCompletableFuture().join();
@@ -51,9 +44,8 @@ class KafkaStorageBindingAwareClusterSnapshotProviderTest {
     @Test
     void reportsBindingHintFromAnyShard() {
         StubStore store = new StubStore(37);
-        KafkaStorageBindingAwareClusterSnapshotProvider provider =
-                new KafkaStorageBindingAwareClusterSnapshotProvider(
-                        () -> CompletableFuture.completedFuture(EMPTY), store);
+        KafkaStorageBindingAwareClusterSnapshotProvider provider = new KafkaStorageBindingAwareClusterSnapshotProvider(
+                () -> CompletableFuture.completedFuture(EMPTY), store);
 
         KafkaStorageClusterSnapshot snapshot =
                 provider.currentSnapshot().toCompletableFuture().join();
@@ -66,18 +58,11 @@ class KafkaStorageBindingAwareClusterSnapshotProviderTest {
 
     @Test
     void preservesAlreadyAuthoritativeBindingFactWithoutScanning() {
-        KafkaStorageClusterSnapshot supplied = new KafkaStorageClusterSnapshot(
-                "kafka-a",
-                18,
-                1,
-                EMPTY.brokers(),
-                true,
-                true,
-                true);
+        KafkaStorageClusterSnapshot supplied =
+                new KafkaStorageClusterSnapshot("kafka-a", 18, 1, EMPTY.brokers(), true, true, true);
         StubStore store = new StubStore(0);
-        KafkaStorageBindingAwareClusterSnapshotProvider provider =
-                new KafkaStorageBindingAwareClusterSnapshotProvider(
-                        () -> CompletableFuture.completedFuture(supplied), store);
+        KafkaStorageBindingAwareClusterSnapshotProvider provider = new KafkaStorageBindingAwareClusterSnapshotProvider(
+                () -> CompletableFuture.completedFuture(supplied), store);
 
         assertSame(supplied, provider.currentSnapshot().toCompletableFuture().join());
         assertEquals(0, store.scans.get());
@@ -111,16 +96,10 @@ class KafkaStorageBindingAwareClusterSnapshotProviderTest {
                         3);
                 return CompletableFuture.completedFuture(new KafkaPartitionScanPage(
                         List.of(new VersionedKafkaPartitionRegistry(
-                                "key",
-                                record,
-                                3,
-                                new Checksum(
-                                        ChecksumType.SHA256,
-                                        "01" + "00".repeat(31)))),
+                                "key", record, 3, new Checksum(ChecksumType.SHA256, "01" + "00".repeat(31)))),
                         Optional.empty()));
             }
-            return CompletableFuture.completedFuture(
-                    new KafkaPartitionScanPage(List.of(), Optional.empty()));
+            return CompletableFuture.completedFuture(new KafkaPartitionScanPage(List.of(), Optional.empty()));
         }
 
         @Override
@@ -136,8 +115,7 @@ class KafkaStorageBindingAwareClusterSnapshotProviderTest {
 
         @Override
         public CompletableFuture<VersionedKafkaPartitionBinding> compareAndSet(
-                VersionedKafkaPartitionBinding expected,
-                KafkaPartitionBindingRecord update) {
+                VersionedKafkaPartitionBinding expected, KafkaPartitionBindingRecord update) {
             throw new UnsupportedOperationException();
         }
 
@@ -147,6 +125,6 @@ class KafkaStorageBindingAwareClusterSnapshotProviderTest {
         }
 
         @Override
-        public void close() { }
+        public void close() {}
     }
 }

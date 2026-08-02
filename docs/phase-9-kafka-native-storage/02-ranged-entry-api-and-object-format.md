@@ -128,12 +128,12 @@ default CompletableFuture<AppendResult> append(
 
 目标修改文件：`nereus-api/.../AppendBatch.java`。
 
-| `PayloadFormat` | Executable after F9-M1 | Per-entry count | Projection hints |
-| --- | --- | --- | --- |
-| `OPAQUE_RECORD_BATCH` | existing | exactly 1 | empty |
-| `KAFKA_RECORD_BATCH` | new | `1..Integer.MAX_VALUE` | empty |
-| `PULSAR_ENTRY_BATCH` | unchanged reserved unless its own activation says otherwise | existing rule | existing rule |
-| `NORMALIZED_ROW_BATCH` | unchanged reserved | rejected | rejected |
+| `PayloadFormat`        | Executable after F9-M1                                      | Per-entry count        | Projection hints |
+|------------------------|-------------------------------------------------------------|------------------------|------------------|
+| `OPAQUE_RECORD_BATCH`  | existing                                                    | exactly 1              | empty            |
+| `KAFKA_RECORD_BATCH`   | new                                                         | `1..Integer.MAX_VALUE` | empty            |
+| `PULSAR_ENTRY_BATCH`   | unchanged reserved unless its own activation says otherwise | existing rule          | existing rule    |
+| `NORMALIZED_ROW_BATCH` | unchanged reserved                                          | rejected               | rejected         |
 
 共同 invariant：
 
@@ -230,10 +230,10 @@ default implementation 只接受 legacy-equivalent request，调用旧 read 后�
 
 给定 logical entry `[entryStart,entryEnd)` 与 request `s`：
 
-| Mode | `s == entryStart` | `entryStart < s < entryEnd` | no entry at/containing `s` |
-| --- | --- | --- | --- |
-| `EXACT_START` | return entry | `OFFSET_NOT_AVAILABLE`，不得跳到下一 entry | follow existing trimmed/end rules |
-| `CONTAINING_ENTRY` | return entry | return complete entry | follow existing trimmed/end rules |
+| Mode               | `s == entryStart` | `entryStart < s < entryEnd`         | no entry at/containing `s`        |
+|--------------------|-------------------|-------------------------------------|-----------------------------------|
+| `EXACT_START`      | return entry      | `OFFSET_NOT_AVAILABLE`，不得跳到下一 entry | follow existing trimmed/end rules |
+| `CONTAINING_ENTRY` | return entry      | return complete entry               | follow existing trimmed/end rules |
 
 containing result 保持：
 
@@ -340,15 +340,15 @@ BookKeeper read reservation 使用 `logicalBytes + 17 * entryCount`，不会把 
 
 ## 6. Layered checksum contract
 
-| Layer | Algorithm/source | Protects | Failure owner |
-| --- | --- | --- | --- |
-| Kafka batch | Kafka magic-specific CRC | Kafka batch header/records after CRC field | adapter/Kafka codec |
-| `AppendBatch.checksum` | CRC32C over exact concatenated entry payloads | caller handoff/request | API/adapter |
-| entry index payload field | current exact payload checksum where present | one entry extraction | physical reader |
-| WAL slice checksum | current Nereus checksum | slice payload + entry index | primary reader |
-| Object provider checksum/etag facts | provider contract | uploaded bytes | object store |
-| NCP2/NTC2 row | CRC32C over exact row payload | Parquet row extraction | compacted reader |
-| generation/object identity | SHA-256 facts | immutable output/source identity | F4 verifier |
+| Layer                               | Algorithm/source                              | Protects                                   | Failure owner       |
+|-------------------------------------|-----------------------------------------------|--------------------------------------------|---------------------|
+| Kafka batch                         | Kafka magic-specific CRC                      | Kafka batch header/records after CRC field | adapter/Kafka codec |
+| `AppendBatch.checksum`              | CRC32C over exact concatenated entry payloads | caller handoff/request                     | API/adapter         |
+| entry index payload field           | current exact payload checksum where present  | one entry extraction                       | physical reader     |
+| WAL slice checksum                  | current Nereus checksum                       | slice payload + entry index                | primary reader      |
+| Object provider checksum/etag facts | provider contract                             | uploaded bytes                             | object store        |
+| NCP2/NTC2 row                       | CRC32C over exact row payload                 | Parquet row extraction                     | compacted reader    |
+| generation/object identity          | SHA-256 facts                                 | immutable output/source identity           | F4 verifier         |
 
 任何一层失败都不能用下一 generation 自动掩盖后继续写。reader 可以按 F4 fallback 规则选择同 view 的另一个
 健康 generation，但 corruption metric/audit 必须保留；没有健康 source 时 partition offline。
@@ -395,22 +395,22 @@ message nereus_committed_generation_v2 {
 
 NCP2 继承 NCP1 common facts并改变/新增：
 
-| Key | Required value/meaning |
-| --- | --- |
-| `nereus.format` | `NCP2` |
-| `nereus.format.version` | `2` |
-| `nereus.read.view` | `COMMITTED` |
-| `nereus.payload.format` | exact `PayloadFormat.name()` |
-| `nereus.logical.format` | immutable stream mapping, F9=`KAFKA_RECORD_BATCH_V1` |
-| `nereus.range.model` | `ENTRY_START_PLUS_RECORD_COUNT_V1` |
-| `nereus.offset.start/end` | dense source coverage |
-| `nereus.source.record.count` | long decimal = coverage length |
-| `nereus.output.record.count` | same as source for lossless view |
-| `nereus.entry.count` | row count，may differ from record count |
-| `nereus.source.set.sha256` | exact committed source set identity |
-| `nereus.policy.sha256` | NCP2 policy identity |
-| `nereus.output.attempt.id` | exact task attempt |
-| `nereus.cumulative.size.at.end` | committed logical cumulative bytes snapshot |
+| Key                             | Required value/meaning                               |
+|---------------------------------|------------------------------------------------------|
+| `nereus.format`                 | `NCP2`                                               |
+| `nereus.format.version`         | `2`                                                  |
+| `nereus.read.view`              | `COMMITTED`                                          |
+| `nereus.payload.format`         | exact `PayloadFormat.name()`                         |
+| `nereus.logical.format`         | immutable stream mapping, F9=`KAFKA_RECORD_BATCH_V1` |
+| `nereus.range.model`            | `ENTRY_START_PLUS_RECORD_COUNT_V1`                   |
+| `nereus.offset.start/end`       | dense source coverage                                |
+| `nereus.source.record.count`    | long decimal = coverage length                       |
+| `nereus.output.record.count`    | same as source for lossless view                     |
+| `nereus.entry.count`            | row count，may differ from record count               |
+| `nereus.source.set.sha256`      | exact committed source set identity                  |
+| `nereus.policy.sha256`          | NCP2 policy identity                                 |
+| `nereus.output.attempt.id`      | exact task attempt                                   |
+| `nereus.cumulative.size.at.end` | committed logical cumulative bytes snapshot          |
 
 unknown `nereus.*` key、missing key、non-canonical decimal、count mismatch 或 trailing row 一律 format error。
 
@@ -476,12 +476,12 @@ source references 仍由 F4 durable protections/generation records 管理。
 
 ### 8.3 Disposition wire IDs
 
-| ID | Name | Rule |
-| --- | --- | --- |
-| 1 | `RETAIN_VALUE` | keyed latest live record |
-| 2 | `RETAIN_TOMBSTONE` | tombstone within delete-retention window |
-| 3 | `RETAIN_UNKEYED` | durable backward-read ID；current stock-compatible strategy does not emit null-key survivors |
-| 4 | `RETAIN_CONTROL` | transaction/control record required by Kafka semantics |
+| ID | Name               | Rule                                                                                        |
+|----|--------------------|---------------------------------------------------------------------------------------------|
+| 1  | `RETAIN_VALUE`     | keyed latest live record                                                                    |
+| 2  | `RETAIN_TOMBSTONE` | tombstone within delete-retention window                                                    |
+| 3  | `RETAIN_UNKEYED`   | durable backward-read ID；current stock-compatible strategy does not emit null-key survivors |
+| 4  | `RETAIN_CONTROL`   | transaction/control record required by Kafka semantics                                      |
 
 ID 是 durable int，不使用 Java enum ordinal。unknown ID fail closed。
 
@@ -545,45 +545,45 @@ Publication：
 
 ## 10. Hard limits
 
-| Limit | Initial target | Enforcement |
-| --- | --- | --- |
-| one entry payload | 64 MiB | API + every reader/writer before allocation |
-| entries per append request | 65,536 | adapter + API config hard cap |
-| records per Kafka batch/entry | `Integer.MAX_VALUE` API；Kafka codec/config lower | checked count |
-| total records per AppendBatch | `Integer.MAX_VALUE` | exact sum |
-| total request logical bytes | 128 MiB default，256 MiB hard | adapter admission |
-| compacted object bytes | existing 1 GiB | V2 writer |
-| Parquet footer | existing 16 MiB | strict reader |
-| row groups | existing 65,536 | strict writer/reader |
-| compaction key | 1 MiB | decoder before spill |
-| coverage/count arithmetic | signed 64-bit non-overflow | all layers |
+| Limit                         | Initial target                                   | Enforcement                                 |
+|-------------------------------|--------------------------------------------------|---------------------------------------------|
+| one entry payload             | 64 MiB                                           | API + every reader/writer before allocation |
+| entries per append request    | 65,536                                           | adapter + API config hard cap               |
+| records per Kafka batch/entry | `Integer.MAX_VALUE` API；Kafka codec/config lower | checked count                               |
+| total records per AppendBatch | `Integer.MAX_VALUE`                              | exact sum                                   |
+| total request logical bytes   | 128 MiB default，256 MiB hard                     | adapter admission                           |
+| compacted object bytes        | existing 1 GiB                                   | V2 writer                                   |
+| Parquet footer                | existing 16 MiB                                  | strict reader                               |
+| row groups                    | existing 65,536                                  | strict writer/reader                        |
+| compaction key                | 1 MiB                                            | decoder before spill                        |
+| coverage/count arithmetic     | signed 64-bit non-overflow                       | all layers                                  |
 
 Kafka configs `message.max.bytes`、`replica.fetch.max.bytes`（尽管 RF1）与 fetch response limits 必须在 runtime
 activation 前验证不超过这些 hard bounds。不能依赖 OOM 把超限 request 变成可恢复 error。
 
 ## 11. Planned classes and method ownership
 
-| Module | Class/method | Change |
-| --- | --- | --- |
-| API | `AppendPrecondition` | new immutable value |
-| API | `ReadBoundaryMode` / `FirstEntryPolicy` | new enums without wire ordinals |
-| API | `ReadRequest` / `SemanticReadResult` | public semantic read |
-| API | `StreamStorage.append/read` | binary-safe default overloads |
-| API | `AppendBatch` | format-specific validation table |
-| API | `ErrorCode` | append two unsupported-semantics codes |
-| core | `DefaultStreamStorage` | override overloads |
-| core | `AppendCoordinator` | caller expected-start propagation and result check |
-| core | `ReadCoordinator` | request-aware range/coverage validation |
-| core | `ReadTargetDispatcher` | propagate request semantics |
-| core | `StreamViewReader` | deprecating adapter to public result |
-| object | `DefaultWalObjectReader` | containing/overflow + Kafka format |
-| object | `DefaultWalObjectWriter` | activated Kafka format validation |
-| BookKeeper | `BookKeeperRangedEntryCodecV1` | NBKE1 count/length/CRC framing；legacy raw mapping unchanged |
-| BookKeeper | `BookKeeperPrimaryWalReader` | exact/containing/overflow parity and frame-overhead reservation |
-| object | V2 compacted classes | closed NCP2/NTC2 implementation |
-| materialization | `RangedLosslessMaterializationRowPublisher` | one source entry → one NCP2 row |
-| materialization | Kafka topic-compaction publisher | decoded survivor → NTC2 row |
-| metadata/core | target format registry/capability | exact V2 dispatch/admission |
+| Module          | Class/method                                | Change                                                          |
+|-----------------|---------------------------------------------|-----------------------------------------------------------------|
+| API             | `AppendPrecondition`                        | new immutable value                                             |
+| API             | `ReadBoundaryMode` / `FirstEntryPolicy`     | new enums without wire ordinals                                 |
+| API             | `ReadRequest` / `SemanticReadResult`        | public semantic read                                            |
+| API             | `StreamStorage.append/read`                 | binary-safe default overloads                                   |
+| API             | `AppendBatch`                               | format-specific validation table                                |
+| API             | `ErrorCode`                                 | append two unsupported-semantics codes                          |
+| core            | `DefaultStreamStorage`                      | override overloads                                              |
+| core            | `AppendCoordinator`                         | caller expected-start propagation and result check              |
+| core            | `ReadCoordinator`                           | request-aware range/coverage validation                         |
+| core            | `ReadTargetDispatcher`                      | propagate request semantics                                     |
+| core            | `StreamViewReader`                          | deprecating adapter to public result                            |
+| object          | `DefaultWalObjectReader`                    | containing/overflow + Kafka format                              |
+| object          | `DefaultWalObjectWriter`                    | activated Kafka format validation                               |
+| BookKeeper      | `BookKeeperRangedEntryCodecV1`              | NBKE1 count/length/CRC framing；legacy raw mapping unchanged     |
+| BookKeeper      | `BookKeeperPrimaryWalReader`                | exact/containing/overflow parity and frame-overhead reservation |
+| object          | V2 compacted classes                        | closed NCP2/NTC2 implementation                                 |
+| materialization | `RangedLosslessMaterializationRowPublisher` | one source entry → one NCP2 row                                 |
+| materialization | Kafka topic-compaction publisher            | decoded survivor → NTC2 row                                     |
+| metadata/core   | target format registry/capability           | exact V2 dispatch/admission                                     |
 
 ## 12. Test contract
 

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -34,7 +35,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-/** Fixed dynamic-slot MATERIALIZATION_SOURCE protection for BookKeeper generation-zero ranges. */
+/**
+ * Fixed dynamic-slot MATERIALIZATION_SOURCE protection for BookKeeper generation-zero ranges.
+ */
 public final class BookKeeperMaterializationSourceProtectionAdapter
         implements MaterializationSourceProtectionAdapter<BookKeeperEntryRangeReadTarget> {
     private static final int FIRST_DYNAMIC_SLOT = 3;
@@ -78,37 +81,30 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
             BookKeeperEntryRangeReadTarget target = requireTarget(exactSource);
             String exactReference = requireText(referenceId, "referenceId");
             ObjectProtectionOwner exactOwner = Objects.requireNonNull(owner, "owner");
-            OwnerRevalidator exactRevalidator = Objects.requireNonNull(
-                    ownerRevalidator, "ownerRevalidator");
+            OwnerRevalidator exactRevalidator = Objects.requireNonNull(ownerRevalidator, "ownerRevalidator");
             BookKeeperOperationDeadline deadline = deadline();
-            return findExisting(streamId, exactSource, exactReference)
-                    .thenCompose(existing -> {
-                        if (existing.isPresent()) {
-                            MaterializationSourceProtection current =
-                                    existing.orElseThrow();
-                            return current.owner().equals(exactOwner)
-                                    ? revalidate(current, exactRevalidator)
-                                    : transfer(current, exactOwner, exactRevalidator);
-                        }
-                        return loadRoot(target, deadline)
-                                .thenCompose(root -> loadRangeAnchor(
-                                                exactStream,
-                                                exactSource,
-                                                target,
-                                                deadline)
-                                        .thenCompose(anchor -> acquireSlot(
-                                                exactStream,
-                                                exactSource,
-                                                target,
-                                                root,
-                                                anchor.value().ledgerRangeSlot(),
-                                                exactReference,
-                                                exactOwner,
-                                                exactRevalidator,
-                                                firstSlot(exactReference),
-                                                0,
-                                                deadline)));
-                    });
+            return findExisting(streamId, exactSource, exactReference).thenCompose(existing -> {
+                if (existing.isPresent()) {
+                    MaterializationSourceProtection current = existing.orElseThrow();
+                    return current.owner().equals(exactOwner)
+                            ? revalidate(current, exactRevalidator)
+                            : transfer(current, exactOwner, exactRevalidator);
+                }
+                return loadRoot(target, deadline)
+                        .thenCompose(root -> loadRangeAnchor(exactStream, exactSource, target, deadline)
+                                .thenCompose(anchor -> acquireSlot(
+                                        exactStream,
+                                        exactSource,
+                                        target,
+                                        root,
+                                        anchor.value().ledgerRangeSlot(),
+                                        exactReference,
+                                        exactOwner,
+                                        exactRevalidator,
+                                        firstSlot(exactReference),
+                                        0,
+                                        deadline)));
+            });
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -116,9 +112,7 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
 
     @Override
     public CompletableFuture<Optional<MaterializationSourceProtection>> findExisting(
-            StreamId streamId,
-            SourceGeneration source,
-            String referenceId) {
+            StreamId streamId, SourceGeneration source, String referenceId) {
         try {
             String exactStream = Objects.requireNonNull(streamId, "streamId").value();
             SourceGeneration exactSource = Objects.requireNonNull(source, "source");
@@ -126,8 +120,8 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
             String exactReference = requireText(referenceId, "referenceId");
             BookKeeperOperationDeadline deadline = deadline();
             return loadRoot(target, deadline)
-                    .thenCompose(ignored -> scanProtections(
-                            target.ledgerId(), Optional.empty(), new ArrayList<>(), deadline))
+                    .thenCompose(ignored ->
+                            scanProtections(target.ledgerId(), Optional.empty(), new ArrayList<>(), deadline))
                     .thenApply(values -> {
                         List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> matches = values.stream()
                                 .filter(value -> value.value().protectionSlot() >= FIRST_DYNAMIC_SLOT)
@@ -135,12 +129,9 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
                                         value.value(), exactStream, exactSource, target, exactReference))
                                 .toList();
                         if (matches.size() > 1) {
-                            throw invariant(
-                                    "BookKeeper materialization source protection is ambiguous");
+                            throw invariant("BookKeeper materialization source protection is ambiguous");
                         }
-                        return matches.isEmpty()
-                                ? Optional.empty()
-                                : Optional.of(wrap(matches.get(0)));
+                        return matches.isEmpty() ? Optional.empty() : Optional.of(wrap(matches.get(0)));
                     });
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
@@ -149,16 +140,15 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
 
     @Override
     public CompletableFuture<MaterializationSourceProtection> revalidate(
-            MaterializationSourceProtection protection,
-            OwnerRevalidator ownerRevalidator) {
+            MaterializationSourceProtection protection, OwnerRevalidator ownerRevalidator) {
         try {
             MaterializationSourceProtection exact = requireWrapper(protection);
-            OwnerRevalidator revalidator = Objects.requireNonNull(
-                    ownerRevalidator, "ownerRevalidator");
-            return revalidator.revalidate(exact.owner())
+            OwnerRevalidator revalidator = Objects.requireNonNull(ownerRevalidator, "ownerRevalidator");
+            return revalidator
+                    .revalidate(exact.owner())
                     .thenCompose(ignored -> reloadExact(exact, deadline()))
-                    .thenCompose(current -> revalidator.revalidate(exact.owner())
-                            .thenApply(ignored -> wrap(current)));
+                    .thenCompose(
+                            current -> revalidator.revalidate(exact.owner()).thenApply(ignored -> wrap(current)));
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -172,18 +162,18 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
         try {
             MaterializationSourceProtection exact = requireWrapper(protection);
             ObjectProtectionOwner replacement = Objects.requireNonNull(newOwner, "newOwner");
-            OwnerRevalidator revalidator = Objects.requireNonNull(
-                    newOwnerRevalidator, "newOwnerRevalidator");
+            OwnerRevalidator revalidator = Objects.requireNonNull(newOwnerRevalidator, "newOwnerRevalidator");
             requireMonotonicOwner(exact.owner(), replacement);
             if (exact.owner().equals(replacement)) {
                 return revalidate(exact, revalidator);
             }
             BookKeeperOperationDeadline deadline = deadline();
-            return revalidator.revalidate(replacement)
+            return revalidator
+                    .revalidate(replacement)
                     .thenCompose(ignored -> reloadExact(exact, deadline))
-                    .thenCompose(current -> compareAndSetOwner(
-                            current, replacement, deadline))
-                    .thenCompose(updated -> revalidator.revalidate(replacement)
+                    .thenCompose(current -> compareAndSetOwner(current, replacement, deadline))
+                    .thenCompose(updated -> revalidator
+                            .revalidate(replacement)
                             .thenCompose(ignored -> reloadExact(wrap(updated), deadline)))
                     .thenApply(this::wrap);
         } catch (Throwable failure) {
@@ -193,16 +183,14 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
 
     @Override
     public CompletableFuture<Void> release(
-            MaterializationSourceProtection protection,
-            RemovalAuthorizer removalAuthorizer) {
+            MaterializationSourceProtection protection, RemovalAuthorizer removalAuthorizer) {
         try {
             MaterializationSourceProtection exact = requireWrapper(protection);
-            RemovalAuthorizer authorizer = Objects.requireNonNull(
-                    removalAuthorizer, "removalAuthorizer");
+            RemovalAuthorizer authorizer = Objects.requireNonNull(removalAuthorizer, "removalAuthorizer");
             BookKeeperOperationDeadline deadline = deadline();
-            return reloadExact(exact, deadline)
-                    .thenCompose(current -> authorizer.authorize(wrap(current))
-                            .thenCompose(ignored -> deleteOrReloadAbsent(current, deadline)));
+            return reloadExact(exact, deadline).thenCompose(current -> authorizer
+                    .authorize(wrap(current))
+                    .thenCompose(ignored -> deleteOrReloadAbsent(current, deadline)));
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -227,20 +215,13 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
                     true,
                     "BookKeeper materialization source protection slots are exhausted"));
         }
-        int slot = FIRST_DYNAMIC_SLOT
-                + Math.floorMod(firstSlot - FIRST_DYNAMIC_SLOT + attempt, dynamicSlots);
+        int slot = FIRST_DYNAMIC_SLOT + Math.floorMod(firstSlot - FIRST_DYNAMIC_SLOT + attempt, dynamicSlots);
         return deadline.bound(metadata.getProtection(
-                        cluster,
-                        configuration.providerScopeSha256(),
-                        target.ledgerId(),
-                        rangeSlot,
-                        slot))
+                        cluster, configuration.providerScopeSha256(), target.ledgerId(), rangeSlot, slot))
                 .thenCompose(optional -> {
                     if (optional.isPresent()) {
-                        BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> current =
-                                optional.orElseThrow();
-                        if (!sameLogicalReference(
-                                current.value(), streamId, source, target, referenceId)) {
+                        BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> current = optional.orElseThrow();
+                        if (!sameLogicalReference(current.value(), streamId, source, target, referenceId)) {
                             return acquireSlot(
                                     streamId,
                                     source,
@@ -256,35 +237,15 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
                         }
                         return reconcileOwner(current, owner, ownerRevalidator, deadline)
                                 .thenCompose(updated -> finishAcquire(
-                                        streamId,
-                                        source,
-                                        target,
-                                        root,
-                                        updated,
-                                        ownerRevalidator,
-                                        deadline));
+                                        streamId, source, target, root, updated, ownerRevalidator, deadline));
                     }
-                    return ownerRevalidator.revalidate(owner)
-                            .thenCompose(ignored -> revalidateRoot(
-                                    root, target, streamId, deadline))
+                    return ownerRevalidator
+                            .revalidate(owner)
+                            .thenCompose(ignored -> revalidateRoot(root, target, streamId, deadline))
                             .thenCompose(ignored -> createOrReload(
-                                    streamId,
-                                    source,
-                                    target,
-                                    root,
-                                    rangeSlot,
-                                    slot,
-                                    referenceId,
-                                    owner,
-                                    deadline))
-                            .thenCompose(created -> finishAcquire(
-                                    streamId,
-                                    source,
-                                    target,
-                                    root,
-                                    created,
-                                    ownerRevalidator,
-                                    deadline))
+                                    streamId, source, target, root, rangeSlot, slot, referenceId, owner, deadline))
+                            .thenCompose(created ->
+                                    finishAcquire(streamId, source, target, root, created, ownerRevalidator, deadline))
                             .exceptionallyCompose(failure -> {
                                 Throwable exact = unwrap(failure);
                                 if (exact instanceof BookKeeperMetadataConditionFailedException) {
@@ -315,7 +276,8 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
             OwnerRevalidator ownerRevalidator,
             BookKeeperOperationDeadline deadline) {
         ObjectProtectionOwner owner = owner(protection.value());
-        return ownerRevalidator.revalidate(owner)
+        return ownerRevalidator
+                .revalidate(owner)
                 .thenCompose(ignored -> revalidateRoot(root, target, streamId, deadline))
                 .thenCompose(ignored -> reloadExact(wrap(protection), deadline))
                 .thenApply(this::wrap);
@@ -355,8 +317,7 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
                 clock.millis(),
                 0,
                 0);
-        return deadline.bound(metadata.createProtection(
-                        cluster, configuration.providerScopeSha256(), value))
+        return deadline.bound(metadata.createProtection(cluster, configuration.providerScopeSha256(), value))
                 .handle((created, failure) -> {
                     if (failure == null) {
                         return CompletableFuture.completedFuture(created);
@@ -370,7 +331,8 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
                                     protectionSlot))
                             .thenCompose(optional -> {
                                 if (optional.isPresent()
-                                        && sameCreatedValue(value, optional.orElseThrow().value())) {
+                                        && sameCreatedValue(
+                                                value, optional.orElseThrow().value())) {
                                     return CompletableFuture.completedFuture(optional.orElseThrow());
                                 }
                                 return CompletableFuture.failedFuture(original);
@@ -389,7 +351,8 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
         if (existing.equals(requested)) {
             return CompletableFuture.completedFuture(current);
         }
-        return ownerRevalidator.revalidate(requested)
+        return ownerRevalidator
+                .revalidate(requested)
                 .thenCompose(ignored -> compareAndSetOwner(current, requested, deadline));
     }
 
@@ -399,10 +362,7 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
             BookKeeperOperationDeadline deadline) {
         BookKeeperLedgerProtectionRecord replacement = withOwner(current.value(), owner);
         return deadline.bound(metadata.compareAndSetProtection(
-                        cluster,
-                        configuration.providerScopeSha256(),
-                        replacement,
-                        current.metadataVersion()))
+                        cluster, configuration.providerScopeSha256(), replacement, current.metadataVersion()))
                 .handle((updated, failure) -> {
                     if (failure == null) {
                         return CompletableFuture.completedFuture(updated);
@@ -416,7 +376,9 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
                                     current.value().protectionSlot()))
                             .thenCompose(optional -> {
                                 if (optional.isPresent()
-                                        && sameCreatedValue(replacement, optional.orElseThrow().value())) {
+                                        && sameCreatedValue(
+                                                replacement,
+                                                optional.orElseThrow().value())) {
                                     return CompletableFuture.completedFuture(optional.orElseThrow());
                                 }
                                 return CompletableFuture.failedFuture(original);
@@ -426,8 +388,7 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
     }
 
     private CompletableFuture<Void> deleteOrReloadAbsent(
-            BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> current,
-            BookKeeperOperationDeadline deadline) {
+            BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> current, BookKeeperOperationDeadline deadline) {
         return deadline.bound(metadata.deleteProtection(
                         cluster,
                         configuration.providerScopeSha256(),
@@ -454,9 +415,9 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
     }
 
     private CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> reloadExact(
-            MaterializationSourceProtection protection,
-            BookKeeperOperationDeadline deadline) {
-        BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> expected = handle(protection).protection();
+            MaterializationSourceProtection protection, BookKeeperOperationDeadline deadline) {
+        BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> expected =
+                handle(protection).protection();
         return deadline.bound(metadata.getProtection(
                         cluster,
                         configuration.providerScopeSha256(),
@@ -467,8 +428,8 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
                     BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> current = optional.orElseThrow(
                             () -> condition("BookKeeper materialization source protection is absent"));
                     if (!sameVersioned(expected, current)) {
-                        return CompletableFuture.failedFuture(condition(
-                                "BookKeeper materialization source protection changed"));
+                        return CompletableFuture.failedFuture(
+                                condition("BookKeeper materialization source protection changed"));
                     }
                     return deadline.bound(metadata.getRoot(
                                     cluster,
@@ -476,8 +437,8 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
                                     current.value().ledgerId()))
                             .thenApply(root -> {
                                 requireReadableRoot(
-                                        root.orElseThrow(() -> condition(
-                                                "BookKeeper materialization source root is absent"))
+                                        root.orElseThrow(() ->
+                                                        condition("BookKeeper materialization source root is absent"))
                                                 .value(),
                                         current.value());
                                 return current;
@@ -486,14 +447,10 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
     }
 
     private CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerRootRecord>> loadRoot(
-            BookKeeperEntryRangeReadTarget target,
-            BookKeeperOperationDeadline deadline) {
-        return deadline.bound(metadata.getRoot(
-                        cluster,
-                        configuration.providerScopeSha256(),
-                        target.ledgerId()))
-                .thenApply(optional -> optional.orElseThrow(
-                        () -> condition("BookKeeper materialization source root is absent")))
+            BookKeeperEntryRangeReadTarget target, BookKeeperOperationDeadline deadline) {
+        return deadline.bound(metadata.getRoot(cluster, configuration.providerScopeSha256(), target.ledgerId()))
+                .thenApply(optional ->
+                        optional.orElseThrow(() -> condition("BookKeeper materialization source root is absent")))
                 .thenApply(root -> {
                     requireReadableRoot(root.value(), target);
                     return root;
@@ -521,34 +478,28 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
             BookKeeperOperationDeadline deadline) {
         return scanProtections(target.ledgerId(), Optional.empty(), new ArrayList<>(), deadline)
                 .thenApply(values -> {
-                    List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> exactAnchors =
-                            values.stream()
+                    List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> exactAnchors = values.stream()
                             .filter(value -> value.value().protectionSlot() == 1)
-                            .filter(value -> value.value().protectionType()
-                                    == BookKeeperProtectionType.VISIBLE_GENERATION)
+                            .filter(value ->
+                                    value.value().protectionType() == BookKeeperProtectionType.VISIBLE_GENERATION)
                             .filter(value -> sameSource(value.value(), streamId, source, target))
                             .toList();
-                    List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> active =
-                            exactAnchors.stream()
-                                    .filter(value -> value.value().lifecycle()
-                                            == ProtectionLifecycle.ACTIVE)
-                                    .toList();
+                    List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> active = exactAnchors.stream()
+                            .filter(value -> value.value().lifecycle() == ProtectionLifecycle.ACTIVE)
+                            .toList();
                     if (active.size() == 1) {
                         return active.get(0);
                     }
                     if (active.isEmpty()
                             && exactAnchors.size() == 1
-                            && exactAnchors.get(0).value().lifecycle()
-                                    == ProtectionLifecycle.RETIRED) {
+                            && exactAnchors.get(0).value().lifecycle() == ProtectionLifecycle.RETIRED) {
                         throw new MaterializationSourceRetiredException(
                                 "BookKeeper generation-zero visible protection was retired");
                     }
                     if (active.isEmpty()) {
-                        throw condition(
-                                "BookKeeper generation-zero visible protection is absent");
+                        throw condition("BookKeeper generation-zero visible protection is absent");
                     }
-                    throw invariant(
-                            "BookKeeper generation-zero visible protection is ambiguous");
+                    throw invariant("BookKeeper generation-zero visible protection is ambiguous");
                 });
     }
 
@@ -559,16 +510,11 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
             BookKeeperOperationDeadline deadline) {
         int limit = Math.min(configuration.retentionPageSize(), 1_024);
         return deadline.bound(metadata.scanProtections(
-                        cluster,
-                        configuration.providerScopeSha256(),
-                        ledgerId,
-                        continuation,
-                        limit))
+                        cluster, configuration.providerScopeSha256(), ledgerId, continuation, limit))
                 .thenCompose(page -> {
                     values.addAll(page.values());
                     int maximum = Math.multiplyExact(
-                            configuration.maxAppendRangesPerLedger(),
-                            configuration.protectionSlotsPerRange());
+                            configuration.maxAppendRangesPerLedger(), configuration.protectionSlotsPerRange());
                     if (values.size() > maximum) {
                         return CompletableFuture.failedFuture(new NereusException(
                                 ErrorCode.METADATA_LIMIT_EXCEEDED,
@@ -576,34 +522,28 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
                                 "BookKeeper materialization source inventory exceeds fixed bounds"));
                     }
                     return page.continuation().isPresent()
-                            ? scanProtections(
-                                    ledgerId, page.continuation(), values, deadline)
+                            ? scanProtections(ledgerId, page.continuation(), values, deadline)
                             : CompletableFuture.completedFuture(List.copyOf(values));
                 });
     }
 
-    private MaterializationSourceProtection requireWrapper(
-            MaterializationSourceProtection protection) {
-        MaterializationSourceProtection exact = Objects.requireNonNull(
-                protection, "protection");
+    private MaterializationSourceProtection requireWrapper(MaterializationSourceProtection protection) {
+        MaterializationSourceProtection exact = Objects.requireNonNull(protection, "protection");
         if (exact.targetType() != ReadTargetType.BOOKKEEPER_ENTRY_RANGE) {
-            throw new IllegalArgumentException(
-                    "BookKeeper source adapter received another protection type");
+            throw new IllegalArgumentException("BookKeeper source adapter received another protection type");
         }
-        BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> value = handle(exact).protection();
+        BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> value =
+                handle(exact).protection();
         if (!value.value().referenceId().equals(exact.referenceId())
                 || !owner(value.value()).equals(exact.owner())
                 || value.metadataVersion() != exact.metadataVersion()) {
-            throw new IllegalArgumentException(
-                    "BookKeeper source protection wrapper is inconsistent");
+            throw new IllegalArgumentException("BookKeeper source protection wrapper is inconsistent");
         }
         return exact;
     }
 
-    private static BookKeeperMaterializationSourceProtectionHandle handle(
-            MaterializationSourceProtection protection) {
-        return protection.requireProviderHandle(
-                BookKeeperMaterializationSourceProtectionHandle.class);
+    private static BookKeeperMaterializationSourceProtectionHandle handle(MaterializationSourceProtection protection) {
+        return protection.requireProviderHandle(BookKeeperMaterializationSourceProtectionHandle.class);
     }
 
     private MaterializationSourceProtection wrap(
@@ -623,9 +563,7 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
                 new Checksum(ChecksumType.SHA256, value.ownerIdentitySha256()));
     }
 
-    private static void requireMonotonicOwner(
-            ObjectProtectionOwner current,
-            ObjectProtectionOwner requested) {
+    private static void requireMonotonicOwner(ObjectProtectionOwner current, ObjectProtectionOwner requested) {
         if (!current.ownerKey().equals(requested.ownerKey())
                 || requested.metadataVersion() < current.metadataVersion()
                 || (requested.metadataVersion() == current.metadataVersion()
@@ -635,8 +573,7 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
     }
 
     private static BookKeeperLedgerProtectionRecord withOwner(
-            BookKeeperLedgerProtectionRecord value,
-            ObjectProtectionOwner owner) {
+            BookKeeperLedgerProtectionRecord value, ObjectProtectionOwner owner) {
         return new BookKeeperLedgerProtectionRecord(
                 value.schemaVersion(),
                 value.ledgerIdentitySha256(),
@@ -692,8 +629,7 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
     }
 
     private static boolean sameCreatedValue(
-            BookKeeperLedgerProtectionRecord expected,
-            BookKeeperLedgerProtectionRecord actual) {
+            BookKeeperLedgerProtectionRecord expected, BookKeeperLedgerProtectionRecord actual) {
         return expected.withMetadataVersion(actual.metadataVersion()).equals(actual);
     }
 
@@ -706,11 +642,8 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
                 && expected.value().equals(actual.value());
     }
 
-    private static void requireReadableRoot(
-            BookKeeperLedgerRootRecord root,
-            BookKeeperEntryRangeReadTarget target) {
-        if (root.ledgerId() != target.ledgerId()
-                || !root.clusterAlias().equals(target.clusterAlias())) {
+    private static void requireReadableRoot(BookKeeperLedgerRootRecord root, BookKeeperEntryRangeReadTarget target) {
+        if (root.ledgerId() != target.ledgerId() || !root.clusterAlias().equals(target.clusterAlias())) {
             throw condition("BookKeeper materialization source root identity differs from target");
         }
         if (root.lifecycle() != BookKeeperLedgerLifecycle.ACTIVE
@@ -721,8 +654,7 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
     }
 
     private static void requireReadableRoot(
-            BookKeeperLedgerRootRecord root,
-            BookKeeperLedgerProtectionRecord protection) {
+            BookKeeperLedgerRootRecord root, BookKeeperLedgerProtectionRecord protection) {
         if (root.ledgerId() != protection.ledgerId()
                 || !root.clusterAlias().equals(protection.clusterAlias())
                 || !root.ledgerIdentitySha256().equals(protection.ledgerIdentitySha256())
@@ -739,8 +671,7 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
 
     private static BookKeeperEntryRangeReadTarget requireTarget(SourceGeneration source) {
         if (!(source.readTarget() instanceof BookKeeperEntryRangeReadTarget target)) {
-            throw new IllegalArgumentException(
-                    "BookKeeper source adapter received another target type");
+            throw new IllegalArgumentException("BookKeeper source adapter received another target type");
         }
         return target;
     }
@@ -748,8 +679,7 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
     private int firstSlot(String referenceId) {
         byte[] digest;
         try {
-            digest = MessageDigest.getInstance("SHA-256")
-                    .digest(referenceId.getBytes(StandardCharsets.UTF_8));
+            digest = MessageDigest.getInstance("SHA-256").digest(referenceId.getBytes(StandardCharsets.UTF_8));
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("SHA-256 is unavailable", impossible);
         }
@@ -767,8 +697,7 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while ((current instanceof CompletionException
-                        || current instanceof java.util.concurrent.ExecutionException)
+        while ((current instanceof CompletionException || current instanceof java.util.concurrent.ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -21,11 +22,12 @@ import java.util.Set;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
 
-/** Closed NCP2/NTC2 schemas, metadata registries, limits, and object identities. */
+/**
+ * Closed NCP2/NTC2 schemas, metadata registries, limits, and object identities.
+ */
 public final class CompactedObjectFormatV2 {
     public static final String COMMITTED_PHYSICAL_FORMAT = "NEREUS_COMPACTED_PARQUET_V2";
-    public static final String TOPIC_COMPACTED_PHYSICAL_FORMAT =
-            "NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2";
+    public static final String TOPIC_COMPACTED_PHYSICAL_FORMAT = "NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2";
     public static final String COMMITTED_FORMAT_ID = "NCP2";
     public static final String TOPIC_COMPACTED_FORMAT_ID = "NTC2";
     public static final String KAFKA_LOGICAL_FORMAT = "KAFKA_RECORD_BATCH_V1";
@@ -109,8 +111,7 @@ public final class CompactedObjectFormatV2 {
             "nereus.source.batch.count",
             "nereus.output.batch.count");
 
-    private CompactedObjectFormatV2() {
-    }
+    private CompactedObjectFormatV2() {}
 
     public static MessageType schema(ReadView view) {
         Objects.requireNonNull(view, "view");
@@ -124,8 +125,8 @@ public final class CompactedObjectFormatV2 {
 
     public static ObjectKeyPrefix prefix(String cluster, ReadView view) {
         String viewComponent = view == ReadView.COMMITTED ? "committed" : "topic-compacted-kafka";
-        return new ObjectKeyPrefix(KeyComponentCodec.encodeComponent(requireText(cluster, "cluster"))
-                + "/compacted/v2/" + viewComponent + "/");
+        return new ObjectKeyPrefix(KeyComponentCodec.encodeComponent(requireText(cluster, "cluster")) + "/compacted/v2/"
+                + viewComponent + "/");
     }
 
     public static Map<String, String> metadata(RangedCompactedObjectWriteRequest request) {
@@ -169,15 +170,20 @@ public final class CompactedObjectFormatV2 {
                 request.compression(),
                 request.targetRowGroupRecords()));
         KafkaTopicCompactedFormatSpecV2 spec = request.topicCompaction();
-        metadata.put("nereus.source.coverage.start", Long.toString(request.sourceCoverage().startOffset()));
-        metadata.put("nereus.source.coverage.end", Long.toString(request.sourceCoverage().endOffset()));
+        metadata.put(
+                "nereus.source.coverage.start",
+                Long.toString(request.sourceCoverage().startOffset()));
+        metadata.put(
+                "nereus.source.coverage.end",
+                Long.toString(request.sourceCoverage().endOffset()));
         metadata.put("nereus.compaction.strategy", spec.strategyId());
         metadata.put("nereus.compaction.strategy.version", Long.toString(spec.strategyVersion()));
         metadata.put("nereus.compaction.key.codec", spec.keyCodecId());
         metadata.put("nereus.compaction.key.encoding", KafkaCompactionKeyEncodingV2.ID);
         metadata.put("nereus.kafka.batch.mapping", KAFKA_LOGICAL_FORMAT);
         metadata.put("nereus.kafka.rewrite.codec", spec.rewriteCodecId());
-        metadata.put("nereus.kafka.message.format.digest", spec.messageFormatSha256().value());
+        metadata.put(
+                "nereus.kafka.message.format.digest", spec.messageFormatSha256().value());
         metadata.put("nereus.source.batch.count", Long.toString(spec.sourceBatchCount()));
         metadata.put("nereus.output.batch.count", Long.toString(spec.outputBatchCount()));
         return java.util.Collections.unmodifiableMap(new LinkedHashMap<>(metadata));
@@ -186,14 +192,14 @@ public final class CompactedObjectFormatV2 {
     public static RangedCompactedObjectMetadata parseMetadata(Map<String, String> actual) {
         Objects.requireNonNull(actual, "actual");
         String formatId = require(actual, "nereus.format");
-        ReadView view = switch (formatId) {
-            case COMMITTED_FORMAT_ID -> ReadView.COMMITTED;
-            case TOPIC_COMPACTED_FORMAT_ID -> ReadView.TOPIC_COMPACTED;
-            default -> throw new CompactedObjectFormatException("unknown Nereus V2 compacted format id");
-        };
-        Set<String> allowed = view == ReadView.COMMITTED
-                ? COMMON_METADATA_KEYS
-                : union(COMMON_METADATA_KEYS, TOPIC_METADATA_KEYS);
+        ReadView view =
+                switch (formatId) {
+                    case COMMITTED_FORMAT_ID -> ReadView.COMMITTED;
+                    case TOPIC_COMPACTED_FORMAT_ID -> ReadView.TOPIC_COMPACTED;
+                    default -> throw new CompactedObjectFormatException("unknown Nereus V2 compacted format id");
+                };
+        Set<String> allowed =
+                view == ReadView.COMMITTED ? COMMON_METADATA_KEYS : union(COMMON_METADATA_KEYS, TOPIC_METADATA_KEYS);
         for (String key : allowed) {
             require(actual, key);
         }
@@ -284,16 +290,12 @@ public final class CompactedObjectFormatV2 {
                 topicSpec);
     }
 
-    public static void validateMetadata(
-            Map<String, String> actual,
-            RangedCompactedObjectWriteRequest expected) {
+    public static void validateMetadata(Map<String, String> actual, RangedCompactedObjectWriteRequest expected) {
         requireExactMap(actual, metadata(expected));
         parseMetadata(actual);
     }
 
-    public static void validateMetadata(
-            Map<String, String> actual,
-            KafkaTopicCompactedObjectWriteRequest expected) {
+    public static void validateMetadata(Map<String, String> actual, KafkaTopicCompactedObjectWriteRequest expected) {
         requireExactMap(actual, metadata(expected));
         parseMetadata(actual);
     }
@@ -311,7 +313,8 @@ public final class CompactedObjectFormatV2 {
                 + "/compacted/v2/"
                 + viewComponent
                 + "/"
-                + KeyComponentCodec.encodeComponent(Objects.requireNonNull(streamId, "streamId").value())
+                + KeyComponentCodec.encodeComponent(
+                        Objects.requireNonNull(streamId, "streamId").value())
                 + "/"
                 + KeyComponentCodec.encodeNonNegativeLong(coverage.startOffset())
                 + "-"

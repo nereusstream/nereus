@@ -24,8 +24,7 @@ import com.nereusstream.metadata.oxia.records.TaskFailureClass;
  * <p>Callers must cancel and retire the stale task before resolving a fresh source set. They must
  * not retry the same immutable task or reopen the retired physical source.
  */
-public final class MaterializationSourceRetiredException extends NereusException
-        implements MaterializationFailure {
+public final class MaterializationSourceRetiredException extends NereusException implements MaterializationFailure {
 
     public MaterializationSourceRetiredException(String message) {
         super(ErrorCode.METADATA_CONDITION_FAILED, true, message);

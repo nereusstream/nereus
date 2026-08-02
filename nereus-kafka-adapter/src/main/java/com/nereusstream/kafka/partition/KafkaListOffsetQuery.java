@@ -14,7 +14,9 @@
 
 package com.nereusstream.kafka.partition;
 
-/** Closed protocol-neutral projection of Kafka ListOffsets query kinds supported by the M3 adapter. */
+/**
+ * Closed protocol-neutral projection of Kafka ListOffsets query kinds supported by the M3 adapter.
+ */
 public enum KafkaListOffsetQuery {
     EARLIEST,
     LATEST,

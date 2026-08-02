@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.ErrorCode;
@@ -34,7 +35,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
-/** Exact NCP1 adapter that maps one dense Parquet row back to one unchanged logical ReadBatch. */
+/**
+ * Exact NCP1 adapter that maps one dense Parquet row back to one unchanged logical ReadBatch.
+ */
 public final class ParquetCompactedTargetReader implements ReadTargetReader {
     public static final ReadTargetReaderKey KEY = new ReadTargetReaderKey(
             ReadTargetType.OBJECT_SLICE,
@@ -48,8 +51,7 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
             Optional.of(ObjectType.STREAM_COMPACTED_OBJECT),
             Optional.of(CompactedObjectFormatV1.COMMITTED_PHYSICAL_FORMAT),
             Optional.of(com.nereusstream.api.PayloadFormat.OPAQUE_RECORD_BATCH.name()));
-    private static final Set<ReadTargetReaderKey> KEYS =
-            Set.of(KEY, LEGACY_OPAQUE_KEY);
+    private static final Set<ReadTargetReaderKey> KEYS = Set.of(KEY, LEGACY_OPAQUE_KEY);
 
     private final CompactedObjectReader reader;
 
@@ -74,19 +76,13 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
             return Math.addExact(target.objectLength(), target.entryIndexRef().length());
         } catch (ArithmeticException failure) {
             throw new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION,
-                    false,
-                    "compacted reader reservation overflows",
-                    failure);
+                    ErrorCode.METADATA_INVARIANT_VIOLATION, false, "compacted reader reservation overflows", failure);
         }
     }
 
     @Override
     public CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
-            StreamId streamId,
-            long startOffset,
-            List<ResolvedRange> ranges,
-            ReadOptions options) {
+            StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
         try {
             Objects.requireNonNull(streamId, "streamId");
             Objects.requireNonNull(options, "options");
@@ -109,25 +105,32 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
         }
     }
 
-    /** Transitional Object-only result used by existing direct reader callers. */
+    /**
+     * Transitional Object-only result used by existing direct reader callers.
+     */
     @Override
     @Deprecated(forRemoval = true)
     public CompletableFuture<WalReadResult> readWithStats(
-            StreamId streamId,
-            long startOffset,
-            List<ResolvedRange> ranges,
-            ReadOptions options) {
+            StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
         return readPhysicalWithStats(streamId, startOffset, ranges, options).thenApply(result -> {
-            List<WalSliceReadStats> legacy = result.rangeStats().stream().map(stats -> {
-                ObjectSliceReadTarget target = ranges.stream()
-                        .map(ParquetCompactedTargetReader::requireTarget)
-                        .filter(candidate -> ReadTargetIdentities.sha256(candidate).equals(stats.targetIdentity()))
-                        .findFirst().orElseThrow();
-                return new WalSliceReadStats(target.objectId(), target.objectOffset(),
-                        stats.resolvedPayloadBytes(), stats.resolvedAuxiliaryBytes(),
-                        stats.physicalPayloadBytesRead(), stats.physicalAuxiliaryBytesRead(),
-                        stats.returnedPayloadBytes());
-            }).toList();
+            List<WalSliceReadStats> legacy = result.rangeStats().stream()
+                    .map(stats -> {
+                        ObjectSliceReadTarget target = ranges.stream()
+                                .map(ParquetCompactedTargetReader::requireTarget)
+                                .filter(candidate ->
+                                        ReadTargetIdentities.sha256(candidate).equals(stats.targetIdentity()))
+                                .findFirst()
+                                .orElseThrow();
+                        return new WalSliceReadStats(
+                                target.objectId(),
+                                target.objectOffset(),
+                                stats.resolvedPayloadBytes(),
+                                stats.resolvedAuxiliaryBytes(),
+                                stats.physicalPayloadBytesRead(),
+                                stats.physicalAuxiliaryBytesRead(),
+                                stats.returnedPayloadBytes());
+                    })
+                    .toList();
             return new WalReadResult(result.batches(), legacy);
         });
     }
@@ -143,9 +146,7 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
             List<PhysicalReadStats> stats,
             long returnedRecords,
             long returnedBytes) {
-        if (index >= ranges.size()
-                || returnedRecords >= options.maxRecords()
-                || returnedBytes >= options.maxBytes()) {
+        if (index >= ranges.size() || returnedRecords >= options.maxRecords() || returnedBytes >= options.maxBytes()) {
             return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats));
         }
         ResolvedRange range = ranges.get(index);
@@ -197,7 +198,11 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
                         // not per-entry payload metadata and the locked PULSAR_ENTRY_V1 codec requires logical
                         // batches to keep the original empty projection-ref surface.
                         Optional.empty(),
-                        new ReadSourceRef(range.offsetRange(), range.generation(), range.commitVersion(), target,
+                        new ReadSourceRef(
+                                range.offsetRange(),
+                                range.generation(),
+                                range.commitVersion(),
+                                target,
                                 ReadTargetIdentities.sha256(target)),
                         target.objectOffset(),
                         target.objectLength()));
@@ -206,9 +211,7 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
                     ReadTargetIdentities.sha256(target),
                     target.objectLength(),
                     target.entryIndexRef().length(),
-                    Math.subtractExact(
-                            result.physicalBytesRead(),
-                            result.footerBytesRead()),
+                    Math.subtractExact(result.physicalBytesRead(), result.footerBytesRead()),
                     result.footerBytesRead(),
                     rangeBytes));
             long records = Math.addExact(returnedRecords, result.rows().size());
@@ -218,25 +221,13 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
                 return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats));
             }
             return readNext(
-                    streamId,
-                    next,
-                    ranges,
-                    index + 1,
-                    options,
-                    deadline,
-                    batches,
-                    stats,
-                    records,
-                    payloadBytes);
+                    streamId, next, ranges, index + 1, options, deadline, batches, stats, records, payloadBytes);
         });
     }
 
-    private static void validateRanges(
-            long startOffset,
-            List<ResolvedRange> ranges) {
+    private static void validateRanges(long startOffset, List<ResolvedRange> ranges) {
         if (startOffset < 0 || ranges.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "compacted reader requires a non-negative offset and non-empty ranges");
+            throw new IllegalArgumentException("compacted reader requires a non-negative offset and non-empty ranges");
         }
         long previousEnd = -1;
         boolean containsStart = false;
@@ -244,8 +235,7 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
             requireTarget(range);
             if (range.generation() <= 0
                     || (previousEnd >= 0 && range.offsetRange().startOffset() != previousEnd)) {
-                throw new CompactedObjectFormatException(
-                        "NCP1 resolved ranges must be higher-generation and gap-free");
+                throw new CompactedObjectFormatException("NCP1 resolved ranges must be higher-generation and gap-free");
             }
             containsStart |= range.offsetRange().contains(startOffset);
             previousEnd = range.offsetRange().endOffset();
@@ -262,16 +252,12 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
                 || target.objectOffset() != 0
                 || !target.logicalFormat().equals(range.payloadFormat().name())) {
             throw new NereusException(
-                    ErrorCode.UNSUPPORTED_READ_TARGET,
-                    false,
-                    "NCP1 reader received a non-exact compacted target");
+                    ErrorCode.UNSUPPORTED_READ_TARGET, false, "NCP1 reader received a non-exact compacted target");
         }
         return target;
     }
 
-    private static void requireMetadata(
-            ResolvedRange range,
-            CompactedObjectMetadata metadata) {
+    private static void requireMetadata(ResolvedRange range, CompactedObjectMetadata metadata) {
         if (metadata.view() != ReadView.COMMITTED
                 || !metadata.sourceCoverage().equals(range.offsetRange())
                 || metadata.payloadFormat() != range.payloadFormat()
@@ -281,8 +267,7 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
                 || metadata.logicalBytes() != range.logicalBytes()
                 || metadata.projectionIdentitySha256().isPresent()
                         != range.projectionRef().isPresent()) {
-            throw new CompactedObjectFormatException(
-                    "NCP1 metadata does not match the resolved generation index");
+            throw new CompactedObjectFormatException("NCP1 metadata does not match the resolved generation index");
         }
     }
 
@@ -308,14 +293,9 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
         }
 
         private Duration remaining() {
-            long nanos = deadlineNanos == Long.MAX_VALUE
-                    ? Long.MAX_VALUE
-                    : deadlineNanos - System.nanoTime();
+            long nanos = deadlineNanos == Long.MAX_VALUE ? Long.MAX_VALUE : deadlineNanos - System.nanoTime();
             if (nanos <= 0) {
-                throw new NereusException(
-                        ErrorCode.TIMEOUT,
-                        true,
-                        "compacted target read deadline expired");
+                throw new NereusException(ErrorCode.TIMEOUT, true, "compacted target read deadline expired");
             }
             return Duration.ofNanos(nanos);
         }

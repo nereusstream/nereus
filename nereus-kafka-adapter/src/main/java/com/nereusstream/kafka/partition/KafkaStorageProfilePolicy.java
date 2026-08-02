@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import com.nereusstream.api.AppendCompletionPolicy;
@@ -7,11 +8,11 @@ import com.nereusstream.api.StorageProfile;
 import java.util.Objects;
 import java.util.Set;
 
-/** Immutable Kafka append policy that preserves each activated Nereus profile's exact success predicate. */
+/**
+ * Immutable Kafka append policy that preserves each activated Nereus profile's exact success predicate.
+ */
 public record KafkaStorageProfilePolicy(
-        StorageProfile storageProfile,
-        DurabilityLevel durabilityLevel,
-        AppendCompletionPolicy completionPolicy) {
+        StorageProfile storageProfile, DurabilityLevel durabilityLevel, AppendCompletionPolicy completionPolicy) {
     private static final Set<StorageProfile> ACTIVATED_PROFILES = Set.of(
             StorageProfile.OBJECT_WAL_SYNC_OBJECT,
             StorageProfile.OBJECT_WAL_ASYNC_OBJECT,

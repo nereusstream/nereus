@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import java.util.Objects;
 
-/** Exact real-provider create/write/read/fence/delete/absence canary evidence. */
+/**
+ * Exact real-provider create/write/read/fence/delete/absence canary evidence.
+ */
 public record BookKeeperScopeCapabilityProof(
         String runId,
         long brokerReadinessEpoch,

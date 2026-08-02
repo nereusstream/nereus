@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.checkpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AcquiredAppendSession;
 import com.nereusstream.api.AppendAuthority;
 import com.nereusstream.api.AppendSession;
@@ -28,8 +28,7 @@ class DefaultKafkaCheckpointSourceValidatorTest {
     private static final StreamId STREAM = new StreamId("stream-1");
     private static final AppendAuthority AUTHORITY =
             new AppendAuthority("kafka-partition-leader-v1", "cluster/topic/0", 7, "1", 9);
-    private static final Checksum HEAD_SHA =
-            new Checksum(ChecksumType.SHA256, "11".repeat(32));
+    private static final Checksum HEAD_SHA = new Checksum(ChecksumType.SHA256, "11".repeat(32));
 
     @Test
     void loadsExactAuthorityHeadAndDelegatesReachabilityFromTheSameObservation() {
@@ -41,7 +40,8 @@ class DefaultKafkaCheckpointSourceValidatorTest {
                 new DefaultKafkaCheckpointSourceValidator(streams, STREAM, acquired);
 
         KafkaCheckpointSourceState current = validator.loadCurrent().join();
-        boolean reachable = validator.isSourceCommitReachable(header(STREAM), current).join();
+        boolean reachable =
+                validator.isSourceCommitReachable(header(STREAM), current).join();
 
         assertThat(current.authority()).isEqualTo(AUTHORITY);
         assertThat(current.writerId()).isEqualTo("writer");
@@ -62,15 +62,19 @@ class DefaultKafkaCheckpointSourceValidatorTest {
         KafkaCheckpointSourceState frozen = validator.loadCurrent().join();
 
         head.set(head(acquired, new Checksum(ChecksumType.SHA256, "22".repeat(32))));
-        assertFailure(() -> validator.isSourceCommitReachable(header(STREAM), frozen).join(), ErrorCode.FENCED_APPEND);
+        assertFailure(
+                () -> validator.isSourceCommitReachable(header(STREAM), frozen).join(), ErrorCode.FENCED_APPEND);
 
-        head.set(head(new AcquiredAppendSession(
-                new AppendSession(STREAM, "writer", 2, "other-token", 4, 20_000),
-                Optional.of(AUTHORITY)), HEAD_SHA));
+        head.set(head(
+                new AcquiredAppendSession(
+                        new AppendSession(STREAM, "writer", 2, "other-token", 4, 20_000), Optional.of(AUTHORITY)),
+                HEAD_SHA));
         assertFailure(() -> validator.loadCurrent().join(), ErrorCode.FENCED_APPEND);
 
         assertFailure(
-                () -> validator.isSourceCommitReachable(header(new StreamId("other")), frozen).join(),
+                () -> validator
+                        .isSourceCommitReachable(header(new StreamId("other")), frozen)
+                        .join(),
                 ErrorCode.METADATA_INVARIANT_VIOLATION);
     }
 
@@ -99,13 +103,10 @@ class DefaultKafkaCheckpointSourceValidatorTest {
 
     private static AcquiredAppendSession acquired(String token, long leaseVersion) {
         return new AcquiredAppendSession(
-                new AppendSession(STREAM, "writer", 2, token, leaseVersion, 10_000),
-                Optional.of(AUTHORITY));
+                new AppendSession(STREAM, "writer", 2, token, leaseVersion, 10_000), Optional.of(AUTHORITY));
     }
 
-    private static StableStreamHeadSnapshot head(
-            AcquiredAppendSession acquired,
-            Checksum digest) {
+    private static StableStreamHeadSnapshot head(AcquiredAppendSession acquired, Checksum digest) {
         return new StableStreamHeadSnapshot(
                 STREAM,
                 StreamState.ACTIVE,
@@ -122,8 +123,7 @@ class DefaultKafkaCheckpointSourceValidatorTest {
 
     private static KafkaCheckpointHeader header(StreamId streamId) {
         return new KafkaCheckpointHeader(
-                0, "cluster", "EjRWeJq83vAAAAAAAAAAAQ", 0, 1,
-                streamId, 1, 7, 2, 0, 2, 1, "commit-1", HEAD_SHA);
+                0, "cluster", "EjRWeJq83vAAAAAAAAAAAQ", 0, 1, streamId, 1, 7, 2, 0, 2, 1, "commit-1", HEAD_SHA);
     }
 
     private static void assertFailure(Runnable action, ErrorCode code) {

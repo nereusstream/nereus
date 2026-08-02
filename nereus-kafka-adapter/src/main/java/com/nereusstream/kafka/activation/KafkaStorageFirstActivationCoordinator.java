@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
 import com.nereusstream.api.ErrorCode;
@@ -24,7 +25,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 
-/** Controller-side empty-cluster PREPARED to ACTIVE protocol with failover-safe CAS recovery. */
+/**
+ * Controller-side empty-cluster PREPARED to ACTIVE protocol with failover-safe CAS recovery.
+ */
 public final class KafkaStorageFirstActivationCoordinator {
     private final KafkaStorageActivationMetadataStore store;
     private final KafkaStorageClusterSnapshotProvider clusterSnapshots;
@@ -45,23 +48,22 @@ public final class KafkaStorageFirstActivationCoordinator {
     public CompletionStage<VersionedKafkaStorageProtocolActivation> activate() {
         return store.getActivation().thenCompose(existing -> {
             if (existing.isPresent()
-                    && existing.orElseThrow().value().lifecycle()
-                            == KafkaStorageActivationLifecycle.ACTIVE) {
-                return currentSnapshot().thenCompose(
-                        snapshot -> refreshActiveReadiness(existing.orElseThrow(), snapshot));
+                    && existing.orElseThrow().value().lifecycle() == KafkaStorageActivationLifecycle.ACTIVE) {
+                return currentSnapshot()
+                        .thenCompose(snapshot -> refreshActiveReadiness(existing.orElseThrow(), snapshot));
             }
             return currentSnapshot().thenCompose(snapshot -> beginOrResume(existing, snapshot));
         });
     }
 
     private CompletionStage<VersionedKafkaStorageProtocolActivation> refreshActiveReadiness(
-            VersionedKafkaStorageProtocolActivation active,
-            KafkaStorageClusterSnapshot snapshot) {
+            VersionedKafkaStorageProtocolActivation active, KafkaStorageClusterSnapshot snapshot) {
         requireActive(active, snapshot);
         return loadCapabilities(snapshot).thenCompose(proof -> {
-            require(Arrays.equals(
-                            active.value().requiredCapabilitySha256(), proof.capabilitySha256()),
-                    "ACTIVE capability digest differs from current brokers", false);
+            require(
+                    Arrays.equals(active.value().requiredCapabilitySha256(), proof.capabilitySha256()),
+                    "ACTIVE capability digest differs from current brokers",
+                    false);
             return upsertReadiness(snapshot, proof).thenApply(readiness -> {
                 requireReadiness(readiness, snapshot, proof);
                 return active;
@@ -70,24 +72,23 @@ public final class KafkaStorageFirstActivationCoordinator {
     }
 
     private CompletionStage<VersionedKafkaStorageProtocolActivation> beginOrResume(
-            Optional<VersionedKafkaStorageProtocolActivation> existing,
-            KafkaStorageClusterSnapshot firstSnapshot) {
+            Optional<VersionedKafkaStorageProtocolActivation> existing, KafkaStorageClusterSnapshot firstSnapshot) {
         requireFirstActivationSnapshot(firstSnapshot);
         return loadCapabilities(firstSnapshot).thenCompose(proof -> {
             if (existing.isPresent()) {
                 VersionedKafkaStorageProtocolActivation prepared = existing.orElseThrow();
                 requirePrepared(prepared, firstSnapshot, proof);
                 return store.getReadiness().thenCompose(readiness -> {
-                    VersionedKafkaStorageReadiness exact = required(
-                            readiness, "PREPARED activation has no readiness proof");
+                    VersionedKafkaStorageReadiness exact =
+                            required(readiness, "PREPARED activation has no readiness proof");
                     requireReadiness(exact, firstSnapshot, proof);
                     requirePreparedReadiness(prepared.value(), exact.value());
                     return revalidateAndActivate(prepared, exact, firstSnapshot);
                 });
             }
-            return upsertReadiness(firstSnapshot, proof).thenCompose(readiness ->
-                    createPrepared(firstSnapshot, proof, readiness).thenCompose(prepared ->
-                            revalidateAndActivate(prepared, readiness, firstSnapshot)));
+            return upsertReadiness(firstSnapshot, proof)
+                    .thenCompose(readiness -> createPrepared(firstSnapshot, proof, readiness)
+                            .thenCompose(prepared -> revalidateAndActivate(prepared, readiness, firstSnapshot)));
         });
     }
 
@@ -97,10 +98,14 @@ public final class KafkaStorageFirstActivationCoordinator {
             KafkaStorageClusterSnapshot firstSnapshot) {
         return currentSnapshot().thenCompose(secondSnapshot -> {
             requireFirstActivationSnapshot(secondSnapshot);
-            require(secondSnapshot.metadataOffset() >= firstSnapshot.metadataOffset(),
-                    "KRaft metadata offset regressed during activation", true);
-            require(secondSnapshot.brokers().equals(firstSnapshot.brokers()),
-                    "KRaft broker set changed during activation", true);
+            require(
+                    secondSnapshot.metadataOffset() >= firstSnapshot.metadataOffset(),
+                    "KRaft metadata offset regressed during activation",
+                    true);
+            require(
+                    secondSnapshot.brokers().equals(firstSnapshot.brokers()),
+                    "KRaft broker set changed during activation",
+                    true);
             return loadCapabilities(secondSnapshot).thenCompose(proof -> {
                 requireReadiness(readiness, secondSnapshot, proof);
                 requirePreparedOrActive(prepared, secondSnapshot, proof);
@@ -111,8 +116,7 @@ public final class KafkaStorageFirstActivationCoordinator {
     }
 
     private CompletableFuture<VersionedKafkaStorageReadiness> upsertReadiness(
-            KafkaStorageClusterSnapshot snapshot,
-            CapabilityProof proof) {
+            KafkaStorageClusterSnapshot snapshot, CapabilityProof proof) {
         return store.getReadiness().thenCompose(existing -> {
             long now = clock.millis();
             if (existing.isPresent()) {
@@ -120,18 +124,18 @@ public final class KafkaStorageFirstActivationCoordinator {
                 if (readinessMatches(current.value(), snapshot, proof, now)) {
                     return CompletableFuture.completedFuture(current);
                 }
-                require(snapshot.metadataOffset() >= current.value().kraftMetadataOffset(),
-                        "KRaft image precedes existing readiness", true);
+                require(
+                        snapshot.metadataOffset() >= current.value().kraftMetadataOffset(),
+                        "KRaft image precedes existing readiness",
+                        true);
                 KafkaStorageReadinessRecord replacement = readiness(
                         snapshot,
                         proof,
                         addExact(current.value().readinessEpoch(), 1),
                         Math.max(now, addExact(current.value().createdAtMillis(), 1)));
-                return recoverReadinessWrite(
-                        store.compareAndSetReadiness(current, replacement), snapshot, proof);
+                return recoverReadinessWrite(store.compareAndSetReadiness(current, replacement), snapshot, proof);
             }
-            return recoverReadinessWrite(
-                    store.createReadiness(readiness(snapshot, proof, 1, now)), snapshot, proof);
+            return recoverReadinessWrite(store.createReadiness(readiness(snapshot, proof, 1, now)), snapshot, proof);
         });
     }
 
@@ -145,8 +149,7 @@ public final class KafkaStorageFirstActivationCoordinator {
                 return CompletableFuture.failedFuture(exact);
             }
             return store.getReadiness().thenApply(current -> {
-                VersionedKafkaStorageReadiness recovered = required(
-                        current, "readiness CAS lost and no winner exists");
+                VersionedKafkaStorageReadiness recovered = required(current, "readiness CAS lost and no winner exists");
                 requireReadiness(recovered, snapshot, proof);
                 return recovered;
             });
@@ -154,9 +157,7 @@ public final class KafkaStorageFirstActivationCoordinator {
     }
 
     private CompletableFuture<VersionedKafkaStorageProtocolActivation> createPrepared(
-            KafkaStorageClusterSnapshot snapshot,
-            CapabilityProof proof,
-            VersionedKafkaStorageReadiness readiness) {
+            KafkaStorageClusterSnapshot snapshot, CapabilityProof proof, VersionedKafkaStorageReadiness readiness) {
         KafkaStorageProtocolActivationRecord value = new KafkaStorageProtocolActivationRecord(
                 KafkaStorageProtocolActivationRecord.RECORD_VERSION,
                 KafkaStorageActivationLifecycle.PREPARED.wireId(),
@@ -187,8 +188,8 @@ public final class KafkaStorageFirstActivationCoordinator {
                 return CompletableFuture.failedFuture(exact);
             }
             return store.getActivation().thenApply(current -> {
-                VersionedKafkaStorageProtocolActivation winner = required(
-                        current, "activation create lost and no winner exists");
+                VersionedKafkaStorageProtocolActivation winner =
+                        required(current, "activation create lost and no winner exists");
                 requirePreparedOrActive(winner, snapshot, proof);
                 requirePreparedReadiness(winner.value(), readiness.value());
                 return winner;
@@ -233,10 +234,12 @@ public final class KafkaStorageFirstActivationCoordinator {
                 return CompletableFuture.failedFuture(exact);
             }
             return store.getActivation().thenApply(currentValue -> {
-                VersionedKafkaStorageProtocolActivation winner = required(
-                        currentValue, "activation CAS lost and no winner exists");
-                require(winner.value().lifecycle() == KafkaStorageActivationLifecycle.ACTIVE,
-                        "activation CAS lost to a non-ACTIVE value", false);
+                VersionedKafkaStorageProtocolActivation winner =
+                        required(currentValue, "activation CAS lost and no winner exists");
+                require(
+                        winner.value().lifecycle() == KafkaStorageActivationLifecycle.ACTIVE,
+                        "activation CAS lost to a non-ACTIVE value",
+                        false);
                 requireSamePreparedFacts(prepared.value(), winner.value());
                 return winner;
             });
@@ -246,7 +249,9 @@ public final class KafkaStorageFirstActivationCoordinator {
     private CompletionStage<CapabilityProof> loadCapabilities(KafkaStorageClusterSnapshot snapshot) {
         List<CompletableFuture<Optional<VersionedKafkaBrokerCapability>>> reads =
                 new ArrayList<>(snapshot.brokers().size());
-        for (KafkaBrokerIdentity broker : snapshot.brokers()) reads.add(store.getCapability(broker));
+        for (KafkaBrokerIdentity broker : snapshot.brokers()) {
+            reads.add(store.getCapability(broker));
+        }
         return CompletableFuture.allOf(reads.toArray(CompletableFuture[]::new)).thenApply(ignored -> {
             List<VersionedKafkaBrokerCapability> capabilities = new ArrayList<>(reads.size());
             byte[] capabilitySha256 = null;
@@ -256,24 +261,30 @@ public final class KafkaStorageFirstActivationCoordinator {
                 KafkaBrokerIdentity identity = snapshot.brokers().get(index);
                 VersionedKafkaBrokerCapability capability = required(
                         reads.get(index).join(),
-                        "capability is absent for broker " + identity.brokerId()
-                                + " epoch " + identity.brokerEpoch());
+                        "capability is absent for broker " + identity.brokerId() + " epoch " + identity.brokerEpoch());
                 KafkaBrokerCapabilityRecord value = capability.value();
-                require(value.kafkaClusterId().equals(snapshot.kafkaClusterId()),
-                        "capability Kafka cluster does not match KRaft", false);
-                require(value.identity().equals(identity),
-                        "capability identity does not match KRaft", false);
-                require(value.expiresAtMillis() > now,
-                        "capability is expired for broker " + identity.brokerId(), true);
-                require(value.supportedStorageProfiles().equals(policy.allowedStorageProfiles()),
-                        "broker storage profiles differ from activation policy", false);
+                require(
+                        value.kafkaClusterId().equals(snapshot.kafkaClusterId()),
+                        "capability Kafka cluster does not match KRaft",
+                        false);
+                require(value.identity().equals(identity), "capability identity does not match KRaft", false);
+                require(value.expiresAtMillis() > now, "capability is expired for broker " + identity.brokerId(), true);
+                require(
+                        value.supportedStorageProfiles().equals(policy.allowedStorageProfiles()),
+                        "broker storage profiles differ from activation policy",
+                        false);
                 byte[] digest = KafkaStorageCapabilityDigests.compatibilitySha256(value);
-                if (capabilitySha256 == null) capabilitySha256 = digest;
-                if (providerScopeSha256 == null) providerScopeSha256 = value.providerScopeSha256();
-                require(Arrays.equals(capabilitySha256, digest),
-                        "broker capability compatibility facts differ", false);
-                require(Arrays.equals(providerScopeSha256, value.providerScopeSha256()),
-                        "broker provider scopes differ", false);
+                if (capabilitySha256 == null) {
+                    capabilitySha256 = digest;
+                }
+                if (providerScopeSha256 == null) {
+                    providerScopeSha256 = value.providerScopeSha256();
+                }
+                require(Arrays.equals(capabilitySha256, digest), "broker capability compatibility facts differ", false);
+                require(
+                        Arrays.equals(providerScopeSha256, value.providerScopeSha256()),
+                        "broker provider scopes differ",
+                        false);
                 capabilities.add(capability);
             }
             return new CapabilityProof(capabilities, capabilitySha256, providerScopeSha256);
@@ -281,10 +292,7 @@ public final class KafkaStorageFirstActivationCoordinator {
     }
 
     private KafkaStorageReadinessRecord readiness(
-            KafkaStorageClusterSnapshot snapshot,
-            CapabilityProof proof,
-            long epoch,
-            long createdAtMillis) {
+            KafkaStorageClusterSnapshot snapshot, CapabilityProof proof, long epoch, long createdAtMillis) {
         return new KafkaStorageReadinessRecord(
                 KafkaStorageReadinessRecord.RECORD_VERSION,
                 policy.kafkaClusterId(),
@@ -301,16 +309,19 @@ public final class KafkaStorageFirstActivationCoordinator {
 
     private void requireFirstActivationSnapshot(KafkaStorageClusterSnapshot snapshot) {
         requireSnapshotIdentity(snapshot);
-        require(snapshot.emptyForFirstActivation(),
-                "first activation requires zero topics, authoritative local logs and bindings", false);
+        require(
+                snapshot.emptyForFirstActivation(),
+                "first activation requires zero topics, authoritative local logs and bindings",
+                false);
     }
 
     private void requireActive(
-            VersionedKafkaStorageProtocolActivation activation,
-            KafkaStorageClusterSnapshot snapshot) {
+            VersionedKafkaStorageProtocolActivation activation, KafkaStorageClusterSnapshot snapshot) {
         requireSnapshotIdentity(snapshot);
-        require(activation.value().lifecycle() == KafkaStorageActivationLifecycle.ACTIVE,
-                "stored activation is not ACTIVE", false);
+        require(
+                activation.value().lifecycle() == KafkaStorageActivationLifecycle.ACTIVE,
+                "stored activation is not ACTIVE",
+                false);
         requireActivationPolicy(activation.value(), snapshot);
     }
 
@@ -318,8 +329,10 @@ public final class KafkaStorageFirstActivationCoordinator {
             VersionedKafkaStorageProtocolActivation activation,
             KafkaStorageClusterSnapshot snapshot,
             CapabilityProof proof) {
-        require(activation.value().lifecycle() == KafkaStorageActivationLifecycle.PREPARED,
-                "first activation encountered a non-PREPARED value", false);
+        require(
+                activation.value().lifecycle() == KafkaStorageActivationLifecycle.PREPARED,
+                "first activation encountered a non-PREPARED value",
+                false);
         requirePreparedOrActive(activation, snapshot, proof);
     }
 
@@ -327,47 +340,65 @@ public final class KafkaStorageFirstActivationCoordinator {
             VersionedKafkaStorageProtocolActivation activation,
             KafkaStorageClusterSnapshot snapshot,
             CapabilityProof proof) {
-        require(activation.value().lifecycle() == KafkaStorageActivationLifecycle.PREPARED
+        require(
+                activation.value().lifecycle() == KafkaStorageActivationLifecycle.PREPARED
                         || activation.value().lifecycle() == KafkaStorageActivationLifecycle.ACTIVE,
-                "first activation encountered an unknown lifecycle", false);
+                "first activation encountered an unknown lifecycle",
+                false);
         requireActivationPolicy(activation.value(), snapshot);
-        require(Arrays.equals(activation.value().requiredCapabilitySha256(), proof.capabilitySha256()),
-                "PREPARED capability digest differs from current brokers", false);
-        require(Arrays.equals(activation.value().requiredBrokerSetSha256(),
+        require(
+                Arrays.equals(activation.value().requiredCapabilitySha256(), proof.capabilitySha256()),
+                "PREPARED capability digest differs from current brokers",
+                false);
+        require(
+                Arrays.equals(
+                        activation.value().requiredBrokerSetSha256(),
                         KafkaStorageReadinessRecord.brokerSetSha256(snapshot.brokers())),
-                "PREPARED broker-set digest differs from current KRaft", true);
+                "PREPARED broker-set digest differs from current KRaft",
+                true);
     }
 
     private void requireActivationPolicy(
-            KafkaStorageProtocolActivationRecord activation,
-            KafkaStorageClusterSnapshot snapshot) {
-        require(activation.kafkaClusterId().equals(policy.kafkaClusterId()),
-                "activation Kafka cluster differs from policy", false);
-        require(activation.kafkaFeatureLevel() == snapshot.kafkaFeatureLevel(),
-                "activation feature level differs from KRaft", false);
-        require(activation.preparedAtMetadataOffset() <= snapshot.metadataOffset(),
-                "KRaft image precedes activation preparation", true);
-        require(activation.allowedStorageProfiles().equals(policy.allowedStorageProfiles()),
-                "activation profiles differ from policy", false);
-        require(activation.defaultStorageProfile().equals(policy.defaultStorageProfile()),
-                "activation default profile differs from policy", false);
+            KafkaStorageProtocolActivationRecord activation, KafkaStorageClusterSnapshot snapshot) {
+        require(
+                activation.kafkaClusterId().equals(policy.kafkaClusterId()),
+                "activation Kafka cluster differs from policy",
+                false);
+        require(
+                activation.kafkaFeatureLevel() == snapshot.kafkaFeatureLevel(),
+                "activation feature level differs from KRaft",
+                false);
+        require(
+                activation.preparedAtMetadataOffset() <= snapshot.metadataOffset(),
+                "KRaft image precedes activation preparation",
+                true);
+        require(
+                activation.allowedStorageProfiles().equals(policy.allowedStorageProfiles()),
+                "activation profiles differ from policy",
+                false);
+        require(
+                activation.defaultStorageProfile().equals(policy.defaultStorageProfile()),
+                "activation default profile differs from policy",
+                false);
     }
 
     private void requireReadiness(
-            VersionedKafkaStorageReadiness readiness,
-            KafkaStorageClusterSnapshot snapshot,
-            CapabilityProof proof) {
+            VersionedKafkaStorageReadiness readiness, KafkaStorageClusterSnapshot snapshot, CapabilityProof proof) {
         KafkaStorageReadinessRecord value = readiness.value();
-        require(value.kafkaClusterId().equals(policy.kafkaClusterId()),
-                "readiness Kafka cluster differs from activation policy", false);
-        require(value.kraftMetadataOffset() <= snapshot.metadataOffset(),
-                "KRaft image precedes readiness", true);
-        require(value.brokers().equals(snapshot.brokers()),
-                "readiness broker set differs from current KRaft", true);
-        require(Arrays.equals(value.capabilitySha256(), proof.capabilitySha256()),
-                "readiness capability digest differs from current brokers", false);
-        require(Arrays.equals(value.providerScopeSha256(), proof.providerScopeSha256()),
-                "readiness provider scope differs from current brokers", false);
+        require(
+                value.kafkaClusterId().equals(policy.kafkaClusterId()),
+                "readiness Kafka cluster differs from activation policy",
+                false);
+        require(value.kraftMetadataOffset() <= snapshot.metadataOffset(), "KRaft image precedes readiness", true);
+        require(value.brokers().equals(snapshot.brokers()), "readiness broker set differs from current KRaft", true);
+        require(
+                Arrays.equals(value.capabilitySha256(), proof.capabilitySha256()),
+                "readiness capability digest differs from current brokers",
+                false);
+        require(
+                Arrays.equals(value.providerScopeSha256(), proof.providerScopeSha256()),
+                "readiness provider scope differs from current brokers",
+                false);
         require(value.expiresAtMillis() > clock.millis(), "readiness is expired", true);
     }
 
@@ -379,67 +410,78 @@ public final class KafkaStorageFirstActivationCoordinator {
         return readiness.kafkaClusterId().equals(policy.kafkaClusterId())
                 && readiness.kraftMetadataOffset() <= snapshot.metadataOffset()
                 && readiness.brokers().equals(snapshot.brokers())
-                && Arrays.equals(readiness.brokerSetSha256(),
-                        KafkaStorageReadinessRecord.brokerSetSha256(snapshot.brokers()))
+                && Arrays.equals(
+                        readiness.brokerSetSha256(), KafkaStorageReadinessRecord.brokerSetSha256(snapshot.brokers()))
                 && Arrays.equals(readiness.capabilitySha256(), proof.capabilitySha256())
                 && Arrays.equals(readiness.providerScopeSha256(), proof.providerScopeSha256())
                 && readiness.expiresAtMillis() > now;
     }
 
     private static void requirePreparedReadiness(
-            KafkaStorageProtocolActivationRecord activation,
-            KafkaStorageReadinessRecord readiness) {
-        require(activation.activationEpoch() == readiness.readinessEpoch(),
-                "PREPARED activation epoch differs from readiness", false);
-        require(activation.preparedAtMetadataOffset() == readiness.kraftMetadataOffset(),
-                "PREPARED metadata offset differs from readiness", false);
-        require(Arrays.equals(activation.requiredCapabilitySha256(), readiness.capabilitySha256()),
-                "PREPARED capability digest differs from readiness", false);
-        require(Arrays.equals(activation.requiredBrokerSetSha256(), readiness.brokerSetSha256()),
-                "PREPARED broker-set digest differs from readiness", false);
+            KafkaStorageProtocolActivationRecord activation, KafkaStorageReadinessRecord readiness) {
+        require(
+                activation.activationEpoch() == readiness.readinessEpoch(),
+                "PREPARED activation epoch differs from readiness",
+                false);
+        require(
+                activation.preparedAtMetadataOffset() == readiness.kraftMetadataOffset(),
+                "PREPARED metadata offset differs from readiness",
+                false);
+        require(
+                Arrays.equals(activation.requiredCapabilitySha256(), readiness.capabilitySha256()),
+                "PREPARED capability digest differs from readiness",
+                false);
+        require(
+                Arrays.equals(activation.requiredBrokerSetSha256(), readiness.brokerSetSha256()),
+                "PREPARED broker-set digest differs from readiness",
+                false);
     }
 
     private static void requireSamePreparedFacts(
-            KafkaStorageProtocolActivationRecord prepared,
-            KafkaStorageProtocolActivationRecord active) {
-        require(prepared.withMetadataVersion(0).equals(new KafkaStorageProtocolActivationRecord(
-                        active.recordVersion(),
-                        KafkaStorageActivationLifecycle.PREPARED.wireId(),
-                        active.kafkaClusterId(),
-                        active.protocolVersion(),
-                        active.apiVersion(),
-                        active.streamHeadSessionVersion(),
-                        active.bindingVersion(),
-                        active.payloadMappingId(),
-                        active.objectWalEntryIndexVersion(),
-                        active.ncpVersion(),
-                        active.ntcVersion(),
-                        active.checkpointVersion(),
-                        active.compactionStrategyVersion(),
-                        active.allowedStorageProfiles(),
-                        active.defaultStorageProfile(),
-                        active.requiredCapabilitySha256(),
-                        active.requiredBrokerSetSha256(),
-                        active.kafkaFeatureLevel(),
-                        active.preparedAtMetadataOffset(),
-                        active.activationEpoch(),
-                        active.preparedAtMillis(),
-                        0,
-                        0)),
-                "ACTIVE winner changed PREPARED immutable facts", false);
+            KafkaStorageProtocolActivationRecord prepared, KafkaStorageProtocolActivationRecord active) {
+        require(
+                prepared.withMetadataVersion(0)
+                        .equals(new KafkaStorageProtocolActivationRecord(
+                                active.recordVersion(),
+                                KafkaStorageActivationLifecycle.PREPARED.wireId(),
+                                active.kafkaClusterId(),
+                                active.protocolVersion(),
+                                active.apiVersion(),
+                                active.streamHeadSessionVersion(),
+                                active.bindingVersion(),
+                                active.payloadMappingId(),
+                                active.objectWalEntryIndexVersion(),
+                                active.ncpVersion(),
+                                active.ntcVersion(),
+                                active.checkpointVersion(),
+                                active.compactionStrategyVersion(),
+                                active.allowedStorageProfiles(),
+                                active.defaultStorageProfile(),
+                                active.requiredCapabilitySha256(),
+                                active.requiredBrokerSetSha256(),
+                                active.kafkaFeatureLevel(),
+                                active.preparedAtMetadataOffset(),
+                                active.activationEpoch(),
+                                active.preparedAtMillis(),
+                                0,
+                                0)),
+                "ACTIVE winner changed PREPARED immutable facts",
+                false);
     }
 
     private void requireSnapshotIdentity(KafkaStorageClusterSnapshot snapshot) {
-        require(snapshot.kafkaClusterId().equals(policy.kafkaClusterId()),
-                "KRaft Kafka cluster differs from activation policy", false);
-        require(snapshot.kafkaFeatureLevel()
-                        == KafkaStorageProtocolActivationRecord.KAFKA_FEATURE_LEVEL,
-                "KRaft nereus.storage.version is not the exact supported level", false);
+        require(
+                snapshot.kafkaClusterId().equals(policy.kafkaClusterId()),
+                "KRaft Kafka cluster differs from activation policy",
+                false);
+        require(
+                snapshot.kafkaFeatureLevel() == KafkaStorageProtocolActivationRecord.KAFKA_FEATURE_LEVEL,
+                "KRaft nereus.storage.version is not the exact supported level",
+                false);
     }
 
     private CompletableFuture<KafkaStorageClusterSnapshot> currentSnapshot() {
-        return Objects.requireNonNull(
-                        clusterSnapshots.currentSnapshot(), "KRaft snapshot future")
+        return Objects.requireNonNull(clusterSnapshots.currentSnapshot(), "KRaft snapshot future")
                 .thenApply(snapshot -> Objects.requireNonNull(snapshot, "KRaft snapshot"))
                 .toCompletableFuture();
     }
@@ -449,7 +491,9 @@ public final class KafkaStorageFirstActivationCoordinator {
     }
 
     private static void require(boolean condition, String message, boolean retriable) {
-        if (!condition) throw failure(message, retriable);
+        if (!condition) {
+            throw failure(message, retriable);
+        }
     }
 
     private static NereusException failure(String message, boolean retriable) {
@@ -476,16 +520,21 @@ public final class KafkaStorageFirstActivationCoordinator {
     }
 
     private record CapabilityProof(
-            List<VersionedKafkaBrokerCapability> capabilities,
-            byte[] capabilitySha256,
-            byte[] providerScopeSha256) {
+            List<VersionedKafkaBrokerCapability> capabilities, byte[] capabilitySha256, byte[] providerScopeSha256) {
         private CapabilityProof {
             capabilities = List.copyOf(capabilities);
             capabilitySha256 = capabilitySha256.clone();
             providerScopeSha256 = providerScopeSha256.clone();
         }
 
-        @Override public byte[] capabilitySha256() { return capabilitySha256.clone(); }
-        @Override public byte[] providerScopeSha256() { return providerScopeSha256.clone(); }
+        @Override
+        public byte[] capabilitySha256() {
+            return capabilitySha256.clone();
+        }
+
+        @Override
+        public byte[] providerScopeSha256() {
+            return providerScopeSha256.clone();
+        }
     }
 }

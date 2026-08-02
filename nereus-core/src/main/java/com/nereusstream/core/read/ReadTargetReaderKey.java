@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.ObjectType;
@@ -9,7 +10,9 @@ import com.nereusstream.api.target.ReadTargetType;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Exact physical reader discriminator; target type alone is intentionally insufficient. */
+/**
+ * Exact physical reader discriminator; target type alone is intentionally insufficient.
+ */
 public record ReadTargetReaderKey(
         ReadTargetType targetType,
         int targetVersion,
@@ -35,14 +38,15 @@ public record ReadTargetReaderKey(
             }
             case BOOKKEEPER_ENTRY_RANGE -> {
                 if (objectType.isPresent() || physicalFormat.isPresent() || logicalFormat.isPresent()) {
-                    throw new IllegalArgumentException(
-                            "BookKeeper reader key cannot carry object fields");
+                    throw new IllegalArgumentException("BookKeeper reader key cannot carry object fields");
                 }
             }
         }
     }
 
-    /** Compatibility constructor for non-object target keys. */
+    /**
+     * Compatibility constructor for non-object target keys.
+     */
     public ReadTargetReaderKey(
             ReadTargetType targetType,
             int targetVersion,
@@ -55,14 +59,17 @@ public record ReadTargetReaderKey(
         Objects.requireNonNull(target, "target");
         if (target instanceof ObjectSliceReadTarget object) {
             return new ReadTargetReaderKey(
-                    object.type(), object.version(), Optional.of(object.objectType()),
-                    Optional.of(object.physicalFormat()), Optional.of(object.logicalFormat()));
+                    object.type(),
+                    object.version(),
+                    Optional.of(object.objectType()),
+                    Optional.of(object.physicalFormat()),
+                    Optional.of(object.logicalFormat()));
         }
         if (target instanceof BookKeeperEntryRangeReadTarget bookKeeper) {
-            return new ReadTargetReaderKey(
-                    bookKeeper.type(), bookKeeper.version(), Optional.empty(), Optional.empty());
+            return new ReadTargetReaderKey(bookKeeper.type(), bookKeeper.version(), Optional.empty(), Optional.empty());
         }
-        throw new IllegalArgumentException("unknown read target Java type: " + target.getClass().getName());
+        throw new IllegalArgumentException(
+                "unknown read target Java type: " + target.getClass().getName());
     }
 
     private static String requireText(String value, String field) {

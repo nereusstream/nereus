@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.util.List;
 import java.util.TreeMap;
 import org.junit.jupiter.api.Test;
@@ -17,12 +17,7 @@ class AckNormalizerTest {
         partials.put(9L, new BatchAckState(3, new long[] {0b010}));
 
         CursorAckState state = new CursorAckState(
-                2,
-                List.of(
-                        new OffsetRange(5, 7),
-                        new OffsetRange(2, 4),
-                        new OffsetRange(7, 8)),
-                partials);
+                2, List.of(new OffsetRange(5, 7), new OffsetRange(2, 4), new OffsetRange(7, 8)), partials);
 
         assertThat(state.markDeleteOffset()).isEqualTo(8);
         assertThat(state.wholeAckRanges()).isEmpty();
@@ -46,8 +41,7 @@ class AckNormalizerTest {
     void rejectsBitsBeyondBatchAndRangesBelowMarkDelete() {
         assertThatThrownBy(() -> new BatchAckState(3, new long[] {0b1000}))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new CursorAckState(
-                5, List.of(new OffsetRange(4, 6)), new TreeMap<>()))
+        assertThatThrownBy(() -> new CursorAckState(5, List.of(new OffsetRange(4, 6)), new TreeMap<>()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

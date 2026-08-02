@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import java.time.Duration;
 import java.util.Objects;
 
-/** Bounded committed Kafka read mapped to Nereus containing-entry semantics. */
+/**
+ * Bounded committed Kafka read mapped to Nereus containing-entry semantics.
+ */
 public record KafkaStorageReadRequest(
         long startOffset,
         long maxOffsetExclusive,

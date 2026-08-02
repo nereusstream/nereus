@@ -22,11 +22,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 public record HeadObjectResult(
-        ObjectKey key,
-        long objectLength,
-        Checksum checksum,
-        Optional<String> etag,
-        Map<String, String> metadata) {
+        ObjectKey key, long objectLength, Checksum checksum, Optional<String> etag, Map<String, String> metadata) {
     public HeadObjectResult {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(checksum, "checksum");
@@ -42,11 +38,7 @@ public record HeadObjectResult(
         }
     }
 
-    public HeadObjectResult(
-            ObjectKey key,
-            long objectLength,
-            Checksum checksum,
-            Map<String, String> metadata) {
+    public HeadObjectResult(ObjectKey key, long objectLength, Checksum checksum, Map<String, String> metadata) {
         this(key, objectLength, checksum, Optional.empty(), metadata);
     }
 }

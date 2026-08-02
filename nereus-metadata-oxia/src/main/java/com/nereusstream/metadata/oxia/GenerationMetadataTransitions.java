@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.ErrorCode;
@@ -14,27 +15,26 @@ import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import com.nereusstream.metadata.oxia.records.WorkerClaimRecord;
 import java.util.Objects;
 
-/** Store-level transition guards for the Phase 4 stream-scoped metadata roots. */
+/**
+ * Store-level transition guards for the Phase 4 stream-scoped metadata roots.
+ */
 final class GenerationMetadataTransitions {
-    private GenerationMetadataTransitions() {
-    }
+    private GenerationMetadataTransitions() {}
 
-    static void requireValidIndexReplacement(
-            GenerationIndexRecord current,
-            GenerationIndexRecord replacement) {
+    static void requireValidIndexReplacement(GenerationIndexRecord current, GenerationIndexRecord replacement) {
         if (!sameGenerationPublicationIdentity(current, replacement)) {
             throw invariant("generation index CAS attempted to change immutable publication identity");
         }
         GenerationLifecycle from = current.lifecycle();
         GenerationLifecycle to = replacement.lifecycle();
-        boolean allowed = switch (from) {
-            case PREPARED -> to == GenerationLifecycle.COMMITTED || to == GenerationLifecycle.ABORTED;
-            case COMMITTED -> to == GenerationLifecycle.QUARANTINED || to == GenerationLifecycle.DRAINING;
-            case QUARANTINED -> to == GenerationLifecycle.COMMITTED
-                    || to == GenerationLifecycle.DRAINING;
-            case DRAINING -> to == GenerationLifecycle.RETIRED;
-            case RETIRED, ABORTED -> false;
-        };
+        boolean allowed =
+                switch (from) {
+                    case PREPARED -> to == GenerationLifecycle.COMMITTED || to == GenerationLifecycle.ABORTED;
+                    case COMMITTED -> to == GenerationLifecycle.QUARANTINED || to == GenerationLifecycle.DRAINING;
+                    case QUARANTINED -> to == GenerationLifecycle.COMMITTED || to == GenerationLifecycle.DRAINING;
+                    case DRAINING -> to == GenerationLifecycle.RETIRED;
+                    case RETIRED, ABORTED -> false;
+                };
         if (!allowed) {
             throw invariant("illegal generation index lifecycle transition: " + from + " -> " + to);
         }
@@ -56,9 +56,7 @@ final class GenerationMetadataTransitions {
     }
 
     static void requireValidTaskReplacement(
-            MaterializationTaskRecord current,
-            MaterializationTaskRecord replacement,
-            long nowMillis) {
+            MaterializationTaskRecord current, MaterializationTaskRecord replacement, long nowMillis) {
         if (!sameTaskPlanningIdentity(current, replacement)) {
             throw invariant("materialization task CAS attempted to change immutable planning identity");
         }
@@ -68,21 +66,24 @@ final class GenerationMetadataTransitions {
 
         TaskLifecycle from = current.lifecycle();
         TaskLifecycle to = replacement.lifecycle();
-        boolean allowed = switch (from) {
-            case PLANNED -> to == TaskLifecycle.CLAIMED;
-            case CLAIMED -> to == TaskLifecycle.CLAIMED
-                    || to == TaskLifecycle.OUTPUT_READY
-                    || to == TaskLifecycle.RETRY_WAIT
-                    || to == TaskLifecycle.CANCELLED
-                    || to == TaskLifecycle.TERMINAL_FAILED;
-            case OUTPUT_READY -> to == TaskLifecycle.PUBLISHING || to == TaskLifecycle.RETRY_WAIT;
-            case PUBLISHING -> to == TaskLifecycle.PUBLISHING
-                    || to == TaskLifecycle.PUBLISHED
-                    || to == TaskLifecycle.OUTPUT_READY
-                    || to == TaskLifecycle.RETRY_WAIT;
-            case RETRY_WAIT -> to == TaskLifecycle.CLAIMED;
-            case PUBLISHED, CANCELLED, TERMINAL_FAILED -> false;
-        };
+        boolean allowed =
+                switch (from) {
+                    case PLANNED -> to == TaskLifecycle.CLAIMED;
+                    case CLAIMED ->
+                        to == TaskLifecycle.CLAIMED
+                                || to == TaskLifecycle.OUTPUT_READY
+                                || to == TaskLifecycle.RETRY_WAIT
+                                || to == TaskLifecycle.CANCELLED
+                                || to == TaskLifecycle.TERMINAL_FAILED;
+                    case OUTPUT_READY -> to == TaskLifecycle.PUBLISHING || to == TaskLifecycle.RETRY_WAIT;
+                    case PUBLISHING ->
+                        to == TaskLifecycle.PUBLISHING
+                                || to == TaskLifecycle.PUBLISHED
+                                || to == TaskLifecycle.OUTPUT_READY
+                                || to == TaskLifecycle.RETRY_WAIT;
+                    case RETRY_WAIT -> to == TaskLifecycle.CLAIMED;
+                    case PUBLISHED, CANCELLED, TERMINAL_FAILED -> false;
+                };
         if (!allowed) {
             throw invariant("illegal materialization task lifecycle transition: " + from + " -> " + to);
         }
@@ -103,12 +104,14 @@ final class GenerationMetadataTransitions {
             }
         }
 
-        if (current.output().isPresent() && to != TaskLifecycle.CLAIMED
+        if (current.output().isPresent()
+                && to != TaskLifecycle.CLAIMED
                 && !current.output().equals(replacement.output())) {
             throw invariant("materialization task CAS changed an established output identity");
         }
 
-        if (from == TaskLifecycle.OUTPUT_READY && to == TaskLifecycle.PUBLISHING
+        if (from == TaskLifecycle.OUTPUT_READY
+                && to == TaskLifecycle.PUBLISHING
                 && replacement.allocatedGeneration().isPresent()) {
             throw invariant("task must freeze publication id before allocating a generation");
         }
@@ -119,7 +122,8 @@ final class GenerationMetadataTransitions {
                 throw invariant("same-state PUBLISHING CAS may only attach the first allocated generation");
             }
         }
-        if (from == TaskLifecycle.PUBLISHING && to == TaskLifecycle.PUBLISHED
+        if (from == TaskLifecycle.PUBLISHING
+                && to == TaskLifecycle.PUBLISHED
                 && (!current.publicationId().equals(replacement.publicationId())
                         || !current.allocatedGeneration().equals(replacement.allocatedGeneration()))) {
             throw invariant("published task changed its frozen publication allocation");
@@ -127,8 +131,7 @@ final class GenerationMetadataTransitions {
     }
 
     static void requireValidCheckpointReplacement(
-            MaterializationCheckpointRecord current,
-            MaterializationCheckpointRecord replacement) {
+            MaterializationCheckpointRecord current, MaterializationCheckpointRecord replacement) {
         if (current.schemaVersion() != replacement.schemaVersion()
                 || !current.streamId().equals(replacement.streamId())
                 || !current.policyId().equals(replacement.policyId())
@@ -149,8 +152,7 @@ final class GenerationMetadataTransitions {
     }
 
     static void requireValidRetentionStatsReplacement(
-            RangeRetentionStatsRecord current,
-            RangeRetentionStatsRecord replacement) {
+            RangeRetentionStatsRecord current, RangeRetentionStatsRecord replacement) {
         if (current.schemaVersion() != replacement.schemaVersion()
                 || !current.streamId().equals(replacement.streamId())
                 || current.offsetStart() != replacement.offsetStart()
@@ -166,8 +168,7 @@ final class GenerationMetadataTransitions {
     }
 
     static void requireValidRegistrationReplacement(
-            MaterializationStreamRegistrationRecord current,
-            MaterializationStreamRegistrationRecord replacement) {
+            MaterializationStreamRegistrationRecord current, MaterializationStreamRegistrationRecord replacement) {
         if (current.schemaVersion() != replacement.schemaVersion()
                 || !current.streamId().equals(replacement.streamId())
                 || !current.projectionRef().equals(replacement.projectionRef())
@@ -183,8 +184,7 @@ final class GenerationMetadataTransitions {
     }
 
     static void requireValidRecoveryRootReplacement(
-            RecoveryCheckpointRootRecord current,
-            RecoveryCheckpointRootRecord replacement) {
+            RecoveryCheckpointRootRecord current, RecoveryCheckpointRootRecord replacement) {
         if (current.schemaVersion() != replacement.schemaVersion()
                 || !current.streamId().equals(replacement.streamId())) {
             throw invariant("recovery root CAS changed immutable stream identity");
@@ -211,9 +211,7 @@ final class GenerationMetadataTransitions {
         }
     }
 
-    static boolean sameGenerationPublicationIdentity(
-            GenerationIndexRecord left,
-            GenerationIndexRecord right) {
+    static boolean sameGenerationPublicationIdentity(GenerationIndexRecord left, GenerationIndexRecord right) {
         return left.schemaVersion() == right.schemaVersion()
                 && left.streamId().equals(right.streamId())
                 && left.readViewId() == right.readViewId()
@@ -241,11 +239,8 @@ final class GenerationMetadataTransitions {
                 && left.createdAtMillis() == right.createdAtMillis();
     }
 
-    static boolean sameTaskPlanningIdentity(
-            MaterializationTaskRecord left,
-            MaterializationTaskRecord right) {
-        return sameTaskCreateIdentity(left, right)
-                && left.createdAtMillis() == right.createdAtMillis();
+    static boolean sameTaskPlanningIdentity(MaterializationTaskRecord left, MaterializationTaskRecord right) {
+        return sameTaskCreateIdentity(left, right) && left.createdAtMillis() == right.createdAtMillis();
     }
 
     /**
@@ -254,9 +249,7 @@ final class GenerationMetadataTransitions {
      * <p>The creation timestamp is deliberately excluded: it is frozen after one value wins the create, but it is
      * not an input to the deterministic task id and two planners need not observe the same wall-clock millisecond.
      */
-    static boolean sameTaskCreateIdentity(
-            MaterializationTaskRecord left,
-            MaterializationTaskRecord right) {
+    static boolean sameTaskCreateIdentity(MaterializationTaskRecord left, MaterializationTaskRecord right) {
         return left.schemaVersion() == right.schemaVersion()
                 && left.taskId().equals(right.taskId())
                 && left.taskSequence() == right.taskSequence()
@@ -274,9 +267,7 @@ final class GenerationMetadataTransitions {
     }
 
     private static void requireNewClaim(
-            MaterializationTaskRecord current,
-            MaterializationTaskRecord replacement,
-            long nowMillis) {
+            MaterializationTaskRecord current, MaterializationTaskRecord replacement, long nowMillis) {
         long expectedAttempt;
         try {
             expectedAttempt = Math.addExact(current.attempt(), 1);
@@ -293,9 +284,7 @@ final class GenerationMetadataTransitions {
         }
     }
 
-    private static void requireHeartbeat(
-            MaterializationTaskRecord current,
-            MaterializationTaskRecord replacement) {
+    private static void requireHeartbeat(MaterializationTaskRecord current, MaterializationTaskRecord replacement) {
         if (replacement.attempt() != current.attempt()
                 || current.workerClaim().isEmpty()
                 || replacement.workerClaim().isEmpty()) {

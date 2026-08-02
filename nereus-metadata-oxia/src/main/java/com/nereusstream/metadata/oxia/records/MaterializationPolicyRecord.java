@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Complete immutable policy snapshot embedded in every durable materialization task. */
+/**
+ * Complete immutable policy snapshot embedded in every durable materialization task.
+ */
 public record MaterializationPolicyRecord(
         String policyId,
         long policyVersion,
@@ -31,8 +34,7 @@ public record MaterializationPolicyRecord(
         if (taskKindId != 1 && taskKindId != 2) {
             throw new IllegalArgumentException("taskKindId is unknown");
         }
-        targetPhysicalFormat = F4RecordValidation.requireText(
-                targetPhysicalFormat, "targetPhysicalFormat");
+        targetPhysicalFormat = F4RecordValidation.requireText(targetPhysicalFormat, "targetPhysicalFormat");
         if (maxSourceRanges <= 0
                 || maxSourceRanges > MAX_SOURCE_RANGES
                 || minMergeSourceRanges < 2
@@ -51,17 +53,13 @@ public record MaterializationPolicyRecord(
         if (!compression.equals("ZSTD") && !compression.equals("UNCOMPRESSED")) {
             throw new IllegalArgumentException("compression must be ZSTD or UNCOMPRESSED");
         }
-        topicStrategyId = F4RecordValidation.requireOptionalText(
-                topicStrategyId, "topicStrategyId", 4096);
+        topicStrategyId = F4RecordValidation.requireOptionalText(topicStrategyId, "topicStrategyId", 4096);
         F4RecordValidation.requireNonNegative(topicStrategyVersion, "topicStrategyVersion");
-        topicKeyCodecId = F4RecordValidation.requireOptionalText(
-                topicKeyCodecId, "topicKeyCodecId", 4096);
+        topicKeyCodecId = F4RecordValidation.requireOptionalText(topicKeyCodecId, "topicKeyCodecId", 4096);
         if (taskKindId == 1) {
             if (readViewId != 1
-                    || (!targetPhysicalFormat.equals(
-                                    "NEREUS_COMPACTED_PARQUET_V1")
-                            && !targetPhysicalFormat.equals(
-                                    "NEREUS_COMPACTED_PARQUET_V2"))
+                    || (!targetPhysicalFormat.equals("NEREUS_COMPACTED_PARQUET_V1")
+                            && !targetPhysicalFormat.equals("NEREUS_COMPACTED_PARQUET_V2"))
                     || !topicStrategyId.isEmpty()
                     || topicStrategyVersion != 0
                     || !topicKeyCodecId.isEmpty()) {
@@ -69,8 +67,7 @@ public record MaterializationPolicyRecord(
             }
         } else if (readViewId != 2
                 || (!targetPhysicalFormat.equals("NEREUS_TOPIC_COMPACTED_PARQUET_V1")
-                        && !targetPhysicalFormat.equals(
-                                "NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2"))
+                        && !targetPhysicalFormat.equals("NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2"))
                 || topicStrategyId.isEmpty()
                 || topicStrategyVersion <= 0
                 || topicKeyCodecId.isEmpty()) {

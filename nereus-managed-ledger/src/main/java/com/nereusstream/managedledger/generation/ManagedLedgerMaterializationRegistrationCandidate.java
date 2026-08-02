@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.generation;
 
 import com.nereusstream.api.Checksum;
@@ -17,39 +18,29 @@ public record ManagedLedgerMaterializationRegistrationCandidate(
         ManagedLedgerProjectionIdentity projectionIdentity,
         Checksum projectionIdentitySha256) {
     public ManagedLedgerMaterializationRegistrationCandidate {
-        managedLedgerName = ManagedLedgerProjectionNames.requireManagedLedgerName(
-                managedLedgerName);
+        managedLedgerName = ManagedLedgerProjectionNames.requireManagedLedgerName(managedLedgerName);
         if (storageClassBindingGeneration < 1) {
-            throw new IllegalArgumentException(
-                    "storageClassBindingGeneration must be positive");
+            throw new IllegalArgumentException("storageClassBindingGeneration must be positive");
         }
-        projectionIdentity = Objects.requireNonNull(
-                projectionIdentity, "projectionIdentity");
-        if (projectionIdentity.storageClassBindingGeneration()
-                != storageClassBindingGeneration) {
-            throw new IllegalArgumentException(
-                    "projection identity binding generation mismatch");
+        projectionIdentity = Objects.requireNonNull(projectionIdentity, "projectionIdentity");
+        if (projectionIdentity.storageClassBindingGeneration() != storageClassBindingGeneration) {
+            throw new IllegalArgumentException("projection identity binding generation mismatch");
         }
-        Checksum expected = new ManagedLedgerGenerationProjectionRefV1(
-                        managedLedgerName, projectionIdentity)
+        Checksum expected = new ManagedLedgerGenerationProjectionRefV1(managedLedgerName, projectionIdentity)
                 .projectionIdentitySha256();
         if (!expected.equals(projectionIdentitySha256)) {
-            throw new IllegalArgumentException(
-                    "projectionIdentitySha256 does not match the exact NPR1 identity");
+            throw new IllegalArgumentException("projectionIdentitySha256 does not match the exact NPR1 identity");
         }
     }
 
-    public static ManagedLedgerMaterializationRegistrationCandidate from(
-            TopicProjectionRecord projection) {
+    public static ManagedLedgerMaterializationRegistrationCandidate from(TopicProjectionRecord projection) {
         Objects.requireNonNull(projection, "projection");
-        ManagedLedgerProjectionIdentity identity =
-                projection.projectionIdentity();
+        ManagedLedgerProjectionIdentity identity = projection.projectionIdentity();
         return new ManagedLedgerMaterializationRegistrationCandidate(
                 projection.managedLedgerName(),
                 projection.storageClassBindingGeneration(),
                 identity,
-                new ManagedLedgerGenerationProjectionRefV1(
-                                projection.managedLedgerName(), identity)
+                new ManagedLedgerGenerationProjectionRefV1(projection.managedLedgerName(), identity)
                         .projectionIdentitySha256());
     }
 }

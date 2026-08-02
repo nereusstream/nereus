@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKeyHash;
@@ -37,79 +37,81 @@ class GcRetirementJournalMetadataStoreContractTest {
             GcRetirementRemovalRecord removal = F4MetadataTestValues.gcRetirementRemoval();
             ObjectKeyHash object = new ObjectKeyHash(manifest.objectKeyHash());
 
-            VersionedGcRetirementProtection createdProtection =
-                    store.createRetirementProtection(F4MetadataTestValues.CLUSTER, protection).join();
-            VersionedGcRetirementRemoval createdRemoval =
-                    store.createRetirementRemoval(F4MetadataTestValues.CLUSTER, removal).join();
-            assertThat(store.createRetirementProtection(
-                            F4MetadataTestValues.CLUSTER, protection).join())
+            VersionedGcRetirementProtection createdProtection = store.createRetirementProtection(
+                            F4MetadataTestValues.CLUSTER, protection)
+                    .join();
+            VersionedGcRetirementRemoval createdRemoval = store.createRetirementRemoval(
+                            F4MetadataTestValues.CLUSTER, removal)
+                    .join();
+            assertThat(store.createRetirementProtection(F4MetadataTestValues.CLUSTER, protection)
+                            .join())
                     .isEqualTo(createdProtection);
-            assertThat(store.createRetirementRemoval(
-                            F4MetadataTestValues.CLUSTER, removal).join())
+            assertThat(store.createRetirementRemoval(F4MetadataTestValues.CLUSTER, removal)
+                            .join())
                     .isEqualTo(createdRemoval);
 
             GcRetirementProtectionScanPage protections = store.scanRetirementProtections(
-                    F4MetadataTestValues.CLUSTER,
-                    object,
-                    manifest.gcAttemptId(),
-                    Optional.empty(),
-                    1).join();
+                            F4MetadataTestValues.CLUSTER, object, manifest.gcAttemptId(), Optional.empty(), 1)
+                    .join();
             assertThat(protections.values()).containsExactly(createdProtection);
             assertThat(protections.continuation()).isPresent();
             assertThat(store.scanRetirementProtections(
-                            F4MetadataTestValues.CLUSTER,
-                            object,
-                            manifest.gcAttemptId(),
-                            protections.continuation(),
-                            1).join().values())
+                                    F4MetadataTestValues.CLUSTER,
+                                    object,
+                                    manifest.gcAttemptId(),
+                                    protections.continuation(),
+                                    1)
+                            .join()
+                            .values())
                     .isEmpty();
 
             GcRetirementRemovalScanPage removals = store.scanRetirementRemovals(
-                    F4MetadataTestValues.CLUSTER,
-                    object,
-                    manifest.gcAttemptId(),
-                    Optional.empty(),
-                    1).join();
+                            F4MetadataTestValues.CLUSTER, object, manifest.gcAttemptId(), Optional.empty(), 1)
+                    .join();
             assertThat(removals.values()).containsExactly(createdRemoval);
             assertThat(removals.continuation()).isPresent();
             assertThat(store.scanRetirementRemovals(
-                            F4MetadataTestValues.CLUSTER,
-                            object,
-                            manifest.gcAttemptId(),
-                            removals.continuation(),
-                            1).join().values())
+                                    F4MetadataTestValues.CLUSTER,
+                                    object,
+                                    manifest.gcAttemptId(),
+                                    removals.continuation(),
+                                    1)
+                            .join()
+                            .values())
                     .isEmpty();
 
-            VersionedGcRetirementManifest createdManifest =
-                    store.createRetirementManifest(F4MetadataTestValues.CLUSTER, manifest).join();
-            assertThat(store.createRetirementManifest(
-                            F4MetadataTestValues.CLUSTER, manifest).join())
+            VersionedGcRetirementManifest createdManifest = store.createRetirementManifest(
+                            F4MetadataTestValues.CLUSTER, manifest)
+                    .join();
+            assertThat(store.createRetirementManifest(F4MetadataTestValues.CLUSTER, manifest)
+                            .join())
                     .isEqualTo(createdManifest);
-            assertThat(store.getRetirementManifest(
-                            F4MetadataTestValues.CLUSTER, object, manifest.gcAttemptId()).join())
+            assertThat(store.getRetirementManifest(F4MetadataTestValues.CLUSTER, object, manifest.gcAttemptId())
+                            .join())
                     .contains(createdManifest);
 
-            assertInvariant(() -> store.createRetirementManifest(
-                    F4MetadataTestValues.CLUSTER, conflictingManifest(manifest)).join());
-            assertInvariant(() -> store.createRetirementRemoval(
-                    F4MetadataTestValues.CLUSTER, conflictingRemoval(removal)).join());
+            assertInvariant(
+                    () -> store.createRetirementManifest(F4MetadataTestValues.CLUSTER, conflictingManifest(manifest))
+                            .join());
+            assertInvariant(
+                    () -> store.createRetirementRemoval(F4MetadataTestValues.CLUSTER, conflictingRemoval(removal))
+                            .join());
             assertThatThrownBy(() -> store.scanRetirementRemovals(
-                            F4MetadataTestValues.CLUSTER,
-                            object,
-                            manifest.gcAttemptId(),
-                            protections.continuation(),
-                            1).join())
+                                    F4MetadataTestValues.CLUSTER,
+                                    object,
+                                    manifest.gcAttemptId(),
+                                    protections.continuation(),
+                                    1)
+                            .join())
                     .isInstanceOf(IllegalArgumentException.class);
 
             String otherAttempt = "b".repeat(26);
-            store.createRetirementRemoval(
-                    F4MetadataTestValues.CLUSTER, withAttempt(removal, otherAttempt)).join();
+            store.createRetirementRemoval(F4MetadataTestValues.CLUSTER, withAttempt(removal, otherAttempt))
+                    .join();
             assertThat(store.scanRetirementRemovals(
-                            F4MetadataTestValues.CLUSTER,
-                            object,
-                            otherAttempt,
-                            Optional.empty(),
-                            10).join().values())
+                                    F4MetadataTestValues.CLUSTER, object, otherAttempt, Optional.empty(), 10)
+                            .join()
+                            .values())
                     .singleElement()
                     .extracting(value -> value.value().gcAttemptId())
                     .isEqualTo(otherAttempt);
@@ -118,8 +120,7 @@ class GcRetirementJournalMetadataStoreContractTest {
         }
     }
 
-    private static GcRetirementManifestRecord conflictingManifest(
-            GcRetirementManifestRecord value) {
+    private static GcRetirementManifestRecord conflictingManifest(GcRetirementManifestRecord value) {
         return new GcRetirementManifestRecord(
                 value.schemaVersion(),
                 value.objectKeyHash(),
@@ -134,8 +135,7 @@ class GcRetirementJournalMetadataStoreContractTest {
                 0);
     }
 
-    private static GcRetirementRemovalRecord conflictingRemoval(
-            GcRetirementRemovalRecord value) {
+    private static GcRetirementRemovalRecord conflictingRemoval(GcRetirementRemovalRecord value) {
         return new GcRetirementRemovalRecord(
                 value.schemaVersion(),
                 value.objectKeyHash(),
@@ -147,8 +147,7 @@ class GcRetirementJournalMetadataStoreContractTest {
                 0);
     }
 
-    private static GcRetirementRemovalRecord withAttempt(
-            GcRetirementRemovalRecord value, String gcAttemptId) {
+    private static GcRetirementRemovalRecord withAttempt(GcRetirementRemovalRecord value, String gcAttemptId) {
         return new GcRetirementRemovalRecord(
                 value.schemaVersion(),
                 value.objectKeyHash(),
@@ -164,8 +163,7 @@ class GcRetirementJournalMetadataStoreContractTest {
         assertThatThrownBy(action::run).satisfies(failure -> {
             Throwable exact = unwrap(failure);
             assertThat(exact).isInstanceOf(NereusException.class);
-            assertThat(((NereusException) exact).code())
-                    .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION);
+            assertThat(((NereusException) exact).code()).isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION);
         });
     }
 

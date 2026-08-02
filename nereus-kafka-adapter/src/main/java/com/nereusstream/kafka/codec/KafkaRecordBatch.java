@@ -18,7 +18,9 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** One validated, byte-exact Kafka magic-v2 record batch and its durable offset facts. */
+/**
+ * One validated, byte-exact Kafka magic-v2 record batch and its durable offset facts.
+ */
 public final class KafkaRecordBatch {
     private final byte[] encodedBytes;
     private final long baseOffset;
@@ -64,7 +66,9 @@ public final class KafkaRecordBatch {
         return encodedBytes.clone();
     }
 
-    /** Returns an owned, read-only view whose position is zero and whose limit is the exact batch size. */
+    /**
+     * Returns an owned, read-only view whose position is zero and whose limit is the exact batch size.
+     */
     public ByteBuffer encodedBuffer() {
         return ByteBuffer.wrap(encodedBytes).asReadOnlyBuffer();
     }
@@ -85,7 +89,9 @@ public final class KafkaRecordBatch {
         return Math.addExact(lastOffset, 1);
     }
 
-    /** Logical offset span. This can exceed {@link #recordCount()} after Kafka compaction. */
+    /**
+     * Logical offset span. This can exceed {@link #recordCount()} after Kafka compaction.
+     */
     public int logicalRecordCount() {
         return Math.toIntExact(Math.addExact(Math.subtractExact(lastOffset, baseOffset), 1));
     }
@@ -134,33 +140,45 @@ public final class KafkaRecordBatch {
         return baseSequence;
     }
 
-    /** Number of physical records declared by the Kafka batch header. */
+    /**
+     * Number of physical records declared by the Kafka batch header.
+     */
     public int recordCount() {
         return recordCount;
     }
 
     @Override
     public boolean equals(Object other) {
-        return this == other || other instanceof KafkaRecordBatch that
-                && baseOffset == that.baseOffset
-                && lastOffset == that.lastOffset
-                && partitionLeaderEpoch == that.partitionLeaderEpoch
-                && checksum == that.checksum
-                && attributes == that.attributes
-                && baseTimestamp == that.baseTimestamp
-                && maxTimestamp == that.maxTimestamp
-                && producerId == that.producerId
-                && producerEpoch == that.producerEpoch
-                && baseSequence == that.baseSequence
-                && recordCount == that.recordCount
-                && Arrays.equals(encodedBytes, that.encodedBytes);
+        return this == other
+                || other instanceof KafkaRecordBatch that
+                        && baseOffset == that.baseOffset
+                        && lastOffset == that.lastOffset
+                        && partitionLeaderEpoch == that.partitionLeaderEpoch
+                        && checksum == that.checksum
+                        && attributes == that.attributes
+                        && baseTimestamp == that.baseTimestamp
+                        && maxTimestamp == that.maxTimestamp
+                        && producerId == that.producerId
+                        && producerEpoch == that.producerEpoch
+                        && baseSequence == that.baseSequence
+                        && recordCount == that.recordCount
+                        && Arrays.equals(encodedBytes, that.encodedBytes);
     }
 
     @Override
     public int hashCode() {
         int result = Objects.hash(
-                baseOffset, lastOffset, partitionLeaderEpoch, checksum, attributes, baseTimestamp, maxTimestamp,
-                producerId, producerEpoch, baseSequence, recordCount);
+                baseOffset,
+                lastOffset,
+                partitionLeaderEpoch,
+                checksum,
+                attributes,
+                baseTimestamp,
+                maxTimestamp,
+                producerId,
+                producerEpoch,
+                baseSequence,
+                recordCount);
         return 31 * result + Arrays.hashCode(encodedBytes);
     }
 }

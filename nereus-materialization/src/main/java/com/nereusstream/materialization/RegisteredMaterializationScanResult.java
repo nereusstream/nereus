@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
-/** Accounting for one complete 64-shard registered-stream materialization pass. */
+/**
+ * Accounting for one complete 64-shard registered-stream materialization pass.
+ */
 public record RegisteredMaterializationScanResult(
         int shardsScanned,
         int registrationsScanned,

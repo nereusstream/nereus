@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Defines how a read start offset relates to the first returned entry range. */
+/**
+ * Defines how a read start offset relates to the first returned entry range.
+ */
 public enum ReadBoundaryMode {
     EXACT_START,
     CONTAINING_ENTRY

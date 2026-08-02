@@ -58,13 +58,13 @@ F1 does not own：
 
 ### 3.1 Implemented through M8
 
-| Area | Implemented |
-| --- | --- |
-| API | values、validation、canonicalization、errors、profile/durability enums |
-| Metadata | fake + production Oxia adapter、binary-v1 codec、partition wrapper、one-head snapshot、bounded scan、head-CAS、repair/watch tests |
-| Object WAL | v1 writer/reader、multi-slice object、footer entry index、CRC32C、local fixture |
-| Core | append、resolve/read、trim/recovery、resource/deadline/close state machines |
-| Build | protocol-neutral dependency guard、ordinary/Docker Phase 1 tasks |
+| Area       | Implemented                                                                                                                 |
+|------------|-----------------------------------------------------------------------------------------------------------------------------|
+| API        | values、validation、canonicalization、errors、profile/durability enums                                                          |
+| Metadata   | fake + production Oxia adapter、binary-v1 codec、partition wrapper、one-head snapshot、bounded scan、head-CAS、repair/watch tests |
+| Object WAL | v1 writer/reader、multi-slice object、footer entry index、CRC32C、local fixture                                                 |
+| Core       | append、resolve/read、trim/recovery、resource/deadline/close state machines                                                    |
+| Build      | protocol-neutral dependency guard、ordinary/Docker Phase 1 tasks                                                             |
 
 ### 3.2 M8 final acceptance
 
@@ -93,7 +93,8 @@ read-target and primary-WAL adapter boundaries、split stable head commit from g
 dual-read/new-write metadata、exact in-process append recovery、seal/logical delete and exact cumulative-result
 handoff。P15-M0-M6 code and gates pass。
 
-Phase 1.5 P15-M0-M6 deliberately keeps the same supported profile/durability as Phase 1。BookKeeper adapters、non-strict success
+Phase 1.5 P15-M0-M6 deliberately keeps the same supported profile/durability as Phase 1。BookKeeper adapters、non-strict
+success
 and Future 4 workers remain deferred beyond it。
 
 F4 随后 final-gated `OBJECT_WAL_ASYNC_OBJECT`；BookKeeper primary-WAL 的真实 writer/reader、exact ledger
@@ -163,7 +164,8 @@ API rules：
 ### 5.1 Phase 1.5 target API evolution
 
 Current `AppendResult` and `ResolvedObjectRange` are object-shaped。Before BookKeeper profiles are
-implemented, the Phase 1.5 target introduces a tagged `ReadTarget`、generic `ResolvedRange` and target-aware durable metadata。
+implemented, the Phase 1.5 target introduces a tagged `ReadTarget`、generic `ResolvedRange` and target-aware durable
+metadata。
 Its code-level contract is `../phase-1.5-core-storage-foundation/01-api-and-read-target-contract.md`。Using fake
 object ids/keys for BK ranges remains forbidden；the BookKeeper target value/codec does not itself register IO support。
 
@@ -191,11 +193,11 @@ An intent is committed only if reachable from `StreamHeadRecord.lastCommitId`。
 
 ### 6.3 Derived indexes
 
-| Record | Purpose | Repair source |
-| --- | --- | --- |
-| `OffsetIndexRecord` | resolve offset to generation-0 physical slice | reachable commit log |
-| `CommittedSliceRecord` | fast replay lookup | reachable commit log |
-| object references | audit/GC references | committed slice/index + manifest |
+| Record                 | Purpose                                       | Repair source                    |
+|------------------------|-----------------------------------------------|----------------------------------|
+| `OffsetIndexRecord`    | resolve offset to generation-0 physical slice | reachable commit log             |
+| `CommittedSliceRecord` | fast replay lookup                            | reachable commit log             |
+| object references      | audit/GC references                           | committed slice/index + manifest |
 
 Derived record failure after head CAS cannot roll back the append。Strict append waits for them or returns
 `AppendOutcome.KNOWN_COMMITTED`；an unconfirmed head response returns `MAY_HAVE_COMMITTED`。Read/replay uses
@@ -235,10 +237,10 @@ The CAS validates：
 
 All successful levels include `HEAD_COMMITTED`。
 
-| Level | Return may happen after | Requirement |
-| --- | --- | --- |
-| `WAL_DURABLE` | `HEAD_COMMITTED` | commit record contains a recoverable primary read target；index may need repair |
-| `WAL_DURABLE_AND_INDEX_COMMITTED` | `PRIMARY_INDEX_CONFIRMED` | offset index and committed-slice marker present/equal |
+| Level                             | Return may happen after   | Requirement                                                                    |
+|-----------------------------------|---------------------------|--------------------------------------------------------------------------------|
+| `WAL_DURABLE`                     | `HEAD_COMMITTED`          | commit record contains a recoverable primary read target；index may need repair |
+| `WAL_DURABLE_AND_INDEX_COMMITTED` | `PRIMARY_INDEX_CONFIRMED` | offset index and committed-slice marker present/equal                          |
 
 Phase 1 M4 implements only the second row。The first row is a target contract for async/BK-only profiles，
 not “WAL put/quorum only”。
@@ -327,17 +329,17 @@ checks；a one-shot cursor minimum is not deletion proof。
 
 ## 11. Failure model
 
-| Failure | Outcome |
-| --- | --- |
-| WAL upload fails | no head commit；append fails |
-| object checksum/manifest mismatch | rejected before head CAS |
-| intent write succeeds, head CAS loses | orphan intent；no visibility unless reachable |
-| stale epoch/token | `FENCED_APPEND` before offset conflict takes precedence |
-| compatible renew/trim changes head version | refresh and retry CAS against semantically compatible head |
-| head commits, index write fails | `KNOWN_COMMITTED`; strict index boundary requires replay/repair |
-| read sees index gap below head | bounded continuation repair；budget exhaustion is retriable, not corruption |
-| object/index bytes corrupt | fail closed; never synthesize from list |
-| cancellation/timeout after irreversible boundary | same structured `AppendOutcome` rules as failure |
+| Failure                                          | Outcome                                                                    |
+|--------------------------------------------------|----------------------------------------------------------------------------|
+| WAL upload fails                                 | no head commit；append fails                                                |
+| object checksum/manifest mismatch                | rejected before head CAS                                                   |
+| intent write succeeds, head CAS loses            | orphan intent；no visibility unless reachable                               |
+| stale epoch/token                                | `FENCED_APPEND` before offset conflict takes precedence                    |
+| compatible renew/trim changes head version       | refresh and retry CAS against semantically compatible head                 |
+| head commits, index write fails                  | `KNOWN_COMMITTED`; strict index boundary requires replay/repair            |
+| read sees index gap below head                   | bounded continuation repair；budget exhaustion is retriable, not corruption |
+| object/index bytes corrupt                       | fail closed; never synthesize from list                                    |
+| cancellation/timeout after irreversible boundary | same structured `AppendOutcome` rules as failure                           |
 
 ## 12. Compatibility outputs
 

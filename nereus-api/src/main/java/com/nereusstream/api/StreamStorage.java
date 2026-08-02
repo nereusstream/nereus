@@ -18,15 +18,13 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
-/** Protocol-neutral L0 storage API. */
+/**
+ * Protocol-neutral L0 storage API.
+ */
 public interface StreamStorage extends AutoCloseable {
-    CompletableFuture<StreamMetadata> createOrGetStream(
-            StreamName streamName,
-            StreamCreateOptions options);
+    CompletableFuture<StreamMetadata> createOrGetStream(StreamName streamName, StreamCreateOptions options);
 
-    CompletableFuture<AppendSession> acquireAppendSession(
-            StreamId streamId,
-            AppendSessionOptions options);
+    CompletableFuture<AppendSession> acquireAppendSession(StreamId streamId, AppendSessionOptions options);
 
     /**
      * Acquires a session optionally fenced by an external monotonic authority term.
@@ -35,15 +33,13 @@ public interface StreamStorage extends AutoCloseable {
      * non-empty authority and otherwise fail closed.
      */
     default CompletableFuture<AcquiredAppendSession> acquireAppendSession(
-            StreamId streamId,
-            AppendSessionRequest request) {
+            StreamId streamId, AppendSessionRequest request) {
         if (request == null) {
             return NereusException.failedFuture(
                     ErrorCode.INVALID_ARGUMENT, false, "append session request is required");
         }
         if (request.authority().isEmpty()) {
-            return acquireAppendSession(streamId, request.options())
-                    .thenApply(AcquiredAppendSession::legacy);
+            return acquireAppendSession(streamId, request.options()).thenApply(AcquiredAppendSession::legacy);
         }
         return NereusException.failedFuture(
                 ErrorCode.UNSUPPORTED_APPEND_AUTHORITY,
@@ -51,10 +47,10 @@ public interface StreamStorage extends AutoCloseable {
                 "storage provider does not support external append authority");
     }
 
-    /** Renews the exact append-session token while preserving any durable external authority binding. */
-    default CompletableFuture<AppendSession> renewAppendSession(
-            AppendSession session,
-            Duration ttl) {
+    /**
+     * Renews the exact append-session token while preserving any durable external authority binding.
+     */
+    default CompletableFuture<AppendSession> renewAppendSession(AppendSession session, Duration ttl) {
         if (session == null || ttl == null || ttl.isZero() || ttl.isNegative()) {
             return NereusException.failedFuture(
                     ErrorCode.INVALID_ARGUMENT, false, "valid append session and renewal TTL are required");
@@ -74,10 +70,7 @@ public interface StreamStorage extends AutoCloseable {
                 "storage provider does not support explicit append-session renewal");
     }
 
-    CompletableFuture<AppendResult> append(
-            StreamId streamId,
-            AppendBatch batch,
-            AppendOptions options);
+    CompletableFuture<AppendResult> append(StreamId streamId, AppendBatch batch, AppendOptions options);
 
     /**
      * Appends with an optional caller-visible logical-offset precondition.
@@ -86,13 +79,9 @@ public interface StreamStorage extends AutoCloseable {
      * conditional append fail closed rather than silently ignoring a non-empty precondition.
      */
     default CompletableFuture<AppendResult> append(
-            StreamId streamId,
-            AppendBatch batch,
-            AppendOptions options,
-            AppendPrecondition precondition) {
+            StreamId streamId, AppendBatch batch, AppendOptions options, AppendPrecondition precondition) {
         if (precondition == null) {
-            return NereusException.failedFuture(
-                    ErrorCode.INVALID_ARGUMENT, false, "append precondition is required");
+            return NereusException.failedFuture(ErrorCode.INVALID_ARGUMENT, false, "append precondition is required");
         }
         if (precondition.equals(AppendPrecondition.none())) {
             return append(streamId, batch, options);
@@ -104,14 +93,9 @@ public interface StreamStorage extends AutoCloseable {
     }
 
     CompletableFuture<AppendResult> recoverAppend(
-            StreamId streamId,
-            AppendAttemptId attemptId,
-            AppendRecoveryOptions options);
+            StreamId streamId, AppendAttemptId attemptId, AppendRecoveryOptions options);
 
-    CompletableFuture<ReadResult> read(
-            StreamId streamId,
-            long startOffset,
-            ReadOptions options);
+    CompletableFuture<ReadResult> read(StreamId streamId, long startOffset, ReadOptions options);
 
     /**
      * Reads through the public semantic-view contract.
@@ -119,12 +103,9 @@ public interface StreamStorage extends AutoCloseable {
      * <p>Existing providers can serve the exact legacy request through their original method. New boundary, view,
      * or first-entry semantics require an explicit provider implementation and otherwise fail closed.
      */
-    default CompletableFuture<SemanticReadResult> read(
-            StreamId streamId,
-            ReadRequest request) {
+    default CompletableFuture<SemanticReadResult> read(StreamId streamId, ReadRequest request) {
         if (request == null) {
-            return NereusException.failedFuture(
-                    ErrorCode.INVALID_ARGUMENT, false, "read request is required");
+            return NereusException.failedFuture(ErrorCode.INVALID_ARGUMENT, false, "read request is required");
         }
         if (!request.isLegacyEquivalent()) {
             return NereusException.failedFuture(
@@ -133,31 +114,24 @@ public interface StreamStorage extends AutoCloseable {
                     "storage provider does not support the requested read semantics");
         }
         return read(streamId, request.startOffset(), request.options())
-                .thenApply(result -> SemanticReadResult.forRequest(
-                        request, result, result.nextOffset()));
+                .thenApply(result -> SemanticReadResult.forRequest(request, result, result.nextOffset()));
     }
 
-    CompletableFuture<ResolveResult> resolve(
-            StreamId streamId,
-            long startOffset,
-            ResolveOptions options);
+    CompletableFuture<ResolveResult> resolve(StreamId streamId, long startOffset, ResolveOptions options);
 
-    CompletableFuture<Void> trim(
-            StreamId streamId,
-            long beforeOffset,
-            TrimOptions options);
+    CompletableFuture<Void> trim(StreamId streamId, long beforeOffset, TrimOptions options);
 
     CompletableFuture<StreamMetadata> getStreamMetadata(StreamId streamId);
 
     /**
      * Reads one exact durable stream-head observation for authority-bound recovery and checkpoint validation.
      *
-     * <p>The default is binary safe and fails closed. Providers must not synthesize the digest from public metadata fields.
+     * <p>The default is binary safe and fails closed. Providers must not synthesize the digest from public metadata
+     * fields.
      */
     default CompletableFuture<StableStreamHeadSnapshot> getStableHeadSnapshot(StreamId streamId) {
         if (streamId == null) {
-            return NereusException.failedFuture(
-                    ErrorCode.INVALID_ARGUMENT, false, "stream ID is required");
+            return NereusException.failedFuture(ErrorCode.INVALID_ARGUMENT, false, "stream ID is required");
         }
         return NereusException.failedFuture(
                 ErrorCode.UNSUPPORTED_READ_SEMANTICS,
@@ -168,13 +142,14 @@ public interface StreamStorage extends AutoCloseable {
     /**
      * Proves that one commit ID/version is an ancestor of the supplied exact descendant anchor.
      *
-     * <p>Missing or mismatched ancestors return {@code false}; broken chains and exhausted provider scan budgets fail closed.
+     * <p>Missing or mismatched ancestors return {@code false}; broken chains and exhausted provider scan budgets fail
+     * closed.
      */
     default CompletableFuture<Boolean> isCommitReachable(
-            StreamCommitAnchor descendant,
-            String ancestorCommitId,
-            long ancestorCommitVersion) {
-        if (descendant == null || ancestorCommitId == null || ancestorCommitId.isBlank()
+            StreamCommitAnchor descendant, String ancestorCommitId, long ancestorCommitVersion) {
+        if (descendant == null
+                || ancestorCommitId == null
+                || ancestorCommitId.isBlank()
                 || ancestorCommitId.getBytes(StandardCharsets.UTF_8).length > 64 * 1024
                 || ancestorCommitVersion <= 0) {
             return NereusException.failedFuture(

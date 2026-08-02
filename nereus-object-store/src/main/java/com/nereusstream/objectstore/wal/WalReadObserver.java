@@ -18,7 +18,6 @@ public interface WalReadObserver {
     void onSliceRead(long fullSlicePayloadBytes, long entryIndexBytes, long returnedPayloadBytes);
 
     static WalReadObserver noop() {
-        return (fullSlicePayloadBytes, entryIndexBytes, returnedPayloadBytes) -> {
-        };
+        return (fullSlicePayloadBytes, entryIndexBytes, returnedPayloadBytes) -> {};
     }
 }

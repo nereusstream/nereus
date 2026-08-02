@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -15,7 +16,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
-/** Complete 256-shard metadata-root enumerator; object-store listing is never recovery authority. */
+/**
+ * Complete 256-shard metadata-root enumerator; object-store listing is never recovery authority.
+ */
 public final class PhysicalObjectRootScanner implements AutoCloseable {
     public static final int ROOT_SHARDS = 256;
 
@@ -37,23 +40,20 @@ public final class PhysicalObjectRootScanner implements AutoCloseable {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
-    public CompletableFuture<PhysicalObjectRootScanResult> scan(
-            PhysicalObjectRootVisitor visitor) {
+    public CompletableFuture<PhysicalObjectRootScanResult> scan(PhysicalObjectRootVisitor visitor) {
         Objects.requireNonNull(visitor, "visitor");
         if (closed.get()) {
             return CompletableFuture.failedFuture(closed("physical-root scan rejected after close"));
         }
         if (!scanning.compareAndSet(false, true)) {
-            return CompletableFuture.failedFuture(
-                    new IllegalStateException("a physical-root scan is already running"));
+            return CompletableFuture.failedFuture(new IllegalStateException("a physical-root scan is already running"));
         }
         if (closed.get()) {
             scanning.set(false);
             return CompletableFuture.failedFuture(closed("physical-root scan raced close"));
         }
         Counts counts = new Counts();
-        CompletableFuture<PhysicalObjectRootScanResult> result = scanShard(
-                0, Optional.empty(), null, visitor, counts);
+        CompletableFuture<PhysicalObjectRootScanResult> result = scanShard(0, Optional.empty(), null, visitor, counts);
         result.whenComplete((ignored, failure) -> scanning.set(false));
         return result;
     }
@@ -68,39 +68,23 @@ public final class PhysicalObjectRootScanner implements AutoCloseable {
             return CompletableFuture.completedFuture(counts.result());
         }
         return bound(
-                        () -> metadataStore.scanRoots(
-                                cluster,
-                                shard,
-                                continuation,
-                                config.metadataScanPageSize()),
+                        () -> metadataStore.scanRoots(cluster, shard, continuation, config.metadataScanPageSize()),
                         "scan physical-root shard " + shard)
                 .thenCompose(page -> {
                     requireIncreasingPage(page, lastKey);
                     return visitPage(page, 0, visitor, counts).thenCompose(ignored -> {
                         if (page.continuation().isPresent()) {
-                            String nextLast = page.values().get(page.values().size() - 1).key();
-                            return scanShard(
-                                    shard,
-                                    page.continuation(),
-                                    nextLast,
-                                    visitor,
-                                    counts);
+                            String nextLast =
+                                    page.values().get(page.values().size() - 1).key();
+                            return scanShard(shard, page.continuation(), nextLast, visitor, counts);
                         }
-                        return scanShard(
-                                shard + 1,
-                                Optional.empty(),
-                                null,
-                                visitor,
-                                counts);
+                        return scanShard(shard + 1, Optional.empty(), null, visitor, counts);
                     });
                 });
     }
 
     private CompletableFuture<Void> visitPage(
-            PhysicalObjectRootScanPage page,
-            int index,
-            PhysicalObjectRootVisitor visitor,
-            Counts counts) {
+            PhysicalObjectRootScanPage page, int index, PhysicalObjectRootVisitor visitor, Counts counts) {
         if (index == page.values().size()) {
             return CompletableFuture.completedFuture(null);
         }
@@ -110,23 +94,19 @@ public final class PhysicalObjectRootScanner implements AutoCloseable {
                 .thenCompose(ignored -> visitPage(page, index + 1, visitor, counts));
     }
 
-    private <T> CompletableFuture<T> bound(
-            Supplier<CompletableFuture<T>> operation, String stage) {
-        MaterializationDeadline deadline = new MaterializationDeadline(
-                config.operationTimeout(), scheduler);
+    private <T> CompletableFuture<T> bound(Supplier<CompletableFuture<T>> operation, String stage) {
+        MaterializationDeadline deadline = new MaterializationDeadline(config.operationTimeout(), scheduler);
         CompletableFuture<T> result = deadline.bound(operation, stage);
         result.whenComplete((ignored, failure) -> deadline.close());
         return result;
     }
 
-    private static void requireIncreasingPage(
-            PhysicalObjectRootScanPage page, String lastKey) {
-        if (lastKey != null && !page.values().isEmpty()
+    private static void requireIncreasingPage(PhysicalObjectRootScanPage page, String lastKey) {
+        if (lastKey != null
+                && !page.values().isEmpty()
                 && page.values().get(0).key().compareTo(lastKey) <= 0) {
             throw new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION,
-                    false,
-                    "physical-root scan did not advance monotonically");
+                    ErrorCode.METADATA_INVARIANT_VIOLATION, false, "physical-root scan did not advance monotonically");
         }
     }
 
@@ -165,8 +145,7 @@ public final class PhysicalObjectRootScanner implements AutoCloseable {
         }
 
         private PhysicalObjectRootScanResult result() {
-            return new PhysicalObjectRootScanResult(
-                    active, marked, deleting, deleted, quarantined);
+            return new PhysicalObjectRootScanResult(active, marked, deleting, deleted, quarantined);
         }
     }
 }

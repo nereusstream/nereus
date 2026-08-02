@@ -46,8 +46,11 @@ public record WrittenStreamSlice(
         Objects.requireNonNull(payloadFormat, "payloadFormat");
         Objects.requireNonNull(entryIndexRef, "entryIndexRef");
         Objects.requireNonNull(sliceChecksum, "sliceChecksum");
-        if (recordCount <= 0 || entryCount <= 0 || logicalBytes < 0
-                || minEventTimeMillis < 0 || maxEventTimeMillis < minEventTimeMillis) {
+        if (recordCount <= 0
+                || entryCount <= 0
+                || logicalBytes < 0
+                || minEventTimeMillis < 0
+                || maxEventTimeMillis < minEventTimeMillis) {
             throw new IllegalArgumentException("written slice numeric fields are invalid");
         }
     }

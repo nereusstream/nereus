@@ -15,7 +15,6 @@
 package com.nereusstream.kafka.checkpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.kafka.checkpoint.KafkaProducerTransactionState.AbortedTransaction;
 import com.nereusstream.kafka.checkpoint.KafkaProducerTransactionState.BatchMetadata;
 import com.nereusstream.kafka.checkpoint.KafkaProducerTransactionState.OpenTransaction;
@@ -33,8 +32,7 @@ class KafkaProducerStatePropertyTest {
     private static final long SEED = 0x4e4b4331L;
     private static final long CHECKPOINT_OFFSET = 1_000_000L;
 
-    private final KafkaProducerTransactionStateCodecV1 codec =
-            new KafkaProducerTransactionStateCodecV1();
+    private final KafkaProducerTransactionStateCodecV1 codec = new KafkaProducerTransactionStateCodecV1();
 
     @Test
     void canonicalStateRoundTripsAndReencodesByteExactly() {
@@ -42,29 +40,21 @@ class KafkaProducerStatePropertyTest {
         for (int iteration = 0; iteration < ITERATIONS; iteration++) {
             KafkaProducerTransactionState state = randomState(random, iteration);
 
-            List<KafkaCheckpointSection> first =
-                    codec.encodeSections(state, CHECKPOINT_OFFSET);
-            KafkaProducerTransactionState decoded =
-                    codec.decodeSections(first, CHECKPOINT_OFFSET);
-            List<KafkaCheckpointSection> second =
-                    codec.encodeSections(decoded, CHECKPOINT_OFFSET);
+            List<KafkaCheckpointSection> first = codec.encodeSections(state, CHECKPOINT_OFFSET);
+            KafkaProducerTransactionState decoded = codec.decodeSections(first, CHECKPOINT_OFFSET);
+            List<KafkaCheckpointSection> second = codec.encodeSections(decoded, CHECKPOINT_OFFSET);
 
-            assertThat(decoded)
-                    .as("state iteration %s", iteration)
-                    .isEqualTo(state);
-            assertThat(second)
-                    .as("section headers iteration %s", iteration)
-                    .zipSatisfy(first, (actual, expected) -> {
-                        assertThat(actual.sectionType()).isEqualTo(expected.sectionType());
-                        assertThat(actual.sectionVersion()).isEqualTo(expected.sectionVersion());
-                        assertThat(actual.sectionFlags()).isEqualTo(expected.sectionFlags());
-                        assertThat(actual.payload()).isEqualTo(expected.payload());
-                    });
+            assertThat(decoded).as("state iteration %s", iteration).isEqualTo(state);
+            assertThat(second).as("section headers iteration %s", iteration).zipSatisfy(first, (actual, expected) -> {
+                assertThat(actual.sectionType()).isEqualTo(expected.sectionType());
+                assertThat(actual.sectionVersion()).isEqualTo(expected.sectionVersion());
+                assertThat(actual.sectionFlags()).isEqualTo(expected.sectionFlags());
+                assertThat(actual.payload()).isEqualTo(expected.payload());
+            });
         }
     }
 
-    private static KafkaProducerTransactionState randomState(
-            Random random, int iteration) {
+    private static KafkaProducerTransactionState randomState(Random random, int iteration) {
         int producerCount = random.nextInt(9);
         ArrayList<ProducerState> producers = new ArrayList<>(producerCount);
         ArrayList<OpenTransaction> openTransactions = new ArrayList<>();
@@ -85,17 +75,15 @@ class KafkaProducerStatePropertyTest {
                 }
                 long lastOffset = nextOffset + offsetDelta;
                 lastTimestamp = iteration * 10_000L + producerIndex * 100L + batchIndex;
-                batches.add(new BatchMetadata(
-                        lastSequence, lastOffset, offsetDelta, lastTimestamp));
+                batches.add(new BatchMetadata(lastSequence, lastOffset, offsetDelta, lastTimestamp));
                 nextOffset = lastOffset + 1 + random.nextInt(3);
             }
             if (random.nextBoolean()) {
                 lastTimestamp += 1 + random.nextInt(100);
             }
-            OptionalLong currentTransactionFirstOffset =
-                    random.nextBoolean()
-                            ? OptionalLong.of(10_000L + iteration * 100L + producerIndex)
-                            : OptionalLong.empty();
+            OptionalLong currentTransactionFirstOffset = random.nextBoolean()
+                    ? OptionalLong.of(10_000L + iteration * 100L + producerIndex)
+                    : OptionalLong.empty();
             producers.add(new ProducerState(
                     producerId,
                     (short) random.nextInt(Short.MAX_VALUE + 1),
@@ -104,15 +92,13 @@ class KafkaProducerStatePropertyTest {
                     currentTransactionFirstOffset,
                     batches));
             currentTransactionFirstOffset.ifPresent(firstOffset ->
-                    openTransactions.add(new OpenTransaction(
-                            producerId, firstOffset, OptionalLong.empty())));
+                    openTransactions.add(new OpenTransaction(producerId, firstOffset, OptionalLong.empty())));
         }
-        openTransactions.sort(Comparator.comparingLong(OpenTransaction::firstOffset)
-                .thenComparingLong(OpenTransaction::producerId));
+        openTransactions.sort(
+                Comparator.comparingLong(OpenTransaction::firstOffset).thenComparingLong(OpenTransaction::producerId));
 
         int abortedCount = random.nextInt(6);
-        ArrayList<AbortedTransaction> abortedTransactions =
-                new ArrayList<>(abortedCount);
+        ArrayList<AbortedTransaction> abortedTransactions = new ArrayList<>(abortedCount);
         for (int index = 0; index < abortedCount; index++) {
             long lastOffset = 700_000L + iteration * 10L + index;
             abortedTransactions.add(new AbortedTransaction(
@@ -122,8 +108,7 @@ class KafkaProducerStatePropertyTest {
                     lastOffset,
                     lastOffset + 1));
         }
-        return new KafkaProducerTransactionState(
-                CHECKPOINT_OFFSET, producers, openTransactions, abortedTransactions);
+        return new KafkaProducerTransactionState(CHECKPOINT_OFFSET, producers, openTransactions, abortedTransactions);
     }
 
     private static int incrementSequence(int sequence) {
@@ -132,8 +117,6 @@ class KafkaProducerStatePropertyTest {
 
     private static int addSequence(int sequence, int increment) {
         long result = sequence + (long) increment;
-        return result > Integer.MAX_VALUE
-                ? Math.toIntExact(result - Integer.MAX_VALUE - 1L)
-                : (int) result;
+        return result > Integer.MAX_VALUE ? Math.toIntExact(result - Integer.MAX_VALUE - 1L) : (int) result;
     }
 }

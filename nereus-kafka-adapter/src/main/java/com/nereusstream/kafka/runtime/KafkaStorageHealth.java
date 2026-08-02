@@ -1,13 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import java.util.Objects;
 
-/** Immutable bounded-label health snapshot for broker readiness and metrics. */
-public record KafkaStorageHealth(
-        KafkaStorageAdmissionState state,
-        boolean ready,
-        String detail) {
+/**
+ * Immutable bounded-label health snapshot for broker readiness and metrics.
+ */
+public record KafkaStorageHealth(KafkaStorageAdmissionState state, boolean ready, String detail) {
     public KafkaStorageHealth {
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(detail, "detail");

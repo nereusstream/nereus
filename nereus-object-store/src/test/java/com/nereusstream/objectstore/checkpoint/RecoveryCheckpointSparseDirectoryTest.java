@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.StreamId;
@@ -56,15 +56,10 @@ class RecoveryCheckpointSparseDirectoryTest {
                     index == 0 ? "commit-9" : "commit-" + (version - 1),
                     List.of(0)));
         }
-        try (LocalFileObjectStore objectStore = new LocalFileObjectStore(
-                        temporaryDirectory.resolve("objects"));
-                StagingFileManager staging = RecoveryCheckpointTestSupport.staging(
-                        temporaryDirectory, 96L << 20);
+        try (LocalFileObjectStore objectStore = new LocalFileObjectStore(temporaryDirectory.resolve("objects"));
+                StagingFileManager staging = RecoveryCheckpointTestSupport.staging(temporaryDirectory, 96L << 20);
                 RecoveryCheckpointWriteResult written = new DefaultRecoveryCheckpointCodecV1(
-                                objectStore,
-                                staging,
-                                Runnable::run,
-                                RecoveryCheckpointTestSupport.verifier())
+                                objectStore, staging, Runnable::run, RecoveryCheckpointTestSupport.verifier())
                         .write(
                                 request,
                                 RecoveryCheckpointTestSupport.publisher(publications),
@@ -79,53 +74,47 @@ class RecoveryCheckpointSparseDirectoryTest {
                             written.contentSha256(),
                             RecoveryCheckpointTestSupport.TIMEOUT)
                     .join();
-            assertThat(codec.findCommit(opened, 10, "commit-10", RecoveryCheckpointTestSupport.TIMEOUT).join())
+            assertThat(codec.findCommit(opened, 10, "commit-10", RecoveryCheckpointTestSupport.TIMEOUT)
+                            .join())
                     .contains(entries.get(0));
-            assertThat(codec.findCommit(opened, 266, "commit-266", RecoveryCheckpointTestSupport.TIMEOUT).join())
+            assertThat(codec.findCommit(opened, 266, "commit-266", RecoveryCheckpointTestSupport.TIMEOUT)
+                            .join())
                     .contains(entries.get(256));
-            assertThat(codec.findCommit(opened, 522, "commit-522", RecoveryCheckpointTestSupport.TIMEOUT).join())
+            assertThat(codec.findCommit(opened, 522, "commit-522", RecoveryCheckpointTestSupport.TIMEOUT)
+                            .join())
                     .contains(entries.get(512));
-            assertThat(codec.findCommitCoveringOffset(
-                            opened, 0, RecoveryCheckpointTestSupport.TIMEOUT).join())
+            assertThat(codec.findCommitCoveringOffset(opened, 0, RecoveryCheckpointTestSupport.TIMEOUT)
+                            .join())
                     .contains(entries.get(0));
-            assertThat(codec.findCommitCoveringOffset(
-                            opened, 1, RecoveryCheckpointTestSupport.TIMEOUT).join())
+            assertThat(codec.findCommitCoveringOffset(opened, 1, RecoveryCheckpointTestSupport.TIMEOUT)
+                            .join())
                     .contains(entries.get(0));
-            assertThat(codec.findCommitCoveringOffset(
-                            opened, 512, RecoveryCheckpointTestSupport.TIMEOUT).join())
+            assertThat(codec.findCommitCoveringOffset(opened, 512, RecoveryCheckpointTestSupport.TIMEOUT)
+                            .join())
                     .contains(entries.get(256));
-            assertThat(codec.findCommitCoveringOffset(
-                            opened, 513, RecoveryCheckpointTestSupport.TIMEOUT).join())
+            assertThat(codec.findCommitCoveringOffset(opened, 513, RecoveryCheckpointTestSupport.TIMEOUT)
+                            .join())
                     .contains(entries.get(256));
-            assertThat(codec.findCommitCoveringOffset(
-                            opened, 1024, RecoveryCheckpointTestSupport.TIMEOUT).join())
+            assertThat(codec.findCommitCoveringOffset(opened, 1024, RecoveryCheckpointTestSupport.TIMEOUT)
+                            .join())
                     .contains(entries.get(512));
-            assertThat(codec.findCommitCoveringOffset(
-                            opened, 1025, RecoveryCheckpointTestSupport.TIMEOUT).join())
+            assertThat(codec.findCommitCoveringOffset(opened, 1025, RecoveryCheckpointTestSupport.TIMEOUT)
+                            .join())
                     .contains(entries.get(512));
-            assertThat(codec.findCommitCoveringOffset(
-                            opened, 1026, RecoveryCheckpointTestSupport.TIMEOUT).join())
+            assertThat(codec.findCommitCoveringOffset(opened, 1026, RecoveryCheckpointTestSupport.TIMEOUT)
+                            .join())
                     .isEmpty();
             assertThat(codec.findPublication(
-                            opened,
-                            1,
-                            new PublicationId("a".repeat(26)),
-                            RecoveryCheckpointTestSupport.TIMEOUT)
-                    .join())
+                                    opened, 1, new PublicationId("a".repeat(26)), RecoveryCheckpointTestSupport.TIMEOUT)
+                            .join())
                     .contains(publications.get(0));
             RecoveryCheckpointPublicationPage first = codec.scanPublications(
-                            opened,
-                            OptionalInt.empty(),
-                            1,
-                            RecoveryCheckpointTestSupport.TIMEOUT)
+                            opened, OptionalInt.empty(), 1, RecoveryCheckpointTestSupport.TIMEOUT)
                     .join();
             assertThat(first.values()).containsExactly(publications.get(0));
             assertThat(first.continuation()).hasValue(1);
             RecoveryCheckpointPublicationPage second = codec.scanPublications(
-                            opened,
-                            first.continuation(),
-                            1,
-                            RecoveryCheckpointTestSupport.TIMEOUT)
+                            opened, first.continuation(), 1, RecoveryCheckpointTestSupport.TIMEOUT)
                     .join();
             assertThat(second.values()).containsExactly(publications.get(1));
             assertThat(second.continuation()).isEmpty();

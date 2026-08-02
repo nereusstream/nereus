@@ -38,7 +38,9 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.CRC32C;
 
-/** Owner-only staging file whose sealed bytes are replayed without whole-object aggregation. */
+/**
+ * Owner-only staging file whose sealed bytes are replayed without whole-object aggregation.
+ */
 public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedStagingFile {
     private enum State {
         OPEN,
@@ -65,26 +67,18 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
     private Checksum sealedSha256;
     private AttemptPublisher activeAttempt;
 
-    PrivateStagedObjectFile(
-            StagingFileManager manager,
-            Path path,
-            int uploadChunkBytes,
-            Executor objectIoExecutor) throws IOException {
+    PrivateStagedObjectFile(StagingFileManager manager, Path path, int uploadChunkBytes, Executor objectIoExecutor)
+            throws IOException {
         this.manager = Objects.requireNonNull(manager, "manager");
         this.path = Objects.requireNonNull(path, "path");
         this.uploadChunkBytes = uploadChunkBytes;
         this.objectIoExecutor = Objects.requireNonNull(objectIoExecutor, "objectIoExecutor");
-        this.writer = FileChannel.open(
-                path,
-                StandardOpenOption.READ,
-                StandardOpenOption.WRITE,
-                LinkOption.NOFOLLOW_LINKS);
+        this.writer =
+                FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
         try {
-            BasicFileAttributes attributes = Files.readAttributes(
-                    path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-            if (!attributes.isRegularFile()
-                    || attributes.isSymbolicLink()
-                    || attributes.fileKey() == null) {
+            BasicFileAttributes attributes =
+                    Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            if (!attributes.isRegularFile() || attributes.isSymbolicLink() || attributes.fileKey() == null) {
                 throw new IOException("staging file identity is unavailable");
             }
             this.openedFileKey = attributes.fileKey();
@@ -99,7 +93,9 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
         }
     }
 
-    /** Returns the single writer stream. Closing it finishes writes but does not release the staged file. */
+    /**
+     * Returns the single writer stream. Closing it finishes writes but does not release the staged file.
+     */
     public OutputStream outputStream() {
         synchronized (this) {
             requireState(State.OPEN, "staging file is not writable");
@@ -110,13 +106,15 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
         }
     }
 
-    /** Seals exact length/checksums/file identity and makes the file eligible for upload replay. */
+    /**
+     * Seals exact length/checksums/file identity and makes the file eligible for upload replay.
+     */
     public synchronized PrivateStagedObjectFile seal() {
         requireState(State.OPEN, "staging file cannot be sealed");
         try {
             finishWrites();
-            BasicFileAttributes attributes = Files.readAttributes(
-                    path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            BasicFileAttributes attributes =
+                    Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             if (!attributes.isRegularFile()
                     || attributes.isSymbolicLink()
                     || attributes.size() != writtenBytes
@@ -236,8 +234,8 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
 
     private synchronized void validateSealedFile() {
         try {
-            BasicFileAttributes attributes = Files.readAttributes(
-                    path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            BasicFileAttributes attributes =
+                    Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             if (!attributes.isRegularFile()
                     || attributes.isSymbolicLink()
                     || attributes.size() != sealedLength
@@ -285,8 +283,8 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
 
     private void deleteQuietly() {
         try {
-            BasicFileAttributes attributes = Files.readAttributes(
-                    path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            BasicFileAttributes attributes =
+                    Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             if (openedFileKey.equals(attributes.fileKey())) {
                 Files.deleteIfExists(path);
             }
@@ -482,12 +480,10 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
         INSTANCE;
 
         @Override
-        public void request(long count) {
-        }
+        public void request(long count) {}
 
         @Override
-        public void cancel() {
-        }
+        public void cancel() {}
     }
 
     private static long addCap(long current, long increment) {

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.SchemaRef;
@@ -10,7 +11,7 @@ final class BookKeeperRecordValidation {
     static final int VERSION = 1;
     static final int MAX_TEXT_BYTES = 4 * 1024;
 
-    private BookKeeperRecordValidation() { }
+    private BookKeeperRecordValidation() {}
 
     static void version(int value) {
         if (value != VERSION) {

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.StorageProfile;
@@ -8,7 +9,9 @@ import com.nereusstream.metadata.oxia.ManagedLedgerProtocolProperties;
 import java.util.Map;
 import java.util.Objects;
 
-/** Authoritative exact-name mapping for the current managed-ledger topic incarnation. */
+/**
+ * Authoritative exact-name mapping for the current managed-ledger topic incarnation.
+ */
 public record TopicProjectionRecord(
         String managedLedgerName,
         String managedLedgerNameHash,
@@ -42,28 +45,24 @@ public record TopicProjectionRecord(
         if (storageClassBindingGeneration < 1 || incarnation < 1) {
             throw new IllegalArgumentException("projection generations must be positive");
         }
-        if (!streamName.equals(ManagedLedgerProjectionNames.streamName(managedLedgerName, incarnation).value())
-                || !streamId.equals(ManagedLedgerProjectionNames.streamId(managedLedgerName, incarnation).value())) {
+        if (!streamName.equals(ManagedLedgerProjectionNames.streamName(managedLedgerName, incarnation)
+                        .value())
+                || !streamId.equals(ManagedLedgerProjectionNames.streamId(managedLedgerName, incarnation)
+                        .value())) {
             throw new IllegalArgumentException("topic projection stream identity mismatch");
         }
         StorageProfile parsedProfile;
         try {
             parsedProfile = StorageProfile.valueOf(storageProfile);
         } catch (IllegalArgumentException failure) {
-            throw new IllegalArgumentException(
-                    "unknown topic projection storage profile",
-                    failure);
+            throw new IllegalArgumentException("unknown topic projection storage profile", failure);
         }
         if (!ManagedLedgerProjectionNames.STORAGE_CLASS.equals(storageClass)
                 || parsedProfile != StorageProfile.OBJECT_WAL_SYNC_OBJECT
-                        && parsedProfile
-                                != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
-                        && parsedProfile
-                                != StorageProfile.BOOKKEEPER_WAL_ONLY
-                        && parsedProfile
-                                != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
-                        && parsedProfile
-                                != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT
+                        && parsedProfile != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
+                        && parsedProfile != StorageProfile.BOOKKEEPER_WAL_ONLY
+                        && parsedProfile != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
+                        && parsedProfile != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT
                 || virtualLedgerId < ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID
                 || virtualLedgerId >= Long.MAX_VALUE
                 || positionMappingVersion != ManagedLedgerProjectionNames.POSITION_MAPPING_VERSION

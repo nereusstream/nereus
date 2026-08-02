@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
 import com.nereusstream.api.StorageProfile;
@@ -9,7 +10,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** Controller-owned immutable policy for the first native-storage activation. */
+/**
+ * Controller-owned immutable policy for the first native-storage activation.
+ */
 public record KafkaStorageActivationPolicy(
         String kafkaClusterId,
         List<String> allowedStorageProfiles,
@@ -23,7 +26,8 @@ public record KafkaStorageActivationPolicy(
         this(
                 kafkaClusterId,
                 canonicalProfiles(allowedStorageProfiles),
-                Objects.requireNonNull(defaultStorageProfile, "defaultStorageProfile").name(),
+                Objects.requireNonNull(defaultStorageProfile, "defaultStorageProfile")
+                        .name(),
                 readinessTtl);
     }
 
@@ -32,11 +36,9 @@ public record KafkaStorageActivationPolicy(
         if (kafkaClusterId.isBlank()) {
             throw new IllegalArgumentException("kafkaClusterId must be nonblank");
         }
-        allowedStorageProfiles = List.copyOf(Objects.requireNonNull(
-                allowedStorageProfiles, "allowedStorageProfiles"));
+        allowedStorageProfiles = List.copyOf(Objects.requireNonNull(allowedStorageProfiles, "allowedStorageProfiles"));
         if (allowedStorageProfiles.isEmpty()
-                || allowedStorageProfiles.size()
-                        > KafkaStorageProtocolActivationRecord.MAX_STORAGE_PROFILES) {
+                || allowedStorageProfiles.size() > KafkaStorageProtocolActivationRecord.MAX_STORAGE_PROFILES) {
             throw new IllegalArgumentException("allowedStorageProfiles must contain between one and five values");
         }
         String previous = null;
@@ -68,7 +70,10 @@ public record KafkaStorageActivationPolicy(
                 throw new IllegalArgumentException("allowedStorageProfiles cannot contain aliases");
             }
         }
-        return profiles.stream().map(Enum::name).sorted(Comparator.naturalOrder()).toList();
+        return profiles.stream()
+                .map(Enum::name)
+                .sorted(Comparator.naturalOrder())
+                .toList();
     }
 
     private static StorageProfile parseCanonical(String supplied) {

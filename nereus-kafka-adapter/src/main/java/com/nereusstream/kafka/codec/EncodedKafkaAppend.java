@@ -19,12 +19,11 @@ import com.nereusstream.api.OffsetRange;
 import java.util.List;
 import java.util.Objects;
 
-/** Exact Nereus append value and validation facts derived from stock Kafka-validated records. */
+/**
+ * Exact Nereus append value and validation facts derived from stock Kafka-validated records.
+ */
 public record EncodedKafkaAppend(
-        AppendBatch appendBatch,
-        OffsetRange range,
-        int encodedBytes,
-        List<KafkaRecordBatch> recordBatches) {
+        AppendBatch appendBatch, OffsetRange range, int encodedBytes, List<KafkaRecordBatch> recordBatches) {
     public EncodedKafkaAppend {
         Objects.requireNonNull(appendBatch, "appendBatch");
         Objects.requireNonNull(range, "range");

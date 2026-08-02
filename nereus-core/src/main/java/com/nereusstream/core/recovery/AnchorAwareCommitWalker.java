@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.recovery;
 
 import com.nereusstream.api.ErrorCode;
@@ -18,7 +19,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Root-double-read live-tail walker shared by checkpoint, replay, and repair paths. */
+/**
+ * Root-double-read live-tail walker shared by checkpoint, replay, and repair paths.
+ */
 public final class AnchorAwareCommitWalker {
     private static final int MAX_ROOT_RESTARTS = 8;
     private static final int MAX_PAGE_SIZE = 1_000;
@@ -27,32 +30,22 @@ public final class AnchorAwareCommitWalker {
     private final OxiaMetadataStore l0Store;
     private final GenerationMetadataStore generationStore;
 
-    public AnchorAwareCommitWalker(
-            String cluster,
-            OxiaMetadataStore l0Store,
-            GenerationMetadataStore generationStore) {
+    public AnchorAwareCommitWalker(String cluster, OxiaMetadataStore l0Store, GenerationMetadataStore generationStore) {
         this.cluster = requireText(cluster, "cluster");
         this.l0Store = Objects.requireNonNull(l0Store, "l0Store");
         this.generationStore = Objects.requireNonNull(generationStore, "generationStore");
     }
 
-    public CompletableFuture<AnchorAwareCommitWalk> walk(
-            StreamId streamId,
-            int maxCommits,
-            int pageSize) {
+    public CompletableFuture<AnchorAwareCommitWalk> walk(StreamId streamId, int maxCommits, int pageSize) {
         Objects.requireNonNull(streamId, "streamId");
         if (maxCommits <= 0 || pageSize <= 0 || pageSize > MAX_PAGE_SIZE) {
-            throw new IllegalArgumentException(
-                    "maxCommits must be positive and pageSize must be in [1, 1000]");
+            throw new IllegalArgumentException("maxCommits must be positive and pageSize must be in [1, 1000]");
         }
         return walkAttempt(streamId, maxCommits, pageSize, 0);
     }
 
     private CompletableFuture<AnchorAwareCommitWalk> walkAttempt(
-            StreamId streamId,
-            int maxCommits,
-            int pageSize,
-            int rootRestarts) {
+            StreamId streamId, int maxCommits, int pageSize, int rootRestarts) {
         return generationStore.getRecoveryRoot(cluster, streamId).thenCompose(root -> {
             AppendRecoveryAnchor anchor = anchor(streamId, root);
             Accumulator accumulator = new Accumulator(root, anchor, maxCommits, pageSize);
@@ -74,9 +67,7 @@ public final class AnchorAwareCommitWalker {
     }
 
     private CompletableFuture<Void> readPage(
-            StreamId streamId,
-            Accumulator accumulator,
-            Optional<AppendRecoveryTailCursor> continuation) {
+            StreamId streamId, Accumulator accumulator, Optional<AppendRecoveryTailCursor> continuation) {
         int remaining = accumulator.maxCommits - accumulator.commits.size();
         if (remaining <= 0) {
             accumulator.anchorReached = false;
@@ -84,12 +75,7 @@ public final class AnchorAwareCommitWalker {
             return CompletableFuture.completedFuture(null);
         }
         int limit = Math.min(accumulator.pageSize, remaining);
-        return l0Store.readAppendRecoveryTail(
-                        cluster,
-                        streamId,
-                        accumulator.anchor,
-                        continuation,
-                        limit)
+        return l0Store.readAppendRecoveryTail(cluster, streamId, accumulator.anchor, continuation, limit)
                 .thenCompose(page -> {
                     accumulator.add(page);
                     if (page.anchorReached()) {
@@ -105,9 +91,7 @@ public final class AnchorAwareCommitWalker {
                 });
     }
 
-    private static AppendRecoveryAnchor anchor(
-            StreamId streamId,
-            Optional<VersionedRecoveryCheckpointRoot> root) {
+    private static AppendRecoveryAnchor anchor(StreamId streamId, Optional<VersionedRecoveryCheckpointRoot> root) {
         if (root.isEmpty() || root.orElseThrow().value().checkpoints().isEmpty()) {
             return AppendRecoveryAnchor.genesis(streamId);
         }
@@ -124,8 +108,7 @@ public final class AnchorAwareCommitWalker {
     }
 
     private static boolean sameRoot(
-            Optional<VersionedRecoveryCheckpointRoot> left,
-            Optional<VersionedRecoveryCheckpointRoot> right) {
+            Optional<VersionedRecoveryCheckpointRoot> left, Optional<VersionedRecoveryCheckpointRoot> right) {
         return left.equals(right);
     }
 
@@ -163,8 +146,7 @@ public final class AnchorAwareCommitWalker {
         }
 
         private void add(AppendRecoveryTailPage page) {
-            if (!page.anchor().equals(anchor)
-                    || (observedHead != null && !observedHead.equals(page.observedHead()))) {
+            if (!page.anchor().equals(anchor) || (observedHead != null && !observedHead.equals(page.observedHead()))) {
                 throw invariant("append recovery pages changed their root/head anchors");
             }
             if (observedHead == null) {
@@ -179,13 +161,7 @@ public final class AnchorAwareCommitWalker {
             if (observedHead == null) {
                 throw invariant("anchor-aware commit walk returned no head observation");
             }
-            return new AnchorAwareCommitWalk(
-                    root,
-                    anchor,
-                    observedHead,
-                    commits,
-                    anchorReached,
-                    continuation);
+            return new AnchorAwareCommitWalk(root, anchor, observedHead, commits, anchorReached, continuation);
         }
     }
 }

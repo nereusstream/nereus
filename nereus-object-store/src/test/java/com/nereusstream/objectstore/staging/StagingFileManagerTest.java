@@ -16,7 +16,6 @@ package com.nereusstream.objectstore.staging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import java.io.ByteArrayOutputStream;
@@ -57,8 +56,8 @@ class StagingFileManagerTest {
             PrivateStagedObjectFile second = manager.create("second");
             OutputStream secondOutput = second.outputStream();
             assertThatThrownBy(() -> secondOutput.write(5))
-                    .isInstanceOfSatisfying(NereusException.class, error ->
-                            assertThat(error.code()).isEqualTo(ErrorCode.BACKPRESSURE_REJECTED));
+                    .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                            .isEqualTo(ErrorCode.BACKPRESSURE_REJECTED));
             first.close();
             assertThat(manager.reservedBytes()).isZero();
 
@@ -76,11 +75,9 @@ class StagingFileManagerTest {
     void startupCleanupDeletesOnlyValidOldProductFiles() throws Exception {
         Path directory = ownerOnlyDirectory("cleanup");
         Path oldProduct = Files.write(
-                directory.resolve("nereus-staging-v1-compacted-0123456789abcdef0123456789abcdef.tmp"),
-                new byte[] {1});
+                directory.resolve("nereus-staging-v1-compacted-0123456789abcdef0123456789abcdef.tmp"), new byte[] {1});
         Path youngProduct = Files.write(
-                directory.resolve("nereus-staging-v1-checkpoint-fedcba9876543210fedcba9876543210.tmp"),
-                new byte[] {2});
+                directory.resolve("nereus-staging-v1-checkpoint-fedcba9876543210fedcba9876543210.tmp"), new byte[] {2});
         Path unrelated = Files.write(directory.resolve("do-not-delete.tmp"), new byte[] {3});
         Files.setLastModifiedTime(oldProduct, FileTime.from(NOW.minus(Duration.ofHours(2))));
         Files.setLastModifiedTime(youngProduct, FileTime.from(NOW.minus(Duration.ofMinutes(1))));
@@ -105,8 +102,8 @@ class StagingFileManagerTest {
             replacePath(directory, path, new byte[] {1, 2, 3});
 
             assertThatThrownBy(staged::openPublisher)
-                    .isInstanceOfSatisfying(NereusException.class, error ->
-                            assertThat(error.code()).isEqualTo(ErrorCode.OBJECT_UPLOAD_FAILED));
+                    .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                            .isEqualTo(ErrorCode.OBJECT_UPLOAD_FAILED));
             staged.close();
             assertThat(manager.reservedBytes()).isZero();
             assertThat(Files.readAllBytes(path)).containsExactly(1, 2, 3);
@@ -146,11 +143,11 @@ class StagingFileManagerTest {
             replacePath(directory, path, new byte[] {1, 2, 3});
 
             assertThatThrownBy(spill::openVerifiedInputStream)
-                    .isInstanceOfSatisfying(NereusException.class, error ->
-                            assertThat(error.code()).isEqualTo(ErrorCode.OBJECT_READ_FAILED));
+                    .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                            .isEqualTo(ErrorCode.OBJECT_READ_FAILED));
             assertThatThrownBy(spill::openRandomAccessReader)
-                    .isInstanceOfSatisfying(NereusException.class, error ->
-                            assertThat(error.code()).isEqualTo(ErrorCode.OBJECT_READ_FAILED));
+                    .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                            .isEqualTo(ErrorCode.OBJECT_READ_FAILED));
             spill.close();
             assertThat(manager.reservedBytes()).isZero();
             assertThat(Files.readAllBytes(path)).containsExactly(1, 2, 3);
@@ -189,19 +186,24 @@ class StagingFileManagerTest {
     @Test
     void rejectsRelativeOrNonOwnerOnlyDirectoryAndInvalidChunkBounds() throws Exception {
         assertThatThrownBy(() -> new StagingFileManager(
-                        Path.of("relative"), 1, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
-                        Duration.ofSeconds(1), Runnable::run))
+                        Path.of("relative"),
+                        1,
+                        StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
+                        Duration.ofSeconds(1),
+                        Runnable::run))
                 .isInstanceOf(IllegalArgumentException.class);
 
         Path permissive = Files.createDirectory(temporary.resolve("permissive"));
         Files.setPosixFilePermissions(permissive, PosixFilePermissions.fromString("rwxr-x---"));
-        assertThatThrownBy(() -> manager(permissive, 1))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> manager(permissive, 1)).isInstanceOf(IllegalArgumentException.class);
 
         Path ownerOnly = ownerOnlyDirectory("chunk");
         assertThatThrownBy(() -> new StagingFileManager(
-                        ownerOnly, 1, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES - 1,
-                        Duration.ofSeconds(1), Runnable::run))
+                        ownerOnly,
+                        1,
+                        StagingFileManager.MIN_UPLOAD_CHUNK_BYTES - 1,
+                        Duration.ofSeconds(1),
+                        Runnable::run))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -224,8 +226,7 @@ class StagingFileManagerTest {
                         PosixFilePermission.OWNER_EXECUTE)));
     }
 
-    private static void replacePath(Path directory, Path path, byte[] replacementBytes)
-            throws Exception {
+    private static void replacePath(Path directory, Path path, byte[] replacementBytes) throws Exception {
         Path replacement = Files.write(directory.resolve("replacement.tmp"), replacementBytes);
         Files.move(replacement, path, StandardCopyOption.REPLACE_EXISTING);
     }

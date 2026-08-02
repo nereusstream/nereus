@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.Objects;
@@ -8,7 +9,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 
-/** Local owner-scoped handle over one authoritative durable cursor generation. */
+/**
+ * Local owner-scoped handle over one authoritative durable cursor generation.
+ */
 public final class CursorHandle {
     private final CursorIdentity identity;
     private final CursorOwnerSession owner;
@@ -17,10 +20,7 @@ public final class CursorHandle {
     private final AtomicBoolean closed = new AtomicBoolean();
 
     CursorHandle(
-            CursorState initialState,
-            CursorOwnerSession owner,
-            int maximumPendingMutations,
-            Executor laneExecutor) {
+            CursorState initialState, CursorOwnerSession owner, int maximumPendingMutations, Executor laneExecutor) {
         CursorState exactState = Objects.requireNonNull(initialState, "initialState");
         this.owner = Objects.requireNonNull(owner, "owner");
         if (!exactState.identity().ledger().equals(owner.ledger())
@@ -47,8 +47,8 @@ public final class CursorHandle {
 
     public CompletableFuture<Void> closeAsync() {
         if (closed.compareAndSet(false, true)) {
-            mutationLane.close(new ManagedLedgerException.CursorAlreadyClosedException(
-                    "durable cursor handle is closed"));
+            mutationLane.close(
+                    new ManagedLedgerException.CursorAlreadyClosedException("durable cursor handle is closed"));
         }
         return mutationLane.whenDrained();
     }
@@ -67,9 +67,7 @@ public final class CursorHandle {
                 || !candidate.ownerSessionId().equals(owner.ownerSessionId())) {
             throw new IllegalArgumentException("cursor completion does not match handle identity or owner");
         }
-        state.getAndUpdate(current -> candidate.mutationSequence() >= current.mutationSequence()
-                ? candidate
-                : current);
+        state.getAndUpdate(current -> candidate.mutationSequence() >= current.mutationSequence() ? candidate : current);
         if (candidate.lifecycle() == CursorLifecycle.DELETED) {
             closeAsync();
         }

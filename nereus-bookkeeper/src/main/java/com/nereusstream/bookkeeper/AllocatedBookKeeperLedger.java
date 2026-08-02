@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
@@ -8,7 +9,9 @@ import com.nereusstream.metadata.oxia.records.LedgerAllocationIntentRecord;
 import java.util.Objects;
 import org.apache.bookkeeper.client.api.WriteAdvHandle;
 
-/** Active durable metadata identities plus the process-local write handle that produced them. */
+/**
+ * Active durable metadata identities plus the process-local write handle that produced them.
+ */
 public record AllocatedBookKeeperLedger(
         WriteAdvHandle handle,
         BookKeeperVersionedValue<BookKeeperWriterStateRecord> writer,

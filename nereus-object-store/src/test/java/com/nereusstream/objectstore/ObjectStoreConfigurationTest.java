@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.net.URI;
 import java.time.Duration;
 import java.util.Optional;
@@ -27,38 +27,49 @@ class ObjectStoreConfigurationTest {
     @Test
     void rejectsEndpointPrefixAndCredentialCombinationsThatCouldAliasOrLeak() {
         assertThatThrownBy(() -> config(
-                        URI.create("https://user@s3.example.com?secret=x"), "nereus/cluster",
-                        Optional.empty(), Optional.empty(), Optional.empty()))
+                        URI.create("https://user@s3.example.com?secret=x"),
+                        "nereus/cluster",
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("origin");
         for (String prefix : new String[] {"/nereus", "nereus/", "nereus//cluster", "nereus/../cluster"}) {
             assertThatThrownBy(() -> config(
-                            URI.create("https://s3.example.com"), prefix,
-                            Optional.empty(), Optional.empty(), Optional.empty()))
+                            URI.create("https://s3.example.com"),
+                            prefix,
+                            Optional.empty(),
+                            Optional.empty(),
+                            Optional.empty()))
                     .isInstanceOf(IllegalArgumentException.class);
         }
         assertThatThrownBy(() -> config(
-                        URI.create("https://s3.example.com"), "nereus/cluster",
-                        Optional.of("access"), Optional.empty(), Optional.empty()))
+                        URI.create("https://s3.example.com"),
+                        "nereus/cluster",
+                        Optional.of("access"),
+                        Optional.empty(),
+                        Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("together");
         assertThatThrownBy(() -> config(
-                        URI.create("https://s3.example.com"), "nereus/cluster",
-                        Optional.empty(), Optional.empty(), Optional.of("session")))
+                        URI.create("https://s3.example.com"),
+                        "nereus/cluster",
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.of("session")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("requires");
         assertThatThrownBy(() -> config(
-                        URI.create("https://s3.example.com"), "nereus/cluster",
-                        Optional.of(" "), Optional.of("secret"), Optional.empty()))
+                        URI.create("https://s3.example.com"),
+                        "nereus/cluster",
+                        Optional.of(" "),
+                        Optional.of("secret"),
+                        Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static ObjectStoreConfiguration config(
-            URI endpoint,
-            String prefix,
-            Optional<String> access,
-            Optional<String> secret,
-            Optional<String> session) {
+            URI endpoint, String prefix, Optional<String> access, Optional<String> secret, Optional<String> session) {
         return new ObjectStoreConfiguration(
                 S3CompatibleObjectStoreProvider.class.getName(),
                 endpoint,

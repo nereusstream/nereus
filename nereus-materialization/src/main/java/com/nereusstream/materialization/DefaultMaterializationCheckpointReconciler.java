@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -36,16 +37,18 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 
-/** Monotonic checkpoint CAS loop with bounded full-prefix validation and response-loss recovery. */
-public final class DefaultMaterializationCheckpointReconciler
-        implements MaterializationCheckpointReconciler {
+/**
+ * Monotonic checkpoint CAS loop with bounded full-prefix validation and response-loss recovery.
+ */
+public final class DefaultMaterializationCheckpointReconciler implements MaterializationCheckpointReconciler {
     public static final int MAX_CANDIDATES = 4_096;
     private static final int MAX_CAS_ATTEMPTS = 8;
-    private static final Comparator<VersionedGenerationIndex> COVER_ORDER = Comparator
-            .comparingLong((VersionedGenerationIndex value) -> value.value().offsetEnd())
+    private static final Comparator<VersionedGenerationIndex> COVER_ORDER = Comparator.comparingLong(
+                    (VersionedGenerationIndex value) -> value.value().offsetEnd())
             .reversed()
             .thenComparing(Comparator.comparingLong(
-                    (VersionedGenerationIndex value) -> value.value().generation()).reversed())
+                            (VersionedGenerationIndex value) -> value.value().generation())
+                    .reversed())
             .thenComparing(VersionedGenerationIndex::key, DefaultMaterializationCheckpointReconciler::compareUtf8);
 
     private final String cluster;
@@ -79,9 +82,7 @@ public final class DefaultMaterializationCheckpointReconciler
 
     @Override
     public CompletableFuture<VersionedMaterializationCheckpoint> reconcile(
-            StreamId streamId,
-            MaterializationPolicy policy,
-            MaterializationTaskMutationGuard mutationGuard) {
+            StreamId streamId, MaterializationPolicy policy, MaterializationTaskMutationGuard mutationGuard) {
         try {
             Operation operation = new Operation(
                     Objects.requireNonNull(streamId, "streamId"),
@@ -97,13 +98,10 @@ public final class DefaultMaterializationCheckpointReconciler
         private final StreamId streamId;
         private final MaterializationPolicy policy;
         private final MaterializationTaskMutationGuard mutationGuard;
-        private final MaterializationDeadline deadline = new MaterializationDeadline(
-                operationTimeout, scheduler);
+        private final MaterializationDeadline deadline = new MaterializationDeadline(operationTimeout, scheduler);
 
         private Operation(
-                StreamId streamId,
-                MaterializationPolicy policy,
-                MaterializationTaskMutationGuard mutationGuard) {
+                StreamId streamId, MaterializationPolicy policy, MaterializationTaskMutationGuard mutationGuard) {
             this.streamId = streamId;
             this.policy = policy;
             this.mutationGuard = mutationGuard;
@@ -115,8 +113,7 @@ public final class DefaultMaterializationCheckpointReconciler
 
         private CompletableFuture<VersionedMaterializationCheckpoint> attempt(int attempt) {
             if (attempt >= MAX_CAS_ATTEMPTS) {
-                return CompletableFuture.failedFuture(condition(
-                        "materialization checkpoint CAS recovery exhausted"));
+                return CompletableFuture.failedFuture(condition("materialization checkpoint CAS recovery exhausted"));
             }
             return deadline.bound(
                             () -> l0Metadata.getStreamSnapshot(cluster, streamId),
@@ -124,11 +121,11 @@ public final class DefaultMaterializationCheckpointReconciler
                     .thenCompose(snapshot -> deadline.bound(
                                     () -> generations.getStreamRegistration(cluster, streamId),
                                     "load registration for materialization checkpoint")
-                            .thenCompose(registration -> loadCheckpoint().thenCompose(checkpoint ->
-                                    reconcileSnapshot(
+                            .thenCompose(registration -> loadCheckpoint()
+                                    .thenCompose(checkpoint -> reconcileSnapshot(
                                             snapshot,
-                                            registration.orElseThrow(() -> condition(
-                                                    "materialization registration is absent")),
+                                            registration.orElseThrow(
+                                                    () -> condition("materialization registration is absent")),
                                             checkpoint,
                                             attempt))));
         }
@@ -136,18 +133,14 @@ public final class DefaultMaterializationCheckpointReconciler
         private CompletableFuture<VersionedMaterializationCheckpoint> loadCheckpoint() {
             return deadline.bound(
                             () -> generations.getMaterializationCheckpoint(
-                                    cluster,
-                                    streamId,
-                                    policy.policyId(),
-                                    policy.policyVersion()),
+                                    cluster, streamId, policy.policyId(), policy.policyVersion()),
                             "load materialization checkpoint")
                     .thenCompose(optional -> {
                         if (optional.isPresent()) {
                             return CompletableFuture.completedFuture(optional.orElseThrow());
                         }
                         return deadline.bound(
-                                        mutationGuard::revalidate,
-                                        "revalidate activation before checkpoint create")
+                                        mutationGuard::revalidate, "revalidate activation before checkpoint create")
                                 .thenCompose(ignored -> deadline.bound(
                                         () -> generations.getOrCreateMaterializationCheckpoint(
                                                 cluster,
@@ -169,15 +162,9 @@ public final class DefaultMaterializationCheckpointReconciler
                 return update(checkpoint, Coverage.at(bounds.trimOffset()), attempt);
             }
             long minimumOffsetEnd = Math.addExact(bounds.trimOffset(), 1);
-            return scan(
-                            minimumOffsetEnd,
-                            bounds.headOffset(),
-                            Optional.empty(),
-                            new ArrayList<>())
+            return scan(minimumOffsetEnd, bounds.headOffset(), Optional.empty(), new ArrayList<>())
                     .thenCompose(candidates -> update(
-                            checkpoint,
-                            coverage(bounds, registration.value().projectionRef(), candidates),
-                            attempt));
+                            checkpoint, coverage(bounds, registration.value().projectionRef(), candidates), attempt));
         }
 
         private Bounds validateSnapshot(
@@ -195,8 +182,8 @@ public final class DefaultMaterializationCheckpointReconciler
             try {
                 state = StreamState.valueOf(snapshot.metadata().state());
                 profile = StorageProfile.valueOf(snapshot.metadata().profile()).canonical();
-                registeredProfile = StorageProfile.valueOf(
-                        registration.value().storageProfile()).canonical();
+                registeredProfile = StorageProfile.valueOf(registration.value().storageProfile())
+                        .canonical();
             } catch (RuntimeException failure) {
                 throw invariant("checkpoint input contains an unsupported state/profile", failure);
             }
@@ -234,8 +221,7 @@ public final class DefaultMaterializationCheckpointReconciler
                                     continuation,
                                     pageSize),
                             "scan committed generations for materialization checkpoint")
-                    .thenCompose(page -> appendPage(
-                            minimumOffsetEnd, maximumOffsetEnd, values, page));
+                    .thenCompose(page -> appendPage(minimumOffsetEnd, maximumOffsetEnd, values, page));
         }
 
         private CompletableFuture<List<VersionedGenerationCandidate>> appendPage(
@@ -251,19 +237,12 @@ public final class DefaultMaterializationCheckpointReconciler
                         "materialization checkpoint candidate count exceeds 4096"));
             }
             if (page.continuation().isPresent()) {
-                return scan(
-                        minimumOffsetEnd,
-                        maximumOffsetEnd,
-                        page.continuation(),
-                        values);
+                return scan(minimumOffsetEnd, maximumOffsetEnd, page.continuation(), values);
             }
             return CompletableFuture.completedFuture(List.copyOf(values));
         }
 
-        private Coverage coverage(
-                Bounds bounds,
-                String projectionRef,
-                List<VersionedGenerationCandidate> candidates) {
+        private Coverage coverage(Bounds bounds, String projectionRef, List<VersionedGenerationCandidate> candidates) {
             List<VersionedGenerationIndex> healthy = candidates.stream()
                     .filter(VersionedGenerationIndex.class::isInstance)
                     .map(VersionedGenerationIndex.class::cast)
@@ -301,10 +280,7 @@ public final class DefaultMaterializationCheckpointReconciler
             return new Coverage(cursor, observedCommitVersion, lastTaskSequence, lastTaskId);
         }
 
-        private boolean satisfiesPolicy(
-                VersionedGenerationIndex candidate,
-                String projectionRef,
-                Bounds bounds) {
+        private boolean satisfiesPolicy(VersionedGenerationIndex candidate, String projectionRef, Bounds bounds) {
             GenerationIndexRecord value = candidate.value();
             if (!value.streamId().equals(streamId.value())
                     || value.readViewId() != policy.view().wireId()
@@ -313,7 +289,8 @@ public final class DefaultMaterializationCheckpointReconciler
             }
             if (value.lifecycle() != GenerationLifecycle.COMMITTED
                     || !value.policySha256().equals(policy.digestSha256().value())
-                    || !value.materializationPolicySha256().equals(policy.digestSha256().value())
+                    || !value.materializationPolicySha256()
+                            .equals(policy.digestSha256().value())
                     || !value.projectionRef().equals(projectionRef)) {
                 return false;
             }
@@ -332,13 +309,11 @@ public final class DefaultMaterializationCheckpointReconciler
         }
 
         private CompletableFuture<VersionedMaterializationCheckpoint> update(
-                VersionedMaterializationCheckpoint current,
-                Coverage coverage,
-                int attempt) {
+                VersionedMaterializationCheckpoint current, Coverage coverage, int attempt) {
             MaterializationCheckpointRecord value = current.value();
             if (coverage.contiguousCoveredOffset() < value.contiguousCoveredOffset()) {
-                return CompletableFuture.failedFuture(invariant(
-                        "materialization checkpoint is ahead of verified committed coverage", null));
+                return CompletableFuture.failedFuture(
+                        invariant("materialization checkpoint is ahead of verified committed coverage", null));
             }
             long covered = Math.max(value.contiguousCoveredOffset(), coverage.contiguousCoveredOffset());
             long observed = Math.max(value.observedCommitVersion(), coverage.observedCommitVersion());
@@ -366,9 +341,7 @@ public final class DefaultMaterializationCheckpointReconciler
                     taskId,
                     Math.max(clock.millis(), value.updatedAtMillis()),
                     0);
-            return deadline.bound(
-                            mutationGuard::revalidate,
-                            "revalidate activation before checkpoint CAS")
+            return deadline.bound(mutationGuard::revalidate, "revalidate activation before checkpoint CAS")
                     .thenCompose(ignored -> deadline.bound(
                             () -> generations.compareAndSetMaterializationCheckpoint(
                                     cluster, replacement, current.metadataVersion()),
@@ -380,15 +353,10 @@ public final class DefaultMaterializationCheckpointReconciler
                         Throwable exact = unwrap(failure);
                         return deadline.bound(
                                         () -> generations.getMaterializationCheckpoint(
-                                                cluster,
-                                                streamId,
-                                                policy.policyId(),
-                                                policy.policyVersion()),
+                                                cluster, streamId, policy.policyId(), policy.policyVersion()),
                                         "reload materialization checkpoint after CAS failure")
                                 .thenCompose(optional -> {
-                                    if (optional.isPresent()
-                                            && exactReplacement(
-                                                    replacement, optional.orElseThrow())) {
+                                    if (optional.isPresent() && exactReplacement(replacement, optional.orElseThrow())) {
                                         return CompletableFuture.completedFuture(optional.orElseThrow());
                                     }
                                     if (isConditionFailure(exact)) {
@@ -407,15 +375,13 @@ public final class DefaultMaterializationCheckpointReconciler
     }
 
     private static boolean exactReplacement(
-            MaterializationCheckpointRecord expected,
-            VersionedMaterializationCheckpoint actual) {
+            MaterializationCheckpointRecord expected, VersionedMaterializationCheckpoint actual) {
         return expected.withMetadataVersion(actual.metadataVersion()).equals(actual.value());
     }
 
     private static boolean isConditionFailure(Throwable failure) {
         return failure instanceof F4MetadataConditionFailedException
-                || failure instanceof NereusException nereus
-                        && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
+                || failure instanceof NereusException nereus && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
     }
 
     private static Throwable unwrap(Throwable failure) {
@@ -431,10 +397,8 @@ public final class DefaultMaterializationCheckpointReconciler
         Objects.requireNonNull(policy, "policy");
         if (policy.view() != ReadView.COMMITTED
                 || policy.taskKind() != TaskKind.LOSSLESS_REWRITE
-                || !MaterializationPolicy.isLosslessCommittedFormat(
-                        policy.targetPhysicalFormat())) {
-            throw new IllegalArgumentException(
-                    "checkpoint reconciler admits only lossless COMMITTED NCP1/NCP2 policy");
+                || !MaterializationPolicy.isLosslessCommittedFormat(policy.targetPhysicalFormat())) {
+            throw new IllegalArgumentException("checkpoint reconciler admits only lossless COMMITTED NCP1/NCP2 policy");
         }
         return policy;
     }
@@ -476,14 +440,10 @@ public final class DefaultMaterializationCheckpointReconciler
         return value;
     }
 
-    private record Bounds(long trimOffset, long headOffset) {
-    }
+    private record Bounds(long trimOffset, long headOffset) {}
 
     private record Coverage(
-            long contiguousCoveredOffset,
-            long observedCommitVersion,
-            long lastTaskSequence,
-            String lastTaskId) {
+            long contiguousCoveredOffset, long observedCommitVersion, long lastTaskSequence, String lastTaskId) {
         private Coverage {
             if (contiguousCoveredOffset < 0
                     || observedCommitVersion < 0

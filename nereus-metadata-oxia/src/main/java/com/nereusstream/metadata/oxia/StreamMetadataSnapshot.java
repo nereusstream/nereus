@@ -19,11 +19,11 @@ import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
 import java.util.Objects;
 
-/** Three read views hydrated from one authoritative stream-head value. */
+/**
+ * Three read views hydrated from one authoritative stream-head value.
+ */
 public record StreamMetadataSnapshot(
-        StreamMetadataRecord metadata,
-        CommittedEndOffsetRecord committedEnd,
-        TrimRecord trim) {
+        StreamMetadataRecord metadata, CommittedEndOffsetRecord committedEnd, TrimRecord trim) {
     public StreamMetadataSnapshot {
         Objects.requireNonNull(metadata, "metadata");
         Objects.requireNonNull(committedEnd, "committedEnd");
@@ -53,9 +53,7 @@ public record StreamMetadataSnapshot(
      * therefore not make two reads of the same head version appear different.
      */
     public boolean sameVersionedAuthority(StreamMetadataSnapshot other) {
-        return other != null
-                && metadataVersion() == other.metadataVersion()
-                && sameSemanticAuthority(other);
+        return other != null && metadataVersion() == other.metadataVersion() && sameSemanticAuthority(other);
     }
 
     /**
@@ -81,12 +79,9 @@ public record StreamMetadataSnapshot(
                 && metadata.createdAtMillis() == otherMetadata.createdAtMillis()
                 && metadata.policyVersion() == otherMetadata.policyVersion()
                 && committedEnd.streamId().equals(otherCommittedEnd.streamId())
-                && committedEnd.committedEndOffset()
-                        == otherCommittedEnd.committedEndOffset()
-                && committedEnd.cumulativeSize()
-                        == otherCommittedEnd.cumulativeSize()
-                && committedEnd.commitVersion()
-                        == otherCommittedEnd.commitVersion()
+                && committedEnd.committedEndOffset() == otherCommittedEnd.committedEndOffset()
+                && committedEnd.cumulativeSize() == otherCommittedEnd.cumulativeSize()
+                && committedEnd.commitVersion() == otherCommittedEnd.commitVersion()
                 && trim.streamId().equals(otherTrim.streamId())
                 && trim.trimOffset() == otherTrim.trimOffset();
     }

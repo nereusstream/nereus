@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import java.util.ArrayList;
@@ -7,7 +8,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Explicit resource ownership ledger; owned resources close once in reverse construction order. */
+/**
+ * Explicit resource ownership ledger; owned resources close once in reverse construction order.
+ */
 public final class KafkaRuntimeResources implements AutoCloseable {
     private final List<Resource> resources;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -19,11 +22,10 @@ public final class KafkaRuntimeResources implements AutoCloseable {
         for (Resource resource : exact) {
             Resource previous = identities.put(resource.value(), resource);
             if (previous != null) {
-                throw new IllegalArgumentException(
-                        "Kafka runtime resource " + resource.name()
-                                + " duplicates " + previous.name()
-                                + " with " + previous.ownership() + "/" + resource.ownership()
-                                + " ownership");
+                throw new IllegalArgumentException("Kafka runtime resource " + resource.name()
+                        + " duplicates " + previous.name()
+                        + " with " + previous.ownership() + "/" + resource.ownership()
+                        + " ownership");
             }
         }
         this.resources = exact;
@@ -63,10 +65,7 @@ public final class KafkaRuntimeResources implements AutoCloseable {
         }
     }
 
-    public record Resource(
-            String name,
-            AutoCloseable value,
-            ResourceOwnership ownership) {
+    public record Resource(String name, AutoCloseable value, ResourceOwnership ownership) {
         public Resource {
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(value, "value");

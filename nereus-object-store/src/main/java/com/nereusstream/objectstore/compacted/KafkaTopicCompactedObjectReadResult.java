@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import java.util.List;
 import java.util.Objects;
 
-/** Strictly verified sparse NTC2 rows and physical/source-coverage accounting. */
+/**
+ * Strictly verified sparse NTC2 rows and physical/source-coverage accounting.
+ */
 public record KafkaTopicCompactedObjectReadResult(
         RangedCompactedObjectMetadata metadata,
         List<KafkaTopicCompactedObjectRow> rows,

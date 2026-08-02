@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-/** Opaque scope-bound continuation token for one cursor-state scan. */
+/**
+ * Opaque scope-bound continuation token for one cursor-state scan.
+ */
 public final class CursorScanToken {
     private final String cluster;
     private final StreamId streamId;

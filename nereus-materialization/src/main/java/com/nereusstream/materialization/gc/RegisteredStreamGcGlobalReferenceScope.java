@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -30,10 +31,9 @@ import java.util.concurrent.CompletableFuture;
  * <p>Registration records remain work hints unless the exact activation record proves registration,
  * physical-root and cursor backfill coverage for the installed domain set.
  */
-public final class RegisteredStreamGcGlobalReferenceScope
-        implements GcGlobalReferenceScope {
-    private static final Comparator<GcAuthorityToken> AUTHORITY_ORDER = Comparator
-            .comparing(GcAuthorityToken::authorityKey)
+public final class RegisteredStreamGcGlobalReferenceScope implements GcGlobalReferenceScope {
+    private static final Comparator<GcAuthorityToken> AUTHORITY_ORDER = Comparator.comparing(
+                    GcAuthorityToken::authorityKey)
             .thenComparingLong(GcAuthorityToken::metadataVersion)
             .thenComparing(value -> value.identitySha256().value());
 
@@ -52,12 +52,9 @@ public final class RegisteredStreamGcGlobalReferenceScope
             List<GcReferenceDomainVersion> installedDomains,
             GcReferenceDomainConfig config) {
         this.cluster = requireText(cluster, "cluster");
-        this.activationStore = Objects.requireNonNull(
-                activationStore, "activationStore");
-        this.generationStore = Objects.requireNonNull(
-                generationStore, "generationStore");
-        this.installedDomains = GenerationProtocolDomainSets.canonicalInstalled(
-                installedDomains);
+        this.activationStore = Objects.requireNonNull(activationStore, "activationStore");
+        this.generationStore = Objects.requireNonNull(generationStore, "generationStore");
+        this.installedDomains = GenerationProtocolDomainSets.canonicalInstalled(installedDomains);
         GcReferenceDomainConfig exactConfig = Objects.requireNonNull(config, "config");
         this.pageSize = exactConfig.metadataScanPageSize();
         this.maxAuthorities = exactConfig.maxAuthoritiesPerSnapshot();
@@ -70,17 +67,14 @@ public final class RegisteredStreamGcGlobalReferenceScope
             Accumulator accumulator = new Accumulator(maxAuthorities);
             if (optional.isEmpty()) {
                 String key = keys.generationProtocolActivationKey();
-                accumulator.addActivation(new GcAuthorityToken(
-                        key,
-                        0,
-                        GlobalReferenceScopeIdentityDigests.activationAbsence(key)));
+                accumulator.addActivation(
+                        new GcAuthorityToken(key, 0, GlobalReferenceScopeIdentityDigests.activationAbsence(key)));
                 accumulator.incomplete = true;
                 return CompletableFuture.completedFuture(accumulator.snapshot());
             }
             VersionedGenerationProtocolActivation activation = optional.orElseThrow();
             accumulator.addActivation(authority(activation));
-            if (!GenerationProtocolDomainSets.deletionReady(
-                    activation.value(), installedDomains)) {
+            if (!GenerationProtocolDomainSets.deletionReady(activation.value(), installedDomains)) {
                 accumulator.incomplete = true;
                 return CompletableFuture.completedFuture(accumulator.snapshot());
             }
@@ -89,35 +83,24 @@ public final class RegisteredStreamGcGlobalReferenceScope
     }
 
     private CompletableFuture<GcGlobalReferenceScopeSnapshot> scanShard(
-            VersionedGenerationProtocolActivation activation,
-            Accumulator accumulator,
-            int shard) {
-        if (accumulator.incomplete
-                || shard == F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS) {
+            VersionedGenerationProtocolActivation activation, Accumulator accumulator, int shard) {
+        if (accumulator.incomplete || shard == F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS) {
             return finish(activation, accumulator);
         }
-        return scanPage(
-                        accumulator,
-                        shard,
-                        Optional.empty(),
-                        null)
+        return scanPage(accumulator, shard, Optional.empty(), null)
                 .thenCompose(ignored -> scanShard(activation, accumulator, shard + 1));
     }
 
     private CompletableFuture<Void> scanPage(
-            Accumulator accumulator,
-            int shard,
-            Optional<F4ScanToken> continuation,
-            String previousKey) {
+            Accumulator accumulator, int shard, Optional<F4ScanToken> continuation, String previousKey) {
         if (accumulator.incomplete) {
             return CompletableFuture.completedFuture(null);
         }
-        return generationStore.scanStreamRegistrations(
-                        cluster, shard, continuation, pageSize)
+        return generationStore
+                .scanStreamRegistrations(cluster, shard, continuation, pageSize)
                 .thenCompose(page -> {
                     requireProgress(page, previousKey);
-                    for (VersionedMaterializationStreamRegistration registration :
-                            page.values()) {
+                    for (VersionedMaterializationStreamRegistration registration : page.values()) {
                         if (!accumulator.addRegistration(registration)) {
                             return CompletableFuture.completedFuture(null);
                         }
@@ -126,17 +109,12 @@ public final class RegisteredStreamGcGlobalReferenceScope
                         return CompletableFuture.completedFuture(null);
                     }
                     String lastKey = page.values().get(page.values().size() - 1).key();
-                    return scanPage(
-                            accumulator,
-                            shard,
-                            page.continuation(),
-                            lastKey);
+                    return scanPage(accumulator, shard, page.continuation(), lastKey);
                 });
     }
 
     private CompletableFuture<GcGlobalReferenceScopeSnapshot> finish(
-            VersionedGenerationProtocolActivation expected,
-            Accumulator accumulator) {
+            VersionedGenerationProtocolActivation expected, Accumulator accumulator) {
         if (accumulator.incomplete) {
             return CompletableFuture.completedFuture(accumulator.snapshot());
         }
@@ -148,16 +126,11 @@ public final class RegisteredStreamGcGlobalReferenceScope
         });
     }
 
-    private static GcAuthorityToken authority(
-            VersionedGenerationProtocolActivation activation) {
-        return new GcAuthorityToken(
-                activation.key(),
-                activation.metadataVersion(),
-                activation.durableValueSha256());
+    private static GcAuthorityToken authority(VersionedGenerationProtocolActivation activation) {
+        return new GcAuthorityToken(activation.key(), activation.metadataVersion(), activation.durableValueSha256());
     }
 
-    private static void requireProgress(
-            StreamRegistrationScanPage page, String previousKey) {
+    private static void requireProgress(StreamRegistrationScanPage page, String previousKey) {
         if (previousKey != null
                 && !page.values().isEmpty()
                 && page.values().get(0).key().compareTo(previousKey) <= 0) {
@@ -174,8 +147,7 @@ public final class RegisteredStreamGcGlobalReferenceScope
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static final class Accumulator {
@@ -200,8 +172,7 @@ public final class RegisteredStreamGcGlobalReferenceScope
             }
         }
 
-        private boolean addRegistration(
-                VersionedMaterializationStreamRegistration registration) {
+        private boolean addRegistration(VersionedMaterializationStreamRegistration registration) {
             StreamId streamId = new StreamId(registration.value().streamId());
             if (!streamIds.add(streamId.value())) {
                 throw invariant("global registration scan returned a duplicate stream");
@@ -214,9 +185,7 @@ public final class RegisteredStreamGcGlobalReferenceScope
             }
             streams.add(streamId);
             authorities.add(new GcAuthorityToken(
-                    registration.key(),
-                    registration.metadataVersion(),
-                    registration.durableValueSha256()));
+                    registration.key(), registration.metadataVersion(), registration.durableValueSha256()));
             return true;
         }
 
@@ -224,11 +193,7 @@ public final class RegisteredStreamGcGlobalReferenceScope
             streams.sort(Comparator.comparing(StreamId::value));
             authorities.sort(AUTHORITY_ORDER);
             return new GcGlobalReferenceScopeSnapshot(
-                    !incomplete,
-                    streamCount,
-                    authorityCount,
-                    List.copyOf(streams),
-                    List.copyOf(authorities));
+                    !incomplete, streamCount, authorityCount, List.copyOf(streams), List.copyOf(authorities));
         }
     }
 }

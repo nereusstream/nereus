@@ -1,19 +1,47 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.SchemaRef;
 import java.util.List;
 
-/** Durable, payload-free reservation for one exact BookKeeper entry range. */
+/**
+ * Durable, payload-free reservation for one exact BookKeeper entry range.
+ */
 public record BookKeeperAppendReservationRecord(
-        int schemaVersion, String reservationId, String appendAttemptId, String streamId, String writerId,
-        String writerRunIdHash, long appendSessionEpoch, String fencingTokenHash, long writerStateEpoch,
-        long ledgerId, long ledgerRootEpoch, int ledgerRangeSlot, long firstEntryId, int entryCount,
-        String rangeChecksumSha256, long expectedStartOffset, String payloadFormat, int recordCount,
-        long logicalBytes, long physicalBytes, List<SchemaRef> schemaRefs, String projectionIdentity,
-        long minEventTimeMillis, long maxEventTimeMillis, AppendReservationLifecycle lifecycle,
-        String commitId, String commitKey, long commitMetadataVersion, String commitRecordSha256,
-        long createdAtMillis, long updatedAtMillis, String stateReason, long metadataVersion) {
+        int schemaVersion,
+        String reservationId,
+        String appendAttemptId,
+        String streamId,
+        String writerId,
+        String writerRunIdHash,
+        long appendSessionEpoch,
+        String fencingTokenHash,
+        long writerStateEpoch,
+        long ledgerId,
+        long ledgerRootEpoch,
+        int ledgerRangeSlot,
+        long firstEntryId,
+        int entryCount,
+        String rangeChecksumSha256,
+        long expectedStartOffset,
+        String payloadFormat,
+        int recordCount,
+        long logicalBytes,
+        long physicalBytes,
+        List<SchemaRef> schemaRefs,
+        String projectionIdentity,
+        long minEventTimeMillis,
+        long maxEventTimeMillis,
+        AppendReservationLifecycle lifecycle,
+        String commitId,
+        String commitKey,
+        long commitMetadataVersion,
+        String commitRecordSha256,
+        long createdAtMillis,
+        long updatedAtMillis,
+        String stateReason,
+        long metadataVersion) {
     public BookKeeperAppendReservationRecord {
         BookKeeperRecordValidation.version(schemaVersion);
         reservationId = BookKeeperRecordValidation.text(reservationId, "reservationId");
@@ -39,8 +67,12 @@ public record BookKeeperAppendReservationRecord(
         schemaRefs = BookKeeperRecordValidation.schemaRefs(schemaRefs);
         projectionIdentity = BookKeeperRecordValidation.text(projectionIdentity, "projectionIdentity");
         BookKeeperRecordValidation.nonNegative(minEventTimeMillis, "minEventTimeMillis");
-        if (maxEventTimeMillis < minEventTimeMillis) throw new IllegalArgumentException("event time range is invalid");
-        if (lifecycle == null) throw new NullPointerException("lifecycle");
+        if (maxEventTimeMillis < minEventTimeMillis) {
+            throw new IllegalArgumentException("event time range is invalid");
+        }
+        if (lifecycle == null) {
+            throw new NullPointerException("lifecycle");
+        }
         commitId = BookKeeperRecordValidation.optional(commitId, "commitId");
         commitKey = BookKeeperRecordValidation.optional(commitKey, "commitKey");
         BookKeeperRecordValidation.nonNegative(commitMetadataVersion, "commitMetadataVersion");
@@ -48,7 +80,9 @@ public record BookKeeperAppendReservationRecord(
         BookKeeperRecordValidation.times(createdAtMillis, updatedAtMillis);
         stateReason = BookKeeperRecordValidation.optional(stateReason, "stateReason");
         BookKeeperRecordValidation.metadataVersion(metadataVersion);
-        boolean committedFacts = !commitId.isEmpty() && !commitKey.isEmpty() && commitMetadataVersion > 0
+        boolean committedFacts = !commitId.isEmpty()
+                && !commitKey.isEmpty()
+                && commitMetadataVersion > 0
                 && !commitRecordSha256.isEmpty();
         boolean committedLifecycle = lifecycle == AppendReservationLifecycle.COMMIT_PREPARED
                 || lifecycle == AppendReservationLifecycle.HEAD_COMMITTED;
@@ -61,11 +95,39 @@ public record BookKeeperAppendReservationRecord(
     }
 
     public BookKeeperAppendReservationRecord withMetadataVersion(long version) {
-        return new BookKeeperAppendReservationRecord(schemaVersion, reservationId, appendAttemptId, streamId,
-                writerId, writerRunIdHash, appendSessionEpoch, fencingTokenHash, writerStateEpoch, ledgerId,
-                ledgerRootEpoch, ledgerRangeSlot, firstEntryId, entryCount, rangeChecksumSha256, expectedStartOffset,
-                payloadFormat, recordCount, logicalBytes, physicalBytes, schemaRefs, projectionIdentity,
-                minEventTimeMillis, maxEventTimeMillis, lifecycle, commitId, commitKey, commitMetadataVersion,
-                commitRecordSha256, createdAtMillis, updatedAtMillis, stateReason, version);
+        return new BookKeeperAppendReservationRecord(
+                schemaVersion,
+                reservationId,
+                appendAttemptId,
+                streamId,
+                writerId,
+                writerRunIdHash,
+                appendSessionEpoch,
+                fencingTokenHash,
+                writerStateEpoch,
+                ledgerId,
+                ledgerRootEpoch,
+                ledgerRangeSlot,
+                firstEntryId,
+                entryCount,
+                rangeChecksumSha256,
+                expectedStartOffset,
+                payloadFormat,
+                recordCount,
+                logicalBytes,
+                physicalBytes,
+                schemaRefs,
+                projectionIdentity,
+                minEventTimeMillis,
+                maxEventTimeMillis,
+                lifecycle,
+                commitId,
+                commitKey,
+                commitMetadataVersion,
+                commitRecordSha256,
+                createdAtMillis,
+                updatedAtMillis,
+                stateReason,
+                version);
     }
 }

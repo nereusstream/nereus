@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.recovery;
 
 import com.nereusstream.api.Checksum;
@@ -34,7 +35,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-/** Newest-first exact-key checkpoint recovery with durable reader pins and bounded fallback. */
+/**
+ * Newest-first exact-key checkpoint recovery with durable reader pins and bounded fallback.
+ */
 public final class KafkaCheckpointRecoveryCoordinator {
     private final String nereusCluster;
     private final KafkaPartitionMetadataStore bindings;
@@ -64,36 +67,37 @@ public final class KafkaCheckpointRecoveryCoordinator {
         this.quarantine = Objects.requireNonNull(quarantine, "quarantine");
     }
 
-    public CompletableFuture<KafkaCheckpointRecoveryResult> recover(
-            KafkaCheckpointRecoveryRequest request) {
+    public CompletableFuture<KafkaCheckpointRecoveryResult> recover(KafkaCheckpointRecoveryRequest request) {
         Objects.requireNonNull(request, "request");
         validateRequest(request);
         long deadline;
         try {
             deadline = Math.addExact(clock.millis(), request.timeout().toMillis());
         } catch (ArithmeticException failure) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "Kafka checkpoint recovery deadline overflows", failure));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("Kafka checkpoint recovery deadline overflows", failure));
         }
-        List<KafkaCheckpointReferenceRecord> references = request.binding().value().checkpointReferences();
+        List<KafkaCheckpointReferenceRecord> references =
+                request.binding().value().checkpointReferences();
         return tryReference(request, references, 0, deadline).thenCompose(result -> {
             if (result.isPresent()) {
-                return CompletableFuture.completedFuture(
-                        new KafkaCheckpointRecoveryResult(result));
+                return CompletableFuture.completedFuture(new KafkaCheckpointRecoveryResult(result));
             }
             if (request.currentSource().trimOffset() == 0) {
                 return CompletableFuture.completedFuture(KafkaCheckpointRecoveryResult.fullReplay());
             }
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                    false,
                     "trimmed Kafka partition has no usable recovery checkpoint"));
         });
     }
 
-    /** Verifies one exact rooted checkpoint without newest-first fallback. */
+    /**
+     * Verifies one exact rooted checkpoint without newest-first fallback.
+     */
     public CompletableFuture<KafkaRecoveredCheckpoint> recoverReference(
-            KafkaCheckpointRecoveryRequest request,
-            KafkaCheckpointReferenceRecord reference) {
+            KafkaCheckpointRecoveryRequest request, KafkaCheckpointReferenceRecord reference) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(reference, "reference");
         validateRequest(request);
@@ -101,33 +105,29 @@ public final class KafkaCheckpointRecoveryCoordinator {
                 .filter(candidate -> candidate.objectId().equals(reference.objectId()))
                 .findFirst();
         if (rooted.isEmpty()) {
-            return CompletableFuture.failedFuture(invariant(
-                    "requested Kafka checkpoint is not rooted by the captured binding"));
+            return CompletableFuture.failedFuture(
+                    invariant("requested Kafka checkpoint is not rooted by the captured binding"));
         }
         if (!rooted.orElseThrow().equals(reference)) {
-            return CompletableFuture.failedFuture(invariant(
-                    "requested Kafka checkpoint conflicts with its captured root"));
+            return CompletableFuture.failedFuture(
+                    invariant("requested Kafka checkpoint conflicts with its captured root"));
         }
         long deadline;
         try {
             deadline = Math.addExact(clock.millis(), request.timeout().toMillis());
         } catch (ArithmeticException failure) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "Kafka checkpoint recovery deadline overflows", failure));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("Kafka checkpoint recovery deadline overflows", failure));
         }
         return quarantine
                 .isQuarantined(
                         request.identity().durableId(),
                         request.binding().value().incarnation(),
                         reference)
-                .thenCompose(
-                        quarantined ->
-                                quarantined
-                                        ? CompletableFuture.failedFuture(
-                                                invariant(
-                                                        "requested Kafka checkpoint is durably"
-                                                            + " quarantined"))
-                                        : recoverOne(request, reference, deadline));
+                .thenCompose(quarantined -> quarantined
+                        ? CompletableFuture.failedFuture(
+                                invariant("requested Kafka checkpoint is durably" + " quarantined"))
+                        : recoverOne(request, reference, deadline));
     }
 
     private CompletableFuture<Optional<KafkaRecoveredCheckpoint>> tryReference(
@@ -135,51 +135,40 @@ public final class KafkaCheckpointRecoveryCoordinator {
             List<KafkaCheckpointReferenceRecord> references,
             int index,
             long deadline) {
-        if (index == references.size()) return CompletableFuture.completedFuture(Optional.empty());
+        if (index == references.size()) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
         KafkaCheckpointReferenceRecord reference = references.get(index);
         return quarantine
                 .isQuarantined(
                         request.identity().durableId(),
                         request.binding().value().incarnation(),
                         reference)
-                .thenCompose(
-                        quarantined -> {
-                            if (quarantined) {
-                                return tryReference(request, references, index + 1, deadline);
-                            }
-                            return recoverOne(request, reference, deadline)
-                                    .thenApply(Optional::of)
-                                    .exceptionallyCompose(
-                                            failure -> {
-                                                Throwable exact = unwrap(failure);
-                                                if (!canFallback(exact)) {
-                                                    return CompletableFuture.failedFuture(exact);
-                                                }
-                                                return quarantine
-                                                        .quarantine(
-                                                                request.identity().durableId(),
-                                                                request.binding()
-                                                                        .value()
-                                                                        .incarnation(),
-                                                                reference,
-                                                                KafkaCheckpointFailureSource
-                                                                        .RECOVERY,
-                                                                exact)
-                                                        .thenCompose(
-                                                                ignored ->
-                                                                        tryReference(
-                                                                                request,
-                                                                                references,
-                                                                                index + 1,
-                                                                                deadline));
-                                            });
-                        });
+                .thenCompose(quarantined -> {
+                    if (quarantined) {
+                        return tryReference(request, references, index + 1, deadline);
+                    }
+                    return recoverOne(request, reference, deadline)
+                            .thenApply(Optional::of)
+                            .exceptionallyCompose(failure -> {
+                                Throwable exact = unwrap(failure);
+                                if (!canFallback(exact)) {
+                                    return CompletableFuture.failedFuture(exact);
+                                }
+                                return quarantine
+                                        .quarantine(
+                                                request.identity().durableId(),
+                                                request.binding().value().incarnation(),
+                                                reference,
+                                                KafkaCheckpointFailureSource.RECOVERY,
+                                                exact)
+                                        .thenCompose(ignored -> tryReference(request, references, index + 1, deadline));
+                            });
+                });
     }
 
     private CompletableFuture<KafkaRecoveredCheckpoint> recoverOne(
-            KafkaCheckpointRecoveryRequest request,
-            KafkaCheckpointReferenceRecord reference,
-            long deadline) {
+            KafkaCheckpointRecoveryRequest request, KafkaCheckpointReferenceRecord reference, long deadline) {
         return loadPhysical(reference).thenCompose(physical -> readPins.acquire(
                         physical,
                         deadline,
@@ -195,16 +184,21 @@ public final class KafkaCheckpointRecoveryCoordinator {
             long deadline) {
         long remaining = deadline - clock.millis();
         if (remaining <= 0) {
-            return releaseAfter(lease, CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.TIMEOUT, true, "Kafka checkpoint recovery deadline expired")));
+            return releaseAfter(
+                    lease,
+                    CompletableFuture.failedFuture(new NereusException(
+                            ErrorCode.TIMEOUT, true, "Kafka checkpoint recovery deadline expired")));
         }
         CompletableFuture<KafkaRecoveredCheckpoint> operation = reader.openAndVerify(
-                        physical.objectKey(), physical.objectLength(), physical.storageChecksum(),
-                        physical.contentSha256().orElseThrow(), java.time.Duration.ofMillis(remaining))
+                        physical.objectKey(),
+                        physical.objectLength(),
+                        physical.storageChecksum(),
+                        physical.contentSha256().orElseThrow(),
+                        java.time.Duration.ofMillis(remaining))
                 .thenCompose(object -> validateObject(request, reference, object))
                 .thenCompose(object -> requireReferenced(request.identity().durableId(), reference)
-                        .thenApply(ignored -> new KafkaRecoveredCheckpoint(
-                                reference, object.header(), object.sections())));
+                        .thenApply(ignored ->
+                                new KafkaRecoveredCheckpoint(reference, object.header(), object.sections())));
         return releaseAfter(lease, operation);
     }
 
@@ -215,16 +209,16 @@ public final class KafkaCheckpointRecoveryCoordinator {
         if (!object.objectId().value().equals(reference.objectId())
                 || !object.objectKey().value().equals(reference.objectKey())
                 || object.objectLength() != reference.objectLength()
-                || !Arrays.equals(
-                        HexFormat.of().parseHex(object.objectSha256().value()), reference.objectSha256())
+                || !Arrays.equals(HexFormat.of().parseHex(object.objectSha256().value()), reference.objectSha256())
                 || object.header().checkpointOffset() != reference.checkpointOffset()
                 || object.header().logStartOffset() != reference.logStartOffsetAtCheckpoint()
                 || object.header().sourceCommitVersion() != reference.sourceCommitVersion()
                 || !Arrays.equals(
-                        HexFormat.of().parseHex(object.header().sourceHeadSha256().value()),
+                        HexFormat.of()
+                                .parseHex(object.header().sourceHeadSha256().value()),
                         reference.sourceHeadSha256())) {
-            return CompletableFuture.failedFuture(invariant(
-                    "NKC1 object conflicts with its authoritative binding reference"));
+            return CompletableFuture.failedFuture(
+                    invariant("NKC1 object conflicts with its authoritative binding reference"));
         }
         verifier.verifyRecoveryWindow(
                 object,
@@ -241,36 +235,36 @@ public final class KafkaCheckpointRecoveryCoordinator {
         if (current.commitVersion() == header.sourceCommitVersion()) {
             if (!current.lastCommitId().equals(header.sourceLastCommitId())
                     || current.endOffset() != header.stableEndOffset()) {
-                return CompletableFuture.failedFuture(invariant(
-                        "NKC1 source anchor conflicts at the same commit version"));
+                return CompletableFuture.failedFuture(
+                        invariant("NKC1 source anchor conflicts at the same commit version"));
             }
             return CompletableFuture.completedFuture(object);
         }
         if (current.commitVersion() < header.sourceCommitVersion()) {
-            return CompletableFuture.failedFuture(invariant(
-                    "NKC1 source commit is ahead of the current stream head"));
+            return CompletableFuture.failedFuture(invariant("NKC1 source commit is ahead of the current stream head"));
         }
-        return request.sourceValidator().isSourceCommitReachable(header, current).thenCompose(reachable ->
-                reachable
+        return request.sourceValidator()
+                .isSourceCommitReachable(header, current)
+                .thenCompose(reachable -> reachable
                         ? CompletableFuture.completedFuture(object)
-                        : CompletableFuture.failedFuture(invariant(
-                                "NKC1 source commit is not reachable from the current stream head")));
+                        : CompletableFuture.failedFuture(
+                                invariant("NKC1 source commit is not reachable from the current stream head")));
     }
 
-    private CompletableFuture<PhysicalObjectIdentity> loadPhysical(
-            KafkaCheckpointReferenceRecord reference) {
+    private CompletableFuture<PhysicalObjectIdentity> loadPhysical(KafkaCheckpointReferenceRecord reference) {
         ObjectKey key = new ObjectKey(reference.objectKey());
         ObjectKeyHash hash = ObjectKeyHash.from(key);
         return physicalStore.getRoot(nereusCluster, hash).thenApply(optional -> {
-            var root = optional.orElseThrow(() -> new NereusException(
-                    ErrorCode.OBJECT_NOT_FOUND, true,
-                    "Kafka checkpoint physical root is absent"));
+            var root = optional.orElseThrow(() ->
+                    new NereusException(ErrorCode.OBJECT_NOT_FOUND, true, "Kafka checkpoint physical root is absent"));
             PhysicalObjectIdentity physical = PhysicalObjectIdentity.from(root.value());
-            Checksum expectedSha = new Checksum(
-                    ChecksumType.SHA256, HexFormat.of().formatHex(reference.objectSha256()));
+            Checksum expectedSha =
+                    new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(reference.objectSha256()));
             if (root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
                     || !physical.objectKey().equals(key)
-                    || physical.objectId().filter(id -> id.equals(new ObjectId(reference.objectId()))).isEmpty()
+                    || physical.objectId()
+                            .filter(id -> id.equals(new ObjectId(reference.objectId())))
+                            .isEmpty()
                     || physical.kind() != PhysicalObjectKind.KAFKA_PARTITION_CHECKPOINT
                     || physical.objectLength() != reference.objectLength()
                     || physical.contentSha256().filter(expectedSha::equals).isEmpty()) {
@@ -281,11 +275,10 @@ public final class KafkaCheckpointRecoveryCoordinator {
     }
 
     private CompletableFuture<Void> requireReferenced(
-            com.nereusstream.metadata.oxia.KafkaPartitionId identity,
-            KafkaCheckpointReferenceRecord expected) {
+            com.nereusstream.metadata.oxia.KafkaPartitionId identity, KafkaCheckpointReferenceRecord expected) {
         return bindings.get(identity).thenAccept(optional -> {
-            VersionedKafkaPartitionBinding current = optional.orElseThrow(() -> invariant(
-                    "Kafka binding disappeared while revalidating a checkpoint read"));
+            VersionedKafkaPartitionBinding current = optional.orElseThrow(
+                    () -> invariant("Kafka binding disappeared while revalidating a checkpoint read"));
             KafkaCheckpointReferenceRecord actual = current.value().checkpointReferences().stream()
                     .filter(reference -> reference.objectId().equals(expected.objectId()))
                     .findFirst()
@@ -296,14 +289,19 @@ public final class KafkaCheckpointRecoveryCoordinator {
         });
     }
 
-    private static <T> CompletableFuture<T> releaseAfter(
-            ObjectReadLease lease, CompletableFuture<T> operation) {
-        return operation.handle((value, failure) -> lease.release().handle((ignored, releaseFailure) -> {
-            if (failure == null && releaseFailure == null) return value;
-            Throwable exact = failure == null ? unwrap(releaseFailure) : unwrap(failure);
-            if (releaseFailure != null && failure != null) exact.addSuppressed(unwrap(releaseFailure));
-            throw new CompletionException(exact);
-        })).thenCompose(value -> value);
+    private static <T> CompletableFuture<T> releaseAfter(ObjectReadLease lease, CompletableFuture<T> operation) {
+        return operation
+                .handle((value, failure) -> lease.release().handle((ignored, releaseFailure) -> {
+                    if (failure == null && releaseFailure == null) {
+                        return value;
+                    }
+                    Throwable exact = failure == null ? unwrap(releaseFailure) : unwrap(failure);
+                    if (releaseFailure != null && failure != null) {
+                        exact.addSuppressed(unwrap(releaseFailure));
+                    }
+                    throw new CompletionException(exact);
+                }))
+                .thenCompose(value -> value);
     }
 
     private static void validateRequest(KafkaCheckpointRecoveryRequest request) {
@@ -316,23 +314,26 @@ public final class KafkaCheckpointRecoveryCoordinator {
 
     private static String requireText(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while (current instanceof CompletionException && current.getCause() != null) current = current.getCause();
+        while (current instanceof CompletionException && current.getCause() != null) {
+            current = current.getCause();
+        }
         return current;
     }
 
     private static boolean canFallback(Throwable failure) {
-        if (!(failure instanceof NereusException nereus)) return false;
+        if (!(failure instanceof NereusException nereus)) {
+            return false;
+        }
         return switch (nereus.code()) {
-            case OBJECT_NOT_FOUND,
-                    OBJECT_CHECKSUM_MISMATCH,
-                    UNSUPPORTED_FORMAT,
-                    METADATA_INVARIANT_VIOLATION -> true;
+            case OBJECT_NOT_FOUND, OBJECT_CHECKSUM_MISMATCH, UNSUPPORTED_FORMAT, METADATA_INVARIANT_VIOLATION -> true;
             default -> false;
         };
     }

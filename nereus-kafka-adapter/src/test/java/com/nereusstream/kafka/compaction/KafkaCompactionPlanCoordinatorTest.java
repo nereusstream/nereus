@@ -16,7 +16,6 @@ package com.nereusstream.kafka.compaction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.kafka.compaction.KafkaCompactionPlanCodecV1Test.Fixture;
@@ -38,73 +37,28 @@ import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
 
 class KafkaCompactionPlanCoordinatorTest {
-  @Test
-  void publishesThePlanBeforeTaskAdmissionAndRecoversByMaterializationTaskId() {
-    Fixture fixture = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED");
-    ArrayList<String> events = new ArrayList<>();
-    FakePlanStore plans = new FakePlanStore(events);
-    KafkaCompactionPlanCoordinator.TaskRoots tasks =
-        (task, guard) -> {
-          events.add("task-guard");
-          return guard
-              .revalidate()
-              .thenApply(
-                  ignored -> {
-                    events.add("task-admit");
-                    return task;
-                  });
+    @Test
+    void publishesThePlanBeforeTaskAdmissionAndRecoversByMaterializationTaskId() {
+        Fixture fixture = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED");
+        ArrayList<String> events = new ArrayList<>();
+        FakePlanStore plans = new FakePlanStore(events);
+        KafkaCompactionPlanCoordinator.TaskRoots tasks = (task, guard) -> {
+            events.add("task-guard");
+            return guard.revalidate().thenApply(ignored -> {
+                events.add("task-admit");
+                return task;
+            });
         };
-    KafkaCompactionPlanCoordinator coordinator =
-        new KafkaCompactionPlanCoordinator(
-            plans,
-            tasks,
-            new KafkaCompactionPlanRecordMapper(),
-            Clock.fixed(Instant.ofEpochMilli(2_000), ZoneOffset.UTC));
-    KafkaPartitionId partition = new KafkaPartitionId("kraft", topicId(7), 1);
+        KafkaCompactionPlanCoordinator coordinator = new KafkaCompactionPlanCoordinator(
+                plans,
+                tasks,
+                new KafkaCompactionPlanRecordMapper(),
+                Clock.fixed(Instant.ofEpochMilli(2_000), ZoneOffset.UTC));
+        KafkaPartitionId partition = new KafkaPartitionId("kraft", topicId(7), 1);
 
-    KafkaCompactionPlanCoordinator.Converged converged =
-        coordinator
-            .converge(
-                partition,
-                fixture.outputTask(),
-                fixture.plan().bindingMetadataVersion(),
-                fixture.plan().lastStableOffset(),
-                fixture.plan().highWatermark(),
-                fixture.plan().candidate(),
-                fixture.plan().decisionSources(),
-                fixture.plan().passOneSnapshot(),
-                () -> {
-                  events.add("authority");
-                  return CompletableFuture.completedFuture(null);
-                })
-            .join();
-
-    assertThat(converged.plan()).isEqualTo(fixture.plan());
-    assertThat(events)
-        .containsExactly(
-            "authority", "plan-put", "task-guard", "authority", "plan-get", "task-admit");
-    assertThat(coordinator.recover(partition, fixture.outputTask()).join().plan())
-        .isEqualTo(fixture.plan());
-    assertThat(plans.lastLookupTaskId()).isEqualTo(fixture.outputTask().taskId());
-  }
-
-  @Test
-  void refusesTaskAdmissionWhenTheDurablePlanDisappears() {
-    Fixture fixture = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED");
-    FakePlanStore plans = new FakePlanStore(new ArrayList<>());
-    plans.removeBeforeFirstGet = true;
-    KafkaCompactionPlanCoordinator coordinator =
-        new KafkaCompactionPlanCoordinator(
-            plans,
-            (task, guard) -> guard.revalidate().thenApply(ignored -> task),
-            new KafkaCompactionPlanRecordMapper(),
-            Clock.systemUTC());
-
-    assertThatThrownBy(
-            () ->
-                coordinator
-                    .converge(
-                        new KafkaPartitionId("kraft", topicId(8), 1),
+        KafkaCompactionPlanCoordinator.Converged converged = coordinator
+                .converge(
+                        partition,
                         fixture.outputTask(),
                         fixture.plan().bindingMetadataVersion(),
                         fixture.plan().lastStableOffset(),
@@ -112,74 +66,108 @@ class KafkaCompactionPlanCoordinatorTest {
                         fixture.plan().candidate(),
                         fixture.plan().decisionSources(),
                         fixture.plan().passOneSnapshot(),
-                        () -> CompletableFuture.completedFuture(null))
-                    .join())
-        .isInstanceOf(CompletionException.class)
-        .hasRootCauseMessage("Kafka compaction plan disappeared before task creation");
-  }
+                        () -> {
+                            events.add("authority");
+                            return CompletableFuture.completedFuture(null);
+                        })
+                .join();
 
-  private static String topicId(int value) {
-    byte[] bytes = new byte[16];
-    bytes[15] = (byte) value;
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-  }
-
-  private static final class FakePlanStore implements KafkaCompactionPlanMetadataStore {
-    private final List<String> events;
-    private VersionedKafkaCompactionPlan current;
-    private String lastLookupTaskId;
-    private boolean removeBeforeFirstGet;
-
-    private FakePlanStore(List<String> events) {
-      this.events = events;
+        assertThat(converged.plan()).isEqualTo(fixture.plan());
+        assertThat(events)
+                .containsExactly("authority", "plan-put", "task-guard", "authority", "plan-get", "task-admit");
+        assertThat(coordinator.recover(partition, fixture.outputTask()).join().plan())
+                .isEqualTo(fixture.plan());
+        assertThat(plans.lastLookupTaskId()).isEqualTo(fixture.outputTask().taskId());
     }
 
-    @Override
-    public CompletableFuture<Optional<VersionedKafkaCompactionPlan>> getCompactionPlan(
-        KafkaPartitionId id, String materializationTaskId) {
-      events.add("plan-get");
-      lastLookupTaskId = materializationTaskId;
-      if (removeBeforeFirstGet) {
-        removeBeforeFirstGet = false;
-        current = null;
-      }
-      return CompletableFuture.completedFuture(Optional.ofNullable(current));
+    @Test
+    void refusesTaskAdmissionWhenTheDurablePlanDisappears() {
+        Fixture fixture = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED");
+        FakePlanStore plans = new FakePlanStore(new ArrayList<>());
+        plans.removeBeforeFirstGet = true;
+        KafkaCompactionPlanCoordinator coordinator = new KafkaCompactionPlanCoordinator(
+                plans,
+                (task, guard) -> guard.revalidate().thenApply(ignored -> task),
+                new KafkaCompactionPlanRecordMapper(),
+                Clock.systemUTC());
+
+        assertThatThrownBy(() -> coordinator
+                        .converge(
+                                new KafkaPartitionId("kraft", topicId(8), 1),
+                                fixture.outputTask(),
+                                fixture.plan().bindingMetadataVersion(),
+                                fixture.plan().lastStableOffset(),
+                                fixture.plan().highWatermark(),
+                                fixture.plan().candidate(),
+                                fixture.plan().decisionSources(),
+                                fixture.plan().passOneSnapshot(),
+                                () -> CompletableFuture.completedFuture(null))
+                        .join())
+                .isInstanceOf(CompletionException.class)
+                .hasRootCauseMessage("Kafka compaction plan disappeared before task creation");
     }
 
-    @Override
-    public CompletableFuture<VersionedKafkaCompactionPlan> putCompactionPlanIfAbsent(
-        KafkaCompactionPlanRecord value) {
-      events.add("plan-put");
-      if (current == null) {
-        current =
-            new VersionedKafkaCompactionPlan(
-                "plans/" + value.materializationTaskId(),
-                value.withMetadataVersion(1),
-                1,
-                new Checksum(ChecksumType.SHA256, "f".repeat(64)));
-      } else if (!current.value().withMetadataVersion(0).equals(value)) {
-        return CompletableFuture.failedFuture(new IllegalStateException("conflicting plan"));
-      }
-      return CompletableFuture.completedFuture(current);
+    private static String topicId(int value) {
+        byte[] bytes = new byte[16];
+        bytes[15] = (byte) value;
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    @Override
-    public CompletableFuture<KafkaCompactionPlanScanPage> scanCompactionPlans(
-        KafkaPartitionId id, Optional<KafkaCompactionPlanScanToken> continuation, int limit) {
-      return CompletableFuture.failedFuture(new UnsupportedOperationException());
-    }
+    private static final class FakePlanStore implements KafkaCompactionPlanMetadataStore {
+        private final List<String> events;
+        private VersionedKafkaCompactionPlan current;
+        private String lastLookupTaskId;
+        private boolean removeBeforeFirstGet;
 
-    @Override
-    public CompletableFuture<Void> deleteCompactionPlan(VersionedKafkaCompactionPlan expected) {
-      if (!expected.equals(current)) {
-        return CompletableFuture.failedFuture(new IllegalStateException("stale plan"));
-      }
-      current = null;
-      return CompletableFuture.completedFuture(null);
-    }
+        private FakePlanStore(List<String> events) {
+            this.events = events;
+        }
 
-    private String lastLookupTaskId() {
-      return lastLookupTaskId;
+        @Override
+        public CompletableFuture<Optional<VersionedKafkaCompactionPlan>> getCompactionPlan(
+                KafkaPartitionId id, String materializationTaskId) {
+            events.add("plan-get");
+            lastLookupTaskId = materializationTaskId;
+            if (removeBeforeFirstGet) {
+                removeBeforeFirstGet = false;
+                current = null;
+            }
+            return CompletableFuture.completedFuture(Optional.ofNullable(current));
+        }
+
+        @Override
+        public CompletableFuture<VersionedKafkaCompactionPlan> putCompactionPlanIfAbsent(
+                KafkaCompactionPlanRecord value) {
+            events.add("plan-put");
+            if (current == null) {
+                current = new VersionedKafkaCompactionPlan(
+                        "plans/" + value.materializationTaskId(),
+                        value.withMetadataVersion(1),
+                        1,
+                        new Checksum(ChecksumType.SHA256, "f".repeat(64)));
+            } else if (!current.value().withMetadataVersion(0).equals(value)) {
+                return CompletableFuture.failedFuture(new IllegalStateException("conflicting plan"));
+            }
+            return CompletableFuture.completedFuture(current);
+        }
+
+        @Override
+        public CompletableFuture<KafkaCompactionPlanScanPage> scanCompactionPlans(
+                KafkaPartitionId id, Optional<KafkaCompactionPlanScanToken> continuation, int limit) {
+            return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        }
+
+        @Override
+        public CompletableFuture<Void> deleteCompactionPlan(VersionedKafkaCompactionPlan expected) {
+            if (!expected.equals(current)) {
+                return CompletableFuture.failedFuture(new IllegalStateException("stale plan"));
+            }
+            current = null;
+            return CompletableFuture.completedFuture(null);
+        }
+
+        private String lastLookupTaskId() {
+            return lastLookupTaskId;
+        }
     }
-  }
 }

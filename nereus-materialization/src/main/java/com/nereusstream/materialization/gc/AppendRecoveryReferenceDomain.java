@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -37,7 +38,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Exact live-tail and recovery-root reference domain for append replay authority. */
+/**
+ * Exact live-tail and recovery-root reference domain for append replay authority.
+ */
 public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
     public static final String DOMAIN_ID = "append-recovery-v1";
     public static final int PROTOCOL_VERSION = 1;
@@ -57,12 +60,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
             OxiaMetadataStore l0MetadataStore,
             GenerationMetadataStore generationStore,
             PhysicalGcConfig config) {
-        this(
-                cluster,
-                l0MetadataStore,
-                generationStore,
-                config,
-                GcGlobalReferenceScope.unsupported());
+        this(cluster, l0MetadataStore, generationStore, config, GcGlobalReferenceScope.unsupported());
     }
 
     public AppendRecoveryReferenceDomain(
@@ -93,17 +91,14 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
     @Override
     public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
         Objects.requireNonNull(query, "query");
-        GcReferenceSnapshotBuilder accumulator = new GcReferenceSnapshotBuilder(
-                DOMAIN_ID, PROTOCOL_VERSION, query, config.referenceDomainConfig());
-        return GcGlobalReferenceScope.resolveStreams(
-                        query, accumulator, globalScope)
-                .thenCompose(streams ->
-                        scanStream(query, streams, accumulator, 0));
+        GcReferenceSnapshotBuilder accumulator =
+                new GcReferenceSnapshotBuilder(DOMAIN_ID, PROTOCOL_VERSION, query, config.referenceDomainConfig());
+        return GcGlobalReferenceScope.resolveStreams(query, accumulator, globalScope)
+                .thenCompose(streams -> scanStream(query, streams, accumulator, 0));
     }
 
     @Override
-    public CompletableFuture<Boolean> stillMatches(
-            GcReferenceQuery query, GcReferenceSnapshot snapshot) {
+    public CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot) {
         Objects.requireNonNull(query, "query");
         Objects.requireNonNull(snapshot, "snapshot");
         if (!snapshot.domainId().equals(DOMAIN_ID)
@@ -115,12 +110,8 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
     }
 
     private CompletableFuture<GcReferenceSnapshot> scanStream(
-            GcReferenceQuery query,
-            List<StreamId> streams,
-            GcReferenceSnapshotBuilder accumulator,
-            int streamIndex) {
-        if (accumulator.limitExceeded()
-                || streamIndex == streams.size()) {
+            GcReferenceQuery query, List<StreamId> streams, GcReferenceSnapshotBuilder accumulator, int streamIndex) {
+        if (accumulator.limitExceeded() || streamIndex == streams.size()) {
             return CompletableFuture.completedFuture(accumulator.build());
         }
         StreamId streamId = streams.get(streamIndex);
@@ -132,14 +123,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
             AppendRecoveryAnchor anchor = optionalRoot
                     .map(root -> anchor(streamId, root))
                     .orElseGet(() -> AppendRecoveryAnchor.genesis(streamId));
-            return scanTail(
-                    query,
-                    streams,
-                    accumulator,
-                    streamIndex,
-                    anchor,
-                    Optional.empty(),
-                    null);
+            return scanTail(query, streams, accumulator, streamIndex, anchor, Optional.empty(), null);
         });
     }
 
@@ -152,12 +136,8 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
             Optional<AppendRecoveryTailCursor> continuation,
             AppendRecoveryHead expectedHead) {
         StreamId streamId = streams.get(streamIndex);
-        return l0MetadataStore.readAppendRecoveryTail(
-                        cluster,
-                        streamId,
-                        anchor,
-                        continuation,
-                        config.metadataScanPageSize())
+        return l0MetadataStore
+                .readAppendRecoveryTail(cluster, streamId, anchor, continuation, config.metadataScanPageSize())
                 .thenCompose(page -> {
                     AppendRecoveryHead observed = page.observedHead();
                     if (expectedHead != null && !expectedHead.equals(observed)) {
@@ -165,9 +145,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
                     }
                     if (continuation.isEmpty()) {
                         accumulator.addAuthority(new GcAuthorityToken(
-                                l0Keys.streamHeadKey(streamId),
-                                observed.metadataVersion(),
-                                headIdentity(observed)));
+                                l0Keys.streamHeadKey(streamId), observed.metadataVersion(), headIdentity(observed)));
                     }
                     addCommits(query, accumulator, page);
                     if (accumulator.limitExceeded()) {
@@ -175,13 +153,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
                     }
                     if (page.continuation().isPresent()) {
                         return scanTail(
-                                query,
-                                streams,
-                                accumulator,
-                                streamIndex,
-                                anchor,
-                                page.continuation(),
-                                observed);
+                                query, streams, accumulator, streamIndex, anchor, page.continuation(), observed);
                     }
                     return scanStream(query, streams, accumulator, streamIndex + 1);
                 });
@@ -198,14 +170,14 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
             return;
         }
         VersionedRecoveryCheckpointRoot root = optionalRoot.orElseThrow();
-        accumulator.addAuthority(new GcAuthorityToken(
-                root.key(), root.metadataVersion(), root.durableValueSha256()));
+        accumulator.addAuthority(new GcAuthorityToken(root.key(), root.metadataVersion(), root.durableValueSha256()));
         for (RecoveryCheckpointReferenceRecord checkpoint : root.value().checkpoints()) {
             if (checkpoint.objectKey().equals(query.object().objectKey().value())
-                    && checkpoint.objectKeyHash().equals(query.object().objectKeyHash().value())
+                    && checkpoint
+                            .objectKeyHash()
+                            .equals(query.object().objectKeyHash().value())
                     && (query.object().objectId().isEmpty()
-                            || query.object().objectId().orElseThrow().value().equals(
-                                    checkpoint.objectId()))) {
+                            || query.object().objectId().orElseThrow().value().equals(checkpoint.objectId()))) {
                 accumulator.addReference(new GcReference(
                         "recovery-checkpoint-root",
                         streamId.value() + "/" + checkpoint.checkpointSequence(),
@@ -218,14 +190,10 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
     }
 
     private static void addCommits(
-            GcReferenceQuery query,
-            GcReferenceSnapshotBuilder accumulator,
-            AppendRecoveryTailPage page) {
+            GcReferenceQuery query, GcReferenceSnapshotBuilder accumulator, AppendRecoveryTailPage page) {
         for (AppendRecoveryCommit commit : page.commitsNewestFirst()) {
-            accumulator.addAuthority(new GcAuthorityToken(
-                    commit.key(),
-                    commit.sourceMetadataVersion(),
-                    commit.sourceRecordSha256()));
+            accumulator.addAuthority(
+                    new GcAuthorityToken(commit.key(), commit.sourceMetadataVersion(), commit.sourceRecordSha256()));
             ReadTarget target = TARGET_CODECS.decode(commit.canonicalCommit().readTarget());
             if (matches(query, target)) {
                 accumulator.addReference(new GcReference(
@@ -242,8 +210,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
         }
     }
 
-    private static AppendRecoveryAnchor anchor(
-            StreamId streamId, VersionedRecoveryCheckpointRoot root) {
+    private static AppendRecoveryAnchor anchor(StreamId streamId, VersionedRecoveryCheckpointRoot root) {
         if (root.value().checkpoints().isEmpty()) {
             return AppendRecoveryAnchor.genesis(streamId);
         }
@@ -290,8 +257,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static final class DigestWriter {
@@ -312,14 +278,13 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
 
         private void text(String value) {
             byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-            digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+            digest.update(
+                    ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
             digest.update(bytes);
         }
 
         private Checksum finish() {
-            return new Checksum(
-                    ChecksumType.SHA256,
-                    HexFormat.of().formatHex(digest.digest()));
+            return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest()));
         }
     }
 }

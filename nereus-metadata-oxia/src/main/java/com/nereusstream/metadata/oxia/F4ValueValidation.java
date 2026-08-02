@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -8,8 +9,7 @@ import java.util.Objects;
 import java.util.function.Function;
 
 final class F4ValueValidation {
-    private F4ValueValidation() {
-    }
+    private F4ValueValidation() {}
 
     static String text(String value, String name) {
         Objects.requireNonNull(value, name);
@@ -34,8 +34,7 @@ final class F4ValueValidation {
         return value;
     }
 
-    static <T> List<T> orderedPage(
-            List<T> values, Function<T, String> key, int maximum, String name) {
+    static <T> List<T> orderedPage(List<T> values, Function<T, String> key, int maximum, String name) {
         Objects.requireNonNull(values, name);
         if (values.size() > maximum || values.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException(name + " exceeds its bound or contains null");

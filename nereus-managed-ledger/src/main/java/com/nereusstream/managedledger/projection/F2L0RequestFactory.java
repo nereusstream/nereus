@@ -29,7 +29,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Centralizes every F2 request option sent to protocol-neutral L0. */
+/**
+ * Centralizes every F2 request option sent to protocol-neutral L0.
+ */
 public final class F2L0RequestFactory {
     public static final String TERMINATE_REASON = "pulsar-managed-ledger-terminate";
     public static final String DELETE_REASON = "pulsar-managed-ledger-delete";
@@ -52,14 +54,10 @@ public final class F2L0RequestFactory {
     }
 
     public AppendOptions appendOptions(Duration timeout) {
-        return appendOptions(
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                timeout);
+        return appendOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, timeout);
     }
 
-    public AppendOptions appendOptions(
-            StorageProfile profile,
-            Duration timeout) {
+    public AppendOptions appendOptions(StorageProfile profile, Duration timeout) {
         StorageProfile exact = requireManagedLedgerProfile(profile);
         return new AppendOptions(
                 Optional.empty(),
@@ -88,22 +86,14 @@ public final class F2L0RequestFactory {
         return new DeleteOptions(timeout, DELETE_REASON);
     }
 
-    private static StorageProfile requireManagedLedgerProfile(
-            StorageProfile profile) {
-        StorageProfile exact = Objects.requireNonNull(
-                        profile, "profile")
-                .canonical();
+    private static StorageProfile requireManagedLedgerProfile(StorageProfile profile) {
+        StorageProfile exact = Objects.requireNonNull(profile, "profile").canonical();
         if (exact != StorageProfile.OBJECT_WAL_SYNC_OBJECT
-                && exact
-                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
-                && exact
-                        != StorageProfile.BOOKKEEPER_WAL_ONLY
-                && exact
-                        != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
-                && exact
-                        != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT) {
-            throw new IllegalArgumentException(
-                    "managed-ledger facade has no executable profile mapping");
+                && exact != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
+                && exact != StorageProfile.BOOKKEEPER_WAL_ONLY
+                && exact != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
+                && exact != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT) {
+            throw new IllegalArgumentException("managed-ledger facade has no executable profile mapping");
         }
         return exact;
     }

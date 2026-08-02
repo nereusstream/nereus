@@ -1,9 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import java.util.Objects;
 
-/** Operator-reviewed monotonic activation request; zero proof digests mean deletion remains disabled. */
+/**
+ * Operator-reviewed monotonic activation request; zero proof digests mean deletion remains disabled.
+ */
 public record BookKeeperProtocolActivationUpdate(
         long brokerReadinessEpoch,
         String brokerReadinessSha256,
@@ -21,8 +24,7 @@ public record BookKeeperProtocolActivationUpdate(
         brokerReadinessSha256 = sha(brokerReadinessSha256, "brokerReadinessSha256");
         rootCoverageProofSha256 = sha(rootCoverageProofSha256, "rootCoverageProofSha256");
         streamCoverageProofSha256 = sha(streamCoverageProofSha256, "streamCoverageProofSha256");
-        bookKeeperScopeProofSha256 = sha(
-                bookKeeperScopeProofSha256, "bookKeeperScopeProofSha256");
+        bookKeeperScopeProofSha256 = sha(bookKeeperScopeProofSha256, "bookKeeperScopeProofSha256");
         if (syncPublicationEnabled && !asyncPublicationEnabled) {
             throw new IllegalArgumentException("sync publication requires async publication");
         }

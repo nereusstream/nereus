@@ -1,13 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.Checksum;
 import java.util.Objects;
 
-public record GcAuthorityToken(
-        String authorityKey,
-        long metadataVersion,
-        Checksum identitySha256) {
+public record GcAuthorityToken(String authorityKey, long metadataVersion, Checksum identitySha256) {
     public GcAuthorityToken {
         authorityKey = requireText(authorityKey, "authorityKey");
         if (metadataVersion < 0) {

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import com.google.common.collect.BoundType;
@@ -10,7 +11,6 @@ import com.nereusstream.managedledger.errors.ManagedLedgerErrorMapper;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -23,7 +23,9 @@ import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.ReadOnlyCursor;
 
-/** Serialized broker-local read-only cursor over dense F2 offsets. */
+/**
+ * Serialized broker-local read-only cursor over dense F2 offsets.
+ */
 public final class NereusReadOnlyCursor implements ReadOnlyCursor {
     private final NereusCursorLedgerView ledger;
     private final ManagedLedgerErrorMapper errorMapper = new ManagedLedgerErrorMapper();
@@ -37,15 +39,24 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
     }
 
     @Override
-    public List<Entry> readEntries(int numberOfEntriesToRead)
-            throws InterruptedException, ManagedLedgerException {
+    public List<Entry> readEntries(int numberOfEntriesToRead) throws InterruptedException, ManagedLedgerException {
         CompletableFuture<List<Entry>> result = new CompletableFuture<>();
-        asyncReadEntries(numberOfEntriesToRead, Long.MAX_VALUE, new ReadEntriesCallback() {
-            @Override public void readEntriesComplete(List<Entry> entries, Object ctx) { result.complete(entries); }
-            @Override public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
-                result.completeExceptionally(exception);
-            }
-        }, null, null);
+        asyncReadEntries(
+                numberOfEntriesToRead,
+                Long.MAX_VALUE,
+                new ReadEntriesCallback() {
+                    @Override
+                    public void readEntriesComplete(List<Entry> entries, Object ctx) {
+                        result.complete(entries);
+                    }
+
+                    @Override
+                    public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
+                        result.completeExceptionally(exception);
+                    }
+                },
+                null,
+                null);
         try {
             return result.get();
         } catch (ExecutionException e) {
@@ -59,10 +70,7 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
 
     @Override
     public void asyncReadEntries(
-            int numberOfEntriesToRead,
-            ReadEntriesCallback callback,
-            Object ctx,
-            Position maxPosition) {
+            int numberOfEntriesToRead, ReadEntriesCallback callback, Object ctx, Position maxPosition) {
         asyncReadEntries(numberOfEntriesToRead, Long.MAX_VALUE, callback, ctx, maxPosition);
     }
 
@@ -75,19 +83,21 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
             Position maxPosition) {
         Objects.requireNonNull(callback, "callback");
         if (numberOfEntriesToRead <= 0 || maxSizeBytes <= 0) {
-            callback.readEntriesFailed(new ManagedLedgerException(
-                    "read limits must be positive"), ctx);
+            callback.readEntriesFailed(new ManagedLedgerException("read limits must be positive"), ctx);
             return;
         }
-        int maxEntries = Math.min(numberOfEntriesToRead, ledger.runtime().config().maxReadEntries());
+        int maxEntries =
+                Math.min(numberOfEntriesToRead, ledger.runtime().config().maxReadEntries());
         enqueue(() -> readBatch(maxEntries, maxSizeBytes, maxPosition))
-                .whenCompleteAsync((entries, error) -> {
-                    if (error == null) {
-                        callback.readEntriesComplete(entries, ctx);
-                    } else {
-                        callback.readEntriesFailed(map(error), ctx);
-                    }
-                }, ledger.runtime().callbackExecutor());
+                .whenCompleteAsync(
+                        (entries, error) -> {
+                            if (error == null) {
+                                callback.readEntriesComplete(entries, ctx);
+                            } else {
+                                callback.readEntriesFailed(map(error), ctx);
+                            }
+                        },
+                        ledger.runtime().callbackExecutor());
     }
 
     @Override
@@ -105,15 +115,13 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
     @Override
     public synchronized boolean hasMoreEntries() {
         StreamMetadata metadata = ledger.currentMetadata();
-        return !closed && Math.max(readPosition.getEntryId(), metadata.trimOffset())
-                < metadata.committedEndOffset();
+        return !closed && Math.max(readPosition.getEntryId(), metadata.trimOffset()) < metadata.committedEndOffset();
     }
 
     @Override
     public synchronized long getNumberOfEntries() {
         StreamMetadata metadata = ledger.currentMetadata();
-        return Math.max(0, metadata.committedEndOffset()
-                - Math.max(readPosition.getEntryId(), metadata.trimOffset()));
+        return Math.max(0, metadata.committedEndOffset() - Math.max(readPosition.getEntryId(), metadata.trimOffset()));
     }
 
     @Override
@@ -124,9 +132,7 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
         StreamMetadata metadata = ledger.currentMetadata();
         long target;
         try {
-            target = Math.addExact(
-                    Math.max(readPosition.getEntryId(), metadata.trimOffset()),
-                    numEntriesToSkip);
+            target = Math.addExact(Math.max(readPosition.getEntryId(), metadata.trimOffset()), numEntriesToSkip);
         } catch (ArithmeticException ignored) {
             target = Long.MAX_VALUE;
         }
@@ -134,9 +140,8 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
     }
 
     @Override
-    public Position findNewestMatching(
-            ManagedCursor.FindPositionConstraint constraint,
-            Predicate<Entry> condition) throws InterruptedException, ManagedLedgerException {
+    public Position findNewestMatching(ManagedCursor.FindPositionConstraint constraint, Predicate<Entry> condition)
+            throws InterruptedException, ManagedLedgerException {
         Objects.requireNonNull(constraint, "constraint");
         Objects.requireNonNull(condition, "condition");
         StreamMetadata metadata = ledger.refreshMetadata().join();
@@ -166,15 +171,12 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
         long lower = metadata.trimOffset();
         long upper = metadata.committedEndOffset();
         if (range.hasLowerBound()) {
-            lower = range.lowerEndpoint().getEntryId()
-                    + (range.lowerBoundType() == BoundType.OPEN ? 1 : 0);
+            lower = range.lowerEndpoint().getEntryId() + (range.lowerBoundType() == BoundType.OPEN ? 1 : 0);
         }
         if (range.hasUpperBound()) {
-            upper = range.upperEndpoint().getEntryId()
-                    + (range.upperBoundType() == BoundType.CLOSED ? 1 : 0);
+            upper = range.upperEndpoint().getEntryId() + (range.upperBoundType() == BoundType.CLOSED ? 1 : 0);
         }
-        return Math.max(0, Math.min(upper, metadata.committedEndOffset())
-                - Math.max(lower, metadata.trimOffset()));
+        return Math.max(0, Math.min(upper, metadata.committedEndOffset()) - Math.max(lower, metadata.trimOffset()));
     }
 
     @Override
@@ -186,38 +188,38 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
     public void asyncClose(CloseCallback callback, Object ctx) {
         Objects.requireNonNull(callback, "callback");
         enqueue(() -> {
-            close();
-            return CompletableFuture.completedFuture(null);
-        }).whenCompleteAsync((ignored, error) -> {
-            if (error == null) {
-                callback.closeComplete(ctx);
-            } else {
-                callback.closeFailed(map(error), ctx);
-            }
-        }, ledger.runtime().callbackExecutor());
+                    close();
+                    return CompletableFuture.completedFuture(null);
+                })
+                .whenCompleteAsync(
+                        (ignored, error) -> {
+                            if (error == null) {
+                                callback.closeComplete(ctx);
+                            } else {
+                                callback.closeFailed(map(error), ctx);
+                            }
+                        },
+                        ledger.runtime().callbackExecutor());
     }
 
-    private synchronized <T> CompletableFuture<T> enqueue(
-            java.util.function.Supplier<CompletableFuture<T>> operation) {
+    private synchronized <T> CompletableFuture<T> enqueue(java.util.function.Supplier<CompletableFuture<T>> operation) {
         if (closed) {
-            return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.STORAGE_CLOSED, false, "read-only cursor is closed"));
+            return CompletableFuture.failedFuture(
+                    new NereusException(ErrorCode.STORAGE_CLOSED, false, "read-only cursor is closed"));
         }
         CompletableFuture<T> result = tail.thenCompose(ignored -> operation.get());
         tail = result.handle((ignored, error) -> null);
         return result;
     }
 
-    private CompletableFuture<List<Entry>> readBatch(
-            int maxEntries, long maxSizeBytes, Position maxPosition) {
+    private CompletableFuture<List<Entry>> readBatch(int maxEntries, long maxSizeBytes, Position maxPosition) {
         return ledger.refreshMetadata().thenCompose(metadata -> {
             Position inclusiveMax = ledger.normalizeInclusiveMax(maxPosition, metadata);
             long start;
             synchronized (this) {
                 start = Math.max(readPosition.getEntryId(), metadata.trimOffset());
             }
-            long endExclusive = Math.min(
-                    metadata.committedEndOffset(), inclusiveMax.getEntryId() + 1);
+            long endExclusive = Math.min(metadata.committedEndOffset(), inclusiveMax.getEntryId() + 1);
             List<Entry> entries = new ArrayList<>();
             return readNext(start, endExclusive, maxEntries, maxSizeBytes, 0, metadata, entries)
                     .thenApply(next -> {
@@ -240,20 +242,21 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
         if (remaining == 0 || offset >= endExclusive) {
             return CompletableFuture.completedFuture(offset);
         }
-        return ledger.readAt(offset, metadata).thenCompose(entry -> {
-            long nextBytes = usedBytes + entry.getLength();
-            if (!entries.isEmpty() && nextBytes > maxBytes) {
-                entry.release();
-                return CompletableFuture.completedFuture(offset);
-            }
-            entries.add(entry);
-            return readNext(offset + 1, endExclusive, remaining - 1, maxBytes,
-                    nextBytes, metadata, entries);
-        }).exceptionallyCompose(error -> {
-            entries.forEach(Entry::release);
-            entries.clear();
-            return CompletableFuture.failedFuture(unwrap(error));
-        });
+        return ledger.readAt(offset, metadata)
+                .thenCompose(entry -> {
+                    long nextBytes = usedBytes + entry.getLength();
+                    if (!entries.isEmpty() && nextBytes > maxBytes) {
+                        entry.release();
+                        return CompletableFuture.completedFuture(offset);
+                    }
+                    entries.add(entry);
+                    return readNext(offset + 1, endExclusive, remaining - 1, maxBytes, nextBytes, metadata, entries);
+                })
+                .exceptionallyCompose(error -> {
+                    entries.forEach(Entry::release);
+                    entries.clear();
+                    return CompletableFuture.failedFuture(unwrap(error));
+                });
     }
 
     private ManagedLedgerException map(Throwable error) {

@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-/** Dual V1/V2 codec that preserves the frozen six-field legacy append-session payload. */
+/**
+ * Dual V1/V2 codec that preserves the frozen six-field legacy append-session payload.
+ */
 public final class AppendSessionRecordCodecV2
         implements MetadataRecordCodec<com.nereusstream.metadata.oxia.records.AppendSessionRecord> {
     private static final int LEGACY_VERSION = 1;
@@ -48,8 +51,12 @@ public final class AppendSessionRecordCodecV2
         Objects.requireNonNull(value, "value");
         if (value.authority().isEmpty()) {
             return legacy.encode(new AppendSessionRecord(
-                    value.streamId(), value.writerId(), value.epoch(), value.fencingToken(),
-                    value.leaseVersion(), value.expiresAtMillis()));
+                    value.streamId(),
+                    value.writerId(),
+                    value.epoch(),
+                    value.fencingToken(),
+                    value.leaseVersion(),
+                    value.expiresAtMillis()));
         }
         F4Binary.Writer writer = new F4Binary.Writer();
         writer.writeUnsignedShort(VERSION);
@@ -98,8 +105,12 @@ public final class AppendSessionRecordCodecV2
         }
         AppendSessionRecord value = legacy.decode(bytes);
         return new com.nereusstream.metadata.oxia.records.AppendSessionRecord(
-                value.streamId(), value.writerId(), value.epoch(), value.fencingToken(),
-                value.leaseVersion(), value.expiresAtMillis());
+                value.streamId(),
+                value.writerId(),
+                value.epoch(),
+                value.fencingToken(),
+                value.leaseVersion(),
+                value.expiresAtMillis());
     }
 
     record AppendSessionRecord(
@@ -108,6 +119,5 @@ public final class AppendSessionRecordCodecV2
             long epoch,
             String fencingToken,
             long leaseVersion,
-            long expiresAtMillis) {
-    }
+            long expiresAtMillis) {}
 }

@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -46,16 +46,15 @@ class PinnedReadCoordinatorTest {
 
     @Test
     void keepsLeaseUntilReaderAndCleanupComplete() {
-        ObjectSliceReadTarget target = ReadTargetReaderRegistryTest.target(
-                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
+        ObjectSliceReadTarget target =
+                ReadTargetReaderRegistryTest.target(ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
         GenerationReadCandidate candidate = candidate(target, 3);
         TestLease lease = new TestLease(target);
         CompletableFuture<WalReadResult> readerCompletion = new CompletableFuture<>();
         TestReader reader = new TestReader(ReadTargetReaderKey.from(target), readerCompletion);
         ReadCoordinator coordinator = coordinator(
                 (stream, offset, view, deadline, repair, excluded, constraint) ->
-                        CompletableFuture.completedFuture(
-                        Optional.of(new PinnedResolvedRange(candidate, lease))),
+                        CompletableFuture.completedFuture(Optional.of(new PinnedResolvedRange(candidate, lease))),
                 new ReadTargetReaderRegistry(List.of(reader)),
                 GenerationReadFailureHandler.noOp());
 
@@ -74,10 +73,10 @@ class PinnedReadCoordinatorTest {
 
     @Test
     void objectCorruptionExcludesFailedCandidateAndFallsBackOnlyWithinTheSameView() {
-        ObjectSliceReadTarget higherTarget = ReadTargetReaderRegistryTest.target(
-                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
-        ObjectSliceReadTarget zeroTarget = ReadTargetReaderRegistryTest.target(
-                ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
+        ObjectSliceReadTarget higherTarget =
+                ReadTargetReaderRegistryTest.target(ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
+        ObjectSliceReadTarget zeroTarget =
+                ReadTargetReaderRegistryTest.target(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
         GenerationReadCandidate higher = candidate(higherTarget, 5);
         GenerationReadCandidate zero = candidate(zeroTarget, 0);
         List<ReadView> views = new ArrayList<>();
@@ -85,19 +84,18 @@ class PinnedReadCoordinatorTest {
         AtomicInteger handled = new AtomicInteger();
         TestReader broken = new TestReader(
                 ReadTargetReaderKey.from(higherTarget),
-                CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "corrupt")));
+                CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "corrupt")));
         TestReader healthy = new TestReader(
-                ReadTargetReaderKey.from(zeroTarget),
-                CompletableFuture.completedFuture(result(zeroTarget, (byte) 9)));
+                ReadTargetReaderKey.from(zeroTarget), CompletableFuture.completedFuture(result(zeroTarget, (byte) 9)));
         ReadCoordinator coordinator = coordinator(
                 (stream, offset, view, deadline, repair, excluded, constraint) -> {
                     views.add(view);
                     exclusions.add(Set.copyOf(excluded));
                     GenerationReadCandidate selected = excluded.contains(higher) ? zero : higher;
                     ObjectSliceReadTarget target = selected == higher ? higherTarget : zeroTarget;
-                    return CompletableFuture.completedFuture(Optional.of(
-                            new PinnedResolvedRange(selected, new TestLease(target))));
+                    return CompletableFuture.completedFuture(
+                            Optional.of(new PinnedResolvedRange(selected, new TestLease(target))));
                 },
                 new ReadTargetReaderRegistry(List.of(broken, healthy)),
                 (stream, candidate, failure) -> {
@@ -121,25 +119,25 @@ class PinnedReadCoordinatorTest {
 
     @Test
     void retriesRetriableTransientFailureOnTheSameCandidateBeforeFallback() {
-        ObjectSliceReadTarget target = ReadTargetReaderRegistryTest.target(
-                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
+        ObjectSliceReadTarget target =
+                ReadTargetReaderRegistryTest.target(ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
         GenerationReadCandidate candidate = candidate(target, 5);
         AtomicInteger resolves = new AtomicInteger();
         AtomicInteger handled = new AtomicInteger();
         SequencedReader reader = new SequencedReader(
                 ReadTargetReaderKey.from(target),
                 List.of(
-                        CompletableFuture.failedFuture(new NereusException(
-                                ErrorCode.OBJECT_READ_FAILED, true, "throttled-1")),
-                        CompletableFuture.failedFuture(new NereusException(
-                                ErrorCode.OBJECT_READ_FAILED, true, "throttled-2")),
+                        CompletableFuture.failedFuture(
+                                new NereusException(ErrorCode.OBJECT_READ_FAILED, true, "throttled-1")),
+                        CompletableFuture.failedFuture(
+                                new NereusException(ErrorCode.OBJECT_READ_FAILED, true, "throttled-2")),
                         CompletableFuture.completedFuture(result(target, (byte) 11))));
         ReadCoordinator coordinator = coordinator(
                 (stream, offset, view, deadline, repair, excluded, constraint) -> {
                     resolves.incrementAndGet();
                     assertThat(excluded).isEmpty();
-                    return CompletableFuture.completedFuture(Optional.of(
-                            new PinnedResolvedRange(candidate, new TestLease(target))));
+                    return CompletableFuture.completedFuture(
+                            Optional.of(new PinnedResolvedRange(candidate, new TestLease(target))));
                 },
                 new ReadTargetReaderRegistry(List.of(reader)),
                 (stream, failed, failure) -> {
@@ -158,28 +156,26 @@ class PinnedReadCoordinatorTest {
 
     @Test
     void fallsBackOnlyAfterTheConfiguredTransientRetryThreshold() {
-        ObjectSliceReadTarget higherTarget = ReadTargetReaderRegistryTest.target(
-                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
-        ObjectSliceReadTarget zeroTarget = ReadTargetReaderRegistryTest.target(
-                ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
+        ObjectSliceReadTarget higherTarget =
+                ReadTargetReaderRegistryTest.target(ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
+        ObjectSliceReadTarget zeroTarget =
+                ReadTargetReaderRegistryTest.target(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
         GenerationReadCandidate higher = candidate(higherTarget, 5);
         GenerationReadCandidate zero = candidate(zeroTarget, 0);
         AtomicInteger resolves = new AtomicInteger();
         AtomicInteger handled = new AtomicInteger();
         TestReader transientFailure = new TestReader(
                 ReadTargetReaderKey.from(higherTarget),
-                CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.OBJECT_READ_FAILED, true, "throttled")));
+                CompletableFuture.failedFuture(new NereusException(ErrorCode.OBJECT_READ_FAILED, true, "throttled")));
         TestReader healthy = new TestReader(
-                ReadTargetReaderKey.from(zeroTarget),
-                CompletableFuture.completedFuture(result(zeroTarget, (byte) 12)));
+                ReadTargetReaderKey.from(zeroTarget), CompletableFuture.completedFuture(result(zeroTarget, (byte) 12)));
         ReadCoordinator coordinator = coordinator(
                 (stream, offset, view, deadline, repair, excluded, constraint) -> {
                     resolves.incrementAndGet();
                     GenerationReadCandidate selected = excluded.contains(higher) ? zero : higher;
                     ObjectSliceReadTarget target = selected == higher ? higherTarget : zeroTarget;
-                    return CompletableFuture.completedFuture(Optional.of(
-                            new PinnedResolvedRange(selected, new TestLease(target))));
+                    return CompletableFuture.completedFuture(
+                            Optional.of(new PinnedResolvedRange(selected, new TestLease(target))));
                 },
                 new ReadTargetReaderRegistry(List.of(transientFailure, healthy)),
                 (stream, failed, failure) -> {
@@ -201,18 +197,17 @@ class PinnedReadCoordinatorTest {
 
     @Test
     void exactConstraintSkipsNewerUnactivatedGeneration() {
-        ObjectSliceReadTarget target = ReadTargetReaderRegistryTest.target(
-                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
+        ObjectSliceReadTarget target =
+                ReadTargetReaderRegistryTest.target(ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
         GenerationReadCandidate unactivated = candidate(target, ReadView.TOPIC_COMPACTED, 9);
         GenerationReadCandidate activated = candidate(target, ReadView.TOPIC_COMPACTED, 7);
         List<Set<GenerationReadCandidate>> exclusions = new ArrayList<>();
         ReadCoordinator coordinator = coordinator(
                 (stream, offset, view, deadline, repair, excluded, constraint) -> {
                     exclusions.add(Set.copyOf(excluded));
-                    GenerationReadCandidate selected =
-                            excluded.contains(unactivated) ? activated : unactivated;
-                    return CompletableFuture.completedFuture(Optional.of(
-                            new PinnedResolvedRange(selected, new TestLease(target))));
+                    GenerationReadCandidate selected = excluded.contains(unactivated) ? activated : unactivated;
+                    return CompletableFuture.completedFuture(
+                            Optional.of(new PinnedResolvedRange(selected, new TestLease(target))));
                 },
                 new ReadTargetReaderRegistry(List.of(new TestReader(
                         ReadTargetReaderKey.from(target),
@@ -249,11 +244,7 @@ class PinnedReadCoordinatorTest {
             ReadCoordinator.PinnedGenerationResolver generationResolver,
             ReadTargetReaderRegistry readers,
             GenerationReadFailureHandler failureHandler) {
-        return coordinator(
-                generationResolver,
-                readers,
-                failureHandler,
-                GenerationReadRetryPolicy.defaults());
+        return coordinator(generationResolver, readers, failureHandler, GenerationReadRetryPolicy.defaults());
     }
 
     private static ReadCoordinator coordinator(
@@ -269,8 +260,8 @@ class PinnedReadCoordinatorTest {
                     case "close" -> null;
                     default -> throw new UnsupportedOperationException(method.getName());
                 });
-        ReadResolver legacy = new ReadResolver(
-                config, metadata, Clock.systemUTC(), ReadMetricsObserver.noop(), Runnable::run);
+        ReadResolver legacy =
+                new ReadResolver(config, metadata, Clock.systemUTC(), ReadMetricsObserver.noop(), Runnable::run);
         return new ReadCoordinator(
                 config,
                 legacy,
@@ -282,16 +273,11 @@ class PinnedReadCoordinatorTest {
                 Runnable::run);
     }
 
-    private static GenerationReadCandidate candidate(
-            ObjectSliceReadTarget target,
-            long generation) {
+    private static GenerationReadCandidate candidate(ObjectSliceReadTarget target, long generation) {
         return candidate(target, ReadView.COMMITTED, generation);
     }
 
-    private static GenerationReadCandidate candidate(
-            ObjectSliceReadTarget target,
-            ReadView view,
-            long generation) {
+    private static GenerationReadCandidate candidate(ObjectSliceReadTarget target, ReadView view, long generation) {
         ResolvedRange range = new ResolvedRange(
                 new OffsetRange(0, 1),
                 generation,
@@ -310,18 +296,14 @@ class PinnedReadCoordinatorTest {
                 generation + 1,
                 new Checksum(ChecksumType.SHA256, String.format("%064x", generation + 1)),
                 generation == 0,
-                generation == 0
-                        ? Optional.empty()
-                        : Optional.of(new PublicationId("a".repeat(26))));
+                generation == 0 ? Optional.empty() : Optional.of(new PublicationId("a".repeat(26))));
     }
 
     private static ReadOptions options() {
         return new ReadOptions(10, 1024, ReadIsolation.COMMITTED, Duration.ofSeconds(5));
     }
 
-    private static WalReadResult result(
-            ObjectSliceReadTarget target,
-            byte value) {
+    private static WalReadResult result(ObjectSliceReadTarget target, byte value) {
         ReadBatch batch = new ReadBatch(
                 new OffsetRange(0, 1),
                 PayloadFormat.OPAQUE_RECORD_BATCH,
@@ -346,9 +328,7 @@ class PinnedReadCoordinatorTest {
         private final CompletableFuture<WalReadResult> result;
         private final AtomicInteger calls = new AtomicInteger();
 
-        private TestReader(
-                ReadTargetReaderKey key,
-                CompletableFuture<WalReadResult> result) {
+        private TestReader(ReadTargetReaderKey key, CompletableFuture<WalReadResult> result) {
             this.key = key;
             this.result = result;
         }
@@ -365,10 +345,7 @@ class PinnedReadCoordinatorTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
-                StreamId streamId,
-                long startOffset,
-                List<ResolvedRange> ranges,
-                ReadOptions options) {
+                StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
             calls.incrementAndGet();
             return result;
         }
@@ -379,9 +356,7 @@ class PinnedReadCoordinatorTest {
         private final List<CompletableFuture<WalReadResult>> results;
         private final AtomicInteger calls = new AtomicInteger();
 
-        private SequencedReader(
-                ReadTargetReaderKey key,
-                List<CompletableFuture<WalReadResult>> results) {
+        private SequencedReader(ReadTargetReaderKey key, List<CompletableFuture<WalReadResult>> results) {
             this.key = key;
             this.results = List.copyOf(results);
         }
@@ -398,14 +373,10 @@ class PinnedReadCoordinatorTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
-                StreamId streamId,
-                long startOffset,
-                List<ResolvedRange> ranges,
-                ReadOptions options) {
+                StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
             int index = calls.getAndIncrement();
             if (index >= results.size()) {
-                return CompletableFuture.failedFuture(new AssertionError(
-                        "sequenced reader received too many calls"));
+                return CompletableFuture.failedFuture(new AssertionError("sequenced reader received too many calls"));
             }
             return results.get(index);
         }

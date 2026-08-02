@@ -16,7 +16,6 @@ package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
@@ -28,27 +27,19 @@ import org.junit.jupiter.api.Test;
 class BookKeeperRangedEntryCodecV1Test {
     @Test
     void stableGoldenRoundTripsExactPayloadAndRecordCount() {
-        byte[] encoded = BookKeeperRangedEntryCodecV1.encode(new AppendEntry(
-                "abc".getBytes(StandardCharsets.UTF_8),
-                3,
-                1,
-                Map.of()));
+        byte[] encoded = BookKeeperRangedEntryCodecV1.encode(
+                new AppendEntry("abc".getBytes(StandardCharsets.UTF_8), 3, 1, Map.of()));
 
-        assertThat(HexFormat.of().formatHex(encoded))
-                .isEqualTo("4e424b45310000000300000003364b3fb7616263");
-        BookKeeperRangedEntryCodecV1.DecodedEntry decoded =
-                BookKeeperRangedEntryCodecV1.decode(encoded);
+        assertThat(HexFormat.of().formatHex(encoded)).isEqualTo("4e424b45310000000300000003364b3fb7616263");
+        BookKeeperRangedEntryCodecV1.DecodedEntry decoded = BookKeeperRangedEntryCodecV1.decode(encoded);
         assertThat(decoded.recordCount()).isEqualTo(3);
         assertThat(decoded.payload()).isEqualTo("abc".getBytes(StandardCharsets.UTF_8));
     }
 
     @Test
     void malformedHeaderAndPayloadCorruptionFailClosed() {
-        byte[] encoded = BookKeeperRangedEntryCodecV1.encode(new AppendEntry(
-                "abc".getBytes(StandardCharsets.UTF_8),
-                3,
-                1,
-                Map.of()));
+        byte[] encoded = BookKeeperRangedEntryCodecV1.encode(
+                new AppendEntry("abc".getBytes(StandardCharsets.UTF_8), 3, 1, Map.of()));
         byte[] badMagic = encoded.clone();
         badMagic[0] ^= 1;
         byte[] badLength = encoded.clone();
@@ -63,7 +54,7 @@ class BookKeeperRangedEntryCodecV1Test {
 
     private static void assertCode(byte[] encoded, ErrorCode expected) {
         assertThatThrownBy(() -> BookKeeperRangedEntryCodecV1.decode(encoded))
-                .isInstanceOfSatisfying(NereusException.class, failure ->
-                        assertThat(failure.code()).isEqualTo(expected));
+                .isInstanceOfSatisfying(NereusException.class, failure -> assertThat(failure.code())
+                        .isEqualTo(expected));
     }
 }

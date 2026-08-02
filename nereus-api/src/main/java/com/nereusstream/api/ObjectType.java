@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Durable object format family. */
+/**
+ * Durable object format family.
+ */
 public enum ObjectType {
     MULTI_STREAM_WAL_OBJECT(1),
     INDEX_OBJECT(2),

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.AppendOutcome;
@@ -16,21 +17,20 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** BK_ONLY physical-reference publisher; Object upload authorization is deliberately unavailable. */
+/**
+ * BK_ONLY physical-reference publisher; Object upload authorization is deliberately unavailable.
+ */
 public final class BookKeeperGenerationZeroPhysicalReferencePublisher
         implements GenerationZeroPhysicalReferencePublisher {
     private final BookKeeperPrimaryPhysicalReferenceAdapter adapter;
 
-    public BookKeeperGenerationZeroPhysicalReferencePublisher(
-            BookKeeperPrimaryPhysicalReferenceAdapter adapter) {
+    public BookKeeperGenerationZeroPhysicalReferencePublisher(BookKeeperPrimaryPhysicalReferenceAdapter adapter) {
         this.adapter = Objects.requireNonNull(adapter, "adapter");
     }
 
     @Override
     public CompletableFuture<Void> authorizeUpload(
-            AppendSession session,
-            PhysicalObjectIdentity object,
-            Duration timeout) {
+            AppendSession session, PhysicalObjectIdentity object, Duration timeout) {
         return CompletableFuture.failedFuture(new NereusException(
                 ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
                 false,
@@ -39,27 +39,22 @@ public final class BookKeeperGenerationZeroPhysicalReferencePublisher
     }
 
     @Override
-    public CompletableFuture<ProtectedStableAppend> protectBeforeHead(
-            PreparedStableAppend append,
-            Duration timeout) {
+    public CompletableFuture<ProtectedStableAppend> protectBeforeHead(PreparedStableAppend append, Duration timeout) {
         PreparedStableAppend exact = Objects.requireNonNull(append, "append");
         if (!(exact.request().readTarget() instanceof BookKeeperEntryRangeReadTarget target)) {
             return CompletableFuture.failedFuture(invariant(
-                    "BK_ONLY stable append carries a non-BookKeeper target",
-                    AppendOutcome.KNOWN_NOT_COMMITTED));
+                    "BK_ONLY stable append carries a non-BookKeeper target", AppendOutcome.KNOWN_NOT_COMMITTED));
         }
         return adapter.protectBeforeHead(exact, target, timeout);
     }
 
     @Override
     public CompletableFuture<ProtectedGenerationZero> protectVisibleIndex(
-            MaterializedGenerationZero append,
-            Duration timeout) {
+            MaterializedGenerationZero append, Duration timeout) {
         MaterializedGenerationZero exact = Objects.requireNonNull(append, "append");
         if (!(exact.committedAppend().readTarget() instanceof BookKeeperEntryRangeReadTarget target)) {
             return CompletableFuture.failedFuture(invariant(
-                    "BK_ONLY generation zero carries a non-BookKeeper target",
-                    AppendOutcome.KNOWN_COMMITTED));
+                    "BK_ONLY generation zero carries a non-BookKeeper target", AppendOutcome.KNOWN_COMMITTED));
         }
         return adapter.protectVisibleIndex(exact, target, timeout);
     }

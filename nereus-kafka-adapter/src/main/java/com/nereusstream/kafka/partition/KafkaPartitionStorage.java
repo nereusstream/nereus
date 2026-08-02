@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import com.nereusstream.api.ErrorCode;
@@ -10,7 +11,9 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Nereus-side partition log boundary consumed by the Kafka fork. */
+/**
+ * Nereus-side partition log boundary consumed by the Kafka fork.
+ */
 public interface KafkaPartitionStorage extends AutoCloseable {
     KafkaPartitionIdentity identity();
 
@@ -22,7 +25,9 @@ public interface KafkaPartitionStorage extends AutoCloseable {
 
     KafkaStableSnapshot stableSnapshot();
 
-    /** Optional checkpoint-before-trim maintenance state machine for production native Kafka storage. */
+    /**
+     * Optional checkpoint-before-trim maintenance state machine for production native Kafka storage.
+     */
     default Optional<KafkaPartitionMaintenance> maintenance() {
         return Optional.empty();
     }
@@ -35,11 +40,8 @@ public interface KafkaPartitionStorage extends AutoCloseable {
      * matching stable end.
      */
     default KafkaStableSnapshot publishDerivedOffsets(
-            long expectedStableEndOffset,
-            long highWatermark,
-            long lastStableOffset) {
-        throw new UnsupportedOperationException(
-                "Kafka partition storage does not support derived-offset publication");
+            long expectedStableEndOffset, long highWatermark, long lastStableOffset) {
+        throw new UnsupportedOperationException("Kafka partition storage does not support derived-offset publication");
     }
 
     /**
@@ -51,8 +53,7 @@ public interface KafkaPartitionStorage extends AutoCloseable {
                 "Kafka partition storage does not support durable log-start publication");
     }
 
-    CompletableFuture<KafkaStableAppendResult> append(
-            ByteBuffer validatedRecords, KafkaAppendContext context);
+    CompletableFuture<KafkaStableAppendResult> append(ByteBuffer validatedRecords, KafkaAppendContext context);
 
     CompletableFuture<KafkaStorageReadResult> read(KafkaStorageReadRequest request);
 
@@ -63,11 +64,10 @@ public interface KafkaPartitionStorage extends AutoCloseable {
      * binding-rooted compacted-view support must fail closed.
      */
     default CompletableFuture<Void> probeMandatoryCompactedRead(Duration timeout) {
-        return CompletableFuture.failedFuture(
-                new NereusException(
-                        ErrorCode.UNSUPPORTED_READ_SEMANTICS,
-                        false,
-                        "Kafka partition storage cannot probe a mandatory compacted read"));
+        return CompletableFuture.failedFuture(new NereusException(
+                ErrorCode.UNSUPPORTED_READ_SEMANTICS,
+                false,
+                "Kafka partition storage cannot probe a mandatory compacted read"));
     }
 
     KafkaPartitionEventSubscription subscribe(KafkaPartitionEventListener listener);

@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,8 +53,7 @@ class CursorMutationLaneTest {
         lane.submit(() -> blocker);
         lane.submit(() -> CompletableFuture.completedFuture("queued"));
 
-        CompletableFuture<String> rejected = lane.submit(
-                () -> CompletableFuture.completedFuture("must-not-run"));
+        CompletableFuture<String> rejected = lane.submit(() -> CompletableFuture.completedFuture("must-not-run"));
 
         assertThatThrownBy(rejected::join)
                 .hasCauseInstanceOf(ManagedLedgerException.TooManyRequestsException.class)
@@ -68,8 +67,7 @@ class CursorMutationLaneTest {
         CursorMutationLane lane = new CursorMutationLane(3, executor);
         CompletableFuture<String> runningOperation = new CompletableFuture<>();
         CompletableFuture<String> running = lane.submit(() -> runningOperation);
-        CompletableFuture<String> queued = lane.submit(
-                () -> CompletableFuture.completedFuture("queued"));
+        CompletableFuture<String> queued = lane.submit(() -> CompletableFuture.completedFuture("queued"));
         executor.runNext();
         IllegalStateException closed = new IllegalStateException("closed");
 
@@ -79,8 +77,7 @@ class CursorMutationLaneTest {
         assertThatThrownBy(queued::join).hasCause(closed);
         assertThat(lane.pendingOperations()).isEqualTo(1);
         assertThat(drained).isNotDone();
-        CompletableFuture<String> afterClose = lane.submit(
-                () -> CompletableFuture.completedFuture("late"));
+        CompletableFuture<String> afterClose = lane.submit(() -> CompletableFuture.completedFuture("late"));
         assertThatThrownBy(afterClose::join).hasCause(closed);
 
         runningOperation.complete("done");
@@ -95,10 +92,8 @@ class CursorMutationLaneTest {
         CursorMutationLane lane = new CursorMutationLane(3, Runnable::run);
         IllegalArgumentException failure = new IllegalArgumentException("bad mutation");
 
-        CompletableFuture<String> failed = lane.submit(
-                () -> CompletableFuture.failedFuture(failure));
-        CompletableFuture<String> following = lane.submit(
-                () -> CompletableFuture.completedFuture("ok"));
+        CompletableFuture<String> failed = lane.submit(() -> CompletableFuture.failedFuture(failure));
+        CompletableFuture<String> following = lane.submit(() -> CompletableFuture.completedFuture("ok"));
 
         assertThatThrownBy(failed::join).hasCause(failure);
         assertThat(following).isCompletedWithValue("ok");
@@ -113,14 +108,12 @@ class CursorMutationLaneTest {
         };
         CursorMutationLane lane = new CursorMutationLane(2, executor);
 
-        CompletableFuture<String> result = lane.submit(
-                () -> CompletableFuture.completedFuture("never"));
+        CompletableFuture<String> result = lane.submit(() -> CompletableFuture.completedFuture("never"));
 
         assertThatThrownBy(result::join).hasCause(rejection);
         assertThat(lane.pendingOperations()).isZero();
-        assertThatThrownBy(() -> lane.submit(
-                        () -> CompletableFuture.completedFuture("late"))
-                .join())
+        assertThatThrownBy(() -> lane.submit(() -> CompletableFuture.completedFuture("late"))
+                        .join())
                 .hasCause(rejection);
     }
 

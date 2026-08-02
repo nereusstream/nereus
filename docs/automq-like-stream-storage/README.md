@@ -160,13 +160,13 @@ activation/capability binding passes pre-IO admission，not merely because an F4
 
 ## 3. Profile matrix
 
-| Profile | Read source after stable head | Object publication | Producer completion |
-| --- | --- | --- | --- |
-| `BOOKKEEPER_WAL_ONLY` | BK generation-zero range | none | `WAL_DURABLE` by default |
-| `BOOKKEEPER_WAL_SYNC_OBJECT` | BK generation-zero range until higher generation is admitted | shared F4 path, awaited | `REQUIRED_OBJECT_GENERATION` completion in addition to profile durability |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BK generation-zero range | shared F4 background generation | `WAL_DURABLE` |
-| `OBJECT_WAL_SYNC_OBJECT` | Object WAL generation zero | compaction only | `WAL_DURABLE_AND_INDEX_COMMITTED` |
-| `OBJECT_WAL_ASYNC_OBJECT` | Object WAL/repairable generation zero | read-optimized generation | `WAL_DURABLE` |
+| Profile                       | Read source after stable head                                | Object publication              | Producer completion                                                       |
+|-------------------------------|--------------------------------------------------------------|---------------------------------|---------------------------------------------------------------------------|
+| `BOOKKEEPER_WAL_ONLY`         | BK generation-zero range                                     | none                            | `WAL_DURABLE` by default                                                  |
+| `BOOKKEEPER_WAL_SYNC_OBJECT`  | BK generation-zero range until higher generation is admitted | shared F4 path, awaited         | `REQUIRED_OBJECT_GENERATION` completion in addition to profile durability |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BK generation-zero range                                     | shared F4 background generation | `WAL_DURABLE`                                                             |
+| `OBJECT_WAL_SYNC_OBJECT`      | Object WAL generation zero                                   | compaction only                 | `WAL_DURABLE_AND_INDEX_COMMITTED`                                         |
+| `OBJECT_WAL_ASYNC_OBJECT`     | Object WAL/repairable generation zero                        | read-optimized generation       | `WAL_DURABLE`                                                             |
 
 `OBJECT_WAL` is the deprecated alias of `OBJECT_WAL_SYNC_OBJECT`。
 
@@ -332,14 +332,14 @@ the target-specific retriable error/backpressure defined by policy。
 
 Required signals：
 
-| Signal | Meaning |
-| --- | --- |
-| `materializationLagRecords` | committed records without required secondary generation |
-| `materializationLagBytes` | primary WAL bytes still protected |
-| `oldestUnmaterializedAgeMs` | recovery/retention risk |
-| `materializationRetryTotal` | task retries |
-| `primaryWalRetentionBlockedTotal` | ranges blocked by generation/read/cursor/catalog refs |
-| `primaryWalReadFallbackTotal` | reads served from primary target instead of higher generation |
+| Signal                            | Meaning                                                       |
+|-----------------------------------|---------------------------------------------------------------|
+| `materializationLagRecords`       | committed records without required secondary generation       |
+| `materializationLagBytes`         | primary WAL bytes still protected                             |
+| `oldestUnmaterializedAgeMs`       | recovery/retention risk                                       |
+| `materializationRetryTotal`       | task retries                                                  |
+| `primaryWalRetentionBlockedTotal` | ranges blocked by generation/read/cursor/catalog refs         |
+| `primaryWalReadFallbackTotal`     | reads served from primary target instead of higher generation |
 
 Policy actions can throttle append、reserve more workers or mark the profile degraded。They cannot discard an
 acknowledged primary range merely because materialization lags。
@@ -356,17 +356,17 @@ acknowledged primary range merely because materialization lags。
 
 ## 11. Failure and repair
 
-| Failure | Outcome / repair |
-| --- | --- |
-| crash before head commit | no success；retry stable append |
-| head commit succeeds before response | replay returns same stable range |
-| ack succeeds before task record / topic unloads | registry scanner reloads projection/head and reconstructs from committed source range |
-| task exists before upload | worker retries idempotently |
-| upload succeeds before generation publish | reuse deterministic output or orphan GC |
-| generation publishes before checkpoint | checkpoint repair from index |
-| output corrupt | do not publish；if detected later, retain/fallback to valid lower generation |
-| object store outage | primary BK reads may continue；Object-WAL profile degrades according to primary availability |
-| WAL GC races worker | `WalRetentionGate` blocks delete until all requirements are safe |
+| Failure                                         | Outcome / repair                                                                            |
+|-------------------------------------------------|---------------------------------------------------------------------------------------------|
+| crash before head commit                        | no success；retry stable append                                                              |
+| head commit succeeds before response            | replay returns same stable range                                                            |
+| ack succeeds before task record / topic unloads | registry scanner reloads projection/head and reconstructs from committed source range       |
+| task exists before upload                       | worker retries idempotently                                                                 |
+| upload succeeds before generation publish       | reuse deterministic output or orphan GC                                                     |
+| generation publishes before checkpoint          | checkpoint repair from index                                                                |
+| output corrupt                                  | do not publish；if detected later, retain/fallback to valid lower generation                 |
+| object store outage                             | primary BK reads may continue；Object-WAL profile degrades according to primary availability |
+| WAL GC races worker                             | `WalRetentionGate` blocks delete until all requirements are safe                            |
 
 ## 12. Implementation gate
 
@@ -388,7 +388,8 @@ registry restart、real two-broker/two-worker contention with compression-heavy 
 protected-intent retirement、partitioned admin compatibility、provider-neutral Hadoop/Oxia logging composition and
 exclusive scheduling for Docker-owning release tasks plus every nested build of the single locked Pulsar checkout
 under the otherwise parallel aggregate. BO additionally requires all seventeen nested builds to force fresh inner
-Gradle execution；its corrected historical pair passes 127/129 fresh inner tasks. BP additionally stabilizes inherited cursor-only TTL evidence across
+Gradle execution；its corrected historical pair passes 127/129 fresh inner tasks. BP additionally stabilizes inherited
+cursor-only TTL evidence across
 Pulsar's standard policy-triggered/manual expiry-monitor conflict without weakening backlog or object-count truth；
 checkpoint BQ then passes the BP-source-lock aggregate from clean, pushed Nereus
 `main@fa533a934c33f5bcc4fda328c4df64cb96c6b485` and Pulsar

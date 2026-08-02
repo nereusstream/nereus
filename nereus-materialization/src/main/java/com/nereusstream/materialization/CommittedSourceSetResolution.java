@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ReadView;
@@ -35,8 +36,7 @@ public record CommittedSourceSetResolution(
                         > streamSnapshot.committedEnd().committedEndOffset()
                 || sourceSet.sources().get(sourceSet.sources().size() - 1).commitVersion()
                         > streamSnapshot.committedEnd().commitVersion()) {
-            throw new IllegalArgumentException(
-                    "COMMITTED source resolution does not match its authoritative snapshot");
+            throw new IllegalArgumentException("COMMITTED source resolution does not match its authoritative snapshot");
         }
     }
 }

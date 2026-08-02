@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -8,7 +9,9 @@ import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import java.util.Objects;
 
-/** Exact process-local discovery evidence from one ACTIVE root or one MARKED recovery root. */
+/**
+ * Exact process-local discovery evidence from one ACTIVE root or one MARKED recovery root.
+ */
 public record GcCandidate(
         String candidateId,
         PhysicalObjectIdentity object,
@@ -23,8 +26,7 @@ public record GcCandidate(
         candidateId = GcPlanValidation.requireBase32Id(candidateId, "candidateId");
         Objects.requireNonNull(object, "object");
         Objects.requireNonNull(referenceQuery, "referenceQuery");
-        discoveryEvidenceSha256 = GcReferenceQuery.requireSha256(
-                discoveryEvidenceSha256, "discoveryEvidenceSha256");
+        discoveryEvidenceSha256 = GcReferenceQuery.requireSha256(discoveryEvidenceSha256, "discoveryEvidenceSha256");
         if (!referenceQuery.object().equals(object)
                 || !referenceQuery.candidateEvidenceSha256().equals(discoveryEvidenceSha256)) {
             throw new IllegalArgumentException("candidate object/query/discovery evidence do not match");
@@ -114,7 +116,9 @@ public record GcCandidate(
                 root.value().deleteNotBeforeMillis());
     }
 
-    /** Epoch under which removable protections had to complete their ACTIVE-root handshake. */
+    /**
+     * Epoch under which removable protections had to complete their ACTIVE-root handshake.
+     */
     public long activeRootLifecycleEpoch() {
         return switch (rootState) {
             case ACTIVE_DISCOVERY -> rootLifecycleEpoch;

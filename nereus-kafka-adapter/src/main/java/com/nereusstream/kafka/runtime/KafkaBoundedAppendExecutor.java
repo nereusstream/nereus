@@ -31,7 +31,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Bounded executor that owns Produce buffers until blocking stock-log append work reaches a terminal result. */
+/**
+ * Bounded executor that owns Produce buffers until blocking stock-log append work reaches a terminal result.
+ */
 public final class KafkaBoundedAppendExecutor implements AutoCloseable {
     private final KafkaByteBudget byteBudget;
     private final TrackingThreadPoolExecutor executor;
@@ -44,10 +46,7 @@ public final class KafkaBoundedAppendExecutor implements AutoCloseable {
     private int activeTasks;
 
     public KafkaBoundedAppendExecutor(
-            int threads,
-            int maxQueuedTasks,
-            KafkaByteBudget byteBudget,
-            String threadNamePrefix) {
+            int threads, int maxQueuedTasks, KafkaByteBudget byteBudget, String threadNamePrefix) {
         if (threads <= 0 || maxQueuedTasks <= 0) {
             throw new IllegalArgumentException("Kafka append executor threads and queue must be positive");
         }
@@ -63,10 +62,7 @@ public final class KafkaBoundedAppendExecutor implements AutoCloseable {
             return thread;
         };
         this.executor = new TrackingThreadPoolExecutor(
-                threads,
-                threads,
-                new ArrayBlockingQueue<>(maxQueuedTasks),
-                threadFactory);
+                threads, threads, new ArrayBlockingQueue<>(maxQueuedTasks), threadFactory);
     }
 
     /**
@@ -80,13 +76,12 @@ public final class KafkaBoundedAppendExecutor implements AutoCloseable {
      * Captures bytes before queue admission and executes work with the same ordering key in strict submission order.
      * Different keys may execute concurrently. Cancelling the returned future never cancels admitted append work.
      */
-    public <T> CompletableFuture<T> submit(
-            Object orderingKey,
-            ByteBuffer requestBytes,
-            KafkaAppendTask<T> task) {
+    public <T> CompletableFuture<T> submit(Object orderingKey, ByteBuffer requestBytes, KafkaAppendTask<T> task) {
         Objects.requireNonNull(orderingKey, "orderingKey");
         Objects.requireNonNull(task, "task");
-        if (closed.get()) return failedClosed();
+        if (closed.get()) {
+            return failedClosed();
+        }
         KafkaProduceBufferSnapshot snapshot;
         try {
             snapshot = KafkaProduceBufferSnapshot.capture(requestBytes, byteBudget);
@@ -114,9 +109,10 @@ public final class KafkaBoundedAppendExecutor implements AutoCloseable {
                 } catch (RejectedExecutionException rejected) {
                     lane.work.removeLast();
                     outstandingTasks--;
-                    if (lane.work.isEmpty()) lanes.remove(orderingKey, lane);
-                    reject(work, closed.get() ? ErrorCode.STORAGE_CLOSED : ErrorCode.BACKPRESSURE_REJECTED,
-                            rejected);
+                    if (lane.work.isEmpty()) {
+                        lanes.remove(orderingKey, lane);
+                    }
+                    reject(work, closed.get() ? ErrorCode.STORAGE_CLOSED : ErrorCode.BACKPRESSURE_REJECTED, rejected);
                 }
             }
         }
@@ -139,7 +135,9 @@ public final class KafkaBoundedAppendExecutor implements AutoCloseable {
         return byteBudget.usedBytes();
     }
 
-    /** A non-mutating view that completes only after close and all admitted work have terminated. */
+    /**
+     * A non-mutating view that completes only after close and all admitted work have terminated.
+     */
     public CompletableFuture<Void> drainedFuture() {
         return drained.thenApply(ignored -> null);
     }
@@ -147,7 +145,9 @@ public final class KafkaBoundedAppendExecutor implements AutoCloseable {
     @Override
     public void close() {
         synchronized (guard) {
-            if (closed.compareAndSet(false, true) && outstandingTasks == 0) executor.shutdown();
+            if (closed.compareAndSet(false, true) && outstandingTasks == 0) {
+                executor.shutdown();
+            }
         }
     }
 
@@ -193,7 +193,9 @@ public final class KafkaBoundedAppendExecutor implements AutoCloseable {
     }
 
     private void shutdownIfDrained() {
-        if (closed.get() && outstandingTasks == 0) executor.shutdown();
+        if (closed.get() && outstandingTasks == 0) {
+            executor.shutdown();
+        }
     }
 
     private static void reject(Work<?> work, ErrorCode code, Throwable cause) {
@@ -208,18 +210,12 @@ public final class KafkaBoundedAppendExecutor implements AutoCloseable {
 
     private static <T> CompletableFuture<T> failedClosed() {
         return CompletableFuture.failedFuture(new NereusException(
-                ErrorCode.STORAGE_CLOSED,
-                false,
-                "Kafka append executor is closed",
-                AppendOutcome.KNOWN_NOT_COMMITTED));
+                ErrorCode.STORAGE_CLOSED, false, "Kafka append executor is closed", AppendOutcome.KNOWN_NOT_COMMITTED));
     }
 
     private final class TrackingThreadPoolExecutor extends ThreadPoolExecutor {
         private TrackingThreadPoolExecutor(
-                int threads,
-                int maximumPoolSize,
-                ArrayBlockingQueue<Runnable> queue,
-                ThreadFactory threadFactory) {
+                int threads, int maximumPoolSize, ArrayBlockingQueue<Runnable> queue, ThreadFactory threadFactory) {
             super(
                     threads,
                     maximumPoolSize,
@@ -246,10 +242,7 @@ public final class KafkaBoundedAppendExecutor implements AutoCloseable {
         private final KafkaAppendTask<T> task;
         private final CompletableFuture<T> result;
 
-        private Work(
-                KafkaProduceBufferSnapshot snapshot,
-                KafkaAppendTask<T> task,
-                CompletableFuture<T> result) {
+        private Work(KafkaProduceBufferSnapshot snapshot, KafkaAppendTask<T> task, CompletableFuture<T> result) {
             this.snapshot = snapshot;
             this.task = task;
             this.result = result;

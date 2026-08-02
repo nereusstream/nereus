@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
@@ -6,7 +7,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
-/** Epoch-scoped broker proof for code, configuration, provider scope and protocol support. */
+/**
+ * Epoch-scoped broker proof for code, configuration, provider scope and protocol support.
+ */
 public record KafkaBrokerCapabilityRecord(
         int recordVersion,
         String kafkaClusterId,
@@ -61,14 +64,14 @@ public record KafkaBrokerCapabilityRecord(
                 kafkaFeatureLevel);
         supportedStorageProfiles = KafkaStorageProtocolActivationRecord.canonicalProfiles(
                 supportedStorageProfiles, "supportedStorageProfiles");
-        configCompatibilitySha256 = KafkaMetadataValidation.sha256(
-                configCompatibilitySha256, "configCompatibilitySha256", false);
-        codeCapabilitySha256 = KafkaMetadataValidation.sha256(
-                codeCapabilitySha256, "codeCapabilitySha256", false);
-        providerScopeSha256 = KafkaMetadataValidation.sha256(
-                providerScopeSha256, "providerScopeSha256", false);
-        if (startedAtMillis <= 0 || heartbeatAtMillis < startedAtMillis
-                || expiresAtMillis <= heartbeatAtMillis || metadataVersion < 0) {
+        configCompatibilitySha256 =
+                KafkaMetadataValidation.sha256(configCompatibilitySha256, "configCompatibilitySha256", false);
+        codeCapabilitySha256 = KafkaMetadataValidation.sha256(codeCapabilitySha256, "codeCapabilitySha256", false);
+        providerScopeSha256 = KafkaMetadataValidation.sha256(providerScopeSha256, "providerScopeSha256", false);
+        if (startedAtMillis <= 0
+                || heartbeatAtMillis < startedAtMillis
+                || expiresAtMillis <= heartbeatAtMillis
+                || metadataVersion < 0) {
             throw new IllegalArgumentException("invalid Kafka broker capability timing/version fields");
         }
     }
@@ -108,41 +111,80 @@ public record KafkaBrokerCapabilityRecord(
                 version);
     }
 
-    @Override public byte[] configCompatibilitySha256() { return configCompatibilitySha256.clone(); }
-    @Override public byte[] codeCapabilitySha256() { return codeCapabilitySha256.clone(); }
-    @Override public byte[] providerScopeSha256() { return providerScopeSha256.clone(); }
+    @Override
+    public byte[] configCompatibilitySha256() {
+        return configCompatibilitySha256.clone();
+    }
+
+    @Override
+    public byte[] codeCapabilitySha256() {
+        return codeCapabilitySha256.clone();
+    }
+
+    @Override
+    public byte[] providerScopeSha256() {
+        return providerScopeSha256.clone();
+    }
 
     @Override
     public boolean equals(Object other) {
-        return this == other || other instanceof KafkaBrokerCapabilityRecord that
-                && recordVersion == that.recordVersion && brokerId == that.brokerId
-                && brokerEpoch == that.brokerEpoch && protocolVersion == that.protocolVersion
-                && apiVersion == that.apiVersion
-                && streamHeadSessionVersion == that.streamHeadSessionVersion
-                && bindingVersion == that.bindingVersion && payloadMappingId == that.payloadMappingId
-                && objectWalEntryIndexVersion == that.objectWalEntryIndexVersion
-                && ncpVersion == that.ncpVersion && ntcVersion == that.ntcVersion
-                && checkpointVersion == that.checkpointVersion
-                && compactionStrategyVersion == that.compactionStrategyVersion
-                && kafkaFeatureLevel == that.kafkaFeatureLevel && startedAtMillis == that.startedAtMillis
-                && heartbeatAtMillis == that.heartbeatAtMillis && expiresAtMillis == that.expiresAtMillis
-                && metadataVersion == that.metadataVersion && kafkaClusterId.equals(that.kafkaClusterId)
-                && runtimeInstanceId.equals(that.runtimeInstanceId) && kafkaVersion.equals(that.kafkaVersion)
-                && nereusBuild.equals(that.nereusBuild) && javaVersion.equals(that.javaVersion)
-                && supportedStorageProfiles.equals(that.supportedStorageProfiles)
-                && Arrays.equals(configCompatibilitySha256, that.configCompatibilitySha256)
-                && Arrays.equals(codeCapabilitySha256, that.codeCapabilitySha256)
-                && Arrays.equals(providerScopeSha256, that.providerScopeSha256);
+        return this == other
+                || other instanceof KafkaBrokerCapabilityRecord that
+                        && recordVersion == that.recordVersion
+                        && brokerId == that.brokerId
+                        && brokerEpoch == that.brokerEpoch
+                        && protocolVersion == that.protocolVersion
+                        && apiVersion == that.apiVersion
+                        && streamHeadSessionVersion == that.streamHeadSessionVersion
+                        && bindingVersion == that.bindingVersion
+                        && payloadMappingId == that.payloadMappingId
+                        && objectWalEntryIndexVersion == that.objectWalEntryIndexVersion
+                        && ncpVersion == that.ncpVersion
+                        && ntcVersion == that.ntcVersion
+                        && checkpointVersion == that.checkpointVersion
+                        && compactionStrategyVersion == that.compactionStrategyVersion
+                        && kafkaFeatureLevel == that.kafkaFeatureLevel
+                        && startedAtMillis == that.startedAtMillis
+                        && heartbeatAtMillis == that.heartbeatAtMillis
+                        && expiresAtMillis == that.expiresAtMillis
+                        && metadataVersion == that.metadataVersion
+                        && kafkaClusterId.equals(that.kafkaClusterId)
+                        && runtimeInstanceId.equals(that.runtimeInstanceId)
+                        && kafkaVersion.equals(that.kafkaVersion)
+                        && nereusBuild.equals(that.nereusBuild)
+                        && javaVersion.equals(that.javaVersion)
+                        && supportedStorageProfiles.equals(that.supportedStorageProfiles)
+                        && Arrays.equals(configCompatibilitySha256, that.configCompatibilitySha256)
+                        && Arrays.equals(codeCapabilitySha256, that.codeCapabilitySha256)
+                        && Arrays.equals(providerScopeSha256, that.providerScopeSha256);
     }
 
     @Override
     public int hashCode() {
         int result = Objects.hash(
-                recordVersion, kafkaClusterId, brokerId, brokerEpoch, runtimeInstanceId, kafkaVersion,
-                nereusBuild, javaVersion, protocolVersion, apiVersion, streamHeadSessionVersion,
-                bindingVersion, payloadMappingId, objectWalEntryIndexVersion, ncpVersion, ntcVersion,
-                checkpointVersion, compactionStrategyVersion, kafkaFeatureLevel,
-                supportedStorageProfiles, startedAtMillis, heartbeatAtMillis, expiresAtMillis,
+                recordVersion,
+                kafkaClusterId,
+                brokerId,
+                brokerEpoch,
+                runtimeInstanceId,
+                kafkaVersion,
+                nereusBuild,
+                javaVersion,
+                protocolVersion,
+                apiVersion,
+                streamHeadSessionVersion,
+                bindingVersion,
+                payloadMappingId,
+                objectWalEntryIndexVersion,
+                ncpVersion,
+                ntcVersion,
+                checkpointVersion,
+                compactionStrategyVersion,
+                kafkaFeatureLevel,
+                supportedStorageProfiles,
+                startedAtMillis,
+                heartbeatAtMillis,
+                expiresAtMillis,
                 metadataVersion);
         result = 31 * result + Arrays.hashCode(configCompatibilitySha256);
         result = 31 * result + Arrays.hashCode(codeCapabilitySha256);

@@ -1,11 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
-import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
 import com.nereusstream.metadata.oxia.FakeBookKeeperMetadataStore;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
@@ -27,9 +26,12 @@ final class BookKeeperLedgerRetentionScannerTest {
         BookKeeperWalConfiguration wal = BookKeeperTestConfigurations.valid();
         BookKeeperLedgerGcConfiguration gc = enabledGc(wal);
         try (FakeBookKeeperMetadataStore metadata = metadata(wal)) {
-            metadata.createRoot(CLUSTER, root(wal, 101, BookKeeperLedgerLifecycle.SEALED, true)).join();
-            metadata.createRoot(CLUSTER, root(wal, 102, BookKeeperLedgerLifecycle.MARKED, true)).join();
-            metadata.createRoot(CLUSTER, root(wal, 103, BookKeeperLedgerLifecycle.SEALED, false)).join();
+            metadata.createRoot(CLUSTER, root(wal, 101, BookKeeperLedgerLifecycle.SEALED, true))
+                    .join();
+            metadata.createRoot(CLUSTER, root(wal, 102, BookKeeperLedgerLifecycle.MARKED, true))
+                    .join();
+            metadata.createRoot(CLUSTER, root(wal, 103, BookKeeperLedgerLifecycle.SEALED, false))
+                    .join();
             AtomicInteger triggerCalls = new AtomicInteger();
             AtomicInteger retirementCalls = new AtomicInteger();
             AtomicInteger convergenceCalls = new AtomicInteger();
@@ -45,18 +47,16 @@ final class BookKeeperLedgerRetentionScannerTest {
                     },
                     (root, timeout) -> {
                         retirementCalls.incrementAndGet();
-                        return CompletableFuture.completedFuture(
-                                new BookKeeperWalReferenceRetirementResult(3, 2, 1));
+                        return CompletableFuture.completedFuture(new BookKeeperWalReferenceRetirementResult(3, 2, 1));
                     },
-                    (root, timeout) -> CompletableFuture.completedFuture(
-                            BookKeeperRetentionEvaluation.blocked(
-                                    Set.of(BookKeeperRetentionBlocker.PROTECTION_PRESENT))),
-                    (candidate, timeout) -> CompletableFuture.failedFuture(
-                            new AssertionError("blocked root must not be marked")),
+                    (root, timeout) -> CompletableFuture.completedFuture(BookKeeperRetentionEvaluation.blocked(
+                            Set.of(BookKeeperRetentionBlocker.PROTECTION_PRESENT))),
+                    (candidate, timeout) ->
+                            CompletableFuture.failedFuture(new AssertionError("blocked root must not be marked")),
                     (root, timeout) -> {
                         convergenceCalls.incrementAndGet();
-                        return CompletableFuture.completedFuture(BookKeeperLedgerGcResult.of(
-                                BookKeeperLedgerGcAction.WAITING_DRAIN, root));
+                        return CompletableFuture.completedFuture(
+                                BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.WAITING_DRAIN, root));
                     });
 
             BookKeeperLedgerRetentionScanResult result = scanner.scanOnce().join();
@@ -82,7 +82,8 @@ final class BookKeeperLedgerRetentionScannerTest {
     void materializationHintFailureDoesNotOwnReferenceOrDeletionCorrectness() {
         BookKeeperWalConfiguration wal = BookKeeperTestConfigurations.valid();
         try (FakeBookKeeperMetadataStore metadata = metadata(wal)) {
-            metadata.createRoot(CLUSTER, root(wal, 201, BookKeeperLedgerLifecycle.SEALED, true)).join();
+            metadata.createRoot(CLUSTER, root(wal, 201, BookKeeperLedgerLifecycle.SEALED, true))
+                    .join();
             AtomicInteger retirementCalls = new AtomicInteger();
             BookKeeperLedgerRetentionScanner scanner = new BookKeeperLedgerRetentionScanner(
                     CLUSTER,
@@ -94,12 +95,10 @@ final class BookKeeperLedgerRetentionScannerTest {
                             new IllegalStateException("injected materialization hint failure")),
                     (root, timeout) -> {
                         retirementCalls.incrementAndGet();
-                        return CompletableFuture.completedFuture(
-                                new BookKeeperWalReferenceRetirementResult(3, 0, 3));
+                        return CompletableFuture.completedFuture(new BookKeeperWalReferenceRetirementResult(3, 0, 3));
                     },
-                    (root, timeout) -> CompletableFuture.completedFuture(
-                            BookKeeperRetentionEvaluation.blocked(
-                                    Set.of(BookKeeperRetentionBlocker.PROTECTION_PRESENT))),
+                    (root, timeout) -> CompletableFuture.completedFuture(BookKeeperRetentionEvaluation.blocked(
+                            Set.of(BookKeeperRetentionBlocker.PROTECTION_PRESENT))),
                     (candidate, timeout) -> CompletableFuture.failedFuture(new AssertionError()),
                     (root, timeout) -> CompletableFuture.failedFuture(new AssertionError()));
 
@@ -116,8 +115,10 @@ final class BookKeeperLedgerRetentionScannerTest {
     void oneRootFailureIsAccountedAndDoesNotStopLaterRootsOrShards() {
         BookKeeperWalConfiguration wal = BookKeeperTestConfigurations.valid();
         try (FakeBookKeeperMetadataStore metadata = metadata(wal)) {
-            metadata.createRoot(CLUSTER, root(wal, 301, BookKeeperLedgerLifecycle.SEALED, true)).join();
-            metadata.createRoot(CLUSTER, root(wal, 302, BookKeeperLedgerLifecycle.SEALED, true)).join();
+            metadata.createRoot(CLUSTER, root(wal, 301, BookKeeperLedgerLifecycle.SEALED, true))
+                    .join();
+            metadata.createRoot(CLUSTER, root(wal, 302, BookKeeperLedgerLifecycle.SEALED, true))
+                    .join();
             AtomicInteger retirementCalls = new AtomicInteger();
             BookKeeperLedgerRetentionScanner scanner = new BookKeeperLedgerRetentionScanner(
                     CLUSTER,
@@ -127,13 +128,10 @@ final class BookKeeperLedgerRetentionScannerTest {
                     metadata,
                     (root, timeout) -> CompletableFuture.completedFuture(null),
                     (root, timeout) -> retirementCalls.incrementAndGet() == 1
-                            ? CompletableFuture.failedFuture(
-                                    new IllegalStateException("injected root failure"))
-                            : CompletableFuture.completedFuture(
-                                    new BookKeeperWalReferenceRetirementResult(3, 0, 3)),
-                    (root, timeout) -> CompletableFuture.completedFuture(
-                            BookKeeperRetentionEvaluation.blocked(
-                                    Set.of(BookKeeperRetentionBlocker.PROTECTION_PRESENT))),
+                            ? CompletableFuture.failedFuture(new IllegalStateException("injected root failure"))
+                            : CompletableFuture.completedFuture(new BookKeeperWalReferenceRetirementResult(3, 0, 3)),
+                    (root, timeout) -> CompletableFuture.completedFuture(BookKeeperRetentionEvaluation.blocked(
+                            Set.of(BookKeeperRetentionBlocker.PROTECTION_PRESENT))),
                     (candidate, timeout) -> CompletableFuture.failedFuture(new AssertionError()),
                     (root, timeout) -> CompletableFuture.failedFuture(new AssertionError()));
 
@@ -152,17 +150,11 @@ final class BookKeeperLedgerRetentionScannerTest {
         BookKeeperWalConfiguration wal = BookKeeperTestConfigurations.valid();
         try (FakeBookKeeperMetadataStore metadata = metadata(wal)) {
             BookKeeperLedgerGcConfiguration disabled = BookKeeperLedgerGcConfiguration.safeDefault();
-            BookKeeperLedgerRetentionScanner scanner = scannerWithForbiddenCallbacks(
-                    wal, disabled, metadata);
+            BookKeeperLedgerRetentionScanner scanner = scannerWithForbiddenCallbacks(wal, disabled, metadata);
             assertThat(scanner.scanOnce().join().mutationEnabled()).isFalse();
 
             BookKeeperLedgerGcConfiguration dryRun = new BookKeeperLedgerGcConfiguration(
-                    1,
-                    Duration.ZERO,
-                    wal.readerLeaseTtl(),
-                    Duration.ofDays(1),
-                    true,
-                    true);
+                    1, Duration.ZERO, wal.readerLeaseTtl(), Duration.ofDays(1), true, true);
             assertThat(scannerWithForbiddenCallbacks(wal, dryRun, metadata)
                             .scanOnce()
                             .join()
@@ -208,17 +200,14 @@ final class BookKeeperLedgerRetentionScannerTest {
             service.closeAsync().get(5, TimeUnit.SECONDS);
             assertThat(service.isRunning()).isFalse();
             assertThat(scheduler.isShutdown()).isFalse();
-            assertThatThrownBy(() -> service.scanNow().join())
-                    .hasMessageContaining("closing");
+            assertThatThrownBy(() -> service.scanNow().join()).hasMessageContaining("closing");
         } finally {
             scheduler.shutdownNow();
         }
     }
 
     private static BookKeeperLedgerRetentionScanner scannerWithForbiddenCallbacks(
-            BookKeeperWalConfiguration wal,
-            BookKeeperLedgerGcConfiguration gc,
-            FakeBookKeeperMetadataStore metadata) {
+            BookKeeperWalConfiguration wal, BookKeeperLedgerGcConfiguration gc, FakeBookKeeperMetadataStore metadata) {
         return new BookKeeperLedgerRetentionScanner(
                 CLUSTER,
                 wal,
@@ -233,8 +222,7 @@ final class BookKeeperLedgerRetentionScannerTest {
     }
 
     private static BookKeeperLedgerRetentionScanResult emptyEnabledResult() {
-        return new BookKeeperLedgerRetentionScanResult(
-                true, 256, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        return new BookKeeperLedgerRetentionScanResult(true, 256, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
     private static FakeBookKeeperMetadataStore metadata(BookKeeperWalConfiguration wal) {
@@ -247,19 +235,11 @@ final class BookKeeperLedgerRetentionScannerTest {
 
     private static BookKeeperLedgerGcConfiguration enabledGc(BookKeeperWalConfiguration wal) {
         return new BookKeeperLedgerGcConfiguration(
-                1,
-                Duration.ZERO,
-                wal.readerLeaseTtl(),
-                Duration.ofDays(1),
-                true,
-                false);
+                1, Duration.ZERO, wal.readerLeaseTtl(), Duration.ofDays(1), true, false);
     }
 
     private static BookKeeperLedgerRootRecord root(
-            BookKeeperWalConfiguration wal,
-            long ledgerId,
-            BookKeeperLedgerLifecycle lifecycle,
-            boolean exactBinding) {
+            BookKeeperWalConfiguration wal, long ledgerId, BookKeeperLedgerLifecycle lifecycle, boolean exactBinding) {
         var keys = new com.nereusstream.metadata.oxia.BookKeeperKeyspace(
                 CLUSTER,
                 wal.maxAppendRangesPerLedger(),

@@ -17,11 +17,10 @@ package com.nereusstream.kafka.checkpoint;
 import java.util.List;
 import java.util.Objects;
 
-/** Kafka-artifact-neutral canonical image of the stock leader-epoch cache. */
-public record KafkaLeaderEpochState(
-        long logStartOffset,
-        long stableEndOffset,
-        List<LeaderEpochRange> ranges) {
+/**
+ * Kafka-artifact-neutral canonical image of the stock leader-epoch cache.
+ */
+public record KafkaLeaderEpochState(long logStartOffset, long stableEndOffset, List<LeaderEpochRange> ranges) {
 
     public KafkaLeaderEpochState {
         if (logStartOffset < 0 || stableEndOffset < logStartOffset) {
@@ -31,8 +30,7 @@ public record KafkaLeaderEpochState(
         int previousEpoch = -1;
         long previousStartOffset = -1;
         for (int index = 0; index < ranges.size(); index++) {
-            LeaderEpochRange range =
-                    Objects.requireNonNull(ranges.get(index), "range");
+            LeaderEpochRange range = Objects.requireNonNull(ranges.get(index), "range");
             if (range.leaderEpoch() <= previousEpoch
                     || range.startOffset() <= previousStartOffset
                     || range.startOffset() > stableEndOffset
@@ -45,13 +43,9 @@ public record KafkaLeaderEpochState(
         }
     }
 
-    public void requireBounds(
-            long expectedLogStartOffset,
-            long expectedStableEndOffset) {
-        if (logStartOffset != expectedLogStartOffset
-                || stableEndOffset != expectedStableEndOffset) {
-            throw new IllegalArgumentException(
-                    "Kafka leader-epoch state does not match checkpoint bounds");
+    public void requireBounds(long expectedLogStartOffset, long expectedStableEndOffset) {
+        if (logStartOffset != expectedLogStartOffset || stableEndOffset != expectedStableEndOffset) {
+            throw new IllegalArgumentException("Kafka leader-epoch state does not match checkpoint bounds");
         }
     }
 
@@ -62,8 +56,7 @@ public record KafkaLeaderEpochState(
     public record LeaderEpochRange(int leaderEpoch, long startOffset) {
         public LeaderEpochRange {
             if (leaderEpoch < 0 || startOffset < 0) {
-                throw new IllegalArgumentException(
-                        "invalid Kafka leader-epoch range");
+                throw new IllegalArgumentException("invalid Kafka leader-epoch range");
             }
         }
     }

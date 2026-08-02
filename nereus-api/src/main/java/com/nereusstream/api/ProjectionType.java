@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Future protocol projection reference type. */
+/**
+ * Future protocol projection reference type.
+ */
 public enum ProjectionType {
     VIRTUAL_LEDGER,
     ENTRY_INDEX,

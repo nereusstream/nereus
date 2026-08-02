@@ -19,14 +19,14 @@ import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-/** Fail-closed validator for the stable Nereus result returned to the Kafka log path. */
+/**
+ * Fail-closed validator for the stable Nereus result returned to the Kafka log path.
+ */
 public final class KafkaAppendResultValidator {
     private KafkaAppendResultValidator() {}
 
     public static AppendResult validate(
-            StreamId expectedStreamId,
-            EncodedKafkaAppend expectedAppend,
-            AppendResult actual) {
+            StreamId expectedStreamId, EncodedKafkaAppend expectedAppend, AppendResult actual) {
         Objects.requireNonNull(expectedStreamId, "expectedStreamId");
         Objects.requireNonNull(expectedAppend, "expectedAppend");
         Objects.requireNonNull(actual, "actual");

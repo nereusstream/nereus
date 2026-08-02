@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import com.nereusstream.api.Checksum;
@@ -102,10 +103,10 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         this.cursorKeys = new CursorKeyspace(cluster);
     }
 
-    /** Performs one complete stream-prefix pass and invokes the visitor strictly one candidate at a time. */
-    public CompletableFuture<ScanResult> scan(
-            CursorLedgerIdentity ledger,
-            CandidateVisitor visitor) {
+    /**
+     * Performs one complete stream-prefix pass and invokes the visitor strictly one candidate at a time.
+     */
+    public CompletableFuture<ScanResult> scan(CursorLedgerIdentity ledger, CandidateVisitor visitor) {
         Objects.requireNonNull(ledger, "ledger");
         Objects.requireNonNull(visitor, "visitor");
         if (closed.get()) {
@@ -127,22 +128,21 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             return CompletableFuture.failedFuture(failure);
         }
         OperationDeadline deadline = new OperationDeadline(config.operationTimeout(), scheduler);
-        CompletableFuture<ScanResult> result = loadInventory(ledger, deadline)
-                .thenCompose(optional -> {
-                    if (optional.isEmpty()) {
-                        return CompletableFuture.completedFuture(ScanResult.missingRetentionResult());
-                    }
-                    InventoryCut cut = optional.orElseThrow();
-                    Counts counts = new Counts(cut);
-                    if (cut.inventory().deletionVetoed()) {
-                        return CompletableFuture.completedFuture(counts.result(true, false));
-                    }
-                    List<ObjectKey> candidates = cut.inventory().unreferencedCandidates().stream()
-                            .sorted(Comparator.comparing(ObjectKey::value))
-                            .toList();
-                    return visitCandidates(cut, candidates, now, visitor, counts, deadline)
-                            .thenApply(ignored -> counts.result(false, false));
-                });
+        CompletableFuture<ScanResult> result = loadInventory(ledger, deadline).thenCompose(optional -> {
+            if (optional.isEmpty()) {
+                return CompletableFuture.completedFuture(ScanResult.missingRetentionResult());
+            }
+            InventoryCut cut = optional.orElseThrow();
+            Counts counts = new Counts(cut);
+            if (cut.inventory().deletionVetoed()) {
+                return CompletableFuture.completedFuture(counts.result(true, false));
+            }
+            List<ObjectKey> candidates = cut.inventory().unreferencedCandidates().stream()
+                    .sorted(Comparator.comparing(ObjectKey::value))
+                    .toList();
+            return visitCandidates(cut, candidates, now, visitor, counts, deadline)
+                    .thenApply(ignored -> counts.result(false, false));
+        });
         result.whenComplete((ignored, failure) -> {
             deadline.close();
             scanning.set(false);
@@ -159,19 +159,16 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
      * incomplete pass into deletion authority.
      */
     public CompletableFuture<Optional<Candidate>> recoverMarked(
-            CursorLedgerIdentity ledger,
-            VersionedPhysicalObjectRoot markedRoot) {
+            CursorLedgerIdentity ledger, VersionedPhysicalObjectRoot markedRoot) {
         Objects.requireNonNull(ledger, "ledger");
         VersionedPhysicalObjectRoot marked = Objects.requireNonNull(markedRoot, "markedRoot");
         if (marked.value().lifecycle() != PhysicalObjectLifecycle.MARKED
-                || PhysicalObjectIdentity.from(marked.value()).kind()
-                        != PhysicalObjectKind.CURSOR_SNAPSHOT) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "cursor snapshot GC recovery requires a MARKED cursor-snapshot root"));
+                || PhysicalObjectIdentity.from(marked.value()).kind() != PhysicalObjectKind.CURSOR_SNAPSHOT) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("cursor snapshot GC recovery requires a MARKED cursor-snapshot root"));
         }
         if (closed.get()) {
-            return CompletableFuture.failedFuture(
-                    closed("cursor snapshot GC recovery rejected after close"));
+            return CompletableFuture.failedFuture(closed("cursor snapshot GC recovery rejected after close"));
         }
         if (!scanning.compareAndSet(false, true)) {
             return CompletableFuture.failedFuture(
@@ -179,8 +176,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         }
         if (closed.get()) {
             scanning.set(false);
-            return CompletableFuture.failedFuture(
-                    closed("cursor snapshot GC recovery raced close"));
+            return CompletableFuture.failedFuture(closed("cursor snapshot GC recovery raced close"));
         }
         final long now;
         try {
@@ -205,12 +201,10 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                     }
                     return bound(
                                     deadline,
-                                    () -> physicalMetadataStore.getRoot(
-                                            cluster, object.objectKeyHash()),
+                                    () -> physicalMetadataStore.getRoot(cluster, object.objectKeyHash()),
                                     "reload MARKED cursor snapshot physical root")
                             .thenCompose(current -> {
-                                if (current.isEmpty()
-                                        || !current.orElseThrow().equals(marked)) {
+                                if (current.isEmpty() || !current.orElseThrow().equals(marked)) {
                                     return CompletableFuture.completedFuture(Optional.empty());
                                 }
                                 return evaluateRoot(cut, listed, marked, now, true, deadline)
@@ -233,8 +227,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
     public CompletableFuture<Boolean> revalidate(Candidate candidate) {
         Objects.requireNonNull(candidate, "candidate");
         if (closed.get()) {
-            return CompletableFuture.failedFuture(
-                    closed("cursor snapshot GC revalidation rejected after close"));
+            return CompletableFuture.failedFuture(closed("cursor snapshot GC revalidation rejected after close"));
         }
         final long now;
         try {
@@ -250,24 +243,23 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                     }
                     InventoryCut latest = optional.orElseThrow();
                     if (latest.inventory().deletionVetoed()
-                            || !candidate.inventory().stillMatches(
-                                    latest.retention(), latest.cursorRoots())
-                            || !latest.inventory().unreferencedCandidates().contains(
-                                    candidate.listedObject().key())
-                            || !candidate.listedObject().equals(
-                                    latest.listedObjects().get(candidate.listedObject().key()))) {
+                            || !candidate.inventory().stillMatches(latest.retention(), latest.cursorRoots())
+                            || !latest.inventory()
+                                    .unreferencedCandidates()
+                                    .contains(candidate.listedObject().key())
+                            || !candidate
+                                    .listedObject()
+                                    .equals(latest.listedObjects()
+                                            .get(candidate.listedObject().key()))) {
                         return CompletableFuture.completedFuture(false);
                     }
                     return bound(
                                     deadline,
                                     () -> physicalMetadataStore.getRoot(
-                                            cluster,
-                                            candidate.object().objectKeyHash()),
+                                            cluster, candidate.object().objectKeyHash()),
                                     "reload cursor snapshot physical root")
                             .thenCompose(root -> {
-                                if (root.isEmpty()
-                                        || !sameCandidateRoot(
-                                                candidate.sourceRoot(), root.orElseThrow())) {
+                                if (root.isEmpty() || !sameCandidateRoot(candidate.sourceRoot(), root.orElseThrow())) {
                                     return CompletableFuture.completedFuture(false);
                                 }
                                 return scanProtections(
@@ -285,8 +277,8 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                                                     protections,
                                                     now);
                                             if (safe.isEmpty()
-                                                    || !safe.orElseThrow().equals(
-                                                            candidate.plannedProtectionRemovals())) {
+                                                    || !safe.orElseThrow()
+                                                            .equals(candidate.plannedProtectionRemovals())) {
                                                 return false;
                                             }
                                             Checksum evidence = evidence(
@@ -319,13 +311,8 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             OperationDeadline deadline) {
         CompletableFuture<Void> visits = CompletableFuture.completedFuture(null);
         for (ObjectKey key : candidates) {
-            visits = visits.thenCompose(ignored -> visitCandidate(
-                    cut,
-                    cut.listedObjects().get(key),
-                    now,
-                    visitor,
-                    counts,
-                    deadline));
+            visits = visits.thenCompose(
+                    ignored -> visitCandidate(cut, cut.listedObjects().get(key), now, visitor, counts, deadline));
         }
         return visits;
     }
@@ -347,27 +334,24 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             return bound(
                             deadline,
                             () -> visitor.visit(candidate),
-                            "visit cursor snapshot GC candidate " + candidate.listedObject().key().value())
-                    .thenRun(() -> counts.visitedCandidates = Math.addExact(
-                            counts.visitedCandidates, 1));
+                            "visit cursor snapshot GC candidate "
+                                    + candidate.listedObject().key().value())
+                    .thenRun(() -> counts.visitedCandidates = Math.addExact(counts.visitedCandidates, 1));
         });
     }
 
     private CompletableFuture<CandidateDecision> evaluate(
-            InventoryCut cut,
-            ListedObject listed,
-            long now,
-            OperationDeadline deadline) {
+            InventoryCut cut, ListedObject listed, long now, OperationDeadline deadline) {
         return bound(
                         deadline,
                         () -> physicalMetadataStore.getRoot(
                                 cluster, com.nereusstream.api.ObjectKeyHash.from(listed.key())),
                         "load cursor snapshot physical root")
                 .thenCompose(optionalRoot -> optionalRoot
-                        .<CompletableFuture<CandidateDecision>>map(root ->
-                                evaluateRoot(cut, listed, root, now, false, deadline))
-                        .orElseGet(() -> CompletableFuture.completedFuture(
-                                CandidateDecision.blocked(Block.MISSING_ROOT))));
+                        .<CompletableFuture<CandidateDecision>>map(
+                                root -> evaluateRoot(cut, listed, root, now, false, deadline))
+                        .orElseGet(() ->
+                                CompletableFuture.completedFuture(CandidateDecision.blocked(Block.MISSING_ROOT))));
     }
 
     private CompletableFuture<CandidateDecision> evaluateRoot(
@@ -390,50 +374,28 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         if (listingNotBefore.isEmpty() || now < listingNotBefore.orElseThrow()) {
             return CompletableFuture.completedFuture(CandidateDecision.blocked(Block.TOO_YOUNG));
         }
-        PhysicalObjectLifecycle requiredLifecycle = recoveringMarked
-                ? PhysicalObjectLifecycle.MARKED
-                : PhysicalObjectLifecycle.ACTIVE;
+        PhysicalObjectLifecycle requiredLifecycle =
+                recoveringMarked ? PhysicalObjectLifecycle.MARKED : PhysicalObjectLifecycle.ACTIVE;
         if (root.value().lifecycle() != requiredLifecycle
-                || PhysicalObjectIdentity.from(root.value()).kind()
-                        != PhysicalObjectKind.CURSOR_SNAPSHOT) {
-            return CompletableFuture.completedFuture(
-                    CandidateDecision.blocked(Block.ROOT_STATE));
+                || PhysicalObjectIdentity.from(root.value()).kind() != PhysicalObjectKind.CURSOR_SNAPSHOT) {
+            return CompletableFuture.completedFuture(CandidateDecision.blocked(Block.ROOT_STATE));
         }
         PhysicalObjectIdentity object = PhysicalObjectIdentity.from(root.value());
         if (!listingMatches(object, listed)) {
-            return CompletableFuture.completedFuture(
-                    CandidateDecision.blocked(Block.IDENTITY_MISMATCH));
+            return CompletableFuture.completedFuture(CandidateDecision.blocked(Block.IDENTITY_MISMATCH));
         }
-        long notBefore = Math.max(
-                root.value().orphanNotBeforeMillis(), listingNotBefore.orElseThrow());
+        long notBefore = Math.max(root.value().orphanNotBeforeMillis(), listingNotBefore.orElseThrow());
         if (now < root.value().createdAtMillis() || now < notBefore) {
-            return CompletableFuture.completedFuture(
-                    CandidateDecision.blocked(Block.TOO_YOUNG));
+            return CompletableFuture.completedFuture(CandidateDecision.blocked(Block.TOO_YOUNG));
         }
-        return scanProtections(
-                        object.objectKeyHash(),
-                        Optional.empty(),
-                        new ArrayList<>(),
-                        null,
-                        deadline)
+        return scanProtections(object.objectKeyHash(), Optional.empty(), new ArrayList<>(), null, deadline)
                 .thenApply(protections -> {
-                    Optional<List<VersionedObjectProtection>> safe = safeProtections(
-                            parsed,
-                            root,
-                            streamId(cut.ledger()),
-                            cut.cursorRoots(),
-                            protections,
-                            now);
+                    Optional<List<VersionedObjectProtection>> safe =
+                            safeProtections(parsed, root, streamId(cut.ledger()), cut.cursorRoots(), protections, now);
                     if (safe.isEmpty()) {
                         return CandidateDecision.blocked(Block.PROTECTION);
                     }
-                    Checksum evidence = evidence(
-                            cut.ledger(),
-                            cut.inventory(),
-                            listed,
-                            root,
-                            protections,
-                            notBefore);
+                    Checksum evidence = evidence(cut.ledger(), cut.inventory(), listed, root, protections, notBefore);
                     GcReferenceQuery query = GcReferenceQuery.create(
                             GcReferenceQueryKind.CURSOR_SNAPSHOT_CANDIDATE,
                             object,
@@ -455,8 +417,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
     }
 
     private CompletableFuture<Optional<InventoryCut>> loadInventory(
-            CursorLedgerIdentity ledger,
-            OperationDeadline deadline) {
+            CursorLedgerIdentity ledger, OperationDeadline deadline) {
         StreamId streamId = streamId(ledger);
         return bound(
                         deadline,
@@ -467,12 +428,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                         return CompletableFuture.completedFuture(Optional.empty());
                     }
                     VersionedCursorRetention retention = optionalRetention.orElseThrow();
-                    return scanCursorRoots(
-                                    streamId,
-                                    Optional.empty(),
-                                    new ArrayList<>(),
-                                    null,
-                                    deadline)
+                    return scanCursorRoots(streamId, Optional.empty(), new ArrayList<>(), null, deadline)
                             .thenCompose(roots -> listObjects(
                                             ledger,
                                             Optional.empty(),
@@ -484,22 +440,14 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                                         CursorSnapshotInventory inventory;
                                         try {
                                             inventory = CursorSnapshotInventory.classify(
-                                                    cluster,
-                                                    ledger,
-                                                    retention,
-                                                    roots,
-                                                    objects.keySet());
+                                                    cluster, ledger, retention, roots, objects.keySet());
                                         } catch (IllegalArgumentException failure) {
                                             throw invariant(
                                                     "cursor snapshot inventory authority/listing is inconsistent",
                                                     failure);
                                         }
-                                        return Optional.of(new InventoryCut(
-                                                ledger,
-                                                retention,
-                                                roots,
-                                                objects,
-                                                inventory));
+                                        return Optional.of(
+                                                new InventoryCut(ledger, retention, roots, objects, inventory));
                                     }));
                 });
     }
@@ -513,36 +461,27 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         return bound(
                         deadline,
                         () -> cursorMetadataStore.scanCursors(
-                                cluster,
-                                streamId,
-                                continuation,
-                                config.cursorScanPageSize()),
+                                cluster, streamId, continuation, config.cursorScanPageSize()),
                         "scan cursor snapshot roots")
                 .thenCompose(page -> {
                     requireIncreasingCursorPage(streamId, page, lastKey);
                     if (page.records().size() > config.cursorScanPageSize()) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "cursor metadata scan exceeded its requested page bound"));
+                        return CompletableFuture.failedFuture(
+                                invariant("cursor metadata scan exceeded its requested page bound"));
                     }
                     for (VersionedCursorState value : page.records()) {
                         values.add(value);
                         if (values.size() > config.maxCursorRoots()) {
-                            return CompletableFuture.failedFuture(limit(
-                                    "cursor snapshot root inventory exceeds the configured complete-scan bound"));
+                            return CompletableFuture.failedFuture(
+                                    limit("cursor snapshot root inventory exceeds the configured complete-scan bound"));
                         }
                     }
                     if (page.continuation().isEmpty()) {
                         return CompletableFuture.completedFuture(List.copyOf(values));
                     }
                     String nextLast = cursorKey(
-                            streamId,
-                            page.records().get(page.records().size() - 1));
-                    return scanCursorRoots(
-                            streamId,
-                            page.continuation(),
-                            values,
-                            nextLast,
-                            deadline);
+                            streamId, page.records().get(page.records().size() - 1));
+                    return scanCursorRoots(streamId, page.continuation(), values, nextLast, deadline);
                 });
     }
 
@@ -553,27 +492,25 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             Set<String> seenContinuations,
             String lastKey,
             OperationDeadline deadline) {
-        ObjectKeyPrefix prefix = new ObjectKeyPrefix(
-                CursorSnapshotKeys.streamPrefix(cluster, ledger));
+        ObjectKeyPrefix prefix = new ObjectKeyPrefix(CursorSnapshotKeys.streamPrefix(cluster, ledger));
         return bound(
                         deadline,
                         () -> objectStore.listObjects(
                                 prefix,
                                 continuation,
-                                new ListObjectsOptions(
-                                        config.objectListPageSize(), deadline.remaining())),
+                                new ListObjectsOptions(config.objectListPageSize(), deadline.remaining())),
                         "list cursor snapshot objects")
                 .thenCompose(page -> {
                     requireIncreasingObjectPage(prefix, page, lastKey);
                     if (page.objects().size() > config.objectListPageSize()) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "object-store list exceeded its requested page bound"));
+                        return CompletableFuture.failedFuture(
+                                invariant("object-store list exceeded its requested page bound"));
                     }
                     for (ListedObject value : page.objects()) {
                         ListedObject prior = values.putIfAbsent(value.key(), value);
                         if (prior != null) {
-                            return CompletableFuture.failedFuture(invariant(
-                                    "cursor snapshot object listing repeated a key"));
+                            return CompletableFuture.failedFuture(
+                                    invariant("cursor snapshot object listing repeated a key"));
                         }
                         if (values.size() > config.maxSnapshotObjects()) {
                             return CompletableFuture.failedFuture(limit(
@@ -585,17 +522,12 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                     }
                     String token = page.continuationToken().orElseThrow();
                     if (!seenContinuations.add(token)) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "cursor snapshot object listing repeated a continuation token"));
+                        return CompletableFuture.failedFuture(
+                                invariant("cursor snapshot object listing repeated a continuation token"));
                     }
-                    String nextLast = page.objects().get(page.objects().size() - 1).key().value();
-                    return listObjects(
-                            ledger,
-                            page.continuationToken(),
-                            values,
-                            seenContinuations,
-                            nextLast,
-                            deadline);
+                    String nextLast =
+                            page.objects().get(page.objects().size() - 1).key().value();
+                    return listObjects(ledger, page.continuationToken(), values, seenContinuations, nextLast, deadline);
                 });
     }
 
@@ -608,34 +540,27 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         return bound(
                         deadline,
                         () -> physicalMetadataStore.scanProtections(
-                                cluster,
-                                object,
-                                continuation,
-                                config.metadataScanPageSize()),
+                                cluster, object, continuation, config.metadataScanPageSize()),
                         "scan cursor snapshot protections")
                 .thenCompose(page -> {
                     requireIncreasingProtectionPage(page, lastKey);
                     if (page.values().size() > config.metadataScanPageSize()) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "protection scan exceeded its requested page bound"));
+                        return CompletableFuture.failedFuture(
+                                invariant("protection scan exceeded its requested page bound"));
                     }
                     for (VersionedObjectProtection value : page.values()) {
                         values.add(value);
                         if (values.size() > config.maxProtectionsPerObject()) {
-                            return CompletableFuture.failedFuture(limit(
-                                    "cursor snapshot protection inventory exceeds the complete-scan bound"));
+                            return CompletableFuture.failedFuture(
+                                    limit("cursor snapshot protection inventory exceeds the complete-scan bound"));
                         }
                     }
                     if (page.continuation().isEmpty()) {
                         return CompletableFuture.completedFuture(List.copyOf(values));
                     }
-                    String nextLast = page.values().get(page.values().size() - 1).key();
-                    return scanProtections(
-                            object,
-                            page.continuation(),
-                            values,
-                            nextLast,
-                            deadline);
+                    String nextLast =
+                            page.values().get(page.values().size() - 1).key();
+                    return scanProtections(object, page.continuation(), values, nextLast, deadline);
                 });
     }
 
@@ -648,10 +573,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             long now) {
         Map<String, VersionedCursorState> owners = new HashMap<>();
         for (VersionedCursorState root : cursorRoots) {
-            if (owners.put(
-                            cursorKeys.cursorStateKey(streamId, root.value().cursorName()),
-                            root)
-                    != null) {
+            if (owners.put(cursorKeys.cursorStateKey(streamId, root.value().cursorName()), root) != null) {
                 return Optional.empty();
             }
         }
@@ -679,8 +601,9 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                 return Optional.empty();
             }
             if (value.ownerMetadataVersion() == owner.metadataVersion()
-                    && !value.ownerIdentitySha256().equals(
-                            CursorMetadataDigests.durableValueSha256(owner.value()).value())) {
+                    && !value.ownerIdentitySha256()
+                            .equals(CursorMetadataDigests.durableValueSha256(owner.value())
+                                    .value())) {
                 return Optional.empty();
             }
             if (type == ObjectProtectionType.CURSOR_SNAPSHOT_PENDING) {
@@ -695,24 +618,20 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
     }
 
     private Optional<Long> listingNotBefore(Instant lastModified) {
-        Optional<Long> afterGrace = checkedAdd(
-                lastModified.toEpochMilli(), config.orphanGrace().toMillis());
-        return afterGrace.flatMap(value -> checkedAdd(
-                value, config.maximumClockSkew().toMillis()));
+        Optional<Long> afterGrace =
+                checkedAdd(lastModified.toEpochMilli(), config.orphanGrace().toMillis());
+        return afterGrace.flatMap(
+                value -> checkedAdd(value, config.maximumClockSkew().toMillis()));
     }
 
-    private static boolean listingMatches(
-            PhysicalObjectIdentity object, ListedObject listed) {
+    private static boolean listingMatches(PhysicalObjectIdentity object, ListedObject listed) {
         return object.objectKey().equals(listed.key())
                 && object.objectLength() == listed.objectLength()
                 && object.etag().equals(listed.etag());
     }
 
-    private static boolean sameCandidateRoot(
-            VersionedPhysicalObjectRoot source,
-            VersionedPhysicalObjectRoot current) {
-        if (!PhysicalObjectIdentity.from(source.value()).equals(
-                PhysicalObjectIdentity.from(current.value()))) {
+    private static boolean sameCandidateRoot(VersionedPhysicalObjectRoot source, VersionedPhysicalObjectRoot current) {
+        if (!PhysicalObjectIdentity.from(source.value()).equals(PhysicalObjectIdentity.from(current.value()))) {
             return false;
         }
         if (current.equals(source)) {
@@ -723,17 +642,14 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                 && current.value().lifecycleEpoch()
                         == Math.addExact(source.value().lifecycleEpoch(), 1)
                 && current.value().createdAtMillis() == source.value().createdAtMillis()
-                && current.value().orphanNotBeforeMillis()
-                        == source.value().orphanNotBeforeMillis();
+                && current.value().orphanNotBeforeMillis() == source.value().orphanNotBeforeMillis();
     }
 
-    private static long activeLifecycleEpoch(
-            VersionedPhysicalObjectRoot root) {
+    private static long activeLifecycleEpoch(VersionedPhysicalObjectRoot root) {
         return switch (root.value().lifecycle()) {
             case ACTIVE -> root.value().lifecycleEpoch();
             case MARKED -> Math.subtractExact(root.value().lifecycleEpoch(), 1);
-            default -> throw new IllegalArgumentException(
-                    "cursor snapshot candidate root must be ACTIVE or MARKED");
+            default -> throw new IllegalArgumentException("cursor snapshot candidate root must be ACTIVE or MARKED");
         };
     }
 
@@ -786,7 +702,9 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             number(digest, activeLifecycleEpoch(root));
             number(digest, root.value().createdAtMillis());
             number(digest, root.value().orphanNotBeforeMillis());
-            text(digest, PhysicalObjectIdentity.from(root.value()).identitySha256().value());
+            text(
+                    digest,
+                    PhysicalObjectIdentity.from(root.value()).identitySha256().value());
             number(digest, protections.size());
             for (VersionedObjectProtection protection : protections) {
                 var value = protection.value();
@@ -803,16 +721,13 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                 number(digest, value.expiresAtMillis());
             }
             number(digest, notBeforeMillis);
-            return new Checksum(
-                    ChecksumType.SHA256,
-                    HexFormat.of().formatHex(digest.digest()));
+            return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest()));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }
     }
 
-    private static void reference(
-            MessageDigest digest, CursorSnapshotReferenceRecord reference) {
+    private static void reference(MessageDigest digest, CursorSnapshotReferenceRecord reference) {
         text(digest, reference.objectKey());
         text(digest, reference.snapshotId());
         number(digest, reference.cursorGeneration());
@@ -826,8 +741,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         number(digest, reference.createdAtMillis());
     }
 
-    private static void optionalText(
-            MessageDigest digest, Optional<String> value) {
+    private static void optionalText(MessageDigest digest, Optional<String> value) {
         number(digest, value.isPresent() ? 1 : 0);
         value.ifPresent(text -> text(digest, text));
     }
@@ -848,8 +762,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                 .array());
     }
 
-    private void requireIncreasingCursorPage(
-            StreamId streamId, CursorScanPage page, String lastKey) {
+    private void requireIncreasingCursorPage(StreamId streamId, CursorScanPage page, String lastKey) {
         String previous = lastKey;
         for (VersionedCursorState value : page.records()) {
             String key = cursorKey(streamId, value);
@@ -860,8 +773,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         }
     }
 
-    private static void requireIncreasingObjectPage(
-            ObjectKeyPrefix prefix, ListObjectsResult page, String lastKey) {
+    private static void requireIncreasingObjectPage(ObjectKeyPrefix prefix, ListObjectsResult page, String lastKey) {
         if (!page.prefix().equals(prefix)) {
             throw invariant("cursor snapshot object listing returned a different prefix");
         }
@@ -872,8 +784,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         }
     }
 
-    private static void requireIncreasingProtectionPage(
-            ObjectProtectionScanPage page, String lastKey) {
+    private static void requireIncreasingProtectionPage(ObjectProtectionScanPage page, String lastKey) {
         if (lastKey != null
                 && !page.values().isEmpty()
                 && page.values().get(0).key().compareTo(lastKey) <= 0) {
@@ -890,9 +801,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
     }
 
     private static <T> CompletableFuture<T> bound(
-            OperationDeadline deadline,
-            Supplier<CompletableFuture<T>> operation,
-            String stage) {
+            OperationDeadline deadline, Supplier<CompletableFuture<T>> operation, String stage) {
         return deadline.bound(operation, stage);
     }
 
@@ -965,12 +874,12 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             Objects.requireNonNull(parsedKey, "parsedKey");
             Objects.requireNonNull(listedObject, "listedObject");
             Objects.requireNonNull(sourceRoot, "sourceRoot");
-            plannedProtectionRemovals = List.copyOf(Objects.requireNonNull(
-                    plannedProtectionRemovals, "plannedProtectionRemovals"));
+            plannedProtectionRemovals =
+                    List.copyOf(Objects.requireNonNull(plannedProtectionRemovals, "plannedProtectionRemovals"));
             Objects.requireNonNull(object, "object");
             Objects.requireNonNull(referenceQuery, "referenceQuery");
-            discoveryEvidenceSha256 = GcReferenceQuery.requireSha256(
-                    discoveryEvidenceSha256, "discoveryEvidenceSha256");
+            discoveryEvidenceSha256 =
+                    GcReferenceQuery.requireSha256(discoveryEvidenceSha256, "discoveryEvidenceSha256");
             if (!inventory.ledger().equals(ledger)
                     || inventory.deletionVetoed()
                     || !inventory.unreferencedCandidates().contains(listedObject.key())
@@ -1034,8 +943,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         }
 
         private static ScanResult missingRetentionResult() {
-            return new ScanResult(
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, true);
+            return new ScanResult(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, true);
         }
     }
 
@@ -1110,7 +1018,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
 
         private void add(Block block) {
             switch (block) {
-                case NONE -> { }
+                case NONE -> {}
                 case MALFORMED_KEY -> malformedKeys = Math.addExact(malformedKeys, 1);
                 case UNKNOWN_AGE -> unknownAgeObjects = Math.addExact(unknownAgeObjects, 1);
                 case TOO_YOUNG -> tooYoungObjects = Math.addExact(tooYoungObjects, 1);
@@ -1146,8 +1054,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         private final AtomicBoolean closed = new AtomicBoolean();
         private final Set<BoundState<?>> active = ConcurrentHashMap.newKeySet();
 
-        private OperationDeadline(
-                Duration timeout, ScheduledExecutorService scheduler) {
+        private OperationDeadline(Duration timeout, ScheduledExecutorService scheduler) {
             this.scheduler = scheduler;
             long now = System.nanoTime();
             long timeoutNanos;
@@ -1156,23 +1063,18 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             } catch (ArithmeticException overflow) {
                 timeoutNanos = Long.MAX_VALUE;
             }
-            this.deadlineNanos = timeoutNanos >= Long.MAX_VALUE - now
-                    ? Long.MAX_VALUE
-                    : now + timeoutNanos;
+            this.deadlineNanos = timeoutNanos >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + timeoutNanos;
         }
 
         private Duration remaining() {
-            long nanos = deadlineNanos == Long.MAX_VALUE
-                    ? Long.MAX_VALUE
-                    : deadlineNanos - System.nanoTime();
+            long nanos = deadlineNanos == Long.MAX_VALUE ? Long.MAX_VALUE : deadlineNanos - System.nanoTime();
             if (nanos <= 0) {
                 throw timeout("cursor snapshot GC operation deadline expired");
             }
             return Duration.ofNanos(nanos);
         }
 
-        private <T> CompletableFuture<T> bound(
-                Supplier<CompletableFuture<T>> operation, String stage) {
+        private <T> CompletableFuture<T> bound(Supplier<CompletableFuture<T>> operation, String stage) {
             if (closed.get()) {
                 return CompletableFuture.failedFuture(closed(stage + " rejected after deadline close"));
             }
@@ -1197,15 +1099,10 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             }
             try {
                 state.timeout = scheduler.schedule(
-                        () -> state.fail(timeout(stage + " timed out")),
-                        nanos,
-                        TimeUnit.NANOSECONDS);
+                        () -> state.fail(timeout(stage + " timed out")), nanos, TimeUnit.NANOSECONDS);
             } catch (RejectedExecutionException failure) {
                 state.fail(new NereusException(
-                        ErrorCode.STORAGE_CLOSED,
-                        false,
-                        stage + " timeout scheduler rejected admitted work",
-                        failure));
+                        ErrorCode.STORAGE_CLOSED, false, stage + " timeout scheduler rejected admitted work", failure));
                 return result;
             }
             source.whenComplete(state::completeFromSource);
@@ -1234,10 +1131,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             private final AtomicBoolean terminal = new AtomicBoolean();
             private volatile ScheduledFuture<?> timeout;
 
-            private BoundState(
-                    CompletableFuture<T> source,
-                    CompletableFuture<T> result,
-                    String stage) {
+            private BoundState(CompletableFuture<T> source, CompletableFuture<T> result, String stage) {
                 this.source = source;
                 this.result = result;
                 this.stage = stage;
@@ -1284,8 +1178,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         }
     }
 
-    private static Duration requireDuration(
-            Duration value, boolean positive, String name) {
+    private static Duration requireDuration(Duration value, boolean positive, String name) {
         Objects.requireNonNull(value, name);
         long millis;
         try {
@@ -1296,18 +1189,15 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         if (value.isNegative()
                 || (positive && (value.isZero() || millis <= 0))
                 || !value.equals(Duration.ofMillis(millis))) {
-            throw new IllegalArgumentException(
-                    name + " must be " + (positive ? "positive" : "non-negative")
-                            + " and exactly millisecond-representable");
+            throw new IllegalArgumentException(name + " must be " + (positive ? "positive" : "non-negative")
+                    + " and exactly millisecond-representable");
         }
         return value;
     }
 
-    private static void requireInRange(
-            int value, int minimum, int maximum, String name) {
+    private static void requireInRange(int value, int minimum, int maximum, String name) {
         if (value < minimum || value > maximum) {
-            throw new IllegalArgumentException(
-                    name + " must be in [" + minimum + ", " + maximum + "]");
+            throw new IllegalArgumentException(name + " must be in [" + minimum + ", " + maximum + "]");
         }
     }
 
@@ -1320,18 +1210,15 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static NereusException invariant(String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static NereusException limit(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_LIMIT_EXCEEDED, false, message);
+        return new NereusException(ErrorCode.METADATA_LIMIT_EXCEEDED, false, message);
     }
 
     private static NereusException timeout(String message) {

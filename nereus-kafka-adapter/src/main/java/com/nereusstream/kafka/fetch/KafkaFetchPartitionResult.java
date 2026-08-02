@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.fetch;
 
 import com.nereusstream.kafka.partition.KafkaPartitionIdentity;
@@ -6,7 +7,9 @@ import com.nereusstream.kafka.partition.KafkaStorageReadResult;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Included partition bytes or an explicit omission caused only by the request-wide byte budget. */
+/**
+ * Included partition bytes or an explicit omission caused only by the request-wide byte budget.
+ */
 public record KafkaFetchPartitionResult(
         KafkaPartitionIdentity identity,
         Optional<KafkaStorageReadResult> readResult,

@@ -66,7 +66,8 @@ F9 current-source provider-chaos update（2026-07-30）：product `main@d6c1de0`
 `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl007` and expands root `phase9ChaosCheck` into the complete
 Oxia/Object/BookKeeper response-loss matrix。The canonical owner performs an actual Toxiproxy connection reset during
 first activation，recovers the same controller epoch，then starts a fresh controller and broker from the same durable
-state and proves offsets `0/2` around the restart。The same root gate also injects provider-applied/caller-unobserved trim
+state and proves offsets `0/2` around the restart。The same root gate also injects provider-applied/caller-unobserved
+trim
 completion for Object sync/async and BookKeeper WAL-only/async/sync，forces fresh-process recovery and rejects a repeated
 physical trim before continuing IO。Fresh `phase9ChaosCheck --rerun-tasks` passes 80/80 tasks in 5m26s；all four process
 owners report zero skipped and zero failures。KF-SCL-007 is `IMPLEMENTED_NOT_RUN` until the final aggregate；
@@ -104,42 +105,54 @@ checkpoint-pinned paged COMMITTED replay and
 storage-profile policy、authority-session periodic renewal/fail-closed fencing and exact bounded ListOffsets scan slices
 are in progress；the adapter now also has the process admission/runtime lifecycle and an explicit owned/borrowed resource
 ledger with reverse-order close。The product runtime now installs the same real Object provider for both
-`OBJECT_WAL_SYNC_OBJECT` and `OBJECT_WAL_ASYNC_OBJECT`，and can optionally install the provider-neutral BookKeeper runtime
-beside them；the BookKeeper graph admits exactly those two Object-WAL profiles plus `BOOKKEEPER_WAL_ONLY` only after the exact F1-BK namespace、
-publication activation and broker readiness are present；a real Oxia + two-bookie gate proves strict BookKeeper append and
+`OBJECT_WAL_SYNC_OBJECT` and `OBJECT_WAL_ASYNC_OBJECT`，and can optionally install the provider-neutral BookKeeper
+runtime
+beside them；the BookKeeper graph admits exactly those two Object-WAL profiles plus `BOOKKEEPER_WAL_ONLY` only after the
+exact F1-BK namespace、
+publication activation and broker readiness are present；a real Oxia + two-bookie gate proves strict BookKeeper append
+and
 cold generation-zero Fetch。A second real release-distribution process gate now proves `BOOKKEEPER_WAL_ONLY` through
 Admin create、Produce、Fetch、ListOffsets、normal shutdown and fresh-JVM cold recovery over stock
-`zk+longhierarchical` BookKeeper metadata while Nereus authority remains in Oxia。A third release-distribution process gate
-selects `OBJECT_WAL_ASYNC_OBJECT` as the exact default over the installed Object provider，then proves offset 0 on the first
-JVM and recovery plus offset 1 on a fresh JVM with earliest=0/latest=2 over real Oxia and LocalStack S3。The local Kafka fork now also maintains
+`zk+longhierarchical` BookKeeper metadata while Nereus authority remains in Oxia。A third release-distribution process
+gate
+selects `OBJECT_WAL_ASYNC_OBJECT` as the exact default over the installed Object provider，then proves offset 0 on the
+first
+JVM and recovery plus offset 1 on a fresh JVM with earliest=0/latest=2 over real Oxia and LocalStack S3。The local Kafka
+fork now also maintains
 checkpoint-restorable virtual segments、exact
 KRaft config history、logical/time indexes and real offset metadata，routes stock DeleteRecords through the shared
 checkpoint-before-trim barrier，and supplies bounded owned-partition capture to the product's periodic retention runtime。
-The Object-WAL runtime now also persists an immutable exact-reference checkpoint-failure quarantine/redacted first-failure
+The Object-WAL runtime now also persists an immutable exact-reference checkpoint-failure quarantine/redacted
+first-failure
 audit in Oxia；recovery and retention cannot use an older root until that audit is durable，and quarantine-store failure
 fails closed。
 On 2026-07-28，the F9 process harness also closed the Object-WAL already-dispatched append takeover cut：three real
 release JVMs share one KRaft/Oxia/LocalStack authority，Toxiproxy holds the old leader inside provider IO，`jcmd` proves
 the storage worker is blocked in `NereusUnifiedLog.appendStable`，and `SIGSTOP` freezes broker 1 before an atomic
-`[1] -> [2]` reassignment。The harness first waits for KRaft heartbeat fencing to remove broker 1 from the broker-endpoint
+`[1] -> [2]` reassignment。The harness first waits for KRaft heartbeat fencing to remove broker 1 from the
+broker-endpoint
 Admin forwarding path，so reassignment is not confused with a client request pinned to the frozen process。After
 `SIGCONT`，the stale request fails with
 `append session changed before guarded object upload`，the WAL key set and latest offset remain unchanged，and broker 2
 commits the next batch at the exact old stable end。The dedicated
 `f9InFlightTakeoverProcessIntegrationTest` is part of `phase9M6KafkaProcessCheck`。
 The same aggregate now also covers all three BookKeeper profiles through post-handoff recovery plus their shared
-Bookie-acked/metadata-`WRITING` stale-completion cut，and a three-voter/three-combined-node process gate kills the current
+Bookie-acked/metadata-`WRITING` stale-completion cut，and a three-voter/three-combined-node process gate kills the
+current
 KRaft controller、requires a different higher-epoch controller to reconcile Nereus ACTIVE authority，then proves native
 Produce/Fetch/ListOffsets and object persistence continue。A second controller gate now uses three dedicated controller
-release JVMs plus one broker JVM and a test-only completion-gate agent to kill the current controller after the real Oxia
-provider has durably applied `createReadiness`、`createActivation(PREPARED)` or the `PREPARED -> ACTIVE` CAS but before the
+release JVMs plus one broker JVM and a test-only completion-gate agent to kill the current controller after the real
+Oxia
+provider has durably applied `createReadiness`、`createActivation(PREPARED)` or the `PREPARED -> ACTIVE` CAS but before
+the
 coordinator observes completion。The replacement controller preserves the readiness-only/PREPARED facts or byte-identical
 ACTIVE authority，publishes non-regressing readiness for broker `[4]`，and the broker subsequently completes native
 Produce/Fetch/ListOffsets with Object persistence。The same gate also covers the before-provider side of all three store
 operations，including activation-absent recovery from an existing readiness tuple。A real Oxia connection-reset gate now
 also proves same-controller-epoch retry after transport recovery。A third controller gate now kills the exact leader on
 both sides of the complete empty-cluster `currentSnapshot` proof and `loadCapabilities` aggregation，then proves
-higher-epoch ACTIVE recovery and native IO。The native checkpoint/trim process gate now uses stock DeleteRecords to publish
+higher-epoch ACTIVE recovery and native IO。The native checkpoint/trim process gate now uses stock DeleteRecords to
+publish
 a rooted NKC1、durably advances log start、kills the release JVM and proves a fresh process hydrates the captured pre-trim
 checkpoint window、prunes virtual segments to the current trim and continues Produce/Fetch/ListOffsets。These are still
 partial F9 results。A second process gate now injects a one-shot completion loss after the real Object-WAL trim future
@@ -163,25 +176,35 @@ The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets�
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation
 publication、binding coverage activation、generation-constrained no-resurrection reads and task-first terminal retirement。
-The current F9 compaction runtime additionally reconstructs every deterministic Object/BookKeeper source protection before
-opening either KCP1 source stream。A fixed BookKeeper generation-zero anchor retired by a concurrent higher generation now
+The current F9 compaction runtime additionally reconstructs every deterministic Object/BookKeeper source protection
+before
+opening either KCP1 source stream。A fixed BookKeeper generation-zero anchor retired by a concurrent higher generation
+now
 cancels the stale immutable task with typed `SOURCE_RETIRED` unless its already-created dynamic task protection can be
 replayed；terminal cleanup releases all exact task-owned source protections before task-first/KCP1-second deletion。
-`KafkaCompactionPartitionPass` now recovers or admits one partition's durable workflow and composes claim heartbeat、two-pass
-execution、restart publication and dual-root retirement。`KafkaCompactionRuntime` now performs bounded fork-owned partition
+`KafkaCompactionPartitionPass` now recovers or admits one partition's durable workflow and composes claim
+heartbeat、two-pass
+execution、restart publication and dual-root retirement。`KafkaCompactionRuntime` now performs bounded fork-owned
+partition
 enumeration、internal-topic-first scheduling、process-current leader revalidation、cross-partition concurrency and
-drain-safe scheduler integration。Kafka native streams now install a canonical projection-free materialization registration，
-and Generation admission/final commit revalidate both cluster ACTIVE/readiness and caller-owned partition authority without
+drain-safe scheduler integration。Kafka native streams now install a canonical projection-free materialization
+registration，
+and Generation admission/final commit revalidate both cluster ACTIVE/readiness and caller-owned partition authority
+without
 relaxing the existing projection-required path；production Object-WAL compaction composition and fork
 registration/capture are now wired through the current leader's partition lock。The fork freezes canonical
 source/HW/LSO，scans the exact decision horizon with stock `CleanedTransactionMetadata`，emits one decision for every
-control marker and revalidates producer/transaction state before returning。Real-provider process restart/takeover and the
+control marker and revalidates producer/transaction state before returning。Real-provider process restart/takeover and
+the
 broad stock-`LogCleaner` differential gate remain pending。The Kafka fork now has
 local stock-`MemoryRecords` timestamp inspection/recovery-state rebuild、Kafka
 sentinel/request mapping、
-leader-epoch-fenced `Partition` lookup installation、`ReplicaManager` delayed-operation wakeup、async completion/cancellation
-plus provisional exact-`Partition` state publication/rollback and exhaustive Nereus-to-Kafka error mapping against the locked 4.3 baseline。
-The fork now also owns an explicit durable `nereus.storage.version` feature、dedicated-controller admission and feature-gated
+leader-epoch-fenced `Partition` lookup installation、`ReplicaManager` delayed-operation wakeup、async
+completion/cancellation
+plus provisional exact-`Partition` state publication/rollback and exhaustive Nereus-to-Kafka error mapping against the
+locked 4.3 baseline。
+The fork now also owns an explicit durable `nereus.storage.version` feature、dedicated-controller admission and
+feature-gated
 RF/minISR/ISR/reassignment/directory enforcement；this is deterministic control-plane evidence, not yet a native Kafka
 production capability. Nereus is built around an Oxia
 metadata/coordination plane, selectable primary-WAL/object-materialization profiles,
@@ -234,15 +257,20 @@ authority-session renewal and exact bounded ListOffsets scan slices；the isolat
 record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHolder` bridge、optional stock
 `Partition`/`ReplicaManager` request seam、a generic
 `BrokerServer` runtime lifecycle injection boundary、the typed adapter-backed runtime bridge、stock-only maintenance
-interfaces、an explicit native-storage launcher and a stock-owned controller metadata-publisher/runtime seam。Its code-level
+interfaces、an explicit native-storage launcher and a stock-owned controller metadata-publisher/runtime seam。Its
+code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The SSH-published fork head is
 `nereus/future9-native-kafka-storage@bd9963c980`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
-controller factories through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。The controller runtime now coalesces
-metadata/leadership callbacks、runs first activation only while locally current、retries only retriable product failures and
+controller factories through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。The controller runtime now
+coalesces
+metadata/leadership callbacks、runs first activation only while locally current、retries only retriable product failures
+and
 cancels scheduled retry on leadership loss；activation scheduling additionally waits for finalized
-`nereus.storage.version >= 1`。The same fork head advertises this opt-in feature only from enabled broker/controller processes、
-allows dedicated enabled controllers and enforces single-copy controller mutations。A real release-distribution combined-node
+`nereus.storage.version >= 1`。The same fork head advertises this opt-in feature only from enabled broker/controller
+processes、
+allows dedicated enabled controllers and enforces single-copy controller mutations。A real release-distribution
+combined-node
 KRaft process gate now passes against four-shard Oxia and pinned LocalStack S3，including explicit feature formatting、
 broker/controller registration、activation、Admin topic creation、acks=all Produce、consumer Fetch、earliest/latest
 ListOffsets、object persistence and SIGTERM shutdown。The same gate now starts a fresh second JVM under the higher KRaft
@@ -252,26 +280,31 @@ that group offset、reinitializes the same transactional ID、commits the next t
 visible offset and verifies earliest=0/latest=5 before a second normal shutdown。The recovery coordinator now retries
 transient page-read backpressure with bounded 10–250 ms exponential delay under the unchanged recovery deadline；it never
 publishes a partial state，while ordinary Fetch continues to reject resource exhaustion immediately。A third JVM then
-stably appends open-transaction data at offset 5 and is forcibly killed；a fourth JVM reuses that transactional ID，recovers
+stably appends open-transaction data at offset 5 and is forcibly killed；a fourth JVM reuses that transactional
+ID，recovers
 the coordinator state、writes ABORT marker 6、commits data/marker 7/8，proves `read_committed` skips the aborted record and
 advances the group to offset 8 with latest=9。The native Kafka process evidence is still single-node, but now covers both
 synchronous and asynchronous Object-WAL plus `BOOKKEEPER_WAL_ONLY`。The product
 adapter's focused real-service gate covers `BOOKKEEPER_WAL_ONLY`，and the Kafka fork now owns the complete typed
 BookKeeper configuration snapshot、exact password-file identity、client lifecycle and
-`OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT + BOOKKEEPER_WAL_ONLY` capability mapping。The BookKeeper process gate uses a real two-bookie
+`OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT + BOOKKEEPER_WAL_ONLY` capability mapping。The BookKeeper process gate
+uses a real two-bookie
 cluster with stock ZooKeeper long-hierarchical metadata，then restarts the exact formatted KRaft broker in a fresh JVM，
 recovers offset 0 and appends offset 1 with earliest=0/latest=2；
 The current process suite additionally covers Object/BookKeeper live takeover、ACTIVE-state three-voter controller
 failover、the complete before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store-publication
 matrix、the four-way initial snapshot-proof/capability-aggregation matrix and actual first-activation Oxia transport
-reset/retry。`f9CoordinatorMigrationProcessIntegrationTest` now also keeps broker 1 alive while atomically moving the user
+reset/retry。`f9CoordinatorMigrationProcessIntegrationTest` now also keeps broker 1 alive while atomically moving the
+user
 partition、`__consumer_offsets-0` and `__transaction_state-0` to broker 2，then recovers group offset 2、reuses the same
 transactional ID for data/marker offsets 3/4、resumes the group at visible offset 3 and ends at earliest/latest `0/5`。
 `f9OngoingTransactionMigrationProcessIntegrationTest` further holds an OPEN transaction while moving the user partition
-and `__transaction_state-0` in one Admin request from broker 1 to broker 2，commits through the migrated coordinator，then opens a
+and `__transaction_state-0` in one Admin request from broker 1 to broker 2，commits through the migrated coordinator，then
+opens a
 second transaction and moves both partitions back to broker 1 before aborting。The gate requires exact singleton
 leader/replicas/ISR on every handoff、both JVMs alive、LSO convergence `0 -> 2 -> 4 -> 6 -> 8`，same-ID continuation after
-both outcomes and `read_committed` skipping the aborted data。`f9MandatoryInternalTopicNtc2ProcessIntegrationTest` further
+both outcomes and `read_committed` skipping the aborted data。`f9MandatoryInternalTopicNtc2ProcessIntegrationTest`
+further
 deletes and corrupts activated `__consumer_offsets` NTC2 bytes while both brokers remain live，proves each handoff leaves
 the group coordinator unavailable without COMMITTED fallback，then performs two exact physical-repair/re-election cycles
 and reloads committed offset `1`。The current suite also passes the stock retention differential oracle and the exact
@@ -311,7 +344,8 @@ lost delete response and fresh-process dual absence。
 The same real-service path now injects applied commit-intent、head and generation-zero response loss，then recovers the
 same exact range with no duplicate BookKeeper write；the pre-head cut remains intentionally internal-reservation recovery
 under the frozen Phase 1.5 no-public-attempt-id contract。
-Provider-boundary and delayed foreign-ledger cuts now also prove permanent quarantine with zero deletes and fresh-candidate
+Provider-boundary and delayed foreign-ledger cuts now also prove permanent quarantine with zero deletes and
+fresh-candidate
 progress；the real Oxia retention fixture fills and scans the exact fixed protection Cartesian bound before vetoing GC。
 The allocation-authority fixture additionally loses real Oxia mutation responses below the production adapter and
 forces two streams onto one candidate id，proving exact reload and one global owner without provider deletion。
@@ -353,7 +387,8 @@ retry-disabled two-broker/two-worker contention。`bookKeeperPrimaryWalM6Check -
 10m22s，and `bookKeeperPrimaryWalFinalCheck --rerun-tasks` passes 236/236 tasks in 30m57s。F1-BK is
 complete/final-gated；online profile migration remains unsupported。
 
-Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。
+Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are
+implemented/final-gated。
 `nereus-managed-ledger` now provides the
 writable facade、strict get-only read-only ledger、exact append recovery/write-fence handoff、lifecycle/admin/stats
 surfaces and audited unsupported channels。F2-M4 cursor boundary is implemented；F2-M5 has product runtime/S3
@@ -536,7 +571,8 @@ absence 验证的旧对象注册为 ACTIVE physical root，并为新 root 重置
 删除，malformed/young/stale/mismatch/conflict 只计数。Checkpoint AM 已加入 proof-driven stream-registration retirement
 foundation：只有精确 DELETED L0、non-live projection、完整且无引用的 F3 cursor/retention authority
 与 terminal/audit-grace-expired F4 workflow 事实同时成立时，才依次退休 owner protection、index/task、
-recovery root、checkpoint/stats/sequence，最后经过 exact recapture 删除 registration。对应 ordinary gate 已覆盖真实 published
+recovery root、checkpoint/stats/sequence，最后经过 exact recapture 删除 registration。对应 ordinary gate 已覆盖真实
+published
 workflow 的 task/two-index/three-protection drain，以及 non-empty NRC1 checkpoint-root/target protection 退休；
 所有 delete-response loss 均依赖 exact absence 收敛，physical root 在整个 registration-retirement 测试后仍保留。
 Checkpoint AN 进一步实现并接入 metadata-first lifecycle：每轮严格执行完整 256-shard physical-root recovery、

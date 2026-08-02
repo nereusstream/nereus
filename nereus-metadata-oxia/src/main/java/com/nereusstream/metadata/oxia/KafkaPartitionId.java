@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Objects;
 
-/** Protocol-neutral identity of one KRaft topic incarnation and partition. */
+/**
+ * Protocol-neutral identity of one KRaft topic incarnation and partition.
+ */
 public record KafkaPartitionId(String kafkaClusterId, String topicId, int partitionId) {
     private static final String ZERO_UUID = "AAAAAAAAAAAAAAAAAAAAAA";
 
@@ -29,7 +32,10 @@ public record KafkaPartitionId(String kafkaClusterId, String topicId, int partit
         try {
             byte[] decoded = Base64.getUrlDecoder().decode(exact + "==");
             if (decoded.length != 16
-                    || !Base64.getUrlEncoder().withoutPadding().encodeToString(decoded).equals(exact)) {
+                    || !Base64.getUrlEncoder()
+                            .withoutPadding()
+                            .encodeToString(decoded)
+                            .equals(exact)) {
                 throw new IllegalArgumentException("topicId must be a canonical Kafka UUID");
             }
         } catch (IllegalArgumentException failure) {

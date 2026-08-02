@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.AcquiredAppendSession;
@@ -18,7 +19,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Optional;
 
-/** Canonical conversion from the exact durable StreamHead record to the protocol-neutral public snapshot. */
+/**
+ * Canonical conversion from the exact durable StreamHead record to the protocol-neutral public snapshot.
+ */
 public final class StableStreamHeadSnapshots {
     private StableStreamHeadSnapshots() {}
 
@@ -38,9 +41,10 @@ public final class StableStreamHeadSnapshots {
                 head.metadataVersion());
     }
 
-    private static Optional<AcquiredAppendSession> session(
-            StreamId streamId, AppendSessionSnapshotRecord snapshot) {
-        if (snapshot.isEmpty()) return Optional.empty();
+    private static Optional<AcquiredAppendSession> session(StreamId streamId, AppendSessionSnapshotRecord snapshot) {
+        if (snapshot.isEmpty()) {
+            return Optional.empty();
+        }
         AppendSession session = new AppendSession(
                 streamId,
                 snapshot.writerId(),
@@ -83,7 +87,8 @@ public final class StableStreamHeadSnapshots {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }

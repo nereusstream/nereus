@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import java.util.Arrays;
@@ -23,7 +24,9 @@ import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 
-/** Deployable AWS SDK v2 async provider for AWS S3 and path-style compatible services. */
+/**
+ * Deployable AWS SDK v2 async provider for AWS S3 and path-style compatible services.
+ */
 public final class S3CompatibleObjectStoreProvider implements ObjectStoreProvider {
     private final AtomicBoolean used = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -88,8 +91,7 @@ public final class S3CompatibleObjectStoreProvider implements ObjectStoreProvide
     }
 
     static ScheduledThreadPoolExecutor newDeadlineScheduler() {
-        ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(
-                1, daemonFactory("nereus-s3-deadline"));
+        ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(1, daemonFactory("nereus-s3-deadline"));
         scheduler.setRemoveOnCancelPolicy(true);
         scheduler.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
         scheduler.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
@@ -109,7 +111,8 @@ public final class S3CompatibleObjectStoreProvider implements ObjectStoreProvide
     }
 
     private static void verifyBucket(S3AsyncClient client, ObjectStoreConfiguration config) throws Exception {
-        CompletableFuture<?> request = client.headBucket(HeadBucketRequest.builder().bucket(config.bucket()).build());
+        CompletableFuture<?> request = client.headBucket(
+                HeadBucketRequest.builder().bucket(config.bucket()).build());
         try {
             request.get(config.requestTimeout().toNanos(), TimeUnit.NANOSECONDS);
         } catch (Throwable failure) {
@@ -121,9 +124,7 @@ public final class S3CompatibleObjectStoreProvider implements ObjectStoreProvide
         }
     }
 
-    static AwsCredentialsProvider credentials(
-            ObjectStoreConfiguration config,
-            ObjectStoreSecretResolver resolver) {
+    static AwsCredentialsProvider credentials(ObjectStoreConfiguration config, ObjectStoreSecretResolver resolver) {
         if (config.accessKeySecretRef().isEmpty()) {
             return DefaultCredentialsProvider.builder().build();
         }
@@ -133,10 +134,13 @@ public final class S3CompatibleObjectStoreProvider implements ObjectStoreProvide
         try {
             access = resolve(resolver, config.accessKeySecretRef().orElseThrow());
             secret = resolve(resolver, config.secretKeySecretRef().orElseThrow());
-            token = config.sessionTokenSecretRef().map(ref -> resolve(resolver, ref)).orElse(null);
-            return StaticCredentialsProvider.create(token == null
-                    ? AwsBasicCredentials.create(new String(access), new String(secret))
-                    : AwsSessionCredentials.create(new String(access), new String(secret), new String(token)));
+            token = config.sessionTokenSecretRef()
+                    .map(ref -> resolve(resolver, ref))
+                    .orElse(null);
+            return StaticCredentialsProvider.create(
+                    token == null
+                            ? AwsBasicCredentials.create(new String(access), new String(secret))
+                            : AwsSessionCredentials.create(new String(access), new String(secret), new String(token)));
         } finally {
             if (access != null) {
                 Arrays.fill(access, '\0');
@@ -152,8 +156,7 @@ public final class S3CompatibleObjectStoreProvider implements ObjectStoreProvide
 
     private static char[] resolve(ObjectStoreSecretResolver resolver, String reference) {
         Optional<char[]> value = resolver.resolve(reference);
-        return value.orElseThrow(() ->
-                new IllegalArgumentException("unresolved object-store secret reference"));
+        return value.orElseThrow(() -> new IllegalArgumentException("unresolved object-store secret reference"));
     }
 
     private void closeCredentials() {

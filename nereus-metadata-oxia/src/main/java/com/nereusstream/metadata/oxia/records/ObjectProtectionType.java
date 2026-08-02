@@ -14,7 +14,9 @@
 
 package com.nereusstream.metadata.oxia.records;
 
-/** Durable owner/reference class protecting one physical object from deletion. */
+/**
+ * Durable owner/reference class protecting one physical object from deletion.
+ */
 public enum ObjectProtectionType {
     VISIBLE_GENERATION(1),
     REACHABLE_APPEND(2),

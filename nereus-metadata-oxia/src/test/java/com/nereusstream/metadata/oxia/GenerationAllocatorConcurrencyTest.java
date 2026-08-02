@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
@@ -36,27 +36,26 @@ class GenerationAllocatorConcurrencyTest {
         try {
             List<CompletableFuture<AllocatedGeneration>> futures = IntStream.range(0, 24)
                     .mapToObj(index -> CompletableFuture.supplyAsync(
-                            () -> allocator.allocate(
-                                            stream,
-                                            ReadView.COMMITTED,
-                                            new PublicationId(publication(index)))
+                            () -> allocator
+                                    .allocate(stream, ReadView.COMMITTED, new PublicationId(publication(index)))
                                     .join(),
                             executor))
                     .toList();
-            List<AllocatedGeneration> allocations = futures.stream()
-                    .map(CompletableFuture::join)
-                    .toList();
+            List<AllocatedGeneration> allocations =
+                    futures.stream().map(CompletableFuture::join).toList();
 
             assertThat(allocations)
                     .extracting(value -> value.generation().value())
                     .doesNotHaveDuplicates()
-                    .containsExactlyInAnyOrderElementsOf(
-                            IntStream.rangeClosed(1, 24).mapToObj(value -> (long) value).toList());
+                    .containsExactlyInAnyOrderElementsOf(IntStream.rangeClosed(1, 24)
+                            .mapToObj(value -> (long) value)
+                            .toList());
             AllocatedGeneration latest = allocations.stream()
                     .max(Comparator.comparingLong(value -> value.generation().value()))
                     .orElseThrow();
-            AllocatedGeneration replay = allocator.allocate(
-                    stream, ReadView.COMMITTED, latest.publicationId()).join();
+            AllocatedGeneration replay = allocator
+                    .allocate(stream, ReadView.COMMITTED, latest.publicationId())
+                    .join();
             assertThat(replay).isEqualTo(latest);
         } finally {
             executor.shutdownNow();
@@ -65,43 +64,33 @@ class GenerationAllocatorConcurrencyTest {
     }
 
     @Test
-    void lostAllocationResponseWithInterleavingBurnsOneGapAndAttachesAUniqueRetry()
-            throws Exception {
+    void lostAllocationResponseWithInterleavingBurnsOneGapAndAttachesAUniqueRetry() throws Exception {
         GenerationMetadataStore durable = new OxiaJavaGenerationMetadataStore(
                 new PartitionedOxiaClient(new InMemoryPartitionedOxiaBackend()),
                 Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
         AtomicBoolean loseFirstResponse = new AtomicBoolean(true);
         AtomicReference<AllocatedGeneration> burned = new AtomicReference<>();
-        GenerationMetadataStore lossy = loseFirstAllocationResponse(
-                durable, loseFirstResponse, burned);
+        GenerationMetadataStore lossy = loseFirstAllocationResponse(durable, loseFirstResponse, burned);
         GenerationAllocator allocator = new GenerationAllocator("cluster", lossy);
         GenerationAllocator independent = new GenerationAllocator("cluster", durable);
         StreamId stream = new StreamId("lost-response-stream");
         PublicationId firstPublication = new PublicationId(publication(0));
         PublicationId interleavingPublication = new PublicationId(publication(1));
         try {
-            assertThatThrownBy(() -> allocator.allocate(
-                                    stream,
-                                    ReadView.COMMITTED,
-                                    firstPublication)
+            assertThatThrownBy(() -> allocator
+                            .allocate(stream, ReadView.COMMITTED, firstPublication)
                             .join())
                     .isInstanceOf(CompletionException.class)
                     .hasRootCauseMessage("injected lost generation allocation response");
 
-            AllocatedGeneration interleaving = independent.allocate(
-                            stream,
-                            ReadView.COMMITTED,
-                            interleavingPublication)
+            AllocatedGeneration interleaving = independent
+                    .allocate(stream, ReadView.COMMITTED, interleavingPublication)
                     .join();
-            AllocatedGeneration attached = allocator.allocate(
-                            stream,
-                            ReadView.COMMITTED,
-                            firstPublication)
+            AllocatedGeneration attached = allocator
+                    .allocate(stream, ReadView.COMMITTED, firstPublication)
                     .join();
-            AllocatedGeneration replay = allocator.allocate(
-                            stream,
-                            ReadView.COMMITTED,
-                            firstPublication)
+            AllocatedGeneration replay = allocator
+                    .allocate(stream, ReadView.COMMITTED, firstPublication)
                     .join();
 
             assertThat(burned.get().generation().value()).isEqualTo(1);
@@ -113,8 +102,7 @@ class GenerationAllocatorConcurrencyTest {
                             interleaving.generation().value(),
                             attached.generation().value()))
                     .doesNotHaveDuplicates();
-            assertThat(durable.getSequence(
-                                    "cluster", stream, ReadView.COMMITTED)
+            assertThat(durable.getSequence("cluster", stream, ReadView.COMMITTED)
                             .join()
                             .orElseThrow()
                             .value()
@@ -146,13 +134,11 @@ class GenerationAllocatorConcurrencyTest {
                         Object result = method.invoke(delegate, args);
                         if (method.getName().equals("allocateGeneration")
                                 && loseFirstResponse.compareAndSet(true, false)) {
-                            return ((CompletableFuture<AllocatedGeneration>) result)
-                                    .thenCompose(allocation -> {
-                                        burned.set(allocation);
-                                        return CompletableFuture.failedFuture(
-                                                new IllegalStateException(
-                                                        "injected lost generation allocation response"));
-                                    });
+                            return ((CompletableFuture<AllocatedGeneration>) result).thenCompose(allocation -> {
+                                burned.set(allocation);
+                                return CompletableFuture.failedFuture(
+                                        new IllegalStateException("injected lost generation allocation response"));
+                            });
                         }
                         return result;
                     } catch (InvocationTargetException failure) {

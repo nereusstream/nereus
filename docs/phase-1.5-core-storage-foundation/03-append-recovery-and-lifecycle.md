@@ -133,11 +133,11 @@ public record AppendReplaySearchResult(
 
 Legal shapes：
 
-| Status | committed append | continuation |
-| --- | --- | --- |
-| `FOUND` | present | empty |
-| `PROVEN_NOT_COMMITTED` | empty | empty |
-| `CONTINUE` | empty | present |
+| Status                 | committed append | continuation |
+|------------------------|------------------|--------------|
+| `FOUND`                | present          | empty        |
+| `PROVEN_NOT_COMMITTED` | empty            | empty        |
+| `CONTINUE`             | empty            | present      |
 
 `scannedRecords` is within `[0,maxCommitsToScan]`。A continuation validates request identity, immutable observed-head
 anchor and the exact dense tuple expected at `nextCommitId`。It is not accepted from public/protocol code and is
@@ -232,13 +232,13 @@ join shared stream mutation lane
 
 State results：
 
-| Observed state | `seal` result |
-| --- | --- |
-| `CREATING` | retriable `STREAM_NOT_ACTIVE` |
-| `ACTIVE` | CAS then return sealed metadata |
-| `SEALED` | idempotent current metadata |
+| Observed state     | `seal` result                     |
+|--------------------|-----------------------------------|
+| `CREATING`         | retriable `STREAM_NOT_ACTIVE`     |
+| `ACTIVE`           | CAS then return sealed metadata   |
+| `SEALED`           | idempotent current metadata       |
 | `DELETING/DELETED` | non-retriable `STREAM_NOT_ACTIVE` |
-| missing | `STREAM_NOT_FOUND` |
+| missing            | `STREAM_NOT_FOUND`                |
 
 The successful `ACTIVE -> SEALED` CAS is termination linearization。Reads/resolves and metadata-only trim remain
 allowed；append/session acquisition are rejected。Final LAC is the committed end in the CAS winner snapshot。
@@ -256,13 +256,13 @@ join shared stream mutation lane
 
 State results：
 
-| Observed state | `delete` result |
-| --- | --- |
-| `CREATING` | retriable `STREAM_NOT_ACTIVE` |
+| Observed state  | `delete` result                            |
+|-----------------|--------------------------------------------|
+| `CREATING`      | retriable `STREAM_NOT_ACTIVE`              |
 | `ACTIVE/SEALED` | transition through `DELETING` to `DELETED` |
-| `DELETING` | resume terminal CAS |
-| `DELETED` | idempotent tombstone snapshot |
-| missing | `STREAM_NOT_FOUND` |
+| `DELETING`      | resume terminal CAS                        |
+| `DELETED`       | idempotent tombstone snapshot              |
+| missing         | `STREAM_NOT_FOUND`                         |
 
 After the first `DELETING` CAS, new append、session、read、resolve and trim operations fail；already returned read
 buffers remain caller-owned and valid。An already admitted read/resolve whose authoritative snapshot observed
@@ -289,14 +289,14 @@ caller deadline elapsed。
 
 ## 11. Operation Matrix by State
 
-| Operation | `ACTIVE` | `SEALED` | `DELETING` | `DELETED` |
-| --- | --- | --- | --- | --- |
-| get metadata | yes | yes | yes | yes |
-| append/acquire session | yes | reject | reject | reject |
-| read/resolve | yes | yes | reject | reject |
-| trim | yes | yes | reject | reject |
-| seal | transition | idempotent | reject | reject |
-| delete | transition | transition | resume | idempotent |
+| Operation              | `ACTIVE`   | `SEALED`   | `DELETING` | `DELETED`  |
+|------------------------|------------|------------|------------|------------|
+| get metadata           | yes        | yes        | yes        | yes        |
+| append/acquire session | yes        | reject     | reject     | reject     |
+| read/resolve           | yes        | yes        | reject     | reject     |
+| trim                   | yes        | yes        | reject     | reject     |
+| seal                   | transition | idempotent | reject     | reject     |
+| delete                 | transition | transition | resume     | idempotent |
 
 `CREATING` is not returned by normal Phase 1 create-or-get today；if observed, no Phase 1.5 operation adopts it as
 active。F2 projection publication requires a canonical empty `ACTIVE` snapshot。

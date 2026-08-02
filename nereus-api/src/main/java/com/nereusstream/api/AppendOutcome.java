@@ -14,14 +14,22 @@
 
 package com.nereusstream.api;
 
-/** Commit certainty carried by an append failure. */
+/**
+ * Commit certainty carried by an append failure.
+ */
 public enum AppendOutcome {
-    /** The failed attempt is known not to have advanced the stream head. */
+    /**
+     * The failed attempt is known not to have advanced the stream head.
+     */
     KNOWN_NOT_COMMITTED,
 
-    /** The stream-head write may have committed and the caller must resolve the original attempt before retrying. */
+    /**
+     * The stream-head write may have committed and the caller must resolve the original attempt before retrying.
+     */
     MAY_HAVE_COMMITTED,
 
-    /** The stream head is known to contain the append, even though the requested operation did not return success. */
+    /**
+     * The stream head is known to contain the append, even though the requested operation did not return success.
+     */
     KNOWN_COMMITTED
 }

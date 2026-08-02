@@ -18,13 +18,15 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceValidator;
 import com.nereusstream.kafka.partition.KafkaPartitionIdentity;
 
-/** Late partition-open factory for one exact leader's maintenance state machine. */
+/**
+ * Late partition-open factory for one exact leader's maintenance state machine.
+ */
 @FunctionalInterface
 public interface KafkaPartitionMaintenanceFactory {
 
-  KafkaPartitionMaintenance create(
-      KafkaPartitionIdentity identity,
-      int leaderEpoch,
-      StreamId streamId,
-      KafkaCheckpointSourceValidator sourceValidator);
+    KafkaPartitionMaintenance create(
+            KafkaPartitionIdentity identity,
+            int leaderEpoch,
+            StreamId streamId,
+            KafkaCheckpointSourceValidator sourceValidator);
 }

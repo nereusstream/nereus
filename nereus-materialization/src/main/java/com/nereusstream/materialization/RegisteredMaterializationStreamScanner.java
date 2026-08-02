@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -32,7 +33,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Process-wide 64-shard liveness scanner; registration triggers work but never becomes stream/index truth. */
+/**
+ * Process-wide 64-shard liveness scanner; registration triggers work but never becomes stream/index truth.
+ */
 public final class RegisteredMaterializationStreamScanner {
     private final String cluster;
     private final OxiaMetadataStore l0Metadata;
@@ -83,8 +86,7 @@ public final class RegisteredMaterializationStreamScanner {
                 policy,
                 registryPageSize,
                 maxTasksPerPlan,
-                MaterializationStreamAuthorityMode
-                        .PROJECTION_REQUIRED);
+                MaterializationStreamAuthorityMode.PROJECTION_REQUIRED);
     }
 
     public RegisteredMaterializationStreamScanner(
@@ -119,8 +121,7 @@ public final class RegisteredMaterializationStreamScanner {
                 policy,
                 registryPageSize,
                 maxTasksPerPlan,
-                MaterializationStreamAuthorityMode
-                        .PROJECTION_REQUIRED);
+                MaterializationStreamAuthorityMode.PROJECTION_REQUIRED);
     }
 
     public RegisteredMaterializationStreamScanner(
@@ -144,19 +145,16 @@ public final class RegisteredMaterializationStreamScanner {
         this.l0Metadata = Objects.requireNonNull(l0Metadata, "l0Metadata");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.activationGuard = Objects.requireNonNull(activationGuard, "activationGuard");
-        this.sourceRepairer = Objects.requireNonNull(
-                sourceRepairer, "sourceRepairer");
+        this.sourceRepairer = Objects.requireNonNull(sourceRepairer, "sourceRepairer");
         this.planner = Objects.requireNonNull(planner, "planner");
         this.tasks = Objects.requireNonNull(tasks, "tasks");
         this.recovery = Objects.requireNonNull(recovery, "recovery");
         this.recoveryScanner = Objects.requireNonNull(recoveryScanner, "recoveryScanner");
-        this.recoveryCheckpoints = Objects.requireNonNull(
-                recoveryCheckpoints, "recoveryCheckpoints");
+        this.recoveryCheckpoints = Objects.requireNonNull(recoveryCheckpoints, "recoveryCheckpoints");
         this.checkpoints = Objects.requireNonNull(checkpoints, "checkpoints");
         this.metadataRetirer = Objects.requireNonNull(metadataRetirer, "metadataRetirer");
         this.policy = Objects.requireNonNull(policy, "policy");
-        this.authorityMode = Objects.requireNonNull(
-                authorityMode, "authorityMode");
+        this.authorityMode = Objects.requireNonNull(authorityMode, "authorityMode");
         if (registryPageSize <= 0 || registryPageSize > 1_000) {
             throw new IllegalArgumentException("registryPageSize must be in [1, 1000]");
         }
@@ -176,9 +174,7 @@ public final class RegisteredMaterializationStreamScanner {
         }
     }
 
-    private CompletableFuture<RegisteredMaterializationScanResult> scanShard(
-            int shard,
-            Accumulator accumulator) {
+    private CompletableFuture<RegisteredMaterializationScanResult> scanShard(int shard, Accumulator accumulator) {
         if (shard == F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS) {
             return CompletableFuture.completedFuture(accumulator.result());
         }
@@ -189,67 +185,56 @@ public final class RegisteredMaterializationStreamScanner {
     }
 
     private CompletableFuture<Void> scanRegistryPage(
-            int shard,
-            Optional<F4ScanToken> continuation,
-            Accumulator accumulator) {
-        return generations.scanStreamRegistrations(
-                        cluster, shard, continuation, registryPageSize)
-                .thenCompose(page -> processRegistrationPage(page, 0, accumulator).thenCompose(ignored -> {
-                    if (page.continuation().isPresent()) {
-                        return scanRegistryPage(shard, page.continuation(), accumulator);
-                    }
-                    return CompletableFuture.completedFuture(null);
-                }));
+            int shard, Optional<F4ScanToken> continuation, Accumulator accumulator) {
+        return generations
+                .scanStreamRegistrations(cluster, shard, continuation, registryPageSize)
+                .thenCompose(
+                        page -> processRegistrationPage(page, 0, accumulator).thenCompose(ignored -> {
+                            if (page.continuation().isPresent()) {
+                                return scanRegistryPage(shard, page.continuation(), accumulator);
+                            }
+                            return CompletableFuture.completedFuture(null);
+                        }));
     }
 
     private CompletableFuture<Void> processRegistrationPage(
-            StreamRegistrationScanPage page,
-            int index,
-            Accumulator accumulator) {
+            StreamRegistrationScanPage page, int index, Accumulator accumulator) {
         if (index == page.values().size()) {
             return CompletableFuture.completedFuture(null);
         }
         VersionedMaterializationStreamRegistration registration = page.values().get(index);
         accumulator.registrationsScanned++;
-        return processRegistration(registration, accumulator).thenCompose(ignored ->
-                processRegistrationPage(page, index + 1, accumulator));
+        return processRegistration(registration, accumulator)
+                .thenCompose(ignored -> processRegistrationPage(page, index + 1, accumulator));
     }
 
     private CompletableFuture<Void> processRegistration(
-            VersionedMaterializationStreamRegistration registration,
-            Accumulator accumulator) {
+            VersionedMaterializationStreamRegistration registration, Accumulator accumulator) {
         MaterializationStreamRegistrationRecord value = registration.value();
         StreamId streamId = new StreamId(value.streamId());
         if (!registration.key().equals(keyspace.materializationRegistryKey(streamId))) {
-            return CompletableFuture.failedFuture(invariant(
-                    "registered materialization stream key/value identity mismatch", null));
+            return CompletableFuture.failedFuture(
+                    invariant("registered materialization stream key/value identity mismatch", null));
         }
         return l0Metadata.getStreamSnapshot(cluster, streamId).thenCompose(snapshot -> {
-            Optional<GenerationActivationSubject> subject =
-                    validateRegistration(
-                            value, streamId, snapshot);
+            Optional<GenerationActivationSubject> subject = validateRegistration(value, streamId, snapshot);
             if (subject.isEmpty()) {
                 accumulator.registrationsSkipped++;
                 return CompletableFuture.completedFuture(null);
             }
-            return activationGuard.requireReady(
+            return activationGuard
+                    .requireReady(
                             policy.taskKind() == TaskKind.TOPIC_KEY_COMPACTION
                                     ? GenerationOperation.TOPIC_COMPACTED_PUBLISH
                                     : GenerationOperation.GENERATION_PUBLISH,
                             subject.orElseThrow(),
-                            authorityMode
-                                    == MaterializationStreamAuthorityMode
-                                            .PROJECTION_REQUIRED)
-                    .thenCompose(proof -> processAdmittedStream(
-                            streamId, snapshot, proof, accumulator));
+                            authorityMode == MaterializationStreamAuthorityMode.PROJECTION_REQUIRED)
+                    .thenCompose(proof -> processAdmittedStream(streamId, snapshot, proof, accumulator));
         });
     }
 
-    private Optional<GenerationActivationSubject>
-            validateRegistration(
-            MaterializationStreamRegistrationRecord registration,
-            StreamId streamId,
-            StreamMetadataSnapshot snapshot) {
+    private Optional<GenerationActivationSubject> validateRegistration(
+            MaterializationStreamRegistrationRecord registration, StreamId streamId, StreamMetadataSnapshot snapshot) {
         if (!snapshot.metadata().streamId().equals(streamId.value())) {
             throw invariant("registered stream snapshot belongs to another stream", null);
         }
@@ -259,8 +244,10 @@ public final class RegisteredMaterializationStreamScanner {
         Optional<ProjectionRef> projection;
         try {
             state = StreamState.valueOf(snapshot.metadata().state());
-            registeredProfile = StorageProfile.valueOf(registration.storageProfile()).canonical();
-            actualProfile = StorageProfile.valueOf(snapshot.metadata().profile()).canonical();
+            registeredProfile =
+                    StorageProfile.valueOf(registration.storageProfile()).canonical();
+            actualProfile =
+                    StorageProfile.valueOf(snapshot.metadata().profile()).canonical();
             projection = ProjectionIdentity.decode(registration.projectionRef());
         } catch (RuntimeException failure) {
             throw invariant("registered stream carries an unsupported state/profile/projection", failure);
@@ -268,39 +255,24 @@ public final class RegisteredMaterializationStreamScanner {
         if ((state != StreamState.ACTIVE && state != StreamState.SEALED)
                 || registeredProfile != actualProfile
                 || !actualProfile.objectMaterializationEnabled()
-                || registration.lastHintCommitVersion() > snapshot.committedEnd().commitVersion()) {
+                || registration.lastHintCommitVersion()
+                        > snapshot.committedEnd().commitVersion()) {
             return Optional.empty();
         }
-        Checksum identity = new Checksum(
-                ChecksumType.SHA256,
-                registration.projectionIdentitySha256());
-        if (authorityMode
-                == MaterializationStreamAuthorityMode
-                        .DIRECT_STREAM) {
-            Checksum expected =
-                    DirectMaterializationStreamAuthority
-                            .identitySha256(
-                                    streamId, actualProfile);
+        Checksum identity = new Checksum(ChecksumType.SHA256, registration.projectionIdentitySha256());
+        if (authorityMode == MaterializationStreamAuthorityMode.DIRECT_STREAM) {
+            Checksum expected = DirectMaterializationStreamAuthority.identitySha256(streamId, actualProfile);
             if (projection.isPresent()
-                    || !registration.projectionRef()
-                            .equals(
-                                    DirectMaterializationStreamAuthority
-                                            .encodedProjectionRef())
+                    || !registration.projectionRef().equals(DirectMaterializationStreamAuthority.encodedProjectionRef())
                     || !identity.equals(expected)) {
                 return Optional.empty();
             }
-            return Optional.of(
-                    new LiveStreamSubject(
-                            streamId, expected));
+            return Optional.of(new LiveStreamSubject(streamId, expected));
         }
         if (projection.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(
-                new LiveProjectionSubject(
-                        streamId,
-                        projection.orElseThrow(),
-                        identity));
+        return Optional.of(new LiveProjectionSubject(streamId, projection.orElseThrow(), identity));
     }
 
     private CompletableFuture<Void> processAdmittedStream(
@@ -310,46 +282,42 @@ public final class RegisteredMaterializationStreamScanner {
             Accumulator accumulator) {
         accumulator.registrationsAdmitted++;
         MaterializationTaskMutationGuard mutationGuard = () -> activationGuard.revalidate(proof);
-        return sourceRepairer.repair(streamId)
-                .thenCompose(ignored -> recoveryScanner.scan(
-                        streamId, mutationGuard))
+        return sourceRepairer
+                .repair(streamId)
+                .thenCompose(ignored -> recoveryScanner.scan(streamId, mutationGuard))
                 .thenCompose(recovered -> {
-            accumulator.existingTasksRecovered = Math.addExact(
-                    accumulator.existingTasksRecovered, recovered.scannedTasks());
-            long trim = snapshot.trim().trimOffset();
-            long head = snapshot.committedEnd().committedEndOffset();
-            CompletableFuture<Void> planned;
-            if (trim >= head) {
-                planned = CompletableFuture.completedFuture(null);
-            } else if (StorageProfile.valueOf(snapshot.metadata().profile()).canonical()
-                    == StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT) {
-                // BK sync owns exact single-append task creation on the producer completion path. This scanner still
-                // recovers those durable tasks and reconciles checkpoint/retirement state, but must not race them with
-                // a wider trim..head plan.
-                planned = CompletableFuture.completedFuture(null);
-            } else {
-                // The advisory checkpoint is intentionally not a skip boundary. Scanning authoritative trim..head
-                // keeps a stale/ahead checkpoint incapable of hiding a missing task or committed index.
-                planned = planner.plan(
-                                streamId,
-                                new OffsetRange(trim, head),
-                                policy,
-                                maxTasksPerPlan)
-                        .thenCompose(tasks -> createAndRecover(
-                                tasks, 0, mutationGuard, accumulator));
-            }
-            return planned.thenCompose(ignored -> recoveryCheckpoints.checkpoint(streamId))
-                    .thenCompose(ignored -> checkpoints.reconcile(
-                            streamId, policy, mutationGuard))
-                    .thenCompose(ignored -> metadataRetirer.retire(
-                            streamId, policy, trim, mutationGuard))
-                    .thenAccept(retired -> accumulator.workflowMetadataRetired = Math.addExact(
-                            accumulator.workflowMetadataRetired,
-                            Math.addExact(
-                                    retired.tasksRetired(),
+                    accumulator.existingTasksRecovered =
+                            Math.addExact(accumulator.existingTasksRecovered, recovered.scannedTasks());
+                    long trim = snapshot.trim().trimOffset();
+                    long head = snapshot.committedEnd().committedEndOffset();
+                    CompletableFuture<Void> planned;
+                    if (trim >= head) {
+                        planned = CompletableFuture.completedFuture(null);
+                    } else if (StorageProfile.valueOf(snapshot.metadata().profile())
+                                    .canonical()
+                            == StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT) {
+                        // BK sync owns exact single-append task creation on the producer completion path. This
+                        // scanner still
+                        // recovers those durable tasks and reconciles checkpoint/retirement state, but must not race
+                        // them with
+                        // a wider trim..head plan.
+                        planned = CompletableFuture.completedFuture(null);
+                    } else {
+                        // The advisory checkpoint is intentionally not a skip boundary. Scanning authoritative trim.
+                        // .head
+                        // keeps a stale/ahead checkpoint incapable of hiding a missing task or committed index.
+                        planned = planner.plan(streamId, new OffsetRange(trim, head), policy, maxTasksPerPlan)
+                                .thenCompose(tasks -> createAndRecover(tasks, 0, mutationGuard, accumulator));
+                    }
+                    return planned.thenCompose(ignored -> recoveryCheckpoints.checkpoint(streamId))
+                            .thenCompose(ignored -> checkpoints.reconcile(streamId, policy, mutationGuard))
+                            .thenCompose(ignored -> metadataRetirer.retire(streamId, policy, trim, mutationGuard))
+                            .thenAccept(retired -> accumulator.workflowMetadataRetired = Math.addExact(
+                                    accumulator.workflowMetadataRetired,
                                     Math.addExact(
-                                            retired.retentionStatsRetired(),
-                                            retired.checkpointsRetired()))));
+                                            retired.tasksRetired(),
+                                            Math.addExact(
+                                                    retired.retentionStatsRetired(), retired.checkpointsRetired()))));
                 });
     }
 
@@ -363,14 +331,13 @@ public final class RegisteredMaterializationStreamScanner {
         }
         return tasks.create(planned.get(index), mutationGuard).thenCompose(durable -> {
             accumulator.plannedTasksConverged++;
-            return recoverCreated(durable, mutationGuard).thenCompose(ignored ->
-                    createAndRecover(planned, index + 1, mutationGuard, accumulator));
+            return recoverCreated(durable, mutationGuard)
+                    .thenCompose(ignored -> createAndRecover(planned, index + 1, mutationGuard, accumulator));
         });
     }
 
     private CompletableFuture<MaterializationTaskRecoveryAction> recoverCreated(
-            VersionedMaterializationTask durable,
-            MaterializationTaskMutationGuard mutationGuard) {
+            VersionedMaterializationTask durable, MaterializationTaskMutationGuard mutationGuard) {
         return recovery.recover(durable, mutationGuard);
     }
 

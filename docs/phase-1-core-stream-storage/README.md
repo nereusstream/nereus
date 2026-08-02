@@ -52,15 +52,15 @@ Phase 1 继承这些不变量：
 
 当前 Phase 0 仓库已有模块：
 
-| Module | Phase 1 role |
-| --- | --- |
-| `nereus-api` | 对外暴露 protocol-neutral L0 API、value types、共享 key/hash helpers |
-| `nereus-core` | `StreamStorage` 主实现、append/read/trim 状态机 |
-| `nereus-metadata-oxia` | Oxia keyspace、single-key CAS commit adapter、metadata records |
-| `nereus-object-store` | Object WAL layout、object IO、range read abstraction |
-| `nereus-managed-ledger` | Phase 1 不接入 |
-| `nereus-pulsar-adapter` | Phase 1 不接入 |
-| `nereus-kop-adapter` | Phase 1 不接入 |
+| Module                  | Phase 1 role                                                 |
+|-------------------------|--------------------------------------------------------------|
+| `nereus-api`            | 对外暴露 protocol-neutral L0 API、value types、共享 key/hash helpers |
+| `nereus-core`           | `StreamStorage` 主实现、append/read/trim 状态机                     |
+| `nereus-metadata-oxia`  | Oxia keyspace、single-key CAS commit adapter、metadata records |
+| `nereus-object-store`   | Object WAL layout、object IO、range read abstraction           |
+| `nereus-managed-ledger` | Phase 1 不接入                                                  |
+| `nereus-pulsar-adapter` | Phase 1 不接入                                                  |
+| `nereus-kop-adapter`    | Phase 1 不接入                                                  |
 
 M0 scaffold migration 已完成。当前代码状态：
 
@@ -136,21 +136,21 @@ Phase 1 不允许：
 
 ## 3. Document Map
 
-| Doc | Purpose |
-| --- | --- |
-| `01-api-and-domain-model.md` | API、value object、错误模型、包结构 |
-| `02-oxia-metadata-and-commit.md` | Oxia keyspace、metadata records、append session、stream-head commit |
-| `03-object-wal-and-index.md` | object WAL 格式、slice、entry index、object store abstraction |
-| `04-core-state-machines.md` | append、read、resolve、trim、recovery 状态机 |
-| `05-implementation-plan-and-tests.md` | 代码落地顺序、测试矩阵、验收条件 |
-| `06-metadata-oxia-position-and-pulsar-reference.md` | `nereus-metadata-oxia` 的横切定位和 Pulsar Oxia 参考边界 |
-| `07-implementation-contract-checklist.md` | 实现前必须遵守的支持范围、stop-the-line 条件和测试 gate |
-| `08-risk-register-and-design-compromises.md` | 当前已知高风险假设、Phase 1 设计妥协和实现门禁 |
-| `09-legacy-oxia-multi-key-commit-design.md` | 已归档的旧 Oxia multi-key atomic commit 方案，供未来 Oxia API 改造后回看 |
-| `10-current-progress-review-2026-07-07.md` | 当前 M0/M1/M2 review 记录，以及 2026-07-08 M2 completion 追加说明 |
-| `11-m3-object-wal-review-2026-07-08.md` | M3 object WAL review 记录、completion blockers 和重新验收 gate |
-| `12-architecture-realignment-2026-07-10.md` | 多 profile 总体架构、Phase 1 strict boundary 与 pre-M4 review closure 记录 |
-| `13-phase-1-final-review-2026-07-11.md` | M8 后代码/设计深审、修复项、命名空间决策和最终复验记录 |
+| Doc                                                 | Purpose                                                           |
+|-----------------------------------------------------|-------------------------------------------------------------------|
+| `01-api-and-domain-model.md`                        | API、value object、错误模型、包结构                                         |
+| `02-oxia-metadata-and-commit.md`                    | Oxia keyspace、metadata records、append session、stream-head commit  |
+| `03-object-wal-and-index.md`                        | object WAL 格式、slice、entry index、object store abstraction          |
+| `04-core-state-machines.md`                         | append、read、resolve、trim、recovery 状态机                             |
+| `05-implementation-plan-and-tests.md`               | 代码落地顺序、测试矩阵、验收条件                                                  |
+| `06-metadata-oxia-position-and-pulsar-reference.md` | `nereus-metadata-oxia` 的横切定位和 Pulsar Oxia 参考边界                    |
+| `07-implementation-contract-checklist.md`           | 实现前必须遵守的支持范围、stop-the-line 条件和测试 gate                             |
+| `08-risk-register-and-design-compromises.md`        | 当前已知高风险假设、Phase 1 设计妥协和实现门禁                                       |
+| `09-legacy-oxia-multi-key-commit-design.md`         | 已归档的旧 Oxia multi-key atomic commit 方案，供未来 Oxia API 改造后回看          |
+| `10-current-progress-review-2026-07-07.md`          | 当前 M0/M1/M2 review 记录，以及 2026-07-08 M2 completion 追加说明            |
+| `11-m3-object-wal-review-2026-07-08.md`             | M3 object WAL review 记录、completion blockers 和重新验收 gate            |
+| `12-architecture-realignment-2026-07-10.md`         | 多 profile 总体架构、Phase 1 strict boundary 与 pre-M4 review closure 记录 |
+| `13-phase-1-final-review-2026-07-11.md`             | M8 后代码/设计深审、修复项、命名空间决策和最终复验记录                                     |
 
 `10`/`11`/`12` 是 dated historical reviews；当前实现状态以本 README、`05` 和 `13` 为准。
 

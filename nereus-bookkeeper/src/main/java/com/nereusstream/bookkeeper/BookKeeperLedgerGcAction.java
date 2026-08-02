@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
-/** One bounded convergence action; the caller schedules later passes instead of blocking a worker thread. */
+/**
+ * One bounded convergence action; the caller schedules later passes instead of blocking a worker thread.
+ */
 public enum BookKeeperLedgerGcAction {
     DISABLED,
     DRY_RUN_ADMITTED,

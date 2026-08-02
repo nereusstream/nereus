@@ -17,7 +17,9 @@ package com.nereusstream.core.recovery;
 import com.nereusstream.api.ObjectId;
 import java.util.concurrent.CompletableFuture;
 
-/** Diagnostic boundary for object ids supplied by an external operational scan. */
+/**
+ * Diagnostic boundary for object ids supplied by an external operational scan.
+ */
 public interface OrphanObjectScanner extends AutoCloseable {
     CompletableFuture<OrphanObjectAssessment> scan(ObjectId objectId);
 

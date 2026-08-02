@@ -25,7 +25,9 @@ import org.apache.bookkeeper.mledger.PositionFactory;
 import org.apache.pulsar.common.api.proto.MessageMetadata;
 import org.apache.pulsar.common.protocol.Commands;
 
-/** An immutable-position Pulsar Entry owning one read-only Netty buffer reference. */
+/**
+ * An immutable-position Pulsar Entry owning one read-only Netty buffer reference.
+ */
 public final class NereusEntry implements Entry {
     private final Position position;
     private final ByteBuf data;

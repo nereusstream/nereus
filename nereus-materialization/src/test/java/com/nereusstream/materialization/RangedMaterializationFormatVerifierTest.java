@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -32,7 +32,6 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.Flow;
 import org.junit.jupiter.api.Test;
@@ -43,53 +42,42 @@ class RangedMaterializationFormatVerifierTest {
     Path temporaryDirectory;
 
     @Test
-    void verifiesNcp2AgainstExactTaskAndRejectsChangedPolicy()
-            throws Exception {
-        try (GenerationPublicationTestSupport.Context context =
-                        GenerationPublicationTestSupport.context();
+    void verifiesNcp2AgainstExactTaskAndRejectsChangedPolicy() throws Exception {
+        try (GenerationPublicationTestSupport.Context context = GenerationPublicationTestSupport.context();
                 StagingFileManager staging = staging();
-                LocalFileObjectStore store =
-                        new LocalFileObjectStore(
-                                temporaryDirectory.resolve("objects"))) {
+                LocalFileObjectStore store = new LocalFileObjectStore(temporaryDirectory.resolve("objects"))) {
             MaterializationTask task = kafkaTask(context.task());
             byte[] payload = new byte[100];
             java.util.Arrays.fill(payload, (byte) 7);
-            RangedCompactedObjectWriteRequest request =
-                    new RangedCompactedObjectWriteRequest(
-                            GenerationPublicationTestSupport.CLUSTER,
-                            task.streamId(),
-                            task.coverage(),
-                            GenerationPublicationTestSupport.CLAIM_ID,
-                            task.sourceSetSha256(),
-                            task.policyDigestSha256(),
-                            PayloadFormat.KAFKA_RECORD_BATCH,
-                            CompactedObjectFormatV2
-                                    .KAFKA_LOGICAL_FORMAT,
-                            2,
-                            1,
-                            payload.length,
-                            payload.length,
-                            task.policy()
-                                    .targetRowGroupRecords(),
-                            task.policy().compression(),
-                            "nereus-kafka-test");
+            RangedCompactedObjectWriteRequest request = new RangedCompactedObjectWriteRequest(
+                    GenerationPublicationTestSupport.CLUSTER,
+                    task.streamId(),
+                    task.coverage(),
+                    GenerationPublicationTestSupport.CLAIM_ID,
+                    task.sourceSetSha256(),
+                    task.policyDigestSha256(),
+                    PayloadFormat.KAFKA_RECORD_BATCH,
+                    CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT,
+                    2,
+                    1,
+                    payload.length,
+                    payload.length,
+                    task.policy().targetRowGroupRecords(),
+                    task.policy().compression(),
+                    "nereus-kafka-test");
 
-            try (RangedCompactedObjectWriteResult written =
-                    new ParquetRangedCompactedObjectWriter(
-                                    staging, Runnable::run)
-                            .write(
-                                    request,
-                                    publisher(new RangedCompactedObjectRow(
-                                            0,
-                                            2,
-                                            0,
-                                            ByteBuffer.wrap(payload),
-                                            Crc32cChecksums.intValue(
-                                                    Crc32cChecksums
-                                                            .checksum(
-                                                                    payload)),
-                                            OptionalLong.empty())))
-                            .join()) {
+            try (RangedCompactedObjectWriteResult written = new ParquetRangedCompactedObjectWriter(
+                            staging, Runnable::run)
+                    .write(
+                            request,
+                            publisher(new RangedCompactedObjectRow(
+                                    0,
+                                    2,
+                                    0,
+                                    ByteBuffer.wrap(payload),
+                                    Crc32cChecksums.intValue(Crc32cChecksums.checksum(payload)),
+                                    OptionalLong.empty())))
+                    .join()) {
                 store.putObject(
                                 written.objectKey(),
                                 written.stagingFile(),
@@ -100,87 +88,57 @@ class RangedMaterializationFormatVerifierTest {
                                         Map.of(),
                                         Duration.ofSeconds(10)))
                         .join();
-                MaterializationOutput output =
-                        output(task, request, written);
-                MaterializationOutputVerifier verifier =
-                        new DefaultMaterializationOutputVerifier(
+                MaterializationOutput output = output(task, request, written);
+                MaterializationOutputVerifier verifier = new DefaultMaterializationOutputVerifier(
+                        store,
+                        new RangedMaterializationFormatVerifier(new RangedCompactedObjectVerifier(
                                 store,
-                                new RangedMaterializationFormatVerifier(
-                                        new RangedCompactedObjectVerifier(
-                                                store,
-                                                new ParquetRangedCompactedObjectReader(
-                                                        store,
-                                                        Runnable::run),
-                                                new ParquetKafkaTopicCompactedReader(
-                                                        store,
-                                                        Runnable::run))));
+                                new ParquetRangedCompactedObjectReader(store, Runnable::run),
+                                new ParquetKafkaTopicCompactedReader(store, Runnable::run))));
 
-                verifier.verify(
-                                task,
-                                output,
-                                Duration.ofSeconds(10))
-                        .join();
+                verifier.verify(task, output, Duration.ofSeconds(10)).join();
 
-                MaterializationPolicy changedPolicy =
-                        MaterializationPolicyFactory
-                                .kafkaLosslessCommitted(
-                                        2,
-                                        16,
-                                        1_000,
-                                        1_000_000,
-                                        128,
-                                        "UNCOMPRESSED");
+                MaterializationPolicy changedPolicy = MaterializationPolicyFactory.kafkaLosslessCommitted(
+                        2, 16, 1_000, 1_000_000, 128, "UNCOMPRESSED");
                 MaterializationTask changedTask =
-                        MaterializationTask.create(
-                                task.streamId(),
-                                task.coverage(),
-                                task.sources(),
-                                changedPolicy);
-                MaterializationOutput relabelled =
-                        new MaterializationOutput(
-                                changedTask.taskId(),
-                                output.streamId(),
-                                output.view(),
-                                output.coverage(),
-                                output.outputAttemptId(),
-                                output.objectId(),
-                                output.objectKey(),
-                                output.objectKeyHash(),
-                                output.objectLength(),
-                                output.storageCrc32c(),
-                                output.contentSha256(),
-                                output.etag(),
-                                output.physicalFormat(),
-                                output.logicalFormat(),
-                                output.readTarget(),
-                                output.targetIdentitySha256(),
-                                output.entryIndexRef(),
-                                output.sourceRecordCount(),
-                                output.outputRecordCount(),
-                                output.entryCount(),
-                                output.logicalBytes(),
-                                output.schemaRefs(),
-                                output.cumulativeSizeAtStart(),
-                                output.cumulativeSizeAtEnd(),
-                                changedTask.sourceSetSha256(),
-                                output.projectionRef());
+                        MaterializationTask.create(task.streamId(), task.coverage(), task.sources(), changedPolicy);
+                MaterializationOutput relabelled = new MaterializationOutput(
+                        changedTask.taskId(),
+                        output.streamId(),
+                        output.view(),
+                        output.coverage(),
+                        output.outputAttemptId(),
+                        output.objectId(),
+                        output.objectKey(),
+                        output.objectKeyHash(),
+                        output.objectLength(),
+                        output.storageCrc32c(),
+                        output.contentSha256(),
+                        output.etag(),
+                        output.physicalFormat(),
+                        output.logicalFormat(),
+                        output.readTarget(),
+                        output.targetIdentitySha256(),
+                        output.entryIndexRef(),
+                        output.sourceRecordCount(),
+                        output.outputRecordCount(),
+                        output.entryCount(),
+                        output.logicalBytes(),
+                        output.schemaRefs(),
+                        output.cumulativeSizeAtStart(),
+                        output.cumulativeSizeAtEnd(),
+                        changedTask.sourceSetSha256(),
+                        output.projectionRef());
 
-                assertThatThrownBy(() -> verifier.verify(
-                                        changedTask,
-                                        relabelled,
-                                        Duration.ofSeconds(10))
+                assertThatThrownBy(() -> verifier.verify(changedTask, relabelled, Duration.ofSeconds(10))
                                 .join())
                         .satisfies(failure ->
-                                assertThat(findNereus(failure).code())
-                                        .isEqualTo(
-                                                ErrorCode
-                                                        .OBJECT_CHECKSUM_MISMATCH));
+                                assertThat(findNereus(failure).code()).isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH));
             }
         }
     }
 
-    private static MaterializationTask kafkaTask(
-            MaterializationTask template) {
+    private static MaterializationTask kafkaTask(MaterializationTask template) {
         SourceGeneration source = template.sources().get(0);
         SourceGeneration kafkaSource = new SourceGeneration(
                 source.view(),
@@ -205,13 +163,7 @@ class RangedMaterializationFormatVerifierTest {
                 template.streamId(),
                 template.coverage(),
                 List.of(kafkaSource),
-                MaterializationPolicyFactory.kafkaLosslessCommitted(
-                        2,
-                        16,
-                        1_000,
-                        1_000_000,
-                        128,
-                        "ZSTD"));
+                MaterializationPolicyFactory.kafkaLosslessCommitted(2, 16, 1_000, 1_000_000, 128, "ZSTD"));
     }
 
     private static MaterializationOutput output(
@@ -232,9 +184,7 @@ class RangedMaterializationFormatVerifierTest {
                 written.entryIndexRef());
         Checksum targetIdentity = new Checksum(
                 ChecksumType.SHA256,
-                ReadTargetCodecRegistry.phase15()
-                        .encode(target)
-                        .identityChecksumValue());
+                ReadTargetCodecRegistry.phase15().encode(target).identityChecksumValue());
         return new MaterializationOutput(
                 task.taskId(),
                 task.streamId(),
@@ -265,48 +215,36 @@ class RangedMaterializationFormatVerifierTest {
     }
 
     private StagingFileManager staging() throws Exception {
-        Path directory =
-                Files.createDirectory(
-                        temporaryDirectory.resolve("staging"));
-        Files.setPosixFilePermissions(
-                directory,
-                PosixFilePermissions.fromString("rwx------"));
+        Path directory = Files.createDirectory(temporaryDirectory.resolve("staging"));
+        Files.setPosixFilePermissions(directory, PosixFilePermissions.fromString("rwx------"));
         return new StagingFileManager(
-                directory,
-                32L << 20,
-                StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
-                Duration.ofHours(1),
-                Runnable::run);
+                directory, 32L << 20, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES, Duration.ofHours(1), Runnable::run);
     }
 
-    private static Flow.Publisher<RangedCompactedObjectRow>
-            publisher(RangedCompactedObjectRow row) {
-        return subscriber -> subscriber.onSubscribe(
-                new Flow.Subscription() {
-                    private boolean complete;
+    private static Flow.Publisher<RangedCompactedObjectRow> publisher(RangedCompactedObjectRow row) {
+        return subscriber -> subscriber.onSubscribe(new Flow.Subscription() {
+            private boolean complete;
 
-                    @Override
-                    public void request(long count) {
-                        if (complete) {
-                            return;
-                        }
-                        complete = true;
-                        subscriber.onNext(row);
-                        subscriber.onComplete();
-                    }
+            @Override
+            public void request(long count) {
+                if (complete) {
+                    return;
+                }
+                complete = true;
+                subscriber.onNext(row);
+                subscriber.onComplete();
+            }
 
-                    @Override
-                    public void cancel() {
-                        complete = true;
-                    }
-                });
+            @Override
+            public void cancel() {
+                complete = true;
+            }
+        });
     }
 
-    private static NereusException findNereus(
-            Throwable supplied) {
+    private static NereusException findNereus(Throwable supplied) {
         Throwable current = supplied;
-        while (current != null
-                && !(current instanceof NereusException)) {
+        while (current != null && !(current instanceof NereusException)) {
             current = current.getCause();
         }
         assertThat(current).isInstanceOf(NereusException.class);

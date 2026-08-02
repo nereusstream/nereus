@@ -24,100 +24,100 @@ import com.nereusstream.objectstore.compacted.KafkaTopicCompactedFormatSpecV2;
 import com.nereusstream.objectstore.compacted.KafkaTopicCompactedObjectWriteRequest;
 import java.util.Objects;
 
-/** Exact NTC2 writer request derived from a verified two-pass result and frozen task facts. */
+/**
+ * Exact NTC2 writer request derived from a verified two-pass result and frozen task facts.
+ */
 public final class KafkaCompactionWriteRequestFactory {
 
-  public KafkaTopicCompactedObjectWriteRequest create(
-      Input input, KafkaCompactionTwoPassExecutor.Result result) {
-    Objects.requireNonNull(input, "input");
-    Objects.requireNonNull(result, "result");
-    return create(
-        input,
-        result.outputCoverage(),
-        result.outputSourceSetSha256(),
-        result.outputRecordCount(),
-        result.outputBatchCount(),
-        result.logicalBytes(),
-        result.outputSourceBatchCount());
-  }
-
-  public KafkaTopicCompactedObjectWriteRequest create(
-      Input input, KafkaCompactionStreamingExecutor.StreamingResult result) {
-    Objects.requireNonNull(input, "input");
-    Objects.requireNonNull(result, "result");
-    return create(
-        input,
-        result.outputCoverage(),
-        result.outputSourceSetSha256(),
-        result.outputRecordCount(),
-        result.outputBatchCount(),
-        result.logicalBytes(),
-        result.outputSourceBatchCount());
-  }
-
-  private KafkaTopicCompactedObjectWriteRequest create(
-      Input input,
-      OffsetRange outputCoverage,
-      Checksum outputSourceSetSha256,
-      long outputRecordCount,
-      int outputBatchCount,
-      long logicalBytes,
-      long outputSourceBatchCount) {
-    if (!input.outputCoverage().equals(outputCoverage)) {
-      throw new IllegalArgumentException(
-          "Kafka NTC2 write coverage does not match the verified two-pass result");
+    public KafkaTopicCompactedObjectWriteRequest create(Input input, KafkaCompactionTwoPassExecutor.Result result) {
+        Objects.requireNonNull(input, "input");
+        Objects.requireNonNull(result, "result");
+        return create(
+                input,
+                result.outputCoverage(),
+                result.outputSourceSetSha256(),
+                result.outputRecordCount(),
+                result.outputBatchCount(),
+                result.logicalBytes(),
+                result.outputSourceBatchCount());
     }
-    return new KafkaTopicCompactedObjectWriteRequest(
-        input.cluster(),
-        input.streamId(),
-        input.outputCoverage(),
-        input.outputAttemptId(),
-        outputSourceSetSha256,
-        input.policySha256(),
-        outputRecordCount,
-        outputBatchCount,
-        logicalBytes,
-        input.cumulativeSizeAtEnd(),
-        input.targetRowGroupRecords(),
-        input.compression(),
-        input.writerBuild(),
-        new KafkaTopicCompactedFormatSpecV2(
-            KafkaCompactionStrategyV1.STRATEGY_ID,
-            KafkaCompactionStrategyV1.STRATEGY_VERSION,
-            KafkaCompactionKeyEncodingV2.ID,
-            CompactedObjectFormatV2.KAFKA_REWRITE_CODEC,
-            KafkaTopicCompactionCodecV1.MESSAGE_FORMAT_SHA256,
-            outputSourceBatchCount,
-            outputBatchCount));
-  }
 
-  public record Input(
-      String cluster,
-      StreamId streamId,
-      OffsetRange outputCoverage,
-      String outputAttemptId,
-      Checksum policySha256,
-      long cumulativeSizeAtEnd,
-      int targetRowGroupRecords,
-      String compression,
-      String writerBuild) {
-    public Input {
-      Objects.requireNonNull(cluster, "cluster");
-      Objects.requireNonNull(streamId, "streamId");
-      Objects.requireNonNull(outputCoverage, "outputCoverage");
-      Objects.requireNonNull(outputAttemptId, "outputAttemptId");
-      Objects.requireNonNull(policySha256, "policySha256");
-      Objects.requireNonNull(compression, "compression");
-      Objects.requireNonNull(writerBuild, "writerBuild");
-      if (cluster.isBlank()
-          || outputCoverage.isEmpty()
-          || policySha256.type() != ChecksumType.SHA256
-          || cumulativeSizeAtEnd < 0
-          || targetRowGroupRecords <= 0
-          || compression.isBlank()
-          || writerBuild.isBlank()) {
-        throw new IllegalArgumentException("invalid Kafka NTC2 write-request input");
-      }
+    public KafkaTopicCompactedObjectWriteRequest create(
+            Input input, KafkaCompactionStreamingExecutor.StreamingResult result) {
+        Objects.requireNonNull(input, "input");
+        Objects.requireNonNull(result, "result");
+        return create(
+                input,
+                result.outputCoverage(),
+                result.outputSourceSetSha256(),
+                result.outputRecordCount(),
+                result.outputBatchCount(),
+                result.logicalBytes(),
+                result.outputSourceBatchCount());
     }
-  }
+
+    private KafkaTopicCompactedObjectWriteRequest create(
+            Input input,
+            OffsetRange outputCoverage,
+            Checksum outputSourceSetSha256,
+            long outputRecordCount,
+            int outputBatchCount,
+            long logicalBytes,
+            long outputSourceBatchCount) {
+        if (!input.outputCoverage().equals(outputCoverage)) {
+            throw new IllegalArgumentException("Kafka NTC2 write coverage does not match the verified two-pass result");
+        }
+        return new KafkaTopicCompactedObjectWriteRequest(
+                input.cluster(),
+                input.streamId(),
+                input.outputCoverage(),
+                input.outputAttemptId(),
+                outputSourceSetSha256,
+                input.policySha256(),
+                outputRecordCount,
+                outputBatchCount,
+                logicalBytes,
+                input.cumulativeSizeAtEnd(),
+                input.targetRowGroupRecords(),
+                input.compression(),
+                input.writerBuild(),
+                new KafkaTopicCompactedFormatSpecV2(
+                        KafkaCompactionStrategyV1.STRATEGY_ID,
+                        KafkaCompactionStrategyV1.STRATEGY_VERSION,
+                        KafkaCompactionKeyEncodingV2.ID,
+                        CompactedObjectFormatV2.KAFKA_REWRITE_CODEC,
+                        KafkaTopicCompactionCodecV1.MESSAGE_FORMAT_SHA256,
+                        outputSourceBatchCount,
+                        outputBatchCount));
+    }
+
+    public record Input(
+            String cluster,
+            StreamId streamId,
+            OffsetRange outputCoverage,
+            String outputAttemptId,
+            Checksum policySha256,
+            long cumulativeSizeAtEnd,
+            int targetRowGroupRecords,
+            String compression,
+            String writerBuild) {
+        public Input {
+            Objects.requireNonNull(cluster, "cluster");
+            Objects.requireNonNull(streamId, "streamId");
+            Objects.requireNonNull(outputCoverage, "outputCoverage");
+            Objects.requireNonNull(outputAttemptId, "outputAttemptId");
+            Objects.requireNonNull(policySha256, "policySha256");
+            Objects.requireNonNull(compression, "compression");
+            Objects.requireNonNull(writerBuild, "writerBuild");
+            if (cluster.isBlank()
+                    || outputCoverage.isEmpty()
+                    || policySha256.type() != ChecksumType.SHA256
+                    || cumulativeSizeAtEnd < 0
+                    || targetRowGroupRecords <= 0
+                    || compression.isBlank()
+                    || writerBuild.isBlank()) {
+                throw new IllegalArgumentException("invalid Kafka NTC2 write-request input");
+            }
+        }
+    }
 }

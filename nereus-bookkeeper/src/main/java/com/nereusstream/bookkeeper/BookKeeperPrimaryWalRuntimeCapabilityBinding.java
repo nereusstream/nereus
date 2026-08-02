@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -21,12 +22,9 @@ public record BookKeeperPrimaryWalRuntimeCapabilityBinding(
         if (protocolVersion != 1 || requiredObjectGenerationCompletionVersion != 1) {
             throw new IllegalArgumentException("unsupported BookKeeper primary-WAL capability version");
         }
-        configurationBindingSha256 = sha256(
-                configurationBindingSha256, "configurationBindingSha256");
-        ledgerIdNamespaceSha256 = sha256(
-                ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256");
-        publicationActivationSha256 = sha256(
-                publicationActivationSha256, "publicationActivationSha256");
+        configurationBindingSha256 = sha256(configurationBindingSha256, "configurationBindingSha256");
+        ledgerIdNamespaceSha256 = sha256(ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256");
+        publicationActivationSha256 = sha256(publicationActivationSha256, "publicationActivationSha256");
     }
 
     private static Checksum sha256(Checksum value, String name) {

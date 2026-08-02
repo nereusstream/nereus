@@ -28,14 +28,10 @@ public interface WalObjectWriter {
      * every provider transmission; the default preserves compatibility for single-attempt test writers.
      */
     default CompletableFuture<WalWriteResult> upload(
-            PreparedWalObject preparedObject,
-            PutObjectAttemptGuard attemptGuard) {
-        PreparedWalObject prepared = Objects.requireNonNull(
-                preparedObject, "preparedObject");
-        PutObjectAttemptGuard guard = Objects.requireNonNull(
-                attemptGuard, "attemptGuard");
-        return guard.authorize(prepared.result().objectKey(), 1)
-                .thenCompose(ignored -> upload(prepared));
+            PreparedWalObject preparedObject, PutObjectAttemptGuard attemptGuard) {
+        PreparedWalObject prepared = Objects.requireNonNull(preparedObject, "preparedObject");
+        PutObjectAttemptGuard guard = Objects.requireNonNull(attemptGuard, "attemptGuard");
+        return guard.authorize(prepared.result().objectKey(), 1).thenCompose(ignored -> upload(prepared));
     }
 
     default CompletableFuture<WalWriteResult> write(WalWriteRequest request) {

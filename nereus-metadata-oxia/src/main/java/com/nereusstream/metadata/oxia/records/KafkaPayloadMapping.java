@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 public enum KafkaPayloadMapping {
@@ -15,7 +16,9 @@ public enum KafkaPayloadMapping {
     }
 
     public static KafkaPayloadMapping fromWireId(int id) {
-        if (id == 1) return KAFKA_RECORD_BATCH_V1;
+        if (id == 1) {
+            return KAFKA_RECORD_BATCH_V1;
+        }
         throw new IllegalArgumentException("unknown Kafka payload mapping wire ID: " + id);
     }
 }

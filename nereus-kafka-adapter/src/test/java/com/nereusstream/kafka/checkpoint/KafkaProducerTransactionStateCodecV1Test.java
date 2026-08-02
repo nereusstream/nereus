@@ -16,12 +16,10 @@ package com.nereusstream.kafka.checkpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.kafka.checkpoint.KafkaProducerTransactionState.AbortedTransaction;
 import com.nereusstream.kafka.checkpoint.KafkaProducerTransactionState.BatchMetadata;
 import com.nereusstream.kafka.checkpoint.KafkaProducerTransactionState.OpenTransaction;
 import com.nereusstream.kafka.checkpoint.KafkaProducerTransactionState.ProducerState;
-import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointFormatV1;
 import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointSection;
 import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointSectionType;
 import java.nio.ByteBuffer;
@@ -35,29 +33,15 @@ import org.junit.jupiter.api.Test;
 
 class KafkaProducerTransactionStateCodecV1Test {
     private static final long CHECKPOINT_OFFSET = 30;
-    private final KafkaProducerTransactionStateCodecV1 codec =
-            new KafkaProducerTransactionStateCodecV1();
+    private final KafkaProducerTransactionStateCodecV1 codec = new KafkaProducerTransactionStateCodecV1();
 
     @Test
     void roundTripsCanonicalSectionsWithFrozenBytesAndDefensiveCollections() throws Exception {
-        ArrayList<BatchMetadata> sourceBatches = new ArrayList<>(List.of(
-                new BatchMetadata(Integer.MAX_VALUE, 12, 1, 1_000),
-                new BatchMetadata(1, 22, 1, 2_000)));
+        ArrayList<BatchMetadata> sourceBatches = new ArrayList<>(
+                List.of(new BatchMetadata(Integer.MAX_VALUE, 12, 1, 1_000), new BatchMetadata(1, 22, 1, 2_000)));
         ArrayList<ProducerState> sourceProducers = new ArrayList<>(List.of(
-                new ProducerState(
-                        7,
-                        (short) 3,
-                        5,
-                        2_000,
-                        OptionalLong.of(10),
-                        sourceBatches),
-                new ProducerState(
-                        9,
-                        (short) -1,
-                        -1,
-                        -1,
-                        OptionalLong.empty(),
-                        List.of())));
+                new ProducerState(7, (short) 3, 5, 2_000, OptionalLong.of(10), sourceBatches),
+                new ProducerState(9, (short) -1, -1, -1, OptionalLong.empty(), List.of())));
         KafkaProducerTransactionState state = new KafkaProducerTransactionState(
                 CHECKPOINT_OFFSET,
                 sourceProducers,
@@ -66,66 +50,50 @@ class KafkaProducerTransactionStateCodecV1Test {
                         new AbortedTransaction((short) 0, 11, 2, 4, 5),
                         new AbortedTransaction((short) 0, 12, 6, 8, 10)));
 
-        List<KafkaCheckpointSection> sections =
-                codec.encodeSections(state, CHECKPOINT_OFFSET);
-        KafkaProducerTransactionState decoded =
-                codec.decodeSections(sections, CHECKPOINT_OFFSET);
+        List<KafkaCheckpointSection> sections = codec.encodeSections(state, CHECKPOINT_OFFSET);
+        KafkaProducerTransactionState decoded = codec.decodeSections(sections, CHECKPOINT_OFFSET);
         sourceBatches.clear();
         sourceProducers.clear();
 
         assertThat(decoded).isEqualTo(state);
         assertThat(state.producers()).hasSize(2);
         assertThat(state.producers().get(0).batches()).hasSize(2);
-        assertThat(sections).extracting(KafkaCheckpointSection::sectionType)
+        assertThat(sections)
+                .extracting(KafkaCheckpointSection::sectionType)
                 .containsExactly(
                         KafkaCheckpointSectionType.PRODUCER_STATE.wireId(),
                         KafkaCheckpointSectionType.ABORTED_TRANSACTION_INDEX.wireId(),
                         KafkaCheckpointSectionType.OPEN_TRANSACTION_SUMMARY.wireId());
-        assertThat(sha256(sections))
-                .isEqualTo("8c767c45f573ac9c8c15b972905a8a6e904dcecb15e7509447d85c84ecf11d73");
+        assertThat(sha256(sections)).isEqualTo("8c767c45f573ac9c8c15b972905a8a6e904dcecb15e7509447d85c84ecf11d73");
     }
 
     @Test
     void acceptsEmptyGenesisStateAndRequiresExactCheckpointOffset() {
-        KafkaProducerTransactionState empty =
-                new KafkaProducerTransactionState(0, List.of(), List.of(), List.of());
+        KafkaProducerTransactionState empty = new KafkaProducerTransactionState(0, List.of(), List.of(), List.of());
 
         List<KafkaCheckpointSection> sections = codec.encodeSections(empty, 0);
 
         assertThat(codec.decodeSections(sections, 0)).isEqualTo(empty);
         assertThatThrownBy(() -> codec.decodeSections(sections, 1))
                 .hasMessageContaining("malformed")
-                .hasRootCauseMessage(
-                        "Kafka producer map end offset must equal the NKC1 checkpoint offset");
+                .hasRootCauseMessage("Kafka producer map end offset must equal the NKC1 checkpoint offset");
     }
 
     @Test
     void preservesMarkerTimestampBeyondTheRetainedDataBatchWindow() {
         ProducerState markerUpdated = new ProducerState(
-                7,
-                (short) 3,
-                5,
-                3_000,
-                OptionalLong.empty(),
-                List.of(new BatchMetadata(1, 12, 1, 2_000)));
+                7, (short) 3, 5, 3_000, OptionalLong.empty(), List.of(new BatchMetadata(1, 12, 1, 2_000)));
         KafkaProducerTransactionState state =
-                new KafkaProducerTransactionState(
-                        13,
-                        List.of(markerUpdated),
-                        List.of(),
-                        List.of());
+                new KafkaProducerTransactionState(13, List.of(markerUpdated), List.of(), List.of());
 
-        assertThat(codec.decodeSections(
-                codec.encodeSections(state, 13), 13))
-                .isEqualTo(state);
+        assertThat(codec.decodeSections(codec.encodeSections(state, 13), 13)).isEqualTo(state);
     }
 
     @Test
     void rejectsUnsortedOrInconsistentProducerAndTransactionFacts() {
         ProducerState first = producer(2, 0, 0, OptionalLong.empty());
         ProducerState second = producer(1, 1, 1, OptionalLong.empty());
-        assertThatThrownBy(() -> new KafkaProducerTransactionState(
-                10, List.of(first, second), List.of(), List.of()))
+        assertThatThrownBy(() -> new KafkaProducerTransactionState(10, List.of(first, second), List.of(), List.of()))
                 .hasMessageContaining("producer IDs");
 
         ProducerState gapped = new ProducerState(
@@ -134,26 +102,20 @@ class KafkaProducerTransactionStateCodecV1Test {
                 -1,
                 2,
                 OptionalLong.empty(),
-                List.of(
-                        new BatchMetadata(2, 2, 0, 1),
-                        new BatchMetadata(4, 4, 0, 2)));
-        assertThatThrownBy(() -> new KafkaProducerTransactionState(
-                10, List.of(gapped), List.of(), List.of()))
+                List.of(new BatchMetadata(2, 2, 0, 1), new BatchMetadata(4, 4, 0, 2)));
+        assertThatThrownBy(() -> new KafkaProducerTransactionState(10, List.of(gapped), List.of(), List.of()))
                 .hasMessageContaining("sequences");
 
         ProducerState transactional = producer(1, 1, 1, OptionalLong.of(1));
         assertThatThrownBy(() -> new KafkaProducerTransactionState(
-                10,
-                List.of(transactional),
-                List.of(new OpenTransaction(1, 2, OptionalLong.empty())),
-                List.of()))
+                        10,
+                        List.of(transactional),
+                        List.of(new OpenTransaction(1, 2, OptionalLong.empty())),
+                        List.of()))
                 .hasMessageContaining("does not match");
 
         assertThatThrownBy(() -> new KafkaProducerTransactionState(
-                10,
-                List.of(transactional),
-                List.of(new OpenTransaction(1, 1, OptionalLong.of(5))),
-                List.of()))
+                        10, List.of(transactional), List.of(new OpenTransaction(1, 1, OptionalLong.of(5))), List.of()))
                 .hasMessageContaining("normal NKC1");
     }
 
@@ -162,11 +124,9 @@ class KafkaProducerTransactionStateCodecV1Test {
         AbortedTransaction later = new AbortedTransaction((short) 0, 1, 3, 7, 8);
         AbortedTransaction earlier = new AbortedTransaction((short) 0, 2, 1, 4, 2);
 
-        assertThatThrownBy(() -> new KafkaProducerTransactionState(
-                10, List.of(), List.of(), List.of(later, earlier)))
+        assertThatThrownBy(() -> new KafkaProducerTransactionState(10, List.of(), List.of(), List.of(later, earlier)))
                 .hasMessageContaining("strictly increasing");
-        assertThatThrownBy(() -> new KafkaProducerTransactionState(
-                7, List.of(), List.of(), List.of(later)))
+        assertThatThrownBy(() -> new KafkaProducerTransactionState(7, List.of(), List.of(), List.of(later)))
                 .hasMessageContaining("extends beyond");
 
         KafkaProducerTransactionState overlapping = new KafkaProducerTransactionState(
@@ -180,47 +140,54 @@ class KafkaProducerTransactionStateCodecV1Test {
                 .isEqualTo(overlapping);
 
         assertThatThrownBy(() -> new KafkaProducerTransactionState(
-                20,
-                List.of(),
-                List.of(),
-                List.of(
-                        new AbortedTransaction((short) 0, 2, 1, 10, 2),
-                        new AbortedTransaction((short) 0, 3, 5, 10, 13))))
+                        20,
+                        List.of(),
+                        List.of(),
+                        List.of(
+                                new AbortedTransaction((short) 0, 2, 1, 10, 2),
+                                new AbortedTransaction((short) 0, 3, 5, 10, 13))))
                 .hasMessageContaining("strictly increasing");
     }
 
     @Test
     void failsClosedForOuterHeaderPayloadVersionCountsFlagsAndTrailingBytes() {
         KafkaProducerTransactionState state = new KafkaProducerTransactionState(
-                10,
-                List.of(producer(1, 1, 1, OptionalLong.empty())),
-                List.of(),
-                List.of());
+                10, List.of(producer(1, 1, 1, OptionalLong.empty())), List.of(), List.of());
         List<KafkaCheckpointSection> sections = codec.encodeSections(state, 10);
         KafkaCheckpointSection producer = sections.get(0);
 
         byte[] badPayloadVersion = producer.payload();
         badPayloadVersion[1] = 2;
         assertThatThrownBy(() -> codec.decodeSections(
-                replace(sections, 0, KafkaCheckpointSection.required(
-                        KafkaCheckpointSectionType.PRODUCER_STATE, badPayloadVersion)),
-                10)).hasMessageContaining("payload version");
+                        replace(
+                                sections,
+                                0,
+                                KafkaCheckpointSection.required(
+                                        KafkaCheckpointSectionType.PRODUCER_STATE, badPayloadVersion)),
+                        10))
+                .hasMessageContaining("payload version");
 
         byte[] oversizedCount = producer.payload();
         ByteBuffer.wrap(oversizedCount).putInt(Short.BYTES + Long.BYTES, -1);
         assertThatThrownBy(() -> codec.decodeSections(
-                replace(sections, 0, KafkaCheckpointSection.required(
-                        KafkaCheckpointSectionType.PRODUCER_STATE, oversizedCount)),
-                10)).hasMessageContaining("producerCount");
+                        replace(
+                                sections,
+                                0,
+                                KafkaCheckpointSection.required(
+                                        KafkaCheckpointSectionType.PRODUCER_STATE, oversizedCount)),
+                        10))
+                .hasMessageContaining("producerCount");
 
         byte[] trailing = Arrays.copyOf(producer.payload(), producer.payload().length + 1);
         assertThatThrownBy(() -> codec.decodeSections(
-                replace(sections, 0, KafkaCheckpointSection.required(
-                        KafkaCheckpointSectionType.PRODUCER_STATE, trailing)),
-                10)).hasMessageContaining("trailing");
+                        replace(
+                                sections,
+                                0,
+                                KafkaCheckpointSection.required(KafkaCheckpointSectionType.PRODUCER_STATE, trailing)),
+                        10))
+                .hasMessageContaining("trailing");
 
-        KafkaCheckpointSection optional = new KafkaCheckpointSection(
-                producer.sectionType(), 1, 0, producer.payload());
+        KafkaCheckpointSection optional = new KafkaCheckpointSection(producer.sectionType(), 1, 0, producer.payload());
         assertThatThrownBy(() -> codec.decodeSections(replace(sections, 0, optional), 10))
                 .hasMessageContaining("section header");
 
@@ -230,10 +197,7 @@ class KafkaProducerTransactionStateCodecV1Test {
     }
 
     private static ProducerState producer(
-            long producerId,
-            int lastSequence,
-            long lastOffset,
-            OptionalLong transaction) {
+            long producerId, int lastSequence, long lastOffset, OptionalLong transaction) {
         long timestamp = 100 + lastOffset;
         return new ProducerState(
                 producerId,
@@ -245,9 +209,7 @@ class KafkaProducerTransactionStateCodecV1Test {
     }
 
     private static List<KafkaCheckpointSection> replace(
-            List<KafkaCheckpointSection> sections,
-            int index,
-            KafkaCheckpointSection replacement) {
+            List<KafkaCheckpointSection> sections, int index, KafkaCheckpointSection replacement) {
         ArrayList<KafkaCheckpointSection> copy = new ArrayList<>(sections);
         copy.set(index, replacement);
         return copy;

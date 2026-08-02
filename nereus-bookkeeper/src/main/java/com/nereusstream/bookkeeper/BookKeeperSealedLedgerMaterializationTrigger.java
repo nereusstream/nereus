@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.ErrorCode;
@@ -13,7 +14,9 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** Revalidates one exact SEALED ledger and hints the single F4 planner/service; it never creates tasks itself. */
+/**
+ * Revalidates one exact SEALED ledger and hints the single F4 planner/service; it never creates tasks itself.
+ */
 public final class BookKeeperSealedLedgerMaterializationTrigger {
     private final String cluster;
     private final BookKeeperWalConfiguration configuration;
@@ -32,14 +35,13 @@ public final class BookKeeperSealedLedgerMaterializationTrigger {
     }
 
     public CompletableFuture<Void> trigger(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> sealedRoot,
-            Duration timeout) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> sealedRoot, Duration timeout) {
         try {
             BookKeeperVersionedValue<BookKeeperLedgerRootRecord> expected =
                     Objects.requireNonNull(sealedRoot, "sealedRoot");
             requireSealed(expected);
-            BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(min(
-                    Objects.requireNonNull(timeout, "timeout"), configuration.operationTimeout()));
+            BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(
+                    min(Objects.requireNonNull(timeout, "timeout"), configuration.operationTimeout()));
             return reload(expected, deadline)
                     .thenCompose(ignored -> deadline.bound(materialization.trigger(
                             new StreamId(expected.value().streamId()))))
@@ -51,8 +53,7 @@ public final class BookKeeperSealedLedgerMaterializationTrigger {
     }
 
     private CompletableFuture<Void> reload(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> expected,
-            BookKeeperOperationDeadline deadline) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> expected, BookKeeperOperationDeadline deadline) {
         return deadline.bound(metadata.getRoot(
                         cluster,
                         configuration.providerScopeSha256(),

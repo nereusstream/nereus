@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -22,7 +23,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Fair, process-local global/per-stream worker admission with duplicate coalescing and bounded close. */
+/**
+ * Fair, process-local global/per-stream worker admission with duplicate coalescing and bounded close.
+ */
 public final class DefaultMaterializationTaskDispatcher implements MaterializationTaskDispatcher {
     private final MaterializationWorker worker;
     private final GenerationCommitter committer;
@@ -52,24 +55,23 @@ public final class DefaultMaterializationTaskDispatcher implements Materializati
                 || maxConcurrentWorkersPerStream <= 0
                 || maxConcurrentWorkersPerStream > maxConcurrentWorkers) {
             throw new IllegalArgumentException(
-                    "worker concurrency must be positive and per-stream concurrency must not exceed global concurrency");
+                    "worker concurrency must be positive and per-stream concurrency must not exceed global "
+                            + "concurrency");
         }
         this.maxConcurrentWorkers = maxConcurrentWorkers;
         this.maxConcurrentWorkersPerStream = maxConcurrentWorkersPerStream;
     }
 
-    /** Compatibility constructor with one globally active worker. */
+    /**
+     * Compatibility constructor with one globally active worker.
+     */
     public DefaultMaterializationTaskDispatcher(
-            MaterializationWorker worker,
-            GenerationCommitter committer,
-            Executor workerExecutor) {
+            MaterializationWorker worker, GenerationCommitter committer, Executor workerExecutor) {
         this(worker, committer, workerExecutor, 1, 1);
     }
 
     @Override
-    public CompletableFuture<Void> dispatch(
-            VersionedMaterializationTask durable,
-            MaterializationTask task) {
+    public CompletableFuture<Void> dispatch(VersionedMaterializationTask durable, MaterializationTask task) {
         try {
             Objects.requireNonNull(durable, "durable");
             Objects.requireNonNull(task, "task");
@@ -83,8 +85,7 @@ public final class DefaultMaterializationTaskDispatcher implements Materializati
             List<WorkItem> starters;
             synchronized (monitor) {
                 if (closed) {
-                    return CompletableFuture.failedFuture(closedFailure(
-                            "materialization dispatcher is closed"));
+                    return CompletableFuture.failedFuture(closedFailure("materialization dispatcher is closed"));
                 }
                 TaskKey key = new TaskKey(task.streamId(), task.taskId());
                 item = admitted.get(key);
@@ -103,9 +104,7 @@ public final class DefaultMaterializationTaskDispatcher implements Materializati
     }
 
     @Override
-    public CompletableFuture<Void> closeAsync(
-            Duration timeout,
-            ScheduledExecutorService scheduler) {
+    public CompletableFuture<Void> closeAsync(Duration timeout, ScheduledExecutorService scheduler) {
         Objects.requireNonNull(timeout, "timeout");
         Objects.requireNonNull(scheduler, "scheduler");
         if (timeout.isZero() || timeout.isNegative()) {
@@ -137,17 +136,13 @@ public final class DefaultMaterializationTaskDispatcher implements Materializati
             }
             scheduleDeadline = !closeFuture.isDone();
         }
-        NereusException rejection = closedFailure(
-                "materialization task was queued when the dispatcher closed");
+        NereusException rejection = closedFailure("materialization task was queued when the dispatcher closed");
         for (WorkItem item : abandoned) {
             item.completion.completeExceptionally(rejection);
         }
         if (scheduleDeadline) {
             try {
-                ScheduledFuture<?> scheduled = scheduler.schedule(
-                        this::forceClose,
-                        timeoutNanos,
-                        TimeUnit.NANOSECONDS);
+                ScheduledFuture<?> scheduled = scheduler.schedule(this::forceClose, timeoutNanos, TimeUnit.NANOSECONDS);
                 synchronized (monitor) {
                     closeTimeout = scheduled;
                     if (closeFuture.isDone()) {
@@ -208,9 +203,11 @@ public final class DefaultMaterializationTaskDispatcher implements Materializati
             try {
                 workerExecutor.execute(() -> start(item));
             } catch (Throwable failure) {
-                finish(item, failure instanceof RejectedExecutionException
-                        ? closedFailure("worker executor rejected admitted materialization work", failure)
-                        : failure);
+                finish(
+                        item,
+                        failure instanceof RejectedExecutionException
+                                ? closedFailure("worker executor rejected admitted materialization work", failure)
+                                : failure);
             }
         }
     }
@@ -221,12 +218,11 @@ public final class DefaultMaterializationTaskDispatcher implements Materializati
         }
         CompletableFuture<Void> operation;
         try {
-            CompletableFuture<MaterializationOutput> execution = Objects.requireNonNull(
-                    worker.execute(item.task), "materialization worker future");
+            CompletableFuture<MaterializationOutput> execution =
+                    Objects.requireNonNull(worker.execute(item.task), "materialization worker future");
             operation = execution
-                    .thenCompose(output -> Objects.requireNonNull(
-                            committer.publish(item.task, output),
-                            "generation commit future"))
+                    .thenCompose(output ->
+                            Objects.requireNonNull(committer.publish(item.task, output), "generation commit future"))
                     .thenApply(ignored -> null);
         } catch (Throwable failure) {
             finish(item, failure);
@@ -303,8 +299,7 @@ public final class DefaultMaterializationTaskDispatcher implements Materializati
             if (operation != null) {
                 operation.cancel(true);
             }
-            finish(item, new CancellationException(
-                    "materialization task cancelled at dispatcher close deadline"));
+            finish(item, new CancellationException("materialization task cancelled at dispatcher close deadline"));
         }
         synchronized (monitor) {
             if (closeFuture != null && !closeFuture.isDone()) {

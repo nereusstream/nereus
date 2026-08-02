@@ -15,7 +15,6 @@
 package com.nereusstream.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
@@ -27,8 +26,8 @@ import com.nereusstream.api.FirstEntryPolicy;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
-import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadBoundaryMode;
+import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ReadResult;
@@ -44,10 +43,9 @@ import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.read.ReadMetricsObserver;
-import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.OffsetIndexEntry;
+import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
-import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import com.nereusstream.objectstore.wal.DefaultWalObjectReader;
@@ -90,14 +88,19 @@ class DefaultStreamStorageReadTest {
         RecordingReadMetrics metrics = new RecordingReadMetrics();
         try (TestContext context = context(defaultConfig(false), metrics)) {
             StreamId streamId = context.createStream("read-adjacent").streamId();
-            AppendResult first = context.storage.append(
-                    streamId, batch(List.of(SCHEMA), "a", "bb"), appendOptions()).join();
-            context.storage.append(streamId, batch(List.of(), "ccc"), appendOptions()).join();
+            AppendResult first = context.storage
+                    .append(streamId, batch(List.of(SCHEMA), "a", "bb"), appendOptions())
+                    .join();
+            context.storage
+                    .append(streamId, batch(List.of(), "ccc"), appendOptions())
+                    .join();
 
-            ResolveResult resolved = context.storage.resolve(
-                    streamId, 1, new ResolveOptions(10, true, true)).join();
-            ReadResult read = context.storage.read(
-                    streamId, 1, readOptions(10, 32, Duration.ofSeconds(5))).join();
+            ResolveResult resolved = context.storage
+                    .resolve(streamId, 1, new ResolveOptions(10, true, true))
+                    .join();
+            ReadResult read = context.storage
+                    .read(streamId, 1, readOptions(10, 32, Duration.ofSeconds(5)))
+                    .join();
 
             assertThat(resolved.ranges()).hasSize(2);
             assertThat(resolved.resolvedEndOffset()).isEqualTo(3);
@@ -105,16 +108,19 @@ class DefaultStreamStorageReadTest {
                     .isEqualTo(((ObjectSliceReadTarget) first.readTarget()).sliceChecksum());
             assertThat(resolved.ranges().getFirst().schemaRefs()).containsExactly(SCHEMA);
             assertThat(read.batches()).hasSize(2);
-            assertThat(read.batches()).extracting(batch -> text(batch.payload()))
+            assertThat(read.batches())
+                    .extracting(batch -> text(batch.payload()))
                     .containsExactly("bb", "ccc");
-            assertThat(read.batches()).extracting(batch -> batch.range())
+            assertThat(read.batches())
+                    .extracting(batch -> batch.range())
                     .containsExactly(new OffsetRange(1, 2), new OffsetRange(2, 3));
             assertThat(read.nextOffset()).isEqualTo(3);
             assertThat(read.endOfStream()).isFalse();
             assertThat(read.batches().getFirst().sourceObjectLength()).isEqualTo(2);
 
-            ReadResult eof = context.storage.read(
-                    streamId, 3, readOptions(10, 32, Duration.ofSeconds(5))).join();
+            ReadResult eof = context.storage
+                    .read(streamId, 3, readOptions(10, 32, Duration.ofSeconds(5)))
+                    .join();
             assertThat(eof.batches()).isEmpty();
             assertThat(eof.nextOffset()).isEqualTo(3);
             assertThat(eof.endOfStream()).isTrue();
@@ -125,10 +131,9 @@ class DefaultStreamStorageReadTest {
     void semanticReadReturnsWholeRangedKafkaEntriesAndAllowsOneFirstOverflow() {
         try (TestContext context = context(defaultConfig(false), new RecordingReadMetrics())) {
             StreamId streamId = context.createStream("ranged-read").streamId();
-            context.storage.append(
-                    streamId,
-                    rangedKafkaBatch(List.of("aaa", "bb"), List.of(3, 2)),
-                    appendOptions()).join();
+            context.storage
+                    .append(streamId, rangedKafkaBatch(List.of("aaa", "bb"), List.of(3, 2)), appendOptions())
+                    .join();
 
             NereusException insideExact = failure(context.storage.read(
                     streamId,
@@ -140,30 +145,36 @@ class DefaultStreamStorageReadTest {
                             readOptions(10, 100, Duration.ofSeconds(5)))));
             assertThat(insideExact.code()).isEqualTo(ErrorCode.OFFSET_NOT_AVAILABLE);
 
-            SemanticReadResult containing = context.storage.read(
-                    streamId,
-                    new ReadRequest(
-                            1,
-                            ReadView.COMMITTED,
-                            ReadBoundaryMode.CONTAINING_ENTRY,
-                            FirstEntryPolicy.LEGACY_STRICT_LIMIT,
-                            readOptions(10, 100, Duration.ofSeconds(5)))).join();
+            SemanticReadResult containing = context.storage
+                    .read(
+                            streamId,
+                            new ReadRequest(
+                                    1,
+                                    ReadView.COMMITTED,
+                                    ReadBoundaryMode.CONTAINING_ENTRY,
+                                    FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                                    readOptions(10, 100, Duration.ofSeconds(5))))
+                    .join();
             assertThat(containing.result().requestedOffset()).isEqualTo(1);
-            assertThat(containing.result().batches()).extracting(batch -> batch.range())
+            assertThat(containing.result().batches())
+                    .extracting(batch -> batch.range())
                     .containsExactly(new OffsetRange(0, 3), new OffsetRange(3, 5));
-            assertThat(containing.result().batches()).extracting(batch -> text(batch.payload()))
+            assertThat(containing.result().batches())
+                    .extracting(batch -> text(batch.payload()))
                     .containsExactly("aaa", "bb");
             assertThat(containing.result().nextOffset()).isEqualTo(5);
             assertThat(containing.sourceCoverageEndOffset()).isEqualTo(5);
 
-            SemanticReadResult overflow = context.storage.read(
-                    streamId,
-                    new ReadRequest(
-                            1,
-                            ReadView.COMMITTED,
-                            ReadBoundaryMode.CONTAINING_ENTRY,
-                            FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
-                            readOptions(1, 1, Duration.ofSeconds(5)))).join();
+            SemanticReadResult overflow = context.storage
+                    .read(
+                            streamId,
+                            new ReadRequest(
+                                    1,
+                                    ReadView.COMMITTED,
+                                    ReadBoundaryMode.CONTAINING_ENTRY,
+                                    FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
+                                    readOptions(1, 1, Duration.ofSeconds(5))))
+                    .join();
             assertThat(overflow.result().batches()).singleElement().satisfies(batch -> {
                 assertThat(batch.range()).isEqualTo(new OffsetRange(0, 3));
                 assertThat(text(batch.payload())).isEqualTo("aaa");
@@ -177,18 +188,21 @@ class DefaultStreamStorageReadTest {
     void byteLimitIncludesZeroByteEntriesAndRejectsAnOversizedFirstEntry() {
         try (TestContext context = context(defaultConfig(false), new RecordingReadMetrics())) {
             StreamId streamId = context.createStream("read-limits").streamId();
-            context.storage.append(
-                    streamId, batch(List.of(), "abc", "", "d"), appendOptions()).join();
+            context.storage
+                    .append(streamId, batch(List.of(), "abc", "", "d"), appendOptions())
+                    .join();
 
-            ReadResult limited = context.storage.read(
-                    streamId, 0, readOptions(3, 3, Duration.ofSeconds(5))).join();
+            ReadResult limited = context.storage
+                    .read(streamId, 0, readOptions(3, 3, Duration.ofSeconds(5)))
+                    .join();
             assertThat(limited.batches()).hasSize(2);
-            assertThat(limited.batches()).extracting(batch -> batch.payload().length)
+            assertThat(limited.batches())
+                    .extracting(batch -> batch.payload().length)
                     .containsExactly(3, 0);
             assertThat(limited.nextOffset()).isEqualTo(2);
 
-            NereusException tooSmall = failure(context.storage.read(
-                    streamId, 0, readOptions(3, 2, Duration.ofSeconds(5))));
+            NereusException tooSmall =
+                    failure(context.storage.read(streamId, 0, readOptions(3, 2, Duration.ofSeconds(5))));
             assertThat(tooSmall.code()).isEqualTo(ErrorCode.READ_LIMIT_TOO_SMALL);
             assertThat(tooSmall.retriable()).isTrue();
         }
@@ -198,17 +212,23 @@ class DefaultStreamStorageReadTest {
     void trimIsCheckedBeforeCacheAndObjectIo() {
         try (TestContext context = context(defaultConfig(true), new RecordingReadMetrics())) {
             StreamId streamId = context.createStream("trimmed-read").streamId();
-            context.storage.append(streamId, batch(List.of(), "a", "b"), appendOptions()).join();
-            context.storage.resolve(streamId, 0, new ResolveOptions(10, true, true)).join();
+            context.storage
+                    .append(streamId, batch(List.of(), "a", "b"), appendOptions())
+                    .join();
+            context.storage
+                    .resolve(streamId, 0, new ResolveOptions(10, true, true))
+                    .join();
             context.metadata.updateTrim("cluster/a", streamId, 1, "test").join();
 
-            NereusException trimmed = failure(context.storage.read(
-                    streamId, 0, readOptions(10, 10, Duration.ofSeconds(5))));
+            NereusException trimmed =
+                    failure(context.storage.read(streamId, 0, readOptions(10, 10, Duration.ofSeconds(5))));
             assertThat(trimmed.code()).isEqualTo(ErrorCode.OFFSET_TRIMMED);
 
-            ReadResult readable = context.storage.read(
-                    streamId, 1, readOptions(10, 10, Duration.ofSeconds(5))).join();
-            assertThat(readable.batches()).extracting(batch -> text(batch.payload()))
+            ReadResult readable = context.storage
+                    .read(streamId, 1, readOptions(10, 10, Duration.ofSeconds(5)))
+                    .join();
+            assertThat(readable.batches())
+                    .extracting(batch -> text(batch.payload()))
                     .containsExactly("b");
         }
     }
@@ -217,19 +237,25 @@ class DefaultStreamStorageReadTest {
     void readRepairsIndexMissingAfterKnownCommittedAppendFailure() {
         try (TestContext context = context(defaultConfig(false), new RecordingReadMetrics())) {
             StreamId streamId = context.createStream("repair-read").streamId();
-            context.metadata.failNext(
-                    FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
-            NereusException appendFailure = failure(context.storage.append(
-                    streamId, batch(List.of(), "repair-me"), appendOptions()));
+            context.metadata.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
+            NereusException appendFailure =
+                    failure(context.storage.append(streamId, batch(List.of(), "repair-me"), appendOptions()));
             assertThat(appendFailure.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
-            assertThat(context.metadata.scanOffsetIndex("cluster/a", streamId, 0, 10).join()).isEmpty();
+            assertThat(context.metadata
+                            .scanOffsetIndex("cluster/a", streamId, 0, 10)
+                            .join())
+                    .isEmpty();
 
-            ReadResult repaired = context.storage.read(
-                    streamId, 0, readOptions(10, 64, Duration.ofSeconds(5))).join();
+            ReadResult repaired = context.storage
+                    .read(streamId, 0, readOptions(10, 64, Duration.ofSeconds(5)))
+                    .join();
 
-            assertThat(repaired.batches()).extracting(batch -> text(batch.payload()))
+            assertThat(repaired.batches())
+                    .extracting(batch -> text(batch.payload()))
                     .containsExactly("repair-me");
-            assertThat(context.metadata.scanOffsetIndex("cluster/a", streamId, 0, 10).join())
+            assertThat(context.metadata
+                            .scanOffsetIndex("cluster/a", streamId, 0, 10)
+                            .join())
                     .hasSize(1);
         }
     }
@@ -242,13 +268,20 @@ class DefaultStreamStorageReadTest {
                 config(false, 1, 1, 8L << 20),
                 failGenerationZeroMaterialization(metadata),
                 objectStore,
-                new DefaultWalObjectReader(objectStore), new RecordingReadMetrics());
-        DefaultStreamStorage second = storage(defaultConfig(false), metadata, objectStore,
-                new DefaultWalObjectReader(objectStore), new RecordingReadMetrics());
+                new DefaultWalObjectReader(objectStore),
+                new RecordingReadMetrics());
+        DefaultStreamStorage second = storage(
+                defaultConfig(false),
+                metadata,
+                objectStore,
+                new DefaultWalObjectReader(objectStore),
+                new RecordingReadMetrics());
         try {
             StreamId streamId = first.createOrGetStream(
-                    new StreamName("repair-budget"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
+                            new StreamName("repair-budget"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
             metadata.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
             failure(first.append(streamId, batch(List.of(), "first"), appendOptions()));
             second.append(streamId, batch(List.of(), "second"), appendOptions()).join();
@@ -256,14 +289,14 @@ class DefaultStreamStorageReadTest {
                     .extracting(OffsetIndexEntry::range)
                     .containsExactly(new OffsetRange(1, 2));
 
-            NereusException exhausted = failure(first.read(
-                    streamId, 0, readOptions(10, 64, Duration.ofSeconds(5))));
+            NereusException exhausted = failure(first.read(streamId, 0, readOptions(10, 64, Duration.ofSeconds(5))));
             assertThat(exhausted.code()).isEqualTo(ErrorCode.READ_RESOLUTION_FAILED);
             assertThat(exhausted.retriable()).isTrue();
 
-            ReadResult recovered = second.read(
-                    streamId, 0, readOptions(10, 64, Duration.ofSeconds(5))).join();
-            assertThat(recovered.batches()).extracting(batch -> text(batch.payload()))
+            ReadResult recovered = second.read(streamId, 0, readOptions(10, 64, Duration.ofSeconds(5)))
+                    .join();
+            assertThat(recovered.batches())
+                    .extracting(batch -> text(batch.payload()))
                     .containsExactly("first", "second");
         } finally {
             first.close();
@@ -278,23 +311,38 @@ class DefaultStreamStorageReadTest {
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         DefaultStreamStorage writerStorage = storage(
-                defaultConfig(false), metadata, objectStore, new DefaultWalObjectReader(objectStore),
+                defaultConfig(false),
+                metadata,
+                objectStore,
+                new DefaultWalObjectReader(objectStore),
                 new RecordingReadMetrics());
         try {
-            StreamId streamId = writerStorage.createOrGetStream(
-                    new StreamName("generation"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
-            writerStorage.append(streamId, batch(List.of(), "a"), appendOptions()).join();
-            OffsetIndexEntry base = metadata.scanOffsetIndex("cluster/a", streamId, 0, 10).join().getFirst();
+            StreamId streamId = writerStorage
+                    .createOrGetStream(
+                            new StreamName("generation"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
+            writerStorage
+                    .append(streamId, batch(List.of(), "a"), appendOptions())
+                    .join();
+            OffsetIndexEntry base = metadata.scanOffsetIndex("cluster/a", streamId, 0, 10)
+                    .join()
+                    .getFirst();
             OffsetIndexEntry higher = withGeneration(base, 7, base.metadataVersion() + 1);
             OxiaMetadataStore overlapping = overrideScan(metadata, List.of(base, higher));
             DefaultStreamStorage readerStorage = storage(
-                    defaultConfig(false), overlapping, objectStore, new DefaultWalObjectReader(objectStore),
+                    defaultConfig(false),
+                    overlapping,
+                    objectStore,
+                    new DefaultWalObjectReader(objectStore),
                     new RecordingReadMetrics());
             try {
-                ResolveResult result = readerStorage.resolve(
-                        streamId, 0, new ResolveOptions(10, false, true)).join();
-                assertThat(result.ranges()).singleElement()
+                ResolveResult result = readerStorage
+                        .resolve(streamId, 0, new ResolveOptions(10, false, true))
+                        .join();
+                assertThat(result.ranges())
+                        .singleElement()
                         .extracting(range -> range.generation())
                         .isEqualTo(7L);
             } finally {
@@ -314,73 +362,76 @@ class DefaultStreamStorageReadTest {
             StreamId streamId = context.createStream("amplification").streamId();
             byte[] large = new byte[512 * 1024];
             Arrays.fill(large, (byte) 'x');
-            context.storage.append(streamId, batchBytes(List.of(), new byte[] {'a'}, large), appendOptions()).join();
+            context.storage
+                    .append(streamId, batchBytes(List.of(), new byte[] {'a'}, large), appendOptions())
+                    .join();
 
-            ReadResult result = context.storage.read(
-                    streamId, 0, readOptions(1, 1, Duration.ofSeconds(5))).join();
+            ReadResult result = context.storage
+                    .read(streamId, 0, readOptions(1, 1, Duration.ofSeconds(5)))
+                    .join();
 
-            assertThat(result.batches()).singleElement()
+            assertThat(result.batches())
+                    .singleElement()
                     .extracting(batch -> batch.payload().length)
                     .isEqualTo(1);
             assertThat(metrics.fullSliceBytes.get()).isEqualTo(large.length + 1L);
             assertThat(metrics.entryIndexBytes.get()).isPositive();
             assertThat(metrics.returnedBytes.get()).isEqualTo(1);
-            assertThat(metrics.fullSliceBytes.get() + metrics.entryIndexBytes.get()
-                    - metrics.returnedBytes.get()).isGreaterThan(large.length);
+            assertThat(metrics.fullSliceBytes.get() + metrics.entryIndexBytes.get() - metrics.returnedBytes.get())
+                    .isGreaterThan(large.length);
         }
     }
 
     @Test
     void fullSliceChecksumCatchesCorruptionOutsideReturnedSubrange() throws Exception {
-        try (TestContext context = context(
-                config(false, 10_000, 1, 8L << 20), new RecordingReadMetrics())) {
+        try (TestContext context = context(config(false, 10_000, 1, 8L << 20), new RecordingReadMetrics())) {
             StreamId streamId = context.createStream("corruption").streamId();
-            AppendResult append = context.storage.append(
-                    streamId, batch(List.of(), "a", "b"), appendOptions()).join();
+            AppendResult append = context.storage
+                    .append(streamId, batch(List.of(), "a", "b"), appendOptions())
+                    .join();
             ObjectSliceReadTarget target = (ObjectSliceReadTarget) append.readTarget();
             Path objectPath = root.resolve(target.objectKey().value());
             byte[] bytes = Files.readAllBytes(objectPath);
             bytes[Math.toIntExact(target.objectOffset() + 1)] ^= 0x01;
             Files.write(objectPath, bytes);
 
-            NereusException corruption = failure(context.storage.read(
-                    streamId, 0, readOptions(1, 1, Duration.ofSeconds(5))));
+            NereusException corruption =
+                    failure(context.storage.read(streamId, 0, readOptions(1, 1, Duration.ofSeconds(5))));
             assertThat(corruption.code()).isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH);
-            assertThat(failure(context.storage.read(
-                    streamId, 0, readOptions(1, 1, Duration.ofSeconds(5)))).code())
+            assertThat(failure(context.storage.read(streamId, 0, readOptions(1, 1, Duration.ofSeconds(5))))
+                            .code())
                     .isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH);
         }
     }
 
     @Test
-    void concurrentReadBackpressureRejectsBeforeStartingAnotherWalReadAndReleasesOnCancel()
-            throws Exception {
+    void concurrentReadBackpressureRejectsBeforeStartingAnotherWalReadAndReleasesOnCancel() throws Exception {
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         DefaultWalObjectReader delegate = new DefaultWalObjectReader(objectStore);
         BlockingWalReader reader = new BlockingWalReader(delegate);
         RecordingReadMetrics metrics = new RecordingReadMetrics();
-        DefaultStreamStorage storage = storage(
-                config(false, 10_000, 1, 8L << 20), metadata, objectStore, reader, metrics);
+        DefaultStreamStorage storage =
+                storage(config(false, 10_000, 1, 8L << 20), metadata, objectStore, reader, metrics);
         try {
             StreamId streamId = storage.createOrGetStream(
-                    new StreamName("read-backpressure"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
+                            new StreamName("read-backpressure"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
             storage.append(streamId, batch(List.of(), "a"), appendOptions()).join();
-            CompletableFuture<ReadResult> first = storage.read(
-                    streamId, 0, readOptions(10, 10, Duration.ofSeconds(5)));
+            CompletableFuture<ReadResult> first = storage.read(streamId, 0, readOptions(10, 10, Duration.ofSeconds(5)));
             assertThat(reader.started.await(5, TimeUnit.SECONDS)).isTrue();
 
-            NereusException rejected = failure(storage.read(
-                    streamId, 0, readOptions(10, 10, Duration.ofSeconds(1))));
+            NereusException rejected = failure(storage.read(streamId, 0, readOptions(10, 10, Duration.ofSeconds(1))));
             assertThat(rejected.code()).isEqualTo(ErrorCode.BACKPRESSURE_REJECTED);
             assertThat(reader.calls).hasValue(1);
             assertThat(metrics.backpressureRejections).hasValue(1);
 
             assertThat(first.cancel(false)).isTrue();
             assertThat(failure(first).code()).isEqualTo(ErrorCode.CANCELLED);
-            CompletableFuture<ReadResult> afterRelease = storage.read(
-                    streamId, 0, readOptions(10, 10, Duration.ofSeconds(1)));
+            CompletableFuture<ReadResult> afterRelease =
+                    storage.read(streamId, 0, readOptions(10, 10, Duration.ofSeconds(1)));
             assertThat(reader.calls).hasValue(2);
             afterRelease.cancel(false);
             assertThat(failure(afterRelease).code()).isEqualTo(ErrorCode.CANCELLED);
@@ -396,20 +447,20 @@ class DefaultStreamStorageReadTest {
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         BlockingWalReader reader = new BlockingWalReader(new DefaultWalObjectReader(objectStore));
-        DefaultStreamStorage storage = storage(
-                config(false, 10_000, 1, 8L << 20), metadata, objectStore, reader,
-                new RecordingReadMetrics());
+        DefaultStreamStorage storage =
+                storage(config(false, 10_000, 1, 8L << 20), metadata, objectStore, reader, new RecordingReadMetrics());
         try {
             StreamId streamId = storage.createOrGetStream(
-                    new StreamName("read-timeout"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
+                            new StreamName("read-timeout"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
             storage.append(streamId, batch(List.of(), "a"), appendOptions()).join();
 
-            NereusException timeout = failure(storage.read(
-                    streamId, 0, readOptions(10, 10, Duration.ofMillis(40))));
+            NereusException timeout = failure(storage.read(streamId, 0, readOptions(10, 10, Duration.ofMillis(40))));
             assertThat(timeout.code()).isEqualTo(ErrorCode.TIMEOUT);
-            CompletableFuture<ReadResult> afterTimeout = storage.read(
-                    streamId, 0, readOptions(10, 10, Duration.ofSeconds(1)));
+            CompletableFuture<ReadResult> afterTimeout =
+                    storage.read(streamId, 0, readOptions(10, 10, Duration.ofSeconds(1)));
             assertThat(reader.calls).hasValue(2);
             afterTimeout.cancel(false);
             assertThat(failure(afterTimeout).code()).isEqualTo(ErrorCode.CANCELLED);
@@ -421,26 +472,28 @@ class DefaultStreamStorageReadTest {
     }
 
     @Test
-    void aggregateReadBufferBudgetRejectsBeforeASecondWalReadEvenWhenPermitIsAvailable()
-            throws Exception {
+    void aggregateReadBufferBudgetRejectsBeforeASecondWalReadEvenWhenPermitIsAvailable() throws Exception {
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         BlockingWalReader reader = new BlockingWalReader(new DefaultWalObjectReader(objectStore));
         RecordingReadMetrics metrics = new RecordingReadMetrics();
-        DefaultStreamStorage storage = storage(
-                config(false, 10_000, 2, 1L << 20), metadata, objectStore, reader, metrics);
+        DefaultStreamStorage storage =
+                storage(config(false, 10_000, 2, 1L << 20), metadata, objectStore, reader, metrics);
         try {
             StreamId streamId = storage.createOrGetStream(
-                    new StreamName("read-buffer"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
+                            new StreamName("read-buffer"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
             byte[] payload = new byte[700 * 1024];
-            storage.append(streamId, batchBytes(List.of(), payload), appendOptions()).join();
-            CompletableFuture<ReadResult> first = storage.read(
-                    streamId, 0, readOptions(1, payload.length, Duration.ofSeconds(5)));
+            storage.append(streamId, batchBytes(List.of(), payload), appendOptions())
+                    .join();
+            CompletableFuture<ReadResult> first =
+                    storage.read(streamId, 0, readOptions(1, payload.length, Duration.ofSeconds(5)));
             assertThat(reader.started.await(5, TimeUnit.SECONDS)).isTrue();
 
-            NereusException rejected = failure(storage.read(
-                    streamId, 0, readOptions(1, payload.length, Duration.ofSeconds(1))));
+            NereusException rejected =
+                    failure(storage.read(streamId, 0, readOptions(1, payload.length, Duration.ofSeconds(1))));
             assertThat(rejected.code()).isEqualTo(ErrorCode.BACKPRESSURE_REJECTED);
             assertThat(reader.calls).hasValue(1);
             assertThat(metrics.backpressureRejections).hasValue(1);
@@ -459,20 +512,34 @@ class DefaultStreamStorageReadTest {
         RecordingReadMetrics metrics = new RecordingReadMetrics();
         try (TestContext context = context(defaultConfig(true), metrics)) {
             StreamId streamId = context.createStream("cache-watch").streamId();
-            context.storage.append(streamId, batch(List.of(), "a"), appendOptions()).join();
+            context.storage
+                    .append(streamId, batch(List.of(), "a"), appendOptions())
+                    .join();
 
-            context.storage.resolve(streamId, 0, new ResolveOptions(10, true, true)).join();
-            context.storage.resolve(streamId, 0, new ResolveOptions(10, true, true)).join();
+            context.storage
+                    .resolve(streamId, 0, new ResolveOptions(10, true, true))
+                    .join();
+            context.storage
+                    .resolve(streamId, 0, new ResolveOptions(10, true, true))
+                    .join();
             assertThat(metrics.cacheMisses).hasValue(1);
             assertThat(metrics.cacheHits).hasValue(1);
 
-            context.storage.append(streamId, batch(List.of(), "b"), appendOptions()).join();
-            context.storage.resolve(streamId, 0, new ResolveOptions(10, true, true)).join();
+            context.storage
+                    .append(streamId, batch(List.of(), "b"), appendOptions())
+                    .join();
+            context.storage
+                    .resolve(streamId, 0, new ResolveOptions(10, true, true))
+                    .join();
             assertThat(metrics.cacheMisses).hasValue(2);
 
             context.metadata.setNextWatchDelivery(FakeOxiaMetadataStore.WatchDelivery.DROP_NEXT);
-            context.storage.append(streamId, batch(List.of(), "c"), appendOptions()).join();
-            context.storage.resolve(streamId, 2, new ResolveOptions(10, true, true)).join();
+            context.storage
+                    .append(streamId, batch(List.of(), "c"), appendOptions())
+                    .join();
+            context.storage
+                    .resolve(streamId, 2, new ResolveOptions(10, true, true))
+                    .join();
             assertThat(metrics.cacheMisses).hasValue(3);
         }
     }
@@ -482,14 +549,15 @@ class DefaultStreamStorageReadTest {
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         BlockingWalReader reader = new BlockingWalReader(new DefaultWalObjectReader(objectStore));
-        DefaultStreamStorage storage = storage(defaultConfig(false), metadata, objectStore, reader,
-                new RecordingReadMetrics());
+        DefaultStreamStorage storage =
+                storage(defaultConfig(false), metadata, objectStore, reader, new RecordingReadMetrics());
         try {
             StreamId streamId = storage.createOrGetStream(
-                    new StreamName("bk-read"),
-                    new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of())).join().streamId();
-            NereusException failure = failure(storage.read(
-                    streamId, 0, readOptions(10, 10, Duration.ofSeconds(1))));
+                            new StreamName("bk-read"),
+                            new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                    .join()
+                    .streamId();
+            NereusException failure = failure(storage.read(streamId, 0, readOptions(10, 10, Duration.ofSeconds(1))));
             assertThat(failure.code()).isEqualTo(ErrorCode.UNSUPPORTED_STORAGE_PROFILE);
             assertThat(reader.calls).hasValue(0);
         } finally {
@@ -504,25 +572,31 @@ class DefaultStreamStorageReadTest {
         RecordingReadMetrics metrics = new RecordingReadMetrics();
         try (TestContext context = context(config(false, 10_000, 1, 8L << 20), metrics)) {
             StreamId streamId = context.createStream("missing-object").streamId();
-            ResolveResult empty = context.storage.resolve(
-                    streamId, 0, new ResolveOptions(10, true, true)).join();
+            ResolveResult empty = context.storage
+                    .resolve(streamId, 0, new ResolveOptions(10, true, true))
+                    .join();
             assertThat(empty.ranges()).isEmpty();
 
-            context.storage.append(streamId, batch(List.of(), "a"), appendOptions()).join();
-            ResolveResult visible = context.storage.resolve(
-                    streamId, 0, new ResolveOptions(10, true, true)).join();
+            context.storage
+                    .append(streamId, batch(List.of(), "a"), appendOptions())
+                    .join();
+            ResolveResult visible = context.storage
+                    .resolve(streamId, 0, new ResolveOptions(10, true, true))
+                    .join();
             assertThat(visible.ranges()).hasSize(1);
-            assertThat(context.storage.read(
-                    streamId, 0, readOptions(10, 10, Duration.ofSeconds(1))).join().batches())
+            assertThat(context.storage
+                            .read(streamId, 0, readOptions(10, 10, Duration.ofSeconds(1)))
+                            .join()
+                            .batches())
                     .hasSize(1);
 
             context.objectStore.deleteAllForTesting();
-            NereusException missing = failure(context.storage.read(
-                    streamId, 0, readOptions(10, 10, Duration.ofSeconds(1))));
+            NereusException missing =
+                    failure(context.storage.read(streamId, 0, readOptions(10, 10, Duration.ofSeconds(1))));
             assertThat(missing.code()).isEqualTo(ErrorCode.OBJECT_NOT_FOUND);
             assertThat(missing.retriable()).isTrue();
-            assertThat(failure(context.storage.read(
-                    streamId, 0, readOptions(10, 10, Duration.ofSeconds(1)))).code())
+            assertThat(failure(context.storage.read(streamId, 0, readOptions(10, 10, Duration.ofSeconds(1))))
+                            .code())
                     .isEqualTo(ErrorCode.OBJECT_NOT_FOUND);
         }
     }
@@ -533,27 +607,32 @@ class DefaultStreamStorageReadTest {
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         OxiaMetadataStore delayedCommit = delayCommit(metadata);
         DefaultStreamStorage storage = storage(
-                defaultConfig(false), delayedCommit, objectStore, new DefaultWalObjectReader(objectStore),
+                defaultConfig(false),
+                delayedCommit,
+                objectStore,
+                new DefaultWalObjectReader(objectStore),
                 new RecordingReadMetrics());
         try {
             StreamId streamId = storage.createOrGetStream(
-                    new StreamName("manifest-only"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
+                            new StreamName("manifest-only"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
             AppendOptions shortAppend = new AppendOptions(
                     Optional.empty(),
                     DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
-                    // Leave enough time for the local object and manifest writes; only the injected head commit must time out.
+                    // Leave enough time for the local object and manifest writes; only the injected head commit must
+                    // time out.
                     Duration.ofSeconds(2),
                     true,
                     Map.of());
-            NereusException uncertain = failure(
-                    storage.append(streamId, batch(List.of(), "not-visible"), shortAppend));
+            NereusException uncertain = failure(storage.append(streamId, batch(List.of(), "not-visible"), shortAppend));
             assertThat(uncertain.appendOutcome()).contains(AppendOutcome.MAY_HAVE_COMMITTED);
             assertThat(metadata.storedMetadataValuesForTesting())
                     .anyMatch(value -> value.recordType().equals("ObjectManifestRecord"));
 
-            ResolveResult resolved = storage.resolve(
-                    streamId, 0, new ResolveOptions(10, false, true)).join();
+            ResolveResult resolved = storage.resolve(streamId, 0, new ResolveOptions(10, false, true))
+                    .join();
             assertThat(resolved.ranges()).isEmpty();
         } finally {
             storage.close();
@@ -583,16 +662,21 @@ class DefaultStreamStorageReadTest {
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         DefaultStreamStorage storage = storage(
-                defaultConfig(false), metadata, objectStore, new DefaultWalObjectReader(objectStore),
-                throwingMetrics);
+                defaultConfig(false), metadata, objectStore, new DefaultWalObjectReader(objectStore), throwingMetrics);
         try {
             StreamId streamId = storage.createOrGetStream(
-                    new StreamName("metrics-failure"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
+                            new StreamName("metrics-failure"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
             storage.append(streamId, batch(List.of(), "a"), appendOptions()).join();
-            assertThat(storage.resolve(streamId, 0, new ResolveOptions(10, true, true)).join().ranges())
+            assertThat(storage.resolve(streamId, 0, new ResolveOptions(10, true, true))
+                            .join()
+                            .ranges())
                     .hasSize(1);
-            assertThat(storage.read(streamId, 0, readOptions(10, 10, Duration.ofSeconds(1))).join().batches())
+            assertThat(storage.read(streamId, 0, readOptions(10, 10, Duration.ofSeconds(1)))
+                            .join()
+                            .batches())
                     .hasSize(1);
         } finally {
             storage.close();
@@ -604,12 +688,8 @@ class DefaultStreamStorageReadTest {
     private TestContext context(StreamStorageConfig config, RecordingReadMetrics metrics) {
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
-        DefaultStreamStorage storage = storage(
-                config,
-                metadata,
-                objectStore,
-                new DefaultWalObjectReader(objectStore),
-                metrics);
+        DefaultStreamStorage storage =
+                storage(config, metadata, objectStore, new DefaultWalObjectReader(objectStore), metrics);
         return new TestContext(storage, metadata, objectStore);
     }
 
@@ -634,10 +714,7 @@ class DefaultStreamStorageReadTest {
     }
 
     private static StreamStorageConfig config(
-            boolean watch,
-            int maxCommitChainScan,
-            int maxConcurrentReads,
-            long maxReadBufferBytes) {
+            boolean watch, int maxCommitChainScan, int maxConcurrentReads, long maxReadBufferBytes) {
         return new StreamStorageConfig(
                 "cluster/a",
                 "writer-a",
@@ -686,19 +763,14 @@ class DefaultStreamStorageReadTest {
                 Optional.empty());
     }
 
-    private static AppendBatch rangedKafkaBatch(
-            List<String> payloads,
-            List<Integer> recordCounts) {
+    private static AppendBatch rangedKafkaBatch(List<String> payloads, List<Integer> recordCounts) {
         List<AppendEntry> entries = new ArrayList<>();
         int records = 0;
         for (int index = 0; index < payloads.size(); index++) {
             int recordCount = recordCounts.get(index);
             records = Math.addExact(records, recordCount);
             entries.add(new AppendEntry(
-                    payloads.get(index).getBytes(StandardCharsets.UTF_8),
-                    recordCount,
-                    NOW.toEpochMilli(),
-                    Map.of()));
+                    payloads.get(index).getBytes(StandardCharsets.UTF_8), recordCount, NOW.toEpochMilli(), Map.of()));
         }
         return new AppendBatch(
                 PayloadFormat.KAFKA_RECORD_BATCH,
@@ -739,10 +811,7 @@ class DefaultStreamStorageReadTest {
         return new String(payload, StandardCharsets.UTF_8);
     }
 
-    private static OffsetIndexEntry withGeneration(
-            OffsetIndexEntry record,
-            long generation,
-            long metadataVersion) {
+    private static OffsetIndexEntry withGeneration(OffsetIndexEntry record, long generation, long metadataVersion) {
         return new OffsetIndexEntry(
                 record.streamId(),
                 record.range(),
@@ -760,9 +829,7 @@ class DefaultStreamStorageReadTest {
                 metadataVersion);
     }
 
-    private static OxiaMetadataStore overrideScan(
-            OxiaMetadataStore delegate,
-            List<OffsetIndexEntry> records) {
+    private static OxiaMetadataStore overrideScan(OxiaMetadataStore delegate, List<OffsetIndexEntry> records) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class, PhysicalObjectMetadataStore.class},
@@ -826,9 +893,7 @@ class DefaultStreamStorageReadTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
-                long startOffset,
-                List<com.nereusstream.api.ResolvedObjectRange> ranges,
-                ReadOptions options) {
+                long startOffset, List<com.nereusstream.api.ResolvedObjectRange> ranges, ReadOptions options) {
             calls.incrementAndGet();
             started.countDown();
             return pending;
@@ -867,13 +932,13 @@ class DefaultStreamStorageReadTest {
     }
 
     private record TestContext(
-            DefaultStreamStorage storage,
-            FakeOxiaMetadataStore metadata,
-            LocalFileObjectStore objectStore) implements AutoCloseable {
+            DefaultStreamStorage storage, FakeOxiaMetadataStore metadata, LocalFileObjectStore objectStore)
+            implements AutoCloseable {
         StreamMetadata createStream(String name) {
             return storage.createOrGetStream(
-                    new StreamName(name),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join();
+                            new StreamName(name),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join();
         }
 
         @Override

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -7,7 +8,9 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.OptionalLong;
 
-/** One retained Kafka semantic unit represented by one sparse NTC2 row. */
+/**
+ * One retained Kafka semantic unit represented by one sparse NTC2 row.
+ */
 public record KafkaTopicCompactedObjectRow(
         long streamOffsetStart,
         int recordCount,

@@ -29,12 +29,12 @@ final class ReadResourceLimiter {
     }
 
     synchronized Reservation reserve(long bytes) {
-        if (bytes <= 0 || bytes > maxBufferedBytes || concurrentReads >= maxConcurrentReads
+        if (bytes <= 0
+                || bytes > maxBufferedBytes
+                || concurrentReads >= maxConcurrentReads
                 || bufferedBytes > maxBufferedBytes - bytes) {
             throw new NereusException(
-                    ErrorCode.BACKPRESSURE_REJECTED,
-                    true,
-                    "read object permit or buffer budget is full");
+                    ErrorCode.BACKPRESSURE_REJECTED, true, "read object permit or buffer budget is full");
         }
         concurrentReads++;
         bufferedBytes += bytes;

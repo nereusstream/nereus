@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Stable on-wire lifecycle identifiers for the per-stream cursor retention root. */
+/**
+ * Stable on-wire lifecycle identifiers for the per-stream cursor retention root.
+ */
 public enum CursorRetentionLifecycle {
     ACTIVE(1),
     PROTECTION_PENDING(2),

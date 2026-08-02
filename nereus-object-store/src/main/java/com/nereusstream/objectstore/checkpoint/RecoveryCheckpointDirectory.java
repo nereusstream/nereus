@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
-/** Exact NRC1 directory byte ranges copied into the recovery-root reference. */
+/**
+ * Exact NRC1 directory byte ranges copied into the recovery-root reference.
+ */
 public record RecoveryCheckpointDirectory(
         long publicationDirectoryOffset,
         long publicationDirectoryLength,

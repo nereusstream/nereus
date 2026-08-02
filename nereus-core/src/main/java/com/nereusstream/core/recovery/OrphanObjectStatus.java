@@ -14,7 +14,9 @@
 
 package com.nereusstream.core.recovery;
 
-/** Metadata-driven diagnostic classification; no value authorizes object deletion. */
+/**
+ * Metadata-driven diagnostic classification; no value authorizes object deletion.
+ */
 public enum OrphanObjectStatus {
     MISSING_MANIFEST,
     UNREFERENCED_MANIFEST,

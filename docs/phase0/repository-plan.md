@@ -25,15 +25,15 @@ Phase 0 established the standalone `nereusstream/nereus` repository.
 
 ## Module Boundaries
 
-| Module | Purpose |
-| --- | --- |
-| `nereus-api` | Protocol-neutral internal API and value types |
-| `nereus-core` | L0 StreamStorage implementation |
-| `nereus-metadata-oxia` | Oxia metadata and coordination adapter |
-| `nereus-object-store` | Object WAL and object IO boundary |
-| `nereus-managed-ledger` | ManagedLedger facade implementation |
-| `nereus-pulsar-adapter` | Pulsar broker integration boundary |
-| `nereus-kop-adapter` | KoP/Kafka projection boundary |
+| Module                  | Purpose                                       |
+|-------------------------|-----------------------------------------------|
+| `nereus-api`            | Protocol-neutral internal API and value types |
+| `nereus-core`           | L0 StreamStorage implementation               |
+| `nereus-metadata-oxia`  | Oxia metadata and coordination adapter        |
+| `nereus-object-store`   | Object WAL and object IO boundary             |
+| `nereus-managed-ledger` | ManagedLedger facade implementation           |
+| `nereus-pulsar-adapter` | Pulsar broker integration boundary            |
+| `nereus-kop-adapter`    | KoP/Kafka projection boundary                 |
 
 ## Fork Workflow
 

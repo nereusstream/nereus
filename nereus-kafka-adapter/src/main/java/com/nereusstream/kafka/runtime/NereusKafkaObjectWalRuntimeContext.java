@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.kafka.recovery.KafkaRecoveryStateFactory;
@@ -11,7 +12,9 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
 
-/** Explicit owned-provider and borrowed Kafka dependencies for Object-WAL runtime bootstrap. */
+/**
+ * Explicit owned-provider and borrowed Kafka dependencies for Object-WAL runtime bootstrap.
+ */
 public record NereusKafkaObjectWalRuntimeContext(
         ObjectStoreProvider objectStoreProvider,
         ObjectStoreSecretResolver secretResolver,

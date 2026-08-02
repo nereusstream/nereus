@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -7,10 +8,7 @@ import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationReco
 import java.util.Objects;
 
 public record VersionedKafkaStorageProtocolActivation(
-        String key,
-        KafkaStorageProtocolActivationRecord value,
-        long metadataVersion,
-        Checksum durableValueSha256) {
+        String key, KafkaStorageProtocolActivationRecord value, long metadataVersion, Checksum durableValueSha256) {
     public VersionedKafkaStorageProtocolActivation {
         requireKeyAndDigest(key, metadataVersion, durableValueSha256);
         Objects.requireNonNull(value, "value");

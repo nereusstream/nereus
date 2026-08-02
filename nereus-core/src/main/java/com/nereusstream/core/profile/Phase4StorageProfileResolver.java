@@ -23,7 +23,9 @@ import com.nereusstream.api.target.ReadTargetType;
 import java.util.Objects;
 import java.util.function.Predicate;
 
-/** Executable Phase 4 Object-WAL matrix; BookKeeper profiles remain closed until their adapter gate. */
+/**
+ * Executable Phase 4 Object-WAL matrix; BookKeeper profiles remain closed until their adapter gate.
+ */
 public final class Phase4StorageProfileResolver implements StorageProfileResolver {
     @Override
     public StorageExecutionPlan requireExecutable(
@@ -48,25 +50,19 @@ public final class Phase4StorageProfileResolver implements StorageProfileResolve
                     "synchronous Object WAL requires index-confirmed durability",
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
-        ObjectPublicationMode publicationMode =
-                profile == StorageProfile.OBJECT_WAL_ASYNC_OBJECT
-                        ? ObjectPublicationMode.ASYNCHRONOUS
-                        : ObjectPublicationMode.SYNCHRONOUS;
-        return new StorageExecutionPlan(
-                profile,
-                ReadTargetType.OBJECT_SLICE,
-                publicationMode,
-                durability);
+        ObjectPublicationMode publicationMode = profile == StorageProfile.OBJECT_WAL_ASYNC_OBJECT
+                ? ObjectPublicationMode.ASYNCHRONOUS
+                : ObjectPublicationMode.SYNCHRONOUS;
+        return new StorageExecutionPlan(profile, ReadTargetType.OBJECT_SLICE, publicationMode, durability);
     }
 
     @Override
-    public ReadTargetType requireReadable(
-            StorageProfile raw, Predicate<ReadTargetType> readerInstalled) {
+    public ReadTargetType requireReadable(StorageProfile raw, Predicate<ReadTargetType> readerInstalled) {
         StorageProfile profile = Objects.requireNonNull(raw, "profile").canonical();
         Predicate<ReadTargetType> installed = Objects.requireNonNull(readerInstalled, "readerInstalled");
         if (!profile.usesObjectWal() || !installed.test(ReadTargetType.OBJECT_SLICE)) {
-            throw new NereusException(ErrorCode.UNSUPPORTED_STORAGE_PROFILE, false,
-                    "storage profile has no complete Phase 4 read plan");
+            throw new NereusException(
+                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE, false, "storage profile has no complete Phase 4 read plan");
         }
         return ReadTargetType.OBJECT_SLICE;
     }

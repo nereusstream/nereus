@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.StorageProfile;
@@ -6,7 +7,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
-/** One-way cluster authority for the exact native-Kafka storage protocol and broker set. */
+/**
+ * One-way cluster authority for the exact native-Kafka storage protocol and broker set.
+ */
 public record KafkaStorageProtocolActivationRecord(
         int recordVersion,
         int lifecycleId,
@@ -67,19 +70,17 @@ public record KafkaStorageProtocolActivationRecord(
         if (!allowedStorageProfiles.contains(defaultStorageProfile)) {
             throw new IllegalArgumentException("defaultStorageProfile must be allowed");
         }
-        requiredCapabilitySha256 = KafkaMetadataValidation.sha256(
-                requiredCapabilitySha256, "requiredCapabilitySha256", false);
-        requiredBrokerSetSha256 = KafkaMetadataValidation.sha256(
-                requiredBrokerSetSha256, "requiredBrokerSetSha256", false);
-        if (preparedAtMetadataOffset < 0 || activationEpoch <= 0 || preparedAtMillis <= 0
-                || metadataVersion < 0) {
+        requiredCapabilitySha256 =
+                KafkaMetadataValidation.sha256(requiredCapabilitySha256, "requiredCapabilitySha256", false);
+        requiredBrokerSetSha256 =
+                KafkaMetadataValidation.sha256(requiredBrokerSetSha256, "requiredBrokerSetSha256", false);
+        if (preparedAtMetadataOffset < 0 || activationEpoch <= 0 || preparedAtMillis <= 0 || metadataVersion < 0) {
             throw new IllegalArgumentException("invalid Kafka storage activation numeric fields");
         }
         if (lifecycle == KafkaStorageActivationLifecycle.PREPARED && activatedAtMillis != 0) {
             throw new IllegalArgumentException("PREPARED activation cannot carry activatedAtMillis");
         }
-        if (lifecycle == KafkaStorageActivationLifecycle.ACTIVE
-                && activatedAtMillis < preparedAtMillis) {
+        if (lifecycle == KafkaStorageActivationLifecycle.ACTIVE && activatedAtMillis < preparedAtMillis) {
             throw new IllegalArgumentException("ACTIVE activation requires a valid activation time");
         }
     }
@@ -115,40 +116,69 @@ public record KafkaStorageProtocolActivationRecord(
                 version);
     }
 
-    @Override public byte[] requiredCapabilitySha256() { return requiredCapabilitySha256.clone(); }
-    @Override public byte[] requiredBrokerSetSha256() { return requiredBrokerSetSha256.clone(); }
+    @Override
+    public byte[] requiredCapabilitySha256() {
+        return requiredCapabilitySha256.clone();
+    }
+
+    @Override
+    public byte[] requiredBrokerSetSha256() {
+        return requiredBrokerSetSha256.clone();
+    }
 
     @Override
     public boolean equals(Object other) {
-        return this == other || other instanceof KafkaStorageProtocolActivationRecord that
-                && recordVersion == that.recordVersion && lifecycleId == that.lifecycleId
-                && protocolVersion == that.protocolVersion && apiVersion == that.apiVersion
-                && streamHeadSessionVersion == that.streamHeadSessionVersion
-                && bindingVersion == that.bindingVersion && payloadMappingId == that.payloadMappingId
-                && objectWalEntryIndexVersion == that.objectWalEntryIndexVersion
-                && ncpVersion == that.ncpVersion && ntcVersion == that.ntcVersion
-                && checkpointVersion == that.checkpointVersion
-                && compactionStrategyVersion == that.compactionStrategyVersion
-                && kafkaFeatureLevel == that.kafkaFeatureLevel
-                && preparedAtMetadataOffset == that.preparedAtMetadataOffset
-                && activationEpoch == that.activationEpoch && preparedAtMillis == that.preparedAtMillis
-                && activatedAtMillis == that.activatedAtMillis && metadataVersion == that.metadataVersion
-                && kafkaClusterId.equals(that.kafkaClusterId)
-                && allowedStorageProfiles.equals(that.allowedStorageProfiles)
-                && defaultStorageProfile.equals(that.defaultStorageProfile)
-                && Arrays.equals(requiredCapabilitySha256, that.requiredCapabilitySha256)
-                && Arrays.equals(requiredBrokerSetSha256, that.requiredBrokerSetSha256);
+        return this == other
+                || other instanceof KafkaStorageProtocolActivationRecord that
+                        && recordVersion == that.recordVersion
+                        && lifecycleId == that.lifecycleId
+                        && protocolVersion == that.protocolVersion
+                        && apiVersion == that.apiVersion
+                        && streamHeadSessionVersion == that.streamHeadSessionVersion
+                        && bindingVersion == that.bindingVersion
+                        && payloadMappingId == that.payloadMappingId
+                        && objectWalEntryIndexVersion == that.objectWalEntryIndexVersion
+                        && ncpVersion == that.ncpVersion
+                        && ntcVersion == that.ntcVersion
+                        && checkpointVersion == that.checkpointVersion
+                        && compactionStrategyVersion == that.compactionStrategyVersion
+                        && kafkaFeatureLevel == that.kafkaFeatureLevel
+                        && preparedAtMetadataOffset == that.preparedAtMetadataOffset
+                        && activationEpoch == that.activationEpoch
+                        && preparedAtMillis == that.preparedAtMillis
+                        && activatedAtMillis == that.activatedAtMillis
+                        && metadataVersion == that.metadataVersion
+                        && kafkaClusterId.equals(that.kafkaClusterId)
+                        && allowedStorageProfiles.equals(that.allowedStorageProfiles)
+                        && defaultStorageProfile.equals(that.defaultStorageProfile)
+                        && Arrays.equals(requiredCapabilitySha256, that.requiredCapabilitySha256)
+                        && Arrays.equals(requiredBrokerSetSha256, that.requiredBrokerSetSha256);
     }
 
     @Override
     public int hashCode() {
         int result = Objects.hash(
-                recordVersion, lifecycleId, kafkaClusterId, protocolVersion, apiVersion,
-                streamHeadSessionVersion, bindingVersion, payloadMappingId,
-                objectWalEntryIndexVersion, ncpVersion, ntcVersion, checkpointVersion,
-                compactionStrategyVersion, allowedStorageProfiles, defaultStorageProfile,
-                kafkaFeatureLevel, preparedAtMetadataOffset, activationEpoch, preparedAtMillis,
-                activatedAtMillis, metadataVersion);
+                recordVersion,
+                lifecycleId,
+                kafkaClusterId,
+                protocolVersion,
+                apiVersion,
+                streamHeadSessionVersion,
+                bindingVersion,
+                payloadMappingId,
+                objectWalEntryIndexVersion,
+                ncpVersion,
+                ntcVersion,
+                checkpointVersion,
+                compactionStrategyVersion,
+                allowedStorageProfiles,
+                defaultStorageProfile,
+                kafkaFeatureLevel,
+                preparedAtMetadataOffset,
+                activationEpoch,
+                preparedAtMillis,
+                activatedAtMillis,
+                metadataVersion);
         result = 31 * result + Arrays.hashCode(requiredCapabilitySha256);
         return 31 * result + Arrays.hashCode(requiredBrokerSetSha256);
     }

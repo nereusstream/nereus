@@ -14,25 +14,19 @@
 
 package com.nereusstream.core.read;
 
-/** Metrics hook for M5 read amplification, backpressure, and index-cache behavior. */
+/**
+ * Metrics hook for M5 read amplification, backpressure, and index-cache behavior.
+ */
 public interface ReadMetricsObserver {
-    default void onSliceRead(
-            long fullSlicePayloadBytes,
-            long entryIndexBytes,
-            long returnedPayloadBytes) {
-    }
+    default void onSliceRead(long fullSlicePayloadBytes, long entryIndexBytes, long returnedPayloadBytes) {}
 
-    default void onBackpressureRejected(long requestedBufferBytes) {
-    }
+    default void onBackpressureRejected(long requestedBufferBytes) {}
 
-    default void onOffsetIndexCacheHit() {
-    }
+    default void onOffsetIndexCacheHit() {}
 
-    default void onOffsetIndexCacheMiss() {
-    }
+    default void onOffsetIndexCacheMiss() {}
 
     static ReadMetricsObserver noop() {
-        return new ReadMetricsObserver() {
-        };
+        return new ReadMetricsObserver() {};
     }
 }

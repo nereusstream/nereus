@@ -15,7 +15,6 @@
 package com.nereusstream.kafka.compaction;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.OffsetRange;
@@ -38,136 +37,131 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class KafkaCompactionBatchSourceTest {
-  @Test
-  void bindsTheExactReaderToTheRecoveredPlanStream() {
-    KafkaCompactionPlan plan = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED").plan();
-    AtomicReference<StreamId> requestedStream = new AtomicReference<>();
-    KafkaCompactionBatchSource source =
-        new KafkaCompactionBatchSource(
-            streamId -> {
-              requestedStream.set(streamId);
-              return (generation, options) ->
-                  CompletableFuture.completedFuture(exactRead(generation, new AtomicInteger()));
-            },
-            options(),
-            Runnable::run);
+    @Test
+    void bindsTheExactReaderToTheRecoveredPlanStream() {
+        KafkaCompactionPlan plan =
+                KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED").plan();
+        AtomicReference<StreamId> requestedStream = new AtomicReference<>();
+        KafkaCompactionBatchSource source = new KafkaCompactionBatchSource(
+                streamId -> {
+                    requestedStream.set(streamId);
+                    return (generation, options) ->
+                            CompletableFuture.completedFuture(exactRead(generation, new AtomicInteger()));
+                },
+                options(),
+                Runnable::run);
 
-    try (KafkaCompactionBatchSource.PassStreams ignored = source.open(plan)) {
-      assertThat(requestedStream).hasValue(plan.streamId());
+        try (KafkaCompactionBatchSource.PassStreams ignored = source.open(plan)) {
+            assertThat(requestedStream).hasValue(plan.streamId());
+        }
     }
-  }
 
-  @Test
-  void opensIndependentDecisionAndOutputStreamsFromTheRecoveredPlan() {
-    KafkaCompactionPlan plan = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED").plan();
-    AtomicInteger closes = new AtomicInteger();
-    ExactSourceRangeReader reader =
-        (source, options) -> CompletableFuture.completedFuture(exactRead(source, closes));
-    KafkaCompactionBatchSource source =
-        new KafkaCompactionBatchSource(reader, options(), Runnable::run);
+    @Test
+    void opensIndependentDecisionAndOutputStreamsFromTheRecoveredPlan() {
+        KafkaCompactionPlan plan =
+                KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED").plan();
+        AtomicInteger closes = new AtomicInteger();
+        ExactSourceRangeReader reader =
+                (source, options) -> CompletableFuture.completedFuture(exactRead(source, closes));
+        KafkaCompactionBatchSource source = new KafkaCompactionBatchSource(reader, options(), Runnable::run);
 
-    try (KafkaCompactionBatchSource.PassStreams passes = source.open(plan)) {
-      assertThat(collect(passes.decisionHorizon()).join())
-          .extracting(ReadBatch::range)
-          .containsExactly(new OffsetRange(0, 2), new OffsetRange(2, 3));
-      assertThat(collect(passes.outputCoverage()).join())
-          .extracting(ReadBatch::range)
-          .containsExactly(new OffsetRange(0, 2));
-      assertThat(closes).hasValue(3);
+        try (KafkaCompactionBatchSource.PassStreams passes = source.open(plan)) {
+            assertThat(collect(passes.decisionHorizon()).join())
+                    .extracting(ReadBatch::range)
+                    .containsExactly(new OffsetRange(0, 2), new OffsetRange(2, 3));
+            assertThat(collect(passes.outputCoverage()).join())
+                    .extracting(ReadBatch::range)
+                    .containsExactly(new OffsetRange(0, 2));
+            assertThat(closes).hasValue(3);
+        }
     }
-  }
 
-  private static ExactSourceRead exactRead(SourceGeneration source, AtomicInteger closes) {
-    ReadBatch batch =
-        new ReadBatch(
-            source.range(),
-            source.payloadFormat(),
-            new byte[Math.toIntExact(source.logicalBytes())],
-            source.schemaRefs(),
-            source.projectionRef(),
-            new ReadSourceRef(
+    private static ExactSourceRead exactRead(SourceGeneration source, AtomicInteger closes) {
+        ReadBatch batch = new ReadBatch(
                 source.range(),
-                source.generation(),
-                source.commitVersion(),
-                source.readTarget(),
-                source.targetIdentitySha256()));
-    return new ExactSourceRead() {
-      @Override
-      public SourceGeneration source() {
-        return source;
-      }
+                source.payloadFormat(),
+                new byte[Math.toIntExact(source.logicalBytes())],
+                source.schemaRefs(),
+                source.projectionRef(),
+                new ReadSourceRef(
+                        source.range(),
+                        source.generation(),
+                        source.commitVersion(),
+                        source.readTarget(),
+                        source.targetIdentitySha256()));
+        return new ExactSourceRead() {
+            @Override
+            public SourceGeneration source() {
+                return source;
+            }
 
-      @Override
-      public Flow.Publisher<ReadBatch> batches() {
-        return subscriber ->
-            subscriber.onSubscribe(
-                new Flow.Subscription() {
-                  private boolean emitted;
+            @Override
+            public Flow.Publisher<ReadBatch> batches() {
+                return subscriber -> subscriber.onSubscribe(new Flow.Subscription() {
+                    private boolean emitted;
 
-                  @Override
-                  public void request(long count) {
-                    if (emitted) {
-                      return;
+                    @Override
+                    public void request(long count) {
+                        if (emitted) {
+                            return;
+                        }
+                        emitted = true;
+                        subscriber.onNext(batch);
+                        subscriber.onComplete();
                     }
-                    emitted = true;
-                    subscriber.onNext(batch);
-                    subscriber.onComplete();
-                  }
 
-                  @Override
-                  public void cancel() {
-                    emitted = true;
-                  }
+                    @Override
+                    public void cancel() {
+                        emitted = true;
+                    }
                 });
-      }
+            }
 
-      @Override
-      public CompletableFuture<ExactSourceReadSummary> completion() {
-        return CompletableFuture.completedFuture(
-            new ExactSourceReadSummary(
-                source.range(),
-                source.recordCount(),
-                source.entryCount(),
-                source.logicalBytes(),
-                new Checksum(ChecksumType.SHA256, "e".repeat(64))));
-      }
+            @Override
+            public CompletableFuture<ExactSourceReadSummary> completion() {
+                return CompletableFuture.completedFuture(new ExactSourceReadSummary(
+                        source.range(),
+                        source.recordCount(),
+                        source.entryCount(),
+                        source.logicalBytes(),
+                        new Checksum(ChecksumType.SHA256, "e".repeat(64))));
+            }
 
-      @Override
-      public void close() {
-        closes.incrementAndGet();
-      }
-    };
-  }
+            @Override
+            public void close() {
+                closes.incrementAndGet();
+            }
+        };
+    }
 
-  private static CompletableFuture<List<ReadBatch>> collect(Flow.Publisher<ReadBatch> publisher) {
-    CompletableFuture<List<ReadBatch>> completion = new CompletableFuture<>();
-    ArrayList<ReadBatch> batches = new ArrayList<>();
-    publisher.subscribe(
-        new Flow.Subscriber<>() {
-          @Override
-          public void onSubscribe(Flow.Subscription subscription) {
-            subscription.request(Long.MAX_VALUE);
-          }
+    private static CompletableFuture<List<ReadBatch>> collect(Flow.Publisher<ReadBatch> publisher) {
+        CompletableFuture<List<ReadBatch>> completion = new CompletableFuture<>();
+        ArrayList<ReadBatch> batches = new ArrayList<>();
+        publisher.subscribe(new Flow.Subscriber<>() {
+            @Override
+            public void onSubscribe(Flow.Subscription subscription) {
+                subscription.request(Long.MAX_VALUE);
+            }
 
-          @Override
-          public void onNext(ReadBatch item) {
-            batches.add(item);
-          }
+            @Override
+            public void onNext(ReadBatch item) {
+                batches.add(item);
+            }
 
-          @Override
-          public void onError(Throwable throwable) {
-            completion.completeExceptionally(throwable);
-          }
+            @Override
+            public void onError(Throwable throwable) {
+                completion.completeExceptionally(throwable);
+            }
 
-          @Override
-          public void onComplete() {
-            completion.complete(List.copyOf(batches));
-          }
+            @Override
+            public void onComplete() {
+                completion.complete(List.copyOf(batches));
+            }
         });
-    return completion;
-  }
+        return completion;
+    }
 
-  private static ReadOptions options() {
-    return new ReadOptions(64, 1 << 20, ReadIsolation.COMMITTED, Duration.ofSeconds(10));
-  }
+    private static ReadOptions options() {
+        return new ReadOptions(64, 1 << 20, ReadIsolation.COMMITTED, Duration.ofSeconds(10));
+    }
 }

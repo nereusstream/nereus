@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static com.nereusstream.materialization.GenerationPublicationTestSupport.CLUSTER;
 import static com.nereusstream.materialization.GenerationPublicationTestSupport.STREAM;
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectKeyHash;
@@ -48,23 +48,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 class StreamRegistrationRetirementWorkflowTest {
-    private static final Clock RETIREMENT_CLOCK = Clock.fixed(
-            Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
+    private static final Clock RETIREMENT_CLOCK = Clock.fixed(Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
 
     @Test
     void nonTerminalTaskAndLiveIndexBlockWithoutMutation() {
-        try (GenerationPublicationTestSupport.Context context =
-                GenerationPublicationTestSupport.context()) {
+        try (GenerationPublicationTestSupport.Context context = GenerationPublicationTestSupport.context()) {
             StreamRegistrationRetirementResult nonTerminal = coordinator(
-                            context,
-                            context.generations(),
-                            context.physical(),
-                            RETIREMENT_CLOCK)
+                            context, context.generations(), context.physical(), RETIREMENT_CLOCK)
                     .retire(STREAM)
                     .join();
 
-            assertThat(nonTerminal.status())
-                    .isEqualTo(StreamRegistrationRetirementStatus.TASK_NOT_TERMINAL);
+            assertThat(nonTerminal.status()).isEqualTo(StreamRegistrationRetirementStatus.TASK_NOT_TERMINAL);
             assertThat(context.generations()
                             .getTask(CLUSTER, STREAM, context.task().taskId())
                             .join())
@@ -74,22 +68,16 @@ class StreamRegistrationRetirementWorkflowTest {
                             .join())
                     .isPresent();
 
-            context.committer(
-                            context.generations(),
-                            GenerationPublicationTestSupport.successfulGuard())
+            context.committer(context.generations(), GenerationPublicationTestSupport.successfulGuard())
                     .publish(context.task(), context.output())
                     .join();
 
             StreamRegistrationRetirementResult liveIndex = coordinator(
-                            context,
-                            context.generations(),
-                            context.physical(),
-                            RETIREMENT_CLOCK)
+                            context, context.generations(), context.physical(), RETIREMENT_CLOCK)
                     .retire(STREAM)
                     .join();
 
-            assertThat(liveIndex.status())
-                    .isEqualTo(StreamRegistrationRetirementStatus.INDEX_STILL_LIVE);
+            assertThat(liveIndex.status()).isEqualTo(StreamRegistrationRetirementStatus.INDEX_STILL_LIVE);
             assertThat(context.generations()
                             .getStreamRegistration(CLUSTER, STREAM)
                             .join())
@@ -100,25 +88,18 @@ class StreamRegistrationRetirementWorkflowTest {
 
     @Test
     void auditGraceBlocksTerminalTaskBeforeAnyOwnerRetirement() {
-        try (GenerationPublicationTestSupport.Context context =
-                GenerationPublicationTestSupport.context()) {
-            context.committer(
-                            context.generations(),
-                            GenerationPublicationTestSupport.successfulGuard())
+        try (GenerationPublicationTestSupport.Context context = GenerationPublicationTestSupport.context()) {
+            context.committer(context.generations(), GenerationPublicationTestSupport.successfulGuard())
                     .publish(context.task(), context.output())
                     .join();
             List<VersionedObjectProtection> protections = allProtections(context);
 
             StreamRegistrationRetirementResult result = coordinator(
-                            context,
-                            context.generations(),
-                            context.physical(),
-                            GenerationPublicationTestSupport.CLOCK)
+                            context, context.generations(), context.physical(), GenerationPublicationTestSupport.CLOCK)
                     .retire(STREAM)
                     .join();
 
-            assertThat(result.status())
-                    .isEqualTo(StreamRegistrationRetirementStatus.AUDIT_GRACE_PENDING);
+            assertThat(result.status()).isEqualTo(StreamRegistrationRetirementStatus.AUDIT_GRACE_PENDING);
             assertThat(allProtections(context)).isEqualTo(protections);
             assertThat(scanIndexes(context.generations())).hasSize(2);
             assertThat(context.generations()
@@ -134,11 +115,8 @@ class StreamRegistrationRetirementWorkflowTest {
 
     @Test
     void retiresPublishedWorkflowOwnersAcrossDeleteResponseLossButKeepsPhysicalRoots() {
-        try (GenerationPublicationTestSupport.Context context =
-                GenerationPublicationTestSupport.context()) {
-            context.committer(
-                            context.generations(),
-                            GenerationPublicationTestSupport.successfulGuard())
+        try (GenerationPublicationTestSupport.Context context = GenerationPublicationTestSupport.context()) {
+            context.committer(context.generations(), GenerationPublicationTestSupport.successfulGuard())
                     .publish(context.task(), context.output())
                     .join();
             retireAllIndexes(context.generations());
@@ -154,18 +132,11 @@ class StreamRegistrationRetirementWorkflowTest {
             AtomicBoolean loseRegistrationDelete = new AtomicBoolean(true);
             AtomicBoolean loseProtectionDelete = new AtomicBoolean(true);
             GenerationMetadataStore generations = loseFirstGenerationDeleteResponses(
-                    context.generations(),
-                    loseIndexDelete,
-                    loseTaskDelete,
-                    loseRegistrationDelete);
-            PhysicalObjectMetadataStore physical = loseFirstProtectionDeleteResponse(
-                    context.physical(), loseProtectionDelete);
+                    context.generations(), loseIndexDelete, loseTaskDelete, loseRegistrationDelete);
+            PhysicalObjectMetadataStore physical =
+                    loseFirstProtectionDeleteResponse(context.physical(), loseProtectionDelete);
 
-            StreamRegistrationRetirementResult result = coordinator(
-                            context,
-                            generations,
-                            physical,
-                            RETIREMENT_CLOCK)
+            StreamRegistrationRetirementResult result = coordinator(context, generations, physical, RETIREMENT_CLOCK)
                     .retire(STREAM)
                     .join();
 
@@ -204,18 +175,13 @@ class StreamRegistrationRetirementWorkflowTest {
                 deletedL0(),
                 generations,
                 physical,
+                subject -> CompletableFuture.completedFuture(new GenerationProjectionAuthoritySnapshot(
+                        subject,
+                        false,
+                        Optional.empty(),
+                        List.of(new GcAuthorityToken("/projection/registration-retirement", 1, sha('a'))))),
                 subject -> CompletableFuture.completedFuture(
-                        new GenerationProjectionAuthoritySnapshot(
-                                subject,
-                                false,
-                                Optional.empty(),
-                                List.of(new GcAuthorityToken(
-                                        "/projection/registration-retirement",
-                                        1,
-                                        sha('a'))))),
-                subject -> CompletableFuture.completedFuture(
-                        StreamRetirementReferenceAuthoritySnapshot.complete(
-                                subject, 0, List.of())),
+                        StreamRetirementReferenceAuthoritySnapshot.complete(subject, 0, List.of())),
                 unavailableCheckpointCodec(),
                 config(),
                 Duration.ofMillis(500),
@@ -246,8 +212,7 @@ class StreamRegistrationRetirementWorkflowTest {
                     case "toString" -> "DeletedRegistrationRetirementL0";
                     case "hashCode" -> System.identityHashCode(proxy);
                     case "equals" -> proxy == arguments[0];
-                    default -> throw new AssertionError(
-                            "root-absent retirement must not call " + method.getName());
+                    default -> throw new AssertionError("root-absent retirement must not call " + method.getName());
                 });
     }
 
@@ -255,14 +220,7 @@ class StreamRegistrationRetirementWorkflowTest {
         ArrayList<VersionedGenerationIndex> indexes = new ArrayList<>();
         Optional<F4ScanToken> continuation = Optional.empty();
         do {
-            var page = store.scanIndex(
-                            CLUSTER,
-                            STREAM,
-                            ReadView.COMMITTED,
-                            0,
-                            Long.MAX_VALUE,
-                            continuation,
-                            1)
+            var page = store.scanIndex(CLUSTER, STREAM, ReadView.COMMITTED, 0, Long.MAX_VALUE, continuation, 1)
                     .join();
             for (VersionedGenerationCandidate candidate : page.values()) {
                 assertThat(candidate).isInstanceOf(VersionedGenerationIndex.class);
@@ -297,10 +255,7 @@ class StreamRegistrationRetirementWorkflowTest {
     }
 
     private static GenerationIndexRecord indexState(
-            GenerationIndexRecord current,
-            GenerationLifecycle lifecycle,
-            String reason,
-            long changedAtMillis) {
+            GenerationIndexRecord current, GenerationLifecycle lifecycle, String reason, long changedAtMillis) {
         return new GenerationIndexRecord(
                 current.schemaVersion(),
                 current.streamId(),
@@ -335,30 +290,19 @@ class StreamRegistrationRetirementWorkflowTest {
     }
 
     private static ObjectKeyHash sourceObject(GenerationPublicationTestSupport.Context context) {
-        ObjectSliceReadTarget target = (ObjectSliceReadTarget) context.task()
-                .sources()
-                .get(0)
-                .readTarget();
+        ObjectSliceReadTarget target =
+                (ObjectSliceReadTarget) context.task().sources().get(0).readTarget();
         return ObjectKeyHash.from(target.objectKey());
     }
 
-    private static List<VersionedObjectProtection> allProtections(
-            GenerationPublicationTestSupport.Context context) {
+    private static List<VersionedObjectProtection> allProtections(GenerationPublicationTestSupport.Context context) {
         ArrayList<VersionedObjectProtection> protections = new ArrayList<>();
         protections.addAll(context.physical()
-                .scanProtections(
-                        CLUSTER,
-                        sourceObject(context),
-                        Optional.empty(),
-                        100)
+                .scanProtections(CLUSTER, sourceObject(context), Optional.empty(), 100)
                 .join()
                 .values());
         protections.addAll(context.physical()
-                .scanProtections(
-                        CLUSTER,
-                        context.output().objectKeyHash(),
-                        Optional.empty(),
-                        100)
+                .scanProtections(CLUSTER, context.output().objectKeyHash(), Optional.empty(), 100)
                 .join()
                 .values());
         return List.copyOf(protections);
@@ -375,18 +319,18 @@ class StreamRegistrationRetirementWorkflowTest {
                 (proxy, method, arguments) -> {
                     try {
                         Object result = method.invoke(delegate, arguments);
-                        AtomicBoolean loss = switch (method.getName()) {
-                            case "deleteIndex" -> loseIndexDelete;
-                            case "deleteTask" -> loseTaskDelete;
-                            case "deleteStreamRegistration" -> loseRegistrationDelete;
-                            default -> null;
-                        };
+                        AtomicBoolean loss =
+                                switch (method.getName()) {
+                                    case "deleteIndex" -> loseIndexDelete;
+                                    case "deleteTask" -> loseTaskDelete;
+                                    case "deleteStreamRegistration" -> loseRegistrationDelete;
+                                    default -> null;
+                                };
                         if (loss != null && loss.compareAndSet(true, false)) {
                             @SuppressWarnings("unchecked")
                             CompletableFuture<Void> deleted = (CompletableFuture<Void>) result;
                             return deleted.thenCompose(ignored -> CompletableFuture.failedFuture(
-                                    new IllegalStateException(
-                                            "lost " + method.getName() + " response")));
+                                    new IllegalStateException("lost " + method.getName() + " response")));
                         }
                         return result;
                     } catch (InvocationTargetException failure) {
@@ -396,21 +340,18 @@ class StreamRegistrationRetirementWorkflowTest {
     }
 
     private static PhysicalObjectMetadataStore loseFirstProtectionDeleteResponse(
-            PhysicalObjectMetadataStore delegate,
-            AtomicBoolean loseResponse) {
+            PhysicalObjectMetadataStore delegate, AtomicBoolean loseResponse) {
         return (PhysicalObjectMetadataStore) Proxy.newProxyInstance(
                 PhysicalObjectMetadataStore.class.getClassLoader(),
                 new Class<?>[] {PhysicalObjectMetadataStore.class},
                 (proxy, method, arguments) -> {
                     try {
                         Object result = method.invoke(delegate, arguments);
-                        if (method.getName().equals("deleteProtection")
-                                && loseResponse.compareAndSet(true, false)) {
+                        if (method.getName().equals("deleteProtection") && loseResponse.compareAndSet(true, false)) {
                             @SuppressWarnings("unchecked")
                             CompletableFuture<Void> deleted = (CompletableFuture<Void>) result;
                             return deleted.thenCompose(ignored -> CompletableFuture.failedFuture(
-                                    new IllegalStateException(
-                                            "lost deleteProtection response")));
+                                    new IllegalStateException("lost deleteProtection response")));
                         }
                         return result;
                     } catch (InvocationTargetException failure) {
@@ -424,8 +365,7 @@ class StreamRegistrationRetirementWorkflowTest {
                 RecoveryCheckpointCodecV1.class.getClassLoader(),
                 new Class<?>[] {RecoveryCheckpointCodecV1.class},
                 (proxy, method, arguments) -> {
-                    throw new AssertionError(
-                            "root-absent retirement must not call " + method.getName());
+                    throw new AssertionError("root-absent retirement must not call " + method.getName());
                 });
     }
 
@@ -452,7 +392,6 @@ class StreamRegistrationRetirementWorkflowTest {
     }
 
     private static Checksum sha(char value) {
-        return new Checksum(
-                ChecksumType.SHA256, String.valueOf(value).repeat(64));
+        return new Checksum(ChecksumType.SHA256, String.valueOf(value).repeat(64));
     }
 }

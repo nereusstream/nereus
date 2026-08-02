@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
-/** Outcome of one bounded stream-registration retirement attempt. */
+/**
+ * Outcome of one bounded stream-registration retirement attempt.
+ */
 public enum StreamRegistrationRetirementStatus {
     DISABLED,
     DRY_RUN,

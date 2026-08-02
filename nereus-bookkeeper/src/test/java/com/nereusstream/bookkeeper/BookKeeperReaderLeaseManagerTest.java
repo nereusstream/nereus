@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
@@ -47,10 +47,12 @@ class BookKeeperReaderLeaseManagerTest {
             assertThat(readerLeases(runtime, root.value().ledgerId())).hasSize(1);
 
             clock.setMillis(100_000);
-            BookKeeperReaderLeaseManager.Lease renewed = manager.claim(root, TIMEOUT).join();
+            BookKeeperReaderLeaseManager.Lease renewed =
+                    manager.claim(root, TIMEOUT).join();
             assertThat(renewed.value().readerSlot()).isEqualTo(first.value().readerSlot());
             assertThat(renewed.value().leaseEpoch()).isEqualTo(2);
-            assertThat(first.revalidate().join().value().ledgerId()).isEqualTo(root.value().ledgerId());
+            assertThat(first.revalidate().join().value().ledgerId())
+                    .isEqualTo(root.value().ledgerId());
 
             first.release().join();
             second.release().join();
@@ -78,7 +80,9 @@ class BookKeeperReaderLeaseManagerTest {
             var durable = readerLeases(runtime, root.value().ledgerId());
             assertThat(durable).hasSize(runtime.configuration.maxReaderLeasesPerLedger());
             assertThat(durable).extracting(value -> value.value().readerSlot()).doesNotHaveDuplicates();
-            assertThat(durable).extracting(value -> value.value().processRunId()).doesNotHaveDuplicates();
+            assertThat(durable)
+                    .extracting(value -> value.value().processRunId())
+                    .doesNotHaveDuplicates();
 
             BookKeeperReaderLeaseManager overflow = new BookKeeperReaderLeaseManager(
                     BookKeeperPrimaryWalAppenderTest.CLUSTER,
@@ -108,15 +112,18 @@ class BookKeeperReaderLeaseManagerTest {
                     runtime.metadata,
                     BookKeeperPrimaryWalAppenderTest.CLOCK,
                     "reader-revalidation");
-            BookKeeperReaderLeaseManager.Lease lease = manager.claim(root, TIMEOUT).join();
-            var durable = runtime.metadata.getReaderLease(
+            BookKeeperReaderLeaseManager.Lease lease =
+                    manager.claim(root, TIMEOUT).join();
+            var durable = runtime.metadata
+                    .getReaderLease(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             runtime.configuration.providerScopeSha256(),
                             root.value().ledgerId(),
                             lease.value().readerSlot())
                     .join()
                     .orElseThrow();
-            runtime.metadata.deleteReaderLease(
+            runtime.metadata
+                    .deleteReaderLease(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             runtime.configuration.providerScopeSha256(),
                             root.value().ledgerId(),
@@ -159,7 +166,8 @@ class BookKeeperReaderLeaseManagerTest {
                     metadata,
                     clock,
                     "reader-renewal-failure");
-            BookKeeperReaderLeaseManager.Lease first = manager.claim(root, TIMEOUT).join();
+            BookKeeperReaderLeaseManager.Lease first =
+                    manager.claim(root, TIMEOUT).join();
             clock.setMillis(100_000);
             failRenewal.set(true);
 
@@ -174,27 +182,25 @@ class BookKeeperReaderLeaseManagerTest {
                     com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord>
             appendAndRoot(BookKeeperPrimaryWalAppenderTest.Runtime runtime) {
         DurablePrimaryAppend durable;
-        try (BookKeeperPreparedPrimaryAppend prepared = runtime.appender.prepare(
-                BookKeeperPrimaryWalAppenderTest.request(
-                        BookKeeperPrimaryWalAppenderTest.session(),
-                        "reader-lease-manager",
-                        10,
-                        new byte[] {1}))) {
+        try (BookKeeperPreparedPrimaryAppend prepared =
+                runtime.appender.prepare(BookKeeperPrimaryWalAppenderTest.request(
+                        BookKeeperPrimaryWalAppenderTest.session(), "reader-lease-manager", 10, new byte[] {1}))) {
             durable = runtime.appender.persist(prepared, TIMEOUT).join();
         }
         long ledgerId = ((BookKeeperEntryRangeReadTarget) durable.readTarget()).ledgerId();
-        return runtime.metadata.getRoot(
-                        BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                        runtime.configuration.providerScopeSha256(),
-                        ledgerId)
+        return runtime.metadata
+                .getRoot(
+                        BookKeeperPrimaryWalAppenderTest.CLUSTER, runtime.configuration.providerScopeSha256(), ledgerId)
                 .join()
                 .orElseThrow();
     }
 
-    private static List<com.nereusstream.metadata.oxia.BookKeeperVersionedValue<
-                    com.nereusstream.metadata.oxia.records.BookKeeperLedgerReaderLeaseRecord>>
+    private static List<
+                    com.nereusstream.metadata.oxia.BookKeeperVersionedValue<
+                            com.nereusstream.metadata.oxia.records.BookKeeperLedgerReaderLeaseRecord>>
             readerLeases(BookKeeperPrimaryWalAppenderTest.Runtime runtime, long ledgerId) {
-        return runtime.metadata.scanReaderLeases(
+        return runtime.metadata
+                .scanReaderLeases(
                         BookKeeperPrimaryWalAppenderTest.CLUSTER,
                         runtime.configuration.providerScopeSha256(),
                         ledgerId,
@@ -222,7 +228,9 @@ class BookKeeperReaderLeaseManagerTest {
 
         @Override
         public Clock withZone(ZoneId zone) {
-            if (!ZoneOffset.UTC.equals(zone)) throw new IllegalArgumentException("test clock is UTC");
+            if (!ZoneOffset.UTC.equals(zone)) {
+                throw new IllegalArgumentException("test clock is UTC");
+            }
             return this;
         }
 

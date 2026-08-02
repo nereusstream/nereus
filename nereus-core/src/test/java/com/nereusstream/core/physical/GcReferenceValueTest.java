@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectKey;
@@ -54,15 +54,10 @@ class GcReferenceValueTest {
     @Test
     void snapshotsAreCanonicalCompleteOrVetoProofs() {
         GcReferenceQuery query = GcReferenceQuery.create(
-                GcReferenceQueryKind.REFERENCED_OBJECT,
-                object(),
-                List.of(new StreamId("stream-a")),
-                SHA_A);
-        List<GcAuthorityToken> authorities = List.of(
-                new GcAuthorityToken("/authority/a", 1, SHA_A),
-                new GcAuthorityToken("/authority/b", 2, SHA_B));
-        List<GcReference> references = List.of(
-                new GcReference("generation", "g-1", "/owner/a", 3, SHA_A));
+                GcReferenceQueryKind.REFERENCED_OBJECT, object(), List.of(new StreamId("stream-a")), SHA_A);
+        List<GcAuthorityToken> authorities =
+                List.of(new GcAuthorityToken("/authority/a", 1, SHA_A), new GcAuthorityToken("/authority/b", 2, SHA_B));
+        List<GcReference> references = List.of(new GcReference("generation", "g-1", "/owner/a", 3, SHA_A));
 
         GcReferenceSnapshot snapshot = GcReferenceSnapshot.create(
                 "generation-v1",
@@ -77,91 +72,49 @@ class GcReferenceValueTest {
         assertThat(snapshot.snapshotSha256().type()).isEqualTo(ChecksumType.SHA256);
 
         assertThatThrownBy(() -> GcReferenceSnapshot.create(
-                        "generation-v1", 1, query.queryIdentitySha256(),
-                        false, false, 3, 1, authorities, references))
+                        "generation-v1", 1, query.queryIdentitySha256(), false, false, 3, 1, authorities, references))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> GcReferenceSnapshot.create(
-                        "generation-v1", 1, query.queryIdentitySha256(),
-                        true, false, 3, 1, authorities, references))
+                        "generation-v1", 1, query.queryIdentitySha256(), true, false, 3, 1, authorities, references))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> GcReferenceSnapshot.create(
-                        "generation-v1", 1, query.queryIdentitySha256(),
-                        true, false, 2, 1,
-                        List.of(authorities.get(1), authorities.get(0)), references))
+                        "generation-v1",
+                        1,
+                        query.queryIdentitySha256(),
+                        true,
+                        false,
+                        2,
+                        1,
+                        List.of(authorities.get(1), authorities.get(0)),
+                        references))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void activationProofLocksLiveAndDeletionSubjectCombinations() {
         LiveProjectionSubject live = new LiveProjectionSubject(
-                new StreamId("stream-a"),
-                new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "projection-a"),
-                SHA_A);
+                new StreamId("stream-a"), new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "projection-a"), SHA_A);
         GenerationActivationProof publication = GenerationActivationProof.create(
-                GenerationOperation.GENERATION_PUBLISH,
-                live,
-                7,
-                8,
-                9,
-                SHA_B,
-                true,
-                false,
-                10);
-        assertThat(publication.subjectSha256())
-                .isEqualTo(GenerationActivationProof.subjectSha256(live));
-        GenerationActivationProof logicalTrim =
-                GenerationActivationProof.create(
-                        GenerationOperation.LOGICAL_TRIM,
-                        live,
-                        7,
-                        8,
-                        9,
-                        SHA_B,
-                        true,
-                        false,
-                        10);
+                GenerationOperation.GENERATION_PUBLISH, live, 7, 8, 9, SHA_B, true, false, 10);
+        assertThat(publication.subjectSha256()).isEqualTo(GenerationActivationProof.subjectSha256(live));
+        GenerationActivationProof logicalTrim = GenerationActivationProof.create(
+                GenerationOperation.LOGICAL_TRIM, live, 7, 8, 9, SHA_B, true, false, 10);
         assertThat(logicalTrim.publicationEnabled()).isTrue();
         assertThat(logicalTrim.deletionEnabled()).isFalse();
 
         GcReferenceQuery query = GcReferenceQuery.create(
-                GcReferenceQueryKind.REFERENCED_OBJECT,
-                object(),
-                List.of(new StreamId("stream-a")),
-                SHA_A);
+                GcReferenceQueryKind.REFERENCED_OBJECT, object(), List.of(new StreamId("stream-a")), SHA_A);
         DomainValidatedDeletionSubject deletion = new DomainValidatedDeletionSubject(query, SHA_B);
         assertThat(GenerationActivationProof.create(
-                        GenerationOperation.PHYSICAL_DELETE,
-                        deletion,
-                        0,
-                        8,
-                        9,
-                        SHA_A,
-                        false,
-                        true,
-                        10).operation())
+                                GenerationOperation.PHYSICAL_DELETE, deletion, 0, 8, 9, SHA_A, false, true, 10)
+                        .operation())
                 .isEqualTo(GenerationOperation.PHYSICAL_DELETE);
 
         assertThatThrownBy(() -> GenerationActivationProof.create(
-                        GenerationOperation.PHYSICAL_DELETE,
-                        live,
-                        7,
-                        8,
-                        9,
-                        SHA_A,
-                        true,
-                        true,
-                        10))
+                        GenerationOperation.PHYSICAL_DELETE, live, 7, 8, 9, SHA_A, true, true, 10))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> GenerationActivationProof.create(
-                        GenerationOperation.PHYSICAL_DELETE,
-                        deletion,
-                        1,
-                        8,
-                        9,
-                        SHA_A,
-                        false,
-                        true,
-                        10))
+                        GenerationOperation.PHYSICAL_DELETE, deletion, 1, 8, 9, SHA_A, false, true, 10))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

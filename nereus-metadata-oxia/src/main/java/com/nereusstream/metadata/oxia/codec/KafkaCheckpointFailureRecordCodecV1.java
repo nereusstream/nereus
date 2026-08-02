@@ -1,11 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureRecord;
 
-/** Closed explicit-field codec for one immutable NKC1 quarantine audit. */
-public final class KafkaCheckpointFailureRecordCodecV1
-        extends AbstractF4RecordCodecV1<KafkaCheckpointFailureRecord> {
+/**
+ * Closed explicit-field codec for one immutable NKC1 quarantine audit.
+ */
+public final class KafkaCheckpointFailureRecordCodecV1 extends AbstractF4RecordCodecV1<KafkaCheckpointFailureRecord> {
     public KafkaCheckpointFailureRecordCodecV1() {
         super(KafkaCheckpointFailureRecord.class);
     }
@@ -36,20 +38,19 @@ public final class KafkaCheckpointFailureRecordCodecV1
     public KafkaCheckpointFailureRecord decode(byte[] bytes) {
         try {
             F4Binary.Reader reader = reader(bytes);
-            KafkaCheckpointFailureRecord value =
-                    new KafkaCheckpointFailureRecord(
-                            reader.readInt("formatVersion"),
-                            reader.readString("kafkaClusterId"),
-                            reader.readString("topicId"),
-                            reader.readInt("partitionId"),
-                            reader.readLong("partitionIncarnation"),
-                            reader.readString("objectId"),
-                            reader.readFixedBytes("referenceSha256", 32),
-                            reader.readInt("sourceId"),
-                            reader.readString("failureCode"),
-                            reader.readFixedBytes("failureSha256", 32),
-                            reader.readLong("quarantinedAtMillis"),
-                            reader.readLong("metadataVersion"));
+            KafkaCheckpointFailureRecord value = new KafkaCheckpointFailureRecord(
+                    reader.readInt("formatVersion"),
+                    reader.readString("kafkaClusterId"),
+                    reader.readString("topicId"),
+                    reader.readInt("partitionId"),
+                    reader.readLong("partitionIncarnation"),
+                    reader.readString("objectId"),
+                    reader.readFixedBytes("referenceSha256", 32),
+                    reader.readInt("sourceId"),
+                    reader.readString("failureCode"),
+                    reader.readFixedBytes("failureSha256", 32),
+                    reader.readLong("quarantinedAtMillis"),
+                    reader.readLong("metadataVersion"));
             reader.requireConsumed();
             return value;
         } catch (RuntimeException failure) {

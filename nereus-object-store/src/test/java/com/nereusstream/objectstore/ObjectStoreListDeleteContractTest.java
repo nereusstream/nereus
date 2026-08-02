@@ -16,7 +16,6 @@ package com.nereusstream.objectstore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -52,8 +51,8 @@ class ObjectStoreListDeleteContractTest {
             Optional<String> token = Optional.empty();
             List<ListedObject> listed = new ArrayList<>();
             do {
-                ListObjectsResult page = store.listObjects(
-                        prefix, token, new ListObjectsOptions(2, TIMEOUT)).join();
+                ListObjectsResult page = store.listObjects(prefix, token, new ListObjectsOptions(2, TIMEOUT))
+                        .join();
                 assertThat(page.prefix()).isEqualTo(prefix);
                 assertThat(page.objects()).hasSizeLessThanOrEqualTo(2);
                 listed.addAll(page.objects());
@@ -62,10 +61,10 @@ class ObjectStoreListDeleteContractTest {
                 assertThat(token).isNotEqualTo(previous);
             } while (token.isPresent());
 
-            assertThat(listed).extracting(value -> value.key().value())
+            assertThat(listed)
+                    .extracting(value -> value.key().value())
                     .containsExactly("compact/a", "compact/b", "compact/c");
-            assertThat(listed).extracting(ListedObject::objectLength)
-                    .containsExactly(1L, 2L, 3L);
+            assertThat(listed).extracting(ListedObject::objectLength).containsExactly(1L, 2L, 3L);
         }
     }
 
@@ -74,22 +73,19 @@ class ObjectStoreListDeleteContractTest {
         try (LocalFileObjectStore store = new LocalFileObjectStore(temporary.resolve("delete"))) {
             PutObjectResult put = put(store, "gc/object", "immutable");
             ObjectKey key = put.key();
-            DeleteObjectOptions wrong = new DeleteObjectOptions(
-                    put.objectLength() + 1,
-                    put.checksum(),
-                    Optional.of(put.etag()),
-                    TIMEOUT);
+            DeleteObjectOptions wrong =
+                    new DeleteObjectOptions(put.objectLength() + 1, put.checksum(), Optional.of(put.etag()), TIMEOUT);
 
             assertThatThrownBy(() -> store.deleteObject(key, wrong).join())
-                    .satisfies(error -> assertThat(unwrap(error).code())
-                            .isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH));
-            assertThat(store.headObject(key, new HeadObjectOptions(TIMEOUT)).join().objectLength())
+                    .satisfies(error -> assertThat(unwrap(error).code()).isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH));
+            assertThat(store.headObject(key, new HeadObjectOptions(TIMEOUT))
+                            .join()
+                            .objectLength())
                     .isEqualTo(put.objectLength());
 
-            DeleteObjectOptions exact = new DeleteObjectOptions(
-                    put.objectLength(), put.checksum(), Optional.of(put.etag()), TIMEOUT);
-            assertThat(store.deleteObject(key, exact).join().status())
-                    .isEqualTo(DeleteObjectResult.Status.DELETED);
+            DeleteObjectOptions exact =
+                    new DeleteObjectOptions(put.objectLength(), put.checksum(), Optional.of(put.etag()), TIMEOUT);
+            assertThat(store.deleteObject(key, exact).join().status()).isEqualTo(DeleteObjectResult.Status.DELETED);
             assertThat(store.deleteObject(key, exact).join().status())
                     .isEqualTo(DeleteObjectResult.Status.ALREADY_ABSENT);
         }
@@ -97,32 +93,22 @@ class ObjectStoreListDeleteContractTest {
 
     @Test
     void listAndDeleteValueTypesRejectUnboundedOrAmbiguousInputs() {
-        assertThatThrownBy(() -> new ListObjectsOptions(0, TIMEOUT))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ListObjectsOptions(1_001, TIMEOUT))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ListObjectsResult(
-                        new ObjectKeyPrefix("p/"), List.of(), Optional.of("next")))
+        assertThatThrownBy(() -> new ListObjectsOptions(0, TIMEOUT)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ListObjectsOptions(1_001, TIMEOUT)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ListObjectsResult(new ObjectKeyPrefix("p/"), List.of(), Optional.of("next")))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new DeleteObjectOptions(
-                        -1,
-                        new Checksum(ChecksumType.CRC32C, "00000000"),
-                        Optional.empty(),
-                        TIMEOUT))
+                        -1, new Checksum(ChecksumType.CRC32C, "00000000"), Optional.empty(), TIMEOUT))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static PutObjectResult put(LocalFileObjectStore store, String key, String value) {
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
         return store.putObject(
-                new ObjectKey(key),
-                ByteBuffer.wrap(bytes),
-                new PutObjectOptions(
-                        "application/octet-stream",
-                        Crc32cChecksums.checksum(bytes),
-                        true,
-                        Map.of(),
-                        TIMEOUT))
+                        new ObjectKey(key),
+                        ByteBuffer.wrap(bytes),
+                        new PutObjectOptions(
+                                "application/octet-stream", Crc32cChecksums.checksum(bytes), true, Map.of(), TIMEOUT))
                 .join();
     }
 

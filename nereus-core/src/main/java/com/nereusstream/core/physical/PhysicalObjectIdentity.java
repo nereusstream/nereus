@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.Checksum;
@@ -10,7 +11,9 @@ import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Exact immutable identity registered under one physical-object deletion root. */
+/**
+ * Exact immutable identity registered under one physical-object deletion root.
+ */
 public record PhysicalObjectIdentity(
         ObjectKey objectKey,
         ObjectKeyHash objectKeyHash,
@@ -73,9 +76,7 @@ public record PhysicalObjectIdentity(
         return new PhysicalObjectIdentity(
                 new ObjectKey(root.objectKey()),
                 new ObjectKeyHash(root.objectKeyHash()),
-                root.objectId().isEmpty()
-                        ? Optional.empty()
-                        : Optional.of(new ObjectId(root.objectId())),
+                root.objectId().isEmpty() ? Optional.empty() : Optional.of(new ObjectId(root.objectId())),
                 PhysicalObjectKind.fromWireId(root.objectKindId()),
                 root.objectLength(),
                 new Checksum(ChecksumType.valueOf(root.storageChecksumType()), root.storageChecksumValue()),

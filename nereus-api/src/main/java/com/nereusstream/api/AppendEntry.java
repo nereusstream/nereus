@@ -17,12 +17,10 @@ package com.nereusstream.api;
 import java.util.Map;
 import java.util.Objects;
 
-/** One caller-visible append entry. */
-public record AppendEntry(
-        byte[] payload,
-        int recordCount,
-        long eventTimeMillis,
-        Map<String, String> attributes) {
+/**
+ * One caller-visible append entry.
+ */
+public record AppendEntry(byte[] payload, int recordCount, long eventTimeMillis, Map<String, String> attributes) {
     public AppendEntry {
         Objects.requireNonNull(payload, "payload");
         if (payload.length > ApiLimits.MAX_ENTRY_PAYLOAD_BYTES) {
@@ -30,9 +28,7 @@ public record AppendEntry(
         }
         payload = payload.clone();
         attributes = MetadataCanonicalizer.canonicalStringMap(
-                attributes,
-                ApiLimits.MAX_ENTRY_ATTRIBUTES_ENCODED_BYTES,
-                "attributes");
+                attributes, ApiLimits.MAX_ENTRY_ATTRIBUTES_ENCODED_BYTES, "attributes");
         if (recordCount <= 0) {
             throw new IllegalArgumentException("recordCount must be positive");
         }

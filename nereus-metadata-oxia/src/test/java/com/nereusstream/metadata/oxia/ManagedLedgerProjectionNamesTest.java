@@ -16,7 +16,6 @@ package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import org.junit.jupiter.api.Test;
 
 class ManagedLedgerProjectionNamesTest {
@@ -36,7 +35,8 @@ class ManagedLedgerProjectionNamesTest {
     void validatesStrictUtf8AndTheExactEncodedLimit() {
         String exactLimit = "x".repeat(ManagedLedgerProjectionNames.MAX_MANAGED_LEDGER_NAME_BYTES);
 
-        assertThat(ManagedLedgerProjectionNames.requireManagedLedgerName(exactLimit)).isSameAs(exactLimit);
+        assertThat(ManagedLedgerProjectionNames.requireManagedLedgerName(exactLimit))
+                .isSameAs(exactLimit);
         assertThatThrownBy(() -> ManagedLedgerProjectionNames.requireManagedLedgerName(" "))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> ManagedLedgerProjectionNames.requireManagedLedgerName("a\0b"))

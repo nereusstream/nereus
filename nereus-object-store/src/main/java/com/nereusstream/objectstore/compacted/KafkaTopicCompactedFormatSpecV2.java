@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import java.util.Objects;
 
-/** Exact Kafka-specific identities frozen into NTC2 metadata and policy hashes. */
+/**
+ * Exact Kafka-specific identities frozen into NTC2 metadata and policy hashes.
+ */
 public record KafkaTopicCompactedFormatSpecV2(
         String strategyId,
         long strategyVersion,

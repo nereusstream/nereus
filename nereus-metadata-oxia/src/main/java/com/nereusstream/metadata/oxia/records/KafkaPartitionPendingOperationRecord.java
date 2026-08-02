@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import java.util.Objects;
@@ -20,10 +21,16 @@ public record KafkaPartitionPendingOperationRecord(
         Objects.requireNonNull(attemptId, "attemptId");
         Objects.requireNonNull(ownerId, "ownerId");
         lastErrorCode = KafkaMetadataValidation.bounded(lastErrorCode, "lastErrorCode");
-        if (targetMetadataOffset < 0) throw new IllegalArgumentException("targetMetadataOffset must be non-negative");
+        if (targetMetadataOffset < 0) {
+            throw new IllegalArgumentException("targetMetadataOffset must be non-negative");
+        }
         if (type == KafkaPartitionOperationType.NONE) {
-            if (!attemptId.isEmpty() || !ownerId.isEmpty() || ownerEpoch != 0
-                    || leaseExpiresAtMillis != 0 || startedAtMillis != 0 || !lastErrorCode.isEmpty()) {
+            if (!attemptId.isEmpty()
+                    || !ownerId.isEmpty()
+                    || ownerEpoch != 0
+                    || leaseExpiresAtMillis != 0
+                    || startedAtMillis != 0
+                    || !lastErrorCode.isEmpty()) {
                 throw new IllegalArgumentException("NONE operation fields must be empty");
             }
         } else {

@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -48,10 +48,8 @@ class ParquetV2CompactedTargetReaderTest {
         StreamId streamId = new StreamId("s-ncp2-cross-object-limit");
         OffsetRange firstCoverage = new OffsetRange(10, 11);
         OffsetRange secondCoverage = new OffsetRange(11, 12);
-        ObjectSliceReadTarget firstTarget =
-                target(streamId, firstCoverage, ReadView.COMMITTED);
-        ObjectSliceReadTarget secondTarget =
-                target(streamId, secondCoverage, ReadView.COMMITTED);
+        ObjectSliceReadTarget firstTarget = target(streamId, firstCoverage, ReadView.COMMITTED);
+        ObjectSliceReadTarget secondTarget = target(streamId, secondCoverage, ReadView.COMMITTED);
         byte[] payload = new byte[70];
         List<FirstEntryPolicy> policies = new ArrayList<>();
         List<Integer> byteLimits = new ArrayList<>();
@@ -61,32 +59,17 @@ class ParquetV2CompactedTargetReaderTest {
                     byteLimits.add(request.maxBytes());
                     if (request.startOffset() == 10) {
                         RangedCompactedObjectRow row = new RangedCompactedObjectRow(
-                                10,
-                                1,
-                                0,
-                                ByteBuffer.wrap(payload),
-                                crc(payload),
-                                OptionalLong.empty());
+                                10, 1, 0, ByteBuffer.wrap(payload), crc(payload), OptionalLong.empty());
                         return java.util.concurrent.CompletableFuture.completedFuture(
                                 new RangedCompactedObjectReadResult(
-                                        metadata(
-                                                streamId,
-                                                firstCoverage,
-                                                ReadView.COMMITTED,
-                                                1,
-                                                1,
-                                                1,
-                                                payload.length),
+                                        metadata(streamId, firstCoverage, ReadView.COMMITTED, 1, 1, 1, payload.length),
                                         List.of(row),
                                         11,
                                         100,
                                         10));
                     }
-                    return java.util.concurrent.CompletableFuture.failedFuture(
-                            new NereusException(
-                                    ErrorCode.READ_LIMIT_TOO_SMALL,
-                                    false,
-                                    "next object entry exceeds the remaining limit"));
+                    return java.util.concurrent.CompletableFuture.failedFuture(new NereusException(
+                            ErrorCode.READ_LIMIT_TOO_SMALL, false, "next object entry exceeds the remaining limit"));
                 },
                 ignored -> java.util.concurrent.CompletableFuture.failedFuture(
                         new AssertionError("NTC2 reader must not run")));
@@ -95,36 +78,21 @@ class ParquetV2CompactedTargetReaderTest {
                 ReadView.COMMITTED,
                 ReadBoundaryMode.CONTAINING_ENTRY,
                 FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
-                new ReadOptions(
-                        100,
-                        100,
-                        ReadIsolation.COMMITTED,
-                        Duration.ofSeconds(10)));
+                new ReadOptions(100, 100, ReadIsolation.COMMITTED, Duration.ofSeconds(10)));
 
         PhysicalReadResult result = reader.readPhysicalWithStats(
                         streamId,
                         request,
                         List.of(
-                                resolved(
-                                        firstCoverage,
-                                        firstTarget,
-                                        1,
-                                        1,
-                                        payload.length),
-                                resolved(
-                                        secondCoverage,
-                                        secondTarget,
-                                        1,
-                                        1,
-                                        payload.length)))
+                                resolved(firstCoverage, firstTarget, 1, 1, payload.length),
+                                resolved(secondCoverage, secondTarget, 1, 1, payload.length)))
                 .join();
 
-        assertThat(result.batches()).singleElement()
-                .satisfies(batch -> assertThat(batch.range()).isEqualTo(firstCoverage));
+        assertThat(result.batches()).singleElement().satisfies(batch -> assertThat(batch.range())
+                .isEqualTo(firstCoverage));
         assertThat(result.sourceCoverageEndOffset()).hasValue(11);
-        assertThat(policies).containsExactly(
-                FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
-                FirstEntryPolicy.LEGACY_STRICT_LIMIT);
+        assertThat(policies)
+                .containsExactly(FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW, FirstEntryPolicy.LEGACY_STRICT_LIMIT);
         assertThat(byteLimits).containsExactly(100, 30);
     }
 
@@ -135,20 +103,16 @@ class ParquetV2CompactedTargetReaderTest {
         ObjectSliceReadTarget target = target(streamId, coverage, ReadView.COMMITTED);
         ResolvedRange range = resolved(coverage, target, 3, 1, 3);
         byte[] payload = "abc".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        RangedCompactedObjectRow row = new RangedCompactedObjectRow(
-                10, 3, 0, ByteBuffer.wrap(payload), crc(payload), OptionalLong.empty());
+        RangedCompactedObjectRow row =
+                new RangedCompactedObjectRow(10, 3, 0, ByteBuffer.wrap(payload), crc(payload), OptionalLong.empty());
         ParquetV2CompactedTargetReader reader = new ParquetV2CompactedTargetReader(
-                ignored -> java.util.concurrent.CompletableFuture.completedFuture(
-                        new RangedCompactedObjectReadResult(
-                                metadata(streamId, coverage, ReadView.COMMITTED, 3, 3, 1, 3),
-                                List.of(row), 13, 100, 10)),
+                ignored -> java.util.concurrent.CompletableFuture.completedFuture(new RangedCompactedObjectReadResult(
+                        metadata(streamId, coverage, ReadView.COMMITTED, 3, 3, 1, 3), List.of(row), 13, 100, 10)),
                 ignored -> java.util.concurrent.CompletableFuture.failedFuture(
                         new AssertionError("NTC2 reader must not run")));
 
         PhysicalReadResult result = reader.readPhysicalWithStats(
-                        streamId,
-                        request(11, ReadView.COMMITTED, ReadBoundaryMode.CONTAINING_ENTRY),
-                        List.of(range))
+                        streamId, request(11, ReadView.COMMITTED, ReadBoundaryMode.CONTAINING_ENTRY), List.of(range))
                 .join();
 
         assertThat(result.batches()).hasSize(1);
@@ -165,20 +129,29 @@ class ParquetV2CompactedTargetReaderTest {
         ResolvedRange range = resolved(coverage, target, 10, 1, 1);
         byte[] payload = new byte[] {7};
         KafkaTopicCompactedObjectRow row = new KafkaTopicCompactedObjectRow(
-                23, 1, KafkaCompactionDispositionV2.RETAIN_UNKEYED,
-                KafkaCompactionKeyEncodingV2.nullKey(23), ByteBuffer.wrap(payload), crc(payload),
-                23, 0, sha256('9'), OptionalLong.empty());
+                23,
+                1,
+                KafkaCompactionDispositionV2.RETAIN_UNKEYED,
+                KafkaCompactionKeyEncodingV2.nullKey(23),
+                ByteBuffer.wrap(payload),
+                crc(payload),
+                23,
+                0,
+                sha256('9'),
+                OptionalLong.empty());
         ParquetV2CompactedTargetReader reader = new ParquetV2CompactedTargetReader(
                 ignored -> java.util.concurrent.CompletableFuture.failedFuture(
                         new AssertionError("NCP2 reader must not run")),
-                ignored -> java.util.concurrent.CompletableFuture.completedFuture(
-                        new KafkaTopicCompactedObjectReadResult(
+                ignored ->
+                        java.util.concurrent.CompletableFuture.completedFuture(new KafkaTopicCompactedObjectReadResult(
                                 metadata(streamId, coverage, ReadView.TOPIC_COMPACTED, 10, 1, 1, 1),
-                                List.of(row), 30, 100, 10)));
+                                List.of(row),
+                                30,
+                                100,
+                                10)));
         ReadRequest request = request(21, ReadView.TOPIC_COMPACTED, ReadBoundaryMode.EXACT_START);
 
-        PhysicalReadResult physical = new ReadTargetDispatcher(
-                        new ReadTargetReaderRegistry(List.of(reader)))
+        PhysicalReadResult physical = new ReadTargetDispatcher(new ReadTargetReaderRegistry(List.of(reader)))
                 .read(streamId, request, List.of(range))
                 .join();
 
@@ -193,14 +166,17 @@ class ParquetV2CompactedTargetReaderTest {
 
     private static ReadRequest request(long start, ReadView view, ReadBoundaryMode boundary) {
         return new ReadRequest(
-                start, view, boundary, FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
+                start,
+                view,
+                boundary,
+                FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
                 new ReadOptions(100, 100, ReadIsolation.COMMITTED, Duration.ofSeconds(10)));
     }
 
     private static ObjectSliceReadTarget target(StreamId streamId, OffsetRange coverage, ReadView view) {
         Checksum content = sha256('a');
-        com.nereusstream.api.ObjectKey key = CompactedObjectFormatV2.objectKey(
-                "test-cluster", view, streamId, coverage, content, "a".repeat(26));
+        com.nereusstream.api.ObjectKey key =
+                CompactedObjectFormatV2.objectKey("test-cluster", view, streamId, coverage, content, "a".repeat(26));
         com.nereusstream.api.ObjectId objectId = CompactedObjectFormatV2.objectId(key);
         EntryIndexRef footer = new EntryIndexRef(
                 EntryIndexLocation.OBJECT_FOOTER,
@@ -211,21 +187,32 @@ class ParquetV2CompactedTargetReaderTest {
                 10,
                 new Checksum(ChecksumType.CRC32C, "00000001"));
         return new ObjectSliceReadTarget(
-                1, objectId, key, ObjectType.STREAM_COMPACTED_OBJECT,
-                CompactedObjectFormatV2.physicalFormat(view), CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT,
-                coverage.startOffset() + "-" + coverage.endOffset(), 0, 100,
-                new Checksum(ChecksumType.CRC32C, "00000002"), footer);
+                1,
+                objectId,
+                key,
+                ObjectType.STREAM_COMPACTED_OBJECT,
+                CompactedObjectFormatV2.physicalFormat(view),
+                CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT,
+                coverage.startOffset() + "-" + coverage.endOffset(),
+                0,
+                100,
+                new Checksum(ChecksumType.CRC32C, "00000002"),
+                footer);
     }
 
     private static ResolvedRange resolved(
-            OffsetRange coverage,
-            ObjectSliceReadTarget target,
-            int records,
-            int entries,
-            long logicalBytes) {
+            OffsetRange coverage, ObjectSliceReadTarget target, int records, int entries, long logicalBytes) {
         return new ResolvedRange(
-                coverage, 2, target, PayloadFormat.KAFKA_RECORD_BATCH,
-                records, entries, logicalBytes, List.of(), Optional.empty(), 1);
+                coverage,
+                2,
+                target,
+                PayloadFormat.KAFKA_RECORD_BATCH,
+                records,
+                entries,
+                logicalBytes,
+                List.of(),
+                Optional.empty(),
+                1);
     }
 
     private static RangedCompactedObjectMetadata metadata(
@@ -237,15 +224,33 @@ class ParquetV2CompactedTargetReaderTest {
             int entries,
             long logicalBytes) {
         return new RangedCompactedObjectMetadata(
-                view, streamId, coverage, sha256('1'), sha256('2'), "a".repeat(26),
-                PayloadFormat.KAFKA_RECORD_BATCH, CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT,
-                CompactedObjectFormatV2.RANGE_MODEL, sourceRecords, outputRecords, entries,
-                logicalBytes, 100 + logicalBytes, "test", "UNCOMPRESSED", 2,
+                view,
+                streamId,
+                coverage,
+                sha256('1'),
+                sha256('2'),
+                "a".repeat(26),
+                PayloadFormat.KAFKA_RECORD_BATCH,
+                CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT,
+                CompactedObjectFormatV2.RANGE_MODEL,
+                sourceRecords,
+                outputRecords,
+                entries,
+                logicalBytes,
+                100 + logicalBytes,
+                "test",
+                "UNCOMPRESSED",
+                2,
                 view == ReadView.COMMITTED
                         ? Optional.empty()
                         : Optional.of(new KafkaTopicCompactedFormatSpecV2(
-                                "latest", 1, CompactedObjectFormatV2.KAFKA_KEY_CODEC,
-                                CompactedObjectFormatV2.KAFKA_REWRITE_CODEC, sha256('3'), 1, entries)));
+                                "latest",
+                                1,
+                                CompactedObjectFormatV2.KAFKA_KEY_CODEC,
+                                CompactedObjectFormatV2.KAFKA_REWRITE_CODEC,
+                                sha256('3'),
+                                1,
+                                entries)));
     }
 
     private static Checksum sha256(char value) {

@@ -1,6 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.kafka.partition.KafkaPartitionIdentity;
@@ -17,19 +20,19 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 class DefaultNereusKafkaRuntimeTest {
     @Test
     void startIsOperationOwnedDeduplicatedAndPublishesReadiness() {
         FakeManager manager = new FakeManager(CompletableFuture.completedFuture(null));
         CompletableFuture<Void> startup = new CompletableFuture<>();
         AtomicInteger starts = new AtomicInteger();
-        DefaultNereusKafkaRuntime runtime = runtime(manager, () -> {
-            starts.incrementAndGet();
-            return startup;
-        }, new KafkaRuntimeResources(List.of()));
+        DefaultNereusKafkaRuntime runtime = runtime(
+                manager,
+                () -> {
+                    starts.incrementAndGet();
+                    return startup;
+                },
+                new KafkaRuntimeResources(List.of()));
 
         CompletableFuture<Void> first = runtime.start().toCompletableFuture();
         CompletableFuture<Void> second = runtime.start().toCompletableFuture();
@@ -40,8 +43,8 @@ class DefaultNereusKafkaRuntimeTest {
         startup.complete(null);
 
         assertThat(second).isCompletedWithValue(null);
-        assertThat(runtime.health()).isEqualTo(new KafkaStorageHealth(
-                KafkaStorageAdmissionState.READY, true, "runtime ready"));
+        assertThat(runtime.health())
+                .isEqualTo(new KafkaStorageHealth(KafkaStorageAdmissionState.READY, true, "runtime ready"));
         runtime.admission().requireReady("produce");
     }
 
@@ -50,16 +53,18 @@ class DefaultNereusKafkaRuntimeTest {
         CompletableFuture<Void> managerDrain = new CompletableFuture<>();
         FakeManager manager = new FakeManager(managerDrain);
         List<String> closes = new java.util.ArrayList<>();
-        KafkaRuntimeResources resources = new KafkaRuntimeResources(List.of(
-                KafkaRuntimeResources.Resource.owned("provider", () -> closes.add("provider"))));
-        DefaultNereusKafkaRuntime runtime = runtime(
-                manager, () -> CompletableFuture.completedFuture(null), resources);
+        KafkaRuntimeResources resources = new KafkaRuntimeResources(
+                List.of(KafkaRuntimeResources.Resource.owned("provider", () -> closes.add("provider"))));
+        DefaultNereusKafkaRuntime runtime = runtime(manager, () -> CompletableFuture.completedFuture(null), resources);
         runtime.start().toCompletableFuture().join();
 
-        CompletableFuture<Void> drain = runtime.beginDrain(DrainReason.BROKER_SHUTDOWN).toCompletableFuture();
+        CompletableFuture<Void> drain =
+                runtime.beginDrain(DrainReason.BROKER_SHUTDOWN).toCompletableFuture();
         assertThat(runtime.health().state()).isEqualTo(KafkaStorageAdmissionState.DRAINING);
         assertRejected(runtime, ErrorCode.METADATA_UNAVAILABLE, true);
-        assertThatThrownBy(() -> runtime.awaitDrained(Duration.ofMillis(10)).toCompletableFuture().join())
+        assertThatThrownBy(() -> runtime.awaitDrained(Duration.ofMillis(10))
+                        .toCompletableFuture()
+                        .join())
                 .isInstanceOf(CompletionException.class)
                 .hasCauseInstanceOf(TimeoutException.class);
         assertThat(drain).isNotDone();
@@ -81,8 +86,8 @@ class DefaultNereusKafkaRuntimeTest {
     void lateStartupCannotReopenDrainAndStartupFailureStaysNotReady() {
         FakeManager drainingManager = new FakeManager(CompletableFuture.completedFuture(null));
         CompletableFuture<Void> lateStartup = new CompletableFuture<>();
-        DefaultNereusKafkaRuntime draining = runtime(
-                drainingManager, () -> lateStartup, new KafkaRuntimeResources(List.of()));
+        DefaultNereusKafkaRuntime draining =
+                runtime(drainingManager, () -> lateStartup, new KafkaRuntimeResources(List.of()));
         CompletableFuture<Void> start = draining.start().toCompletableFuture();
         draining.beginDrain(DrainReason.STARTUP_FAILURE);
         lateStartup.complete(null);
@@ -148,8 +153,7 @@ class DefaultNereusKafkaRuntimeTest {
 
         backgroundStop.complete(null);
         assertThat(manager.shutdowns).hasValue(1);
-        assertThat(events)
-                .containsExactly("background-start", "background-stop", "manager-shutdown");
+        assertThat(events).containsExactly("background-start", "background-stop", "manager-shutdown");
         assertThat(drain).isNotDone();
         managerDrain.complete(null);
         assertThat(drain).isCompletedWithValue(null);
@@ -181,15 +185,13 @@ class DefaultNereusKafkaRuntimeTest {
                 new KafkaRuntimeResources(List.of()));
         runtime.start().toCompletableFuture().join();
 
-        assertThatThrownBy(() -> runtime
-                        .beginDrain(DrainReason.BROKER_SHUTDOWN)
+        assertThatThrownBy(() -> runtime.beginDrain(DrainReason.BROKER_SHUTDOWN)
                         .toCompletableFuture()
                         .join())
                 .isInstanceOf(CompletionException.class)
                 .cause()
                 .isSameAs(backgroundFailure)
-                .satisfies(failure ->
-                        assertThat(failure.getSuppressed()).containsExactly(managerFailure));
+                .satisfies(failure -> assertThat(failure.getSuppressed()).containsExactly(managerFailure));
         assertThat(manager.shutdowns).hasValue(1);
     }
 
@@ -197,14 +199,10 @@ class DefaultNereusKafkaRuntimeTest {
             KafkaPartitionStorageManager manager,
             java.util.function.Supplier<CompletableFuture<Void>> startup,
             KafkaRuntimeResources resources) {
-        return new DefaultNereusKafkaRuntime(
-                new KafkaStorageAdmission(), manager, startup, resources);
+        return new DefaultNereusKafkaRuntime(new KafkaStorageAdmission(), manager, startup, resources);
     }
 
-    private static void assertRejected(
-            DefaultNereusKafkaRuntime runtime,
-            ErrorCode expected,
-            boolean retriable) {
+    private static void assertRejected(DefaultNereusKafkaRuntime runtime, ErrorCode expected, boolean retriable) {
         assertThatThrownBy(() -> runtime.admission().requireReady("fetch"))
                 .isInstanceOfSatisfying(NereusException.class, failure -> {
                     assertThat(failure.code()).isEqualTo(expected);
@@ -234,17 +232,12 @@ class DefaultNereusKafkaRuntimeTest {
 
         @Override
         public CompletableFuture<Void> resign(
-                KafkaPartitionIdentity identity,
-                int observedLeaderEpoch,
-                Duration timeout) {
+                KafkaPartitionIdentity identity, int observedLeaderEpoch, Duration timeout) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         }
 
         @Override
-        public CompletableFuture<Void> delete(
-                KafkaPartitionIdentity identity,
-                long metadataOffset,
-                Duration timeout) {
+        public CompletableFuture<Void> delete(KafkaPartitionIdentity identity, long metadataOffset, Duration timeout) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         }
 
@@ -256,7 +249,9 @@ class DefaultNereusKafkaRuntimeTest {
         @Override
         public CompletableFuture<Void> shutdown() {
             shutdowns.incrementAndGet();
-            if (events != null) events.add("manager-shutdown");
+            if (events != null) {
+                events.add("manager-shutdown");
+            }
             return drain;
         }
 

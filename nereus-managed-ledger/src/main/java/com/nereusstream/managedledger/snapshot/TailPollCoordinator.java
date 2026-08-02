@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.snapshot;
 
 import com.nereusstream.api.StreamMetadata;
@@ -13,7 +14,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 
-/** Coalesces all local cursor tail waits into one timer and one metadata refresh. */
+/**
+ * Coalesces all local cursor tail waits into one timer and one metadata refresh.
+ */
 public final class TailPollCoordinator implements AutoCloseable {
     private final ScheduledExecutorService scheduler;
     private final Duration interval;
@@ -37,8 +40,8 @@ public final class TailPollCoordinator implements AutoCloseable {
     public void register(PendingReadWaiter waiter) {
         Objects.requireNonNull(waiter, "waiter");
         if (closed.get()) {
-            waiter.tryFail(new ManagedLedgerException.ManagedLedgerAlreadyClosedException(
-                    "tail poll coordinator is closed"));
+            waiter.tryFail(
+                    new ManagedLedgerException.ManagedLedgerAlreadyClosedException("tail poll coordinator is closed"));
             return;
         }
         waiters.add(waiter);
@@ -57,19 +60,23 @@ public final class TailPollCoordinator implements AutoCloseable {
     }
 
     private void schedule() {
-        if (waiters.isEmpty() || closed.get() || !scheduled.compareAndSet(false, true)) return;
+        if (waiters.isEmpty() || closed.get() || !scheduled.compareAndSet(false, true)) {
+            return;
+        }
         scheduler.schedule(this::poll, interval.toNanos(), TimeUnit.NANOSECONDS);
     }
 
     private void poll() {
-        if (closed.get()) return;
+        if (closed.get()) {
+            return;
+        }
         refresh.get().whenComplete((metadata, error) -> {
             scheduled.set(false);
             if (error == null) {
                 signal(metadata);
             } else {
-                ManagedLedgerException failure = new ManagedLedgerException(
-                        "Nereus tail metadata refresh failed", error);
+                ManagedLedgerException failure =
+                        new ManagedLedgerException("Nereus tail metadata refresh failed", error);
                 waiters.removeIf(waiter -> waiter.tryFail(failure));
             }
             schedule();
@@ -82,7 +89,9 @@ public final class TailPollCoordinator implements AutoCloseable {
 
     @Override
     public void close() {
-        if (!closed.compareAndSet(false, true)) return;
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
         ManagedLedgerException failure = new ManagedLedgerException.ManagedLedgerAlreadyClosedException(
                 "managed ledger closed while waiting at tail");
         waiters.removeIf(waiter -> waiter.tryFail(failure));

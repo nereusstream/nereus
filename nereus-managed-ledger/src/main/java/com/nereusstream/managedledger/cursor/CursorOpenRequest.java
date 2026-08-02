@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.Collections;
@@ -6,7 +7,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/** Complete protocol-neutral input for opening or creating one durable cursor. */
+/**
+ * Complete protocol-neutral input for opening or creating one durable cursor.
+ */
 public record CursorOpenRequest(
         InitialCursorPosition initialPosition,
         Map<String, Long> initialPositionProperties,
@@ -15,12 +18,9 @@ public record CursorOpenRequest(
         long observedCommittedEndOffset) {
     public CursorOpenRequest {
         Objects.requireNonNull(initialPosition, "initialPosition");
-        initialPositionProperties = immutableMap(
-                initialPositionProperties, "initialPositionProperties");
-        initialCursorProperties = immutableMap(
-                initialCursorProperties, "initialCursorProperties");
-        if (observedTrimOffset < 0
-                || observedCommittedEndOffset < observedTrimOffset) {
+        initialPositionProperties = immutableMap(initialPositionProperties, "initialPositionProperties");
+        initialCursorProperties = immutableMap(initialCursorProperties, "initialCursorProperties");
+        if (observedTrimOffset < 0 || observedCommittedEndOffset < observedTrimOffset) {
             throw new IllegalArgumentException("observed cursor bounds are invalid");
         }
     }

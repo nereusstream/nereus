@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -22,7 +23,6 @@ import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
-import com.nereusstream.metadata.oxia.TaskScanPage;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedMaterializationStreamRegistration;
@@ -41,15 +41,18 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Bounded whole-index DAG planner with deterministic overlap tiling and fixed-point eligibility. */
+/**
+ * Bounded whole-index DAG planner with deterministic overlap tiling and fixed-point eligibility.
+ */
 public final class DefaultMaterializationPlanner implements MaterializationPlanner {
     public static final int MAX_CANDIDATE_EDGES = 4_096;
     public static final int MAX_SCANNED_TASKS = 4_096;
 
-    private static final Comparator<SourceGeneration> EDGE_ORDER = Comparator
-            .comparingLong((SourceGeneration source) -> source.range().startOffset())
+    private static final Comparator<SourceGeneration> EDGE_ORDER = Comparator.comparingLong(
+                    (SourceGeneration source) -> source.range().startOffset())
             .thenComparingLong(source -> source.range().endOffset())
-            .thenComparing(Comparator.comparingLong(SourceGeneration::generation).reversed())
+            .thenComparing(
+                    Comparator.comparingLong(SourceGeneration::generation).reversed())
             .thenComparing(SourceGeneration::indexKey, DefaultMaterializationPlanner::compareUtf8);
 
     private final String cluster;
@@ -59,17 +62,8 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
     private final MaterializationStreamAuthorityMode authorityMode;
 
     public DefaultMaterializationPlanner(
-            String cluster,
-            OxiaMetadataStore l0Metadata,
-            GenerationMetadataStore generations,
-            int scanPageSize) {
-        this(
-                cluster,
-                l0Metadata,
-                generations,
-                scanPageSize,
-                MaterializationStreamAuthorityMode
-                        .PROJECTION_REQUIRED);
+            String cluster, OxiaMetadataStore l0Metadata, GenerationMetadataStore generations, int scanPageSize) {
+        this(cluster, l0Metadata, generations, scanPageSize, MaterializationStreamAuthorityMode.PROJECTION_REQUIRED);
     }
 
     public DefaultMaterializationPlanner(
@@ -85,16 +79,12 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             throw new IllegalArgumentException("scanPageSize must be in [1, 1000]");
         }
         this.scanPageSize = scanPageSize;
-        this.authorityMode = Objects.requireNonNull(
-                authorityMode, "authorityMode");
+        this.authorityMode = Objects.requireNonNull(authorityMode, "authorityMode");
     }
 
     @Override
     public CompletableFuture<List<MaterializationTask>> plan(
-            StreamId streamId,
-            OffsetRange requestedRange,
-            MaterializationPolicy policy,
-            int maxTasks) {
+            StreamId streamId, OffsetRange requestedRange, MaterializationPolicy policy, int maxTasks) {
         try {
             Objects.requireNonNull(streamId, "streamId");
             Objects.requireNonNull(requestedRange, "requestedRange");
@@ -105,8 +95,9 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             if (maxTasks <= 0 || maxTasks > 1_000) {
                 throw new IllegalArgumentException("maxTasks must be in [1, 1000]");
             }
-            return l0Metadata.getStreamSnapshot(cluster, streamId).thenCompose(snapshot ->
-                    generations.getStreamRegistration(cluster, streamId).thenCompose(registration ->
+            return l0Metadata.getStreamSnapshot(cluster, streamId).thenCompose(snapshot -> generations
+                    .getStreamRegistration(cluster, streamId)
+                    .thenCompose(registration ->
                             planSnapshot(streamId, requestedRange, policy, maxTasks, snapshot, registration)));
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
@@ -147,19 +138,20 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
                                 bounds.endOffset(),
                                 Optional.empty(),
                                 new ArrayList<>());
-        CompletableFuture<List<VersionedMaterializationTask>> tasks = scanTasks(
-                streamId, Optional.empty(), new ArrayList<>());
-        return sourceCandidates.thenCombine(
-                        targetCandidates,
-                        CandidateSets::new)
-                .thenCombine(tasks, (candidates, allTasks) -> buildPlan(
-                        streamId,
-                        policy,
-                        maxTasks,
-                        bounds,
-                        candidates.sources(),
-                        candidates.targets(),
-                        allTasks));
+        CompletableFuture<List<VersionedMaterializationTask>> tasks =
+                scanTasks(streamId, Optional.empty(), new ArrayList<>());
+        return sourceCandidates
+                .thenCombine(targetCandidates, CandidateSets::new)
+                .thenCombine(
+                        tasks,
+                        (candidates, allTasks) -> buildPlan(
+                                streamId,
+                                policy,
+                                maxTasks,
+                                bounds,
+                                candidates.sources(),
+                                candidates.targets(),
+                                allTasks));
     }
 
     private PlannerBounds requireBounds(
@@ -187,44 +179,35 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
         }
         if (!profile.objectMaterializationEnabled()) {
             throw new NereusException(
-                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
-                    false,
-                    "stream profile disables object materialization");
+                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE, false, "stream profile disables object materialization");
         }
-        VersionedMaterializationStreamRegistration exactRegistration = registration.orElseThrow(() ->
-                new NereusException(
-                        ErrorCode.METADATA_CONDITION_FAILED,
-                        true,
-                        "materialization stream registration is absent"));
+        VersionedMaterializationStreamRegistration exactRegistration =
+                registration.orElseThrow(() -> new NereusException(
+                        ErrorCode.METADATA_CONDITION_FAILED, true, "materialization stream registration is absent"));
         if (!exactRegistration.value().streamId().equals(streamId.value())) {
             throw invariant("materialization registration belongs to another stream", null);
         }
         StorageProfile registeredProfile;
         Optional<ProjectionRef> effectiveProjection;
         try {
-            registeredProfile = StorageProfile.valueOf(
-                    exactRegistration.value().storageProfile()).canonical();
-            effectiveProjection = ProjectionIdentity.decode(exactRegistration.value().projectionRef());
+            registeredProfile = StorageProfile.valueOf(exactRegistration.value().storageProfile())
+                    .canonical();
+            effectiveProjection =
+                    ProjectionIdentity.decode(exactRegistration.value().projectionRef());
         } catch (RuntimeException failure) {
             throw invariant("materialization registration contains an unsupported identity", failure);
         }
         boolean validAuthority;
-        if (authorityMode
-                == MaterializationStreamAuthorityMode
-                        .PROJECTION_REQUIRED) {
+        if (authorityMode == MaterializationStreamAuthorityMode.PROJECTION_REQUIRED) {
             validAuthority = effectiveProjection.isPresent();
         } else {
-            Checksum expected =
-                    DirectMaterializationStreamAuthority
-                            .identitySha256(streamId, profile);
+            Checksum expected = DirectMaterializationStreamAuthority.identitySha256(streamId, profile);
             validAuthority = effectiveProjection.isEmpty()
-                    && exactRegistration.value().projectionRef()
-                            .equals(
-                                    DirectMaterializationStreamAuthority
-                                            .encodedProjectionRef())
-                    && exactRegistration.value()
-                            .projectionIdentitySha256()
-                            .equals(expected.value());
+                    && exactRegistration
+                            .value()
+                            .projectionRef()
+                            .equals(DirectMaterializationStreamAuthority.encodedProjectionRef())
+                    && exactRegistration.value().projectionIdentitySha256().equals(expected.value());
         }
         if (registeredProfile != profile || !validAuthority) {
             throw new NereusException(
@@ -249,16 +232,10 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             long maximumOffsetEnd,
             Optional<F4ScanToken> continuation,
             ArrayList<VersionedGenerationCandidate> values) {
-        return generations.scanIndex(
-                        cluster,
-                        streamId,
-                        view,
-                        minimumOffsetEnd,
-                        maximumOffsetEnd,
-                        continuation,
-                        scanPageSize)
-                .thenCompose(page -> appendCandidatePage(
-                        streamId, view, minimumOffsetEnd, maximumOffsetEnd, values, page));
+        return generations
+                .scanIndex(cluster, streamId, view, minimumOffsetEnd, maximumOffsetEnd, continuation, scanPageSize)
+                .thenCompose(
+                        page -> appendCandidatePage(streamId, view, minimumOffsetEnd, maximumOffsetEnd, values, page));
     }
 
     private CompletableFuture<List<VersionedGenerationCandidate>> appendCandidatePage(
@@ -273,31 +250,25 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             return CompletableFuture.failedFuture(limit("generation candidate edge count exceeds 4096"));
         }
         if (page.continuation().isPresent()) {
-            return scanCandidates(
-                    streamId,
-                    view,
-                    minimumOffsetEnd,
-                    maximumOffsetEnd,
-                    page.continuation(),
-                    values);
+            return scanCandidates(streamId, view, minimumOffsetEnd, maximumOffsetEnd, page.continuation(), values);
         }
         return CompletableFuture.completedFuture(List.copyOf(values));
     }
 
     private CompletableFuture<List<VersionedMaterializationTask>> scanTasks(
-            StreamId streamId,
-            Optional<F4ScanToken> continuation,
-            ArrayList<VersionedMaterializationTask> values) {
-        return generations.scanTasks(cluster, streamId, continuation, scanPageSize).thenCompose(page -> {
-            values.addAll(page.values());
-            if (values.size() > MAX_SCANNED_TASKS) {
-                return CompletableFuture.failedFuture(limit("materialization task scan exceeds 4096"));
-            }
-            if (page.continuation().isPresent()) {
-                return scanTasks(streamId, page.continuation(), values);
-            }
-            return CompletableFuture.completedFuture(List.copyOf(values));
-        });
+            StreamId streamId, Optional<F4ScanToken> continuation, ArrayList<VersionedMaterializationTask> values) {
+        return generations
+                .scanTasks(cluster, streamId, continuation, scanPageSize)
+                .thenCompose(page -> {
+                    values.addAll(page.values());
+                    if (values.size() > MAX_SCANNED_TASKS) {
+                        return CompletableFuture.failedFuture(limit("materialization task scan exceeds 4096"));
+                    }
+                    if (page.continuation().isPresent()) {
+                        return scanTasks(streamId, page.continuation(), values);
+                    }
+                    return CompletableFuture.completedFuture(List.copyOf(values));
+                });
     }
 
     private List<MaterializationTask> buildPlan(
@@ -321,9 +292,8 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
                 .filter(source -> source.range().endOffset() <= bounds.endOffset())
                 .sorted(EDGE_ORDER)
                 .toList();
-        List<MaterializationTaskRecord> existingTasks = durableTasks.stream()
-                .map(VersionedMaterializationTask::value)
-                .toList();
+        List<MaterializationTaskRecord> existingTasks =
+                durableTasks.stream().map(VersionedMaterializationTask::value).toList();
         List<MaterializationTask> result = new ArrayList<>(Math.min(maxTasks, 16));
         long cursor = bounds.startOffset();
         int iterations = 0;
@@ -337,10 +307,7 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
                 throw invariant("planner path did not advance the source cursor", null);
             }
             MaterializationTask task = MaterializationTask.create(
-                    streamId,
-                    new OffsetRange(path.startOffset(), path.endOffset()),
-                    path.sources(),
-                    policy);
+                    streamId, new OffsetRange(path.startOffset(), path.endOffset()), path.sources(), policy);
             if (!eligible(task, policy)
                     || alreadyPublished(task, targetCandidates)
                     || exactTaskExists(task, existingTasks)) {
@@ -357,10 +324,7 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
     }
 
     private static Optional<Path> selectPath(
-            long cursor,
-            long maximumEndOffset,
-            List<SourceGeneration> edges,
-            MaterializationPolicy policy) {
+            long cursor, long maximumEndOffset, List<SourceGeneration> edges, MaterializationPolicy policy) {
         Map<Long, Map<PathState, Path>> pathsByEnd = new HashMap<>();
         Path best = null;
         for (SourceGeneration edge : edges) {
@@ -384,8 +348,8 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
                     continue;
                 }
                 PathState state = candidate.state();
-                Map<PathState, Path> atEnd = pathsByEnd.computeIfAbsent(
-                        candidate.endOffset(), ignored -> new HashMap<>());
+                Map<PathState, Path> atEnd =
+                        pathsByEnd.computeIfAbsent(candidate.endOffset(), ignored -> new HashMap<>());
                 Path current = atEnd.get(state);
                 if (current == null || compareSameEnd(candidate, current) < 0) {
                     atEnd.put(state, candidate);
@@ -405,18 +369,18 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             return true;
         }
         Checksum digest = policy.digestSha256();
-        boolean everySourceAlreadyCurrent = task.sources().stream().allMatch(source ->
-                source.generation() > 0
-                        && source.materializationPolicySha256().filter(digest::equals).isPresent()
+        boolean everySourceAlreadyCurrent = task.sources().stream()
+                .allMatch(source -> source.generation() > 0
+                        && source.materializationPolicySha256()
+                                .filter(digest::equals)
+                                .isPresent()
                         && source.readTarget() instanceof ObjectSliceReadTarget target
                         && target.objectType() == ObjectType.STREAM_COMPACTED_OBJECT
                         && target.physicalFormat().equals(policy.targetPhysicalFormat()));
         return !everySourceAlreadyCurrent || task.sources().size() >= policy.minMergeSourceRanges();
     }
 
-    private static boolean alreadyPublished(
-            MaterializationTask task,
-            List<VersionedGenerationCandidate> candidates) {
+    private static boolean alreadyPublished(MaterializationTask task, List<VersionedGenerationCandidate> candidates) {
         return candidates.stream()
                 .filter(VersionedGenerationIndex.class::isInstance)
                 .map(VersionedGenerationIndex.class::cast)
@@ -430,17 +394,13 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
                         && index.policySha256().equals(task.policyDigestSha256().value()));
     }
 
-    private static boolean exactTaskExists(
-            MaterializationTask task,
-            List<MaterializationTaskRecord> existing) {
+    private static boolean exactTaskExists(MaterializationTask task, List<MaterializationTaskRecord> existing) {
         return existing.stream().anyMatch(record -> record.taskId().equals(task.taskId()));
     }
 
-    private static boolean overlapsActiveTask(
-            MaterializationTask task,
-            List<MaterializationTaskRecord> existing) {
-        return existing.stream().anyMatch(record ->
-                record.readViewId() == task.view().wireId()
+    private static boolean overlapsActiveTask(MaterializationTask task, List<MaterializationTaskRecord> existing) {
+        return existing.stream()
+                .anyMatch(record -> record.readViewId() == task.view().wireId()
                         && record.policyId().equals(task.policy().policyId())
                         && record.policyVersion() == task.policy().policyVersion()
                         && active(record.lifecycle())
@@ -472,8 +432,8 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             if (generation != 0) {
                 return generation;
             }
-            int edgeEnd = Long.compare(
-                    rightEdge.range().endOffset(), leftEdge.range().endOffset());
+            int edgeEnd =
+                    Long.compare(rightEdge.range().endOffset(), leftEdge.range().endOffset());
             if (edgeEnd != 0) {
                 return edgeEnd;
             }
@@ -506,10 +466,7 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             // Normalize only that exact V1 mapping so a newer NCP2 prefix can safely replace a
             // retired BookKeeper prefix while the planner appends a still-readable BK tail.
             if (payloadFormat == PayloadFormat.KAFKA_RECORD_BATCH
-                    && object.logicalFormat()
-                            .equals(
-                                    CompactedObjectFormatV2
-                                            .KAFKA_LOGICAL_FORMAT)) {
+                    && object.logicalFormat().equals(CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT)) {
                 return payloadFormat.name();
             }
             return object.logicalFormat();
@@ -541,12 +498,10 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             long endOffset,
             long committedEndOffset,
             long headCommitVersion,
-            Optional<ProjectionRef> effectiveProjection) {
-    }
+            Optional<ProjectionRef> effectiveProjection) {}
 
     private record CandidateSets(
-            List<VersionedGenerationCandidate> sources,
-            List<VersionedGenerationCandidate> targets) {
+            List<VersionedGenerationCandidate> sources, List<VersionedGenerationCandidate> targets) {
         private CandidateSets {
             sources = List.copyOf(sources);
             targets = List.copyOf(targets);
@@ -565,16 +520,11 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
                     source.payloadFormat(),
                     source.projectionRef(),
                     source.schemaRefs(),
-                    DefaultMaterializationPlanner.logicalFormat(
-                            source.readTarget(), source.payloadFormat()));
+                    DefaultMaterializationPlanner.logicalFormat(source.readTarget(), source.payloadFormat()));
         }
     }
 
-    private record PathState(
-            long startOffset,
-            long cumulativeSizeAtStart,
-            Compatibility compatibility) {
-    }
+    private record PathState(long startOffset, long cumulativeSizeAtStart, Compatibility compatibility) {}
 
     private record Path(
             long startOffset,

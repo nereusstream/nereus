@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.AppendOutcome;
@@ -8,7 +9,9 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Owned Produce bytes safe to retain after the Kafka request thread returns. */
+/**
+ * Owned Produce bytes safe to retain after the Kafka request thread returns.
+ */
 public final class KafkaProduceBufferSnapshot implements AutoCloseable {
     private final byte[] bytes;
     private final KafkaByteBudget.Lease lease;
@@ -23,13 +26,16 @@ public final class KafkaProduceBufferSnapshot implements AutoCloseable {
         Objects.requireNonNull(requestBytes, "requestBytes");
         Objects.requireNonNull(budget, "budget");
         ByteBuffer source = requestBytes.duplicate();
-        if (!source.hasRemaining()) throw new IllegalArgumentException("Kafka Produce buffer cannot be empty");
+        if (!source.hasRemaining()) {
+            throw new IllegalArgumentException("Kafka Produce buffer cannot be empty");
+        }
         int bytes = source.remaining();
-        KafkaByteBudget.Lease lease = budget.tryAcquire(bytes).orElseThrow(() -> new NereusException(
-                ErrorCode.BACKPRESSURE_REJECTED,
-                true,
-                "Kafka Produce owned-buffer byte budget is exhausted",
-                AppendOutcome.KNOWN_NOT_COMMITTED));
+        KafkaByteBudget.Lease lease = budget.tryAcquire(bytes)
+                .orElseThrow(() -> new NereusException(
+                        ErrorCode.BACKPRESSURE_REJECTED,
+                        true,
+                        "Kafka Produce owned-buffer byte budget is exhausted",
+                        AppendOutcome.KNOWN_NOT_COMMITTED));
         try {
             byte[] copy = new byte[bytes];
             source.get(copy);
@@ -45,17 +51,23 @@ public final class KafkaProduceBufferSnapshot implements AutoCloseable {
     }
 
     public ByteBuffer buffer() {
-        if (closed.get()) throw new IllegalStateException("Kafka Produce buffer snapshot is closed");
+        if (closed.get()) {
+            throw new IllegalStateException("Kafka Produce buffer snapshot is closed");
+        }
         return ByteBuffer.wrap(bytes).asReadOnlyBuffer();
     }
 
     ByteBuffer mutableExecutionBuffer() {
-        if (closed.get()) throw new IllegalStateException("Kafka Produce buffer snapshot is closed");
+        if (closed.get()) {
+            throw new IllegalStateException("Kafka Produce buffer snapshot is closed");
+        }
         return ByteBuffer.wrap(bytes);
     }
 
     @Override
     public void close() {
-        if (closed.compareAndSet(false, true)) lease.close();
+        if (closed.compareAndSet(false, true)) {
+            lease.close();
+        }
     }
 }

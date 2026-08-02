@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectKey;
@@ -23,7 +23,6 @@ import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import java.security.SecureRandom;
-import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -41,24 +40,15 @@ class GcPlanTest {
         VersionedPhysicalObjectRoot active = activeRoot();
         GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
         GcCandidate candidate = candidate(config, active, query);
-        List<GcReferenceSnapshot> snapshots = List.of(
-                snapshot(query, "generation-v1", List.of(authority("/a", 1))));
-        List<GcPlannedProtectionRemoval> protections = List.of(protection(
-                candidate.object().objectKeyHash(), 1, 9, SHA_A));
-        List<GcPlannedMetadataRemoval> metadataRemovals = List.of(metadata(
-                "/metadata/generation-a", 12, SHA_A));
-        Checksum digest = GcPlan.computeReferenceSetSha256(
-                config, candidate, snapshots, protections, metadataRemovals);
+        List<GcReferenceSnapshot> snapshots = List.of(snapshot(query, "generation-v1", List.of(authority("/a", 1))));
+        List<GcPlannedProtectionRemoval> protections =
+                List.of(protection(candidate.object().objectKeyHash(), 1, 9, SHA_A));
+        List<GcPlannedMetadataRemoval> metadataRemovals = List.of(metadata("/metadata/generation-a", 12, SHA_A));
+        Checksum digest = GcPlan.computeReferenceSetSha256(config, candidate, snapshots, protections, metadataRemovals);
         VersionedPhysicalObjectRoot marked = markedRoot(active, ATTEMPT_ID, digest, 300, 500);
 
-        GcPlan plan = GcPlan.fromMarkedRoot(
-                config,
-                ATTEMPT_ID,
-                candidate,
-                snapshots,
-                protections,
-                metadataRemovals,
-                marked);
+        GcPlan plan =
+                GcPlan.fromMarkedRoot(config, ATTEMPT_ID, candidate, snapshots, protections, metadataRemovals, marked);
 
         assertThat(plan.referenceSetSha256()).isEqualTo(digest);
         assertThat(plan.markedRootMetadataVersion()).isEqualTo(8);
@@ -76,14 +66,11 @@ class GcPlanTest {
         VersionedPhysicalObjectRoot active = activeRoot();
         GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
         GcCandidate candidate = candidate(config, active, query);
-        List<GcReferenceSnapshot> snapshots = List.of(
-                snapshot(query, "generation-v1", List.of(authority("/a", 1))));
+        List<GcReferenceSnapshot> snapshots = List.of(snapshot(query, "generation-v1", List.of(authority("/a", 1))));
         List<GcPlannedMetadataRemoval> metadata = List.of(metadata("/metadata/a", 12, SHA_A));
 
-        Checksum first = GcPlan.computeReferenceSetSha256(
-                config, candidate, snapshots, List.of(), metadata);
-        Checksum second = GcPlan.computeReferenceSetSha256(
-                config, candidate, snapshots, List.of(), metadata);
+        Checksum first = GcPlan.computeReferenceSetSha256(config, candidate, snapshots, List.of(), metadata);
+        Checksum second = GcPlan.computeReferenceSetSha256(config, candidate, snapshots, List.of(), metadata);
         Checksum changedAuthority = GcPlan.computeReferenceSetSha256(
                 config,
                 candidate,
@@ -91,11 +78,7 @@ class GcPlanTest {
                 List.of(),
                 metadata);
         Checksum changedMetadataVersion = GcPlan.computeReferenceSetSha256(
-                config,
-                candidate,
-                snapshots,
-                List.of(),
-                List.of(metadata("/metadata/a", 13, SHA_B)));
+                config, candidate, snapshots, List.of(), List.of(metadata("/metadata/a", 13, SHA_B)));
 
         assertThat(second).isEqualTo(first);
         assertThat(changedAuthority).isNotEqualTo(first);
@@ -108,15 +91,12 @@ class GcPlanTest {
         VersionedPhysicalObjectRoot active = activeRoot();
         GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
         GcCandidate candidate = candidate(config, active, query);
-        List<GcReferenceSnapshot> snapshots = List.of(
-                snapshot(query, "generation-v1", List.of(authority("/a", 1))));
-        List<GcPlannedProtectionRemoval> protections = List.of(protection(
-                candidate.object().objectKeyHash(), 1, 9, SHA_A));
-        List<GcPlannedMetadataRemoval> removals = List.of(metadata(
-                "/metadata/generation-a", 12, SHA_A));
+        List<GcReferenceSnapshot> snapshots = List.of(snapshot(query, "generation-v1", List.of(authority("/a", 1))));
+        List<GcPlannedProtectionRemoval> protections =
+                List.of(protection(candidate.object().objectKeyHash(), 1, 9, SHA_A));
+        List<GcPlannedMetadataRemoval> removals = List.of(metadata("/metadata/generation-a", 12, SHA_A));
 
-        Checksum fromSnapshots = GcPlan.computeReferenceSetSha256(
-                config, candidate, snapshots, protections, removals);
+        Checksum fromSnapshots = GcPlan.computeReferenceSetSha256(config, candidate, snapshots, protections, removals);
         Checksum fromProofs = GcPlanValidation.referenceSetSha256(
                 query.queryIdentitySha256(),
                 snapshots.stream().map(GcDomainSnapshotProof::from).toList(),
@@ -139,12 +119,8 @@ class GcPlanTest {
         VersionedPhysicalObjectRoot active = activeRoot();
         GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
         GcCandidate candidate = candidate(config, active, query);
-        GcReference reference = new GcReference(
-                "generation-index",
-                "stream-a/1/42",
-                "/metadata/generation-a",
-                12,
-                SHA_A);
+        GcReference reference =
+                new GcReference("generation-index", "stream-a/1/42", "/metadata/generation-a", 12, SHA_A);
         GcReferenceSnapshot snapshot = GcReferenceSnapshot.create(
                 "generation-v1",
                 1,
@@ -163,8 +139,8 @@ class GcPlanTest {
                         List.of(),
                         List.of(metadata("/metadata/generation-a", 12, SHA_A))))
                 .isNotNull();
-        assertThatThrownBy(() -> GcPlan.computeReferenceSetSha256(
-                        config, candidate, List.of(snapshot), List.of(), List.of()))
+        assertThatThrownBy(() ->
+                        GcPlan.computeReferenceSetSha256(config, candidate, List.of(snapshot), List.of(), List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exact planned metadata removal");
         assertThatThrownBy(() -> GcPlan.computeReferenceSetSha256(
@@ -188,8 +164,7 @@ class GcPlanTest {
                         candidate,
                         List.of(snapshot),
                         List.of(),
-                        List.of(new GcPlannedMetadataRemoval(
-                                "another-type", "/metadata/generation-a", 12, SHA_A))))
+                        List.of(new GcPlannedMetadataRemoval("another-type", "/metadata/generation-a", 12, SHA_A))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exact planned metadata removal");
     }
@@ -210,16 +185,13 @@ class GcPlanTest {
                 0,
                 List.of(authority("/a", 1)),
                 List.of());
-        assertThatThrownBy(() -> GcPlan.computeReferenceSetSha256(
-                        config, candidate, List.of(incomplete), List.of(), List.of()))
+        assertThatThrownBy(() ->
+                        GcPlan.computeReferenceSetSha256(config, candidate, List.of(incomplete), List.of(), List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("complete");
 
         GcReferenceQuery otherQuery = GcReferenceQuery.create(
-                GcReferenceQueryKind.REFERENCED_OBJECT,
-                query.object(),
-                List.of(new StreamId("stream-b")),
-                SHA_A);
+                GcReferenceQueryKind.REFERENCED_OBJECT, query.object(), List.of(new StreamId("stream-b")), SHA_A);
         assertThatThrownBy(() -> GcPlan.computeReferenceSetSha256(
                         config,
                         candidate,
@@ -247,13 +219,11 @@ class GcPlanTest {
         VersionedPhysicalObjectRoot active = activeRoot();
         GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
         GcCandidate candidate = candidate(config, active, query);
-        GcReferenceSnapshot oversized = snapshot(
-                query,
-                "generation-v1",
-                List.of(authority("/a", 1), authority("/b", 1)));
+        GcReferenceSnapshot oversized =
+                snapshot(query, "generation-v1", List.of(authority("/a", 1), authority("/b", 1)));
 
-        assertThatThrownBy(() -> GcPlan.computeReferenceSetSha256(
-                        config, candidate, List.of(oversized), List.of(), List.of()))
+        assertThatThrownBy(() ->
+                        GcPlan.computeReferenceSetSha256(config, candidate, List.of(oversized), List.of(), List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("configured bounds");
         assertThatThrownBy(() -> GcPlan.computeReferenceSetSha256(
@@ -272,8 +242,8 @@ class GcPlanTest {
         VersionedPhysicalObjectRoot active = activeRoot();
         GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
         GcCandidate candidate = candidate(config, active, query);
-        GcPlannedProtectionRemoval unrelated = protection(
-                ObjectKeyHash.from(new ObjectKey("objects/other")), 1, 9, SHA_A);
+        GcPlannedProtectionRemoval unrelated =
+                protection(ObjectKeyHash.from(new ObjectKey("objects/other")), 1, 9, SHA_A);
 
         assertThatThrownBy(() -> GcPlan.computeReferenceSetSha256(
                         config,
@@ -291,8 +261,7 @@ class GcPlanTest {
         VersionedPhysicalObjectRoot active = activeRoot();
         GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
         GcCandidate candidate = candidate(config, active, query);
-        List<GcReferenceSnapshot> snapshots = List.of(
-                snapshot(query, "generation-v1", List.of(authority("/a", 1))));
+        List<GcReferenceSnapshot> snapshots = List.of(snapshot(query, "generation-v1", List.of(authority("/a", 1))));
 
         Checksum first = GcPlan.computeReferenceSetSha256(
                 config,
@@ -316,10 +285,8 @@ class GcPlanTest {
         VersionedPhysicalObjectRoot active = activeRoot();
         GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
         GcCandidate candidate = candidate(config, active, query);
-        List<GcReferenceSnapshot> snapshots = List.of(
-                snapshot(query, "generation-v1", List.of(authority("/a", 1))));
-        Checksum digest = GcPlan.computeReferenceSetSha256(
-                config, candidate, snapshots, List.of(), List.of());
+        List<GcReferenceSnapshot> snapshots = List.of(snapshot(query, "generation-v1", List.of(authority("/a", 1))));
+        Checksum digest = GcPlan.computeReferenceSetSha256(config, candidate, snapshots, List.of(), List.of());
 
         assertThatThrownBy(() -> GcPlan.fromMarkedRoot(
                         config,
@@ -349,23 +316,12 @@ class GcPlanTest {
         VersionedPhysicalObjectRoot active = activeRoot();
         GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
         GcCandidate activeCandidate = candidate(config, active, query);
-        List<GcReferenceSnapshot> snapshots = List.of(
-                snapshot(query, "generation-v1", List.of(authority("/a", 1))));
-        Checksum digest = GcPlan.computeReferenceSetSha256(
-                config, activeCandidate, snapshots, List.of(), List.of());
-        VersionedPhysicalObjectRoot marked = markedRoot(
-                active, ATTEMPT_ID, digest, 300, 500, 42);
-        GcCandidate recovered = GcCandidate.fromMarkedRoot(
-                config, "c".repeat(52), marked, query, SHA_A, 900);
+        List<GcReferenceSnapshot> snapshots = List.of(snapshot(query, "generation-v1", List.of(authority("/a", 1))));
+        Checksum digest = GcPlan.computeReferenceSetSha256(config, activeCandidate, snapshots, List.of(), List.of());
+        VersionedPhysicalObjectRoot marked = markedRoot(active, ATTEMPT_ID, digest, 300, 500, 42);
+        GcCandidate recovered = GcCandidate.fromMarkedRoot(config, "c".repeat(52), marked, query, SHA_A, 900);
 
-        GcPlan plan = GcPlan.fromMarkedRoot(
-                config,
-                ATTEMPT_ID,
-                recovered,
-                snapshots,
-                List.of(),
-                List.of(),
-                marked);
+        GcPlan plan = GcPlan.fromMarkedRoot(config, ATTEMPT_ID, recovered, snapshots, List.of(), List.of(), marked);
 
         assertThat(recovered.rootState()).isEqualTo(GcCandidateRootState.MARKED_RECOVERY);
         assertThat(recovered.rootMetadataVersion()).isEqualTo(42);
@@ -388,17 +344,10 @@ class GcPlanTest {
                 List.of());
 
         assertThatThrownBy(() -> GcCandidate.fromActiveRoot(
-                        config,
-                        CANDIDATE_ID,
-                        markedRoot(active, ATTEMPT_ID, digest, 300, 500),
-                        query,
-                        SHA_A,
-                        300,
-                        500))
+                        config, CANDIDATE_ID, markedRoot(active, ATTEMPT_ID, digest, 300, 500), query, SHA_A, 300, 500))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ACTIVE");
-        assertThatThrownBy(() -> GcCandidate.fromActiveRoot(
-                        config, CANDIDATE_ID, active, query, SHA_A, 150, 150))
+        assertThatThrownBy(() -> GcCandidate.fromActiveRoot(config, CANDIDATE_ID, active, query, SHA_A, 150, 150))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("eligibility");
     }
@@ -413,18 +362,12 @@ class GcPlanTest {
     }
 
     private static GcCandidate candidate(
-            PhysicalGcConfig config,
-            VersionedPhysicalObjectRoot active,
-            GcReferenceQuery query) {
-        return GcCandidate.fromActiveRoot(
-                config, CANDIDATE_ID, active, query, SHA_A, 250, 250);
+            PhysicalGcConfig config, VersionedPhysicalObjectRoot active, GcReferenceQuery query) {
+        return GcCandidate.fromActiveRoot(config, CANDIDATE_ID, active, query, SHA_A, 250, 250);
     }
 
     private static GcPlannedProtectionRemoval protection(
-            ObjectKeyHash object,
-            long ownerMetadataVersion,
-            long metadataVersion,
-            Checksum durableValueSha256) {
+            ObjectKeyHash object, long ownerMetadataVersion, long metadataVersion, Checksum durableValueSha256) {
         ObjectProtectionRecord value = new ObjectProtectionRecord(
                 1,
                 object.value(),
@@ -438,38 +381,22 @@ class GcPlanTest {
                 0,
                 metadataVersion);
         return new GcPlannedProtectionRemoval(new VersionedObjectProtection(
-                "/protections/" + object.value() + "/generation-a",
-                value,
-                metadataVersion,
-                durableValueSha256));
+                "/protections/" + object.value() + "/generation-a", value, metadataVersion, durableValueSha256));
     }
 
-    private static GcPlannedMetadataRemoval metadata(
-            String key, long version, Checksum durableValueSha256) {
-        return new GcPlannedMetadataRemoval(
-                "generation-index", key, version, durableValueSha256);
+    private static GcPlannedMetadataRemoval metadata(String key, long version, Checksum durableValueSha256) {
+        return new GcPlannedMetadataRemoval("generation-index", key, version, durableValueSha256);
     }
 
     private static GcReferenceQuery query(PhysicalObjectIdentity object) {
         return GcReferenceQuery.create(
-                GcReferenceQueryKind.REFERENCED_OBJECT,
-                object,
-                List.of(new StreamId("stream-a")),
-                SHA_A);
+                GcReferenceQueryKind.REFERENCED_OBJECT, object, List.of(new StreamId("stream-a")), SHA_A);
     }
 
     private static GcReferenceSnapshot snapshot(
             GcReferenceQuery query, String domainId, List<GcAuthorityToken> authorities) {
         return GcReferenceSnapshot.create(
-                domainId,
-                1,
-                query.queryIdentitySha256(),
-                true,
-                false,
-                authorities.size(),
-                0,
-                authorities,
-                List.of());
+                domainId, 1, query.queryIdentitySha256(), true, false, authorities.size(), 0, authorities, List.of());
     }
 
     private static GcAuthorityToken authority(String key, long version) {
@@ -485,8 +412,7 @@ class GcPlanTest {
                 CRC,
                 Optional.of(SHA_A),
                 Optional.of("etag"));
-        PhysicalObjectRootRecord record = rootRecord(
-                object, PhysicalObjectLifecycle.ACTIVE, 4, "", "", 0, 0, 0, 7);
+        PhysicalObjectRootRecord record = rootRecord(object, PhysicalObjectLifecycle.ACTIVE, 4, "", "", 0, 0, 0, 7);
         return new VersionedPhysicalObjectRoot("/root/one", record, 7, SHA_A);
     }
 

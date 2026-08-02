@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.ObjectKeyHash;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** One exact source protection retained by a durable GC retirement journal. */
+/**
+ * One exact source protection retained by a durable GC retirement journal.
+ */
 public record GcRetirementProtectionRecord(
         int schemaVersion,
         String objectKeyHash,
@@ -21,13 +24,12 @@ public record GcRetirementProtectionRecord(
         gcAttemptId = F4RecordValidation.requireBase32Id(gcAttemptId, "gcAttemptId");
         protectionKey = boundedKey(protectionKey, "protectionKey");
         F4RecordValidation.requireMetadataVersion(protectionMetadataVersion);
-        protectionDurableValueSha256 = F4RecordValidation.requireSha256(
-                protectionDurableValueSha256, "protectionDurableValueSha256");
+        protectionDurableValueSha256 =
+                F4RecordValidation.requireSha256(protectionDurableValueSha256, "protectionDurableValueSha256");
         Objects.requireNonNull(protection, "protection");
         if (!protection.objectKeyHash().equals(objectKeyHash)
                 || protection.metadataVersion() != protectionMetadataVersion) {
-            throw new IllegalArgumentException(
-                    "journal protection does not match its object/version identity");
+            throw new IllegalArgumentException("journal protection does not match its object/version identity");
         }
         F4RecordValidation.requireMetadataVersion(metadataVersion);
     }

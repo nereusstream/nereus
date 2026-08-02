@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import com.nereusstream.api.Checksum;
@@ -7,7 +8,9 @@ import com.nereusstream.api.StreamId;
 import java.util.List;
 import java.util.Objects;
 
-/** Ephemeral, authority-bound logical-trim candidate. */
+/**
+ * Ephemeral, authority-bound logical-trim candidate.
+ */
 public record RetentionCandidate(
         StreamId streamId,
         long currentTrimOffset,
@@ -36,23 +39,18 @@ public record RetentionCandidate(
                 || sizeCut > cursorCut
                 || candidateTrimOffset <= currentTrimOffset
                 || candidateTrimOffset > cursorCut
-                || candidateTrimOffset != Math.min(
-                        cursorCut, Math.max(timeCut, sizeCut))) {
-            throw new IllegalArgumentException(
-                    "retention candidate offsets or formula are invalid");
+                || candidateTrimOffset != Math.min(cursorCut, Math.max(timeCut, sizeCut))) {
+            throw new IllegalArgumentException("retention candidate offsets or formula are invalid");
         }
         if (streamHeadMetadataVersion < 0
                 || cursorRetentionMetadataVersion < 0
                 || policyVersion < 0
                 || plannedAtMillis < 0) {
-            throw new IllegalArgumentException(
-                    "retention candidate versions/time must be non-negative");
+            throw new IllegalArgumentException("retention candidate versions/time must be non-negative");
         }
-        statsTokens = List.copyOf(
-                Objects.requireNonNull(statsTokens, "statsTokens"));
+        statsTokens = List.copyOf(Objects.requireNonNull(statsTokens, "statsTokens"));
         if (statsTokens.size() > MAX_STATS_TOKENS) {
-            throw new IllegalArgumentException(
-                    "retention candidate stats token count exceeds 4096");
+            throw new IllegalArgumentException("retention candidate stats token count exceeds 4096");
         }
         String previous = null;
         for (RetentionStatsToken token : statsTokens) {

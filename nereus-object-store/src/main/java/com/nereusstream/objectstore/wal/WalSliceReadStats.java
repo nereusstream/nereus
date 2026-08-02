@@ -17,7 +17,9 @@ package com.nereusstream.objectstore.wal;
 import com.nereusstream.api.ObjectId;
 import java.util.Objects;
 
-/** Resolved-target identity plus exact physical/logical byte accounting for one verified read. */
+/**
+ * Resolved-target identity plus exact physical/logical byte accounting for one verified read.
+ */
 public record WalSliceReadStats(
         ObjectId objectId,
         long objectOffset,

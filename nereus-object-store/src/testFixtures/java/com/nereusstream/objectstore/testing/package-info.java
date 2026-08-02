@@ -12,5 +12,7 @@
  * limitations under the License.
  */
 
-/** Test fixtures for object-store backed Phase 1 tests. */
+/**
+ * Test fixtures for object-store backed Phase 1 tests.
+ */
 package com.nereusstream.objectstore.testing;

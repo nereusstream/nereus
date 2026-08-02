@@ -1,7 +1,7 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
-import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ReadTargetIdentities;
 import com.nereusstream.api.target.ReadTarget;
@@ -17,19 +17,22 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Immutable registry and identity checker for canonical target codecs. */
+/**
+ * Immutable registry and identity checker for canonical target codecs.
+ */
 public final class ReadTargetCodecRegistry {
     public static final String PAYLOAD_ENCODING = "canonical-target-v1";
     private final Map<Key, ReadTargetCodec<?>> codecs;
 
     public ReadTargetCodecRegistry(List<ReadTargetCodec<?>> codecs) {
-        this.codecs = List.copyOf(codecs).stream().collect(Collectors.toUnmodifiableMap(
-                codec -> new Key(codec.targetType(), codec.targetVersion()), Function.identity()));
+        this.codecs = List.copyOf(codecs).stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        codec -> new Key(codec.targetType(), codec.targetVersion()), Function.identity()));
     }
 
     public static ReadTargetCodecRegistry phase15() {
-        return new ReadTargetCodecRegistry(List.of(
-                new ObjectSliceReadTargetCodecV1(), new BookKeeperEntryRangeReadTargetCodecV1()));
+        return new ReadTargetCodecRegistry(
+                List.of(new ObjectSliceReadTargetCodecV1(), new BookKeeperEntryRangeReadTargetCodecV1()));
     }
 
     public ReadTargetRecord encode(ReadTarget target) {
@@ -40,8 +43,13 @@ public final class ReadTargetCodecRegistry {
         }
         byte[] payload = codec.encode(target);
         String identity = ReadTargetIdentities.sha256(target).value();
-        return new ReadTargetRecord(target.type().name(), target.version(), PAYLOAD_ENCODING,
-                payload, ChecksumType.SHA256.name(), identity);
+        return new ReadTargetRecord(
+                target.type().name(),
+                target.version(),
+                PAYLOAD_ENCODING,
+                payload,
+                ChecksumType.SHA256.name(),
+                identity);
     }
 
     public ReadTarget decode(ReadTargetRecord record) {
@@ -51,7 +59,8 @@ public final class ReadTargetCodecRegistry {
             throw new MetadataCodecException("unsupported read target encoding or identity checksum");
         }
         String expected = identity(record.targetType(), record.targetVersion(), record.payload());
-        if (!MessageDigest.isEqual(expected.getBytes(StandardCharsets.US_ASCII),
+        if (!MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.US_ASCII),
                 record.identityChecksumValue().getBytes(StandardCharsets.US_ASCII))) {
             throw new MetadataCodecException("read target identity checksum mismatch");
         }
@@ -67,7 +76,9 @@ public final class ReadTargetCodecRegistry {
     @SuppressWarnings("unchecked")
     private ReadTargetCodec<ReadTarget> codec(ReadTargetType type, int version) {
         ReadTargetCodec<?> codec = codecs.get(new Key(type, version));
-        if (codec == null) throw new MetadataCodecException("unsupported read target codec: " + type + "/" + version);
+        if (codec == null) {
+            throw new MetadataCodecException("unsupported read target codec: " + type + "/" + version);
+        }
         return (ReadTargetCodec<ReadTarget>) codec;
     }
 
@@ -85,5 +96,5 @@ public final class ReadTargetCodecRegistry {
         }
     }
 
-    private record Key(ReadTargetType type, int version) { }
+    private record Key(ReadTargetType type, int version) {}
 }

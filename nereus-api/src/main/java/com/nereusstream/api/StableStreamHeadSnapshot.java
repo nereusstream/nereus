@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.api;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Optional;
 
-/** One exact durable stream-head observation, including its current append authority and canonical byte digest. */
+/**
+ * One exact durable stream-head observation, including its current append authority and canonical byte digest.
+ */
 public record StableStreamHeadSnapshot(
         StreamId streamId,
         StreamState state,
@@ -31,8 +34,11 @@ public record StableStreamHeadSnapshot(
         if (durableHeadSha256.type() != ChecksumType.SHA256) {
             throw new IllegalArgumentException("durableHeadSha256 must use SHA256");
         }
-        if (trimOffset < 0 || committedEndOffset < trimOffset || cumulativeSize < 0
-                || commitVersion < 0 || metadataVersion < 0) {
+        if (trimOffset < 0
+                || committedEndOffset < trimOffset
+                || cumulativeSize < 0
+                || commitVersion < 0
+                || metadataVersion < 0) {
             throw new IllegalArgumentException("invalid stable stream-head numeric fields");
         }
         boolean emptyCommitChain = commitVersion == 0;
@@ -49,7 +55,6 @@ public record StableStreamHeadSnapshot(
     }
 
     public StreamCommitAnchor commitAnchor() {
-        return new StreamCommitAnchor(
-                streamId, lastCommitId, committedEndOffset, cumulativeSize, commitVersion);
+        return new StreamCommitAnchor(streamId, lastCommitId, committedEndOffset, cumulativeSize, commitVersion);
     }
 }

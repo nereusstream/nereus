@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.CLUSTER;
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.target.ReadTargetType;
@@ -24,8 +24,7 @@ import org.junit.jupiter.api.Test;
 class TerminalMaterializationSourceProtectionReleaserTest {
     @Test
     void releasesEveryExactSourceBeforeTheTerminalTaskLosesItsRemovalAuthority() {
-        MaterializationWorkerTestHarness.Scenario scenario =
-                MaterializationWorkerTestHarness.scenario(value -> value);
+        MaterializationWorkerTestHarness.Scenario scenario = MaterializationWorkerTestHarness.scenario(value -> value);
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             VersionedMaterializationTask planned = scenario.tasks()
@@ -35,8 +34,7 @@ class TerminalMaterializationSourceProtectionReleaserTest {
             VersionedMaterializationTask claimed = scenario.tasks()
                     .claim(planned, "c".repeat(26), "p".repeat(26), 2_000)
                     .join();
-            FakeSourceProtectionAdapter adapter =
-                    new FakeSourceProtectionAdapter(scenario.task(), claimed);
+            FakeSourceProtectionAdapter adapter = new FakeSourceProtectionAdapter(scenario.task(), claimed);
             VersionedMaterializationTask cancelled = scenario.tasks()
                     .failClaim(
                             claimed,
@@ -54,21 +52,18 @@ class TerminalMaterializationSourceProtectionReleaserTest {
                             Duration.ofSeconds(10),
                             scheduler);
 
-            assertThat(releaser.release(
-                            cancelled,
-                            () -> {
+            assertThat(releaser.release(cancelled, () -> {
                                 guardCalls.incrementAndGet();
                                 return CompletableFuture.completedFuture(null);
                             })
-                    .join())
+                            .join())
                     .isEqualTo(2);
             assertThat(adapter.protections).isEmpty();
             assertThat(adapter.released).hasValue(2);
             assertThat(guardCalls).hasValue(5);
 
-            assertThat(releaser.release(
-                            cancelled, MaterializationTaskMutationGuard.noOp())
-                    .join())
+            assertThat(releaser.release(cancelled, MaterializationTaskMutationGuard.noOp())
+                            .join())
                     .isZero();
         } finally {
             scheduler.shutdownNow();
@@ -78,26 +73,17 @@ class TerminalMaterializationSourceProtectionReleaserTest {
 
     private static final class FakeSourceProtectionAdapter
             implements MaterializationSourceProtectionAdapter<ObjectSliceReadTarget> {
-        private final Map<String, MaterializationSourceProtection> protections =
-                new LinkedHashMap<>();
+        private final Map<String, MaterializationSourceProtection> protections = new LinkedHashMap<>();
         private final AtomicInteger released = new AtomicInteger();
 
-        private FakeSourceProtectionAdapter(
-                MaterializationTask task,
-                VersionedMaterializationTask ownerTask) {
-            ObjectProtectionOwner owner =
-                    MaterializationProtectionIdentities.taskOwner(ownerTask);
+        private FakeSourceProtectionAdapter(MaterializationTask task, VersionedMaterializationTask ownerTask) {
+            ObjectProtectionOwner owner = MaterializationProtectionIdentities.taskOwner(ownerTask);
             for (SourceGeneration source : task.sources()) {
-                String referenceId = MaterializationProtectionIdentities.sourceReferenceId(
-                        CLUSTER, task, source);
+                String referenceId = MaterializationProtectionIdentities.sourceReferenceId(CLUSTER, task, source);
                 protections.put(
                         referenceId,
                         new MaterializationSourceProtection(
-                                ReadTargetType.OBJECT_SLICE,
-                                referenceId,
-                                owner,
-                                ownerTask.metadataVersion(),
-                                source));
+                                ReadTargetType.OBJECT_SLICE, referenceId, owner, ownerTask.metadataVersion(), source));
             }
         }
 
@@ -123,17 +109,13 @@ class TerminalMaterializationSourceProtectionReleaserTest {
 
         @Override
         public CompletableFuture<Optional<MaterializationSourceProtection>> findExisting(
-                StreamId streamId,
-                SourceGeneration source,
-                String referenceId) {
-            return CompletableFuture.completedFuture(
-                    Optional.ofNullable(protections.get(referenceId)));
+                StreamId streamId, SourceGeneration source, String referenceId) {
+            return CompletableFuture.completedFuture(Optional.ofNullable(protections.get(referenceId)));
         }
 
         @Override
         public CompletableFuture<MaterializationSourceProtection> revalidate(
-                MaterializationSourceProtection protection,
-                OwnerRevalidator ownerRevalidator) {
+                MaterializationSourceProtection protection, OwnerRevalidator ownerRevalidator) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         }
 
@@ -147,13 +129,10 @@ class TerminalMaterializationSourceProtectionReleaserTest {
 
         @Override
         public CompletableFuture<Void> release(
-                MaterializationSourceProtection protection,
-                RemovalAuthorizer removalAuthorizer) {
-            MaterializationSourceProtection current =
-                    protections.get(protection.referenceId());
+                MaterializationSourceProtection protection, RemovalAuthorizer removalAuthorizer) {
+            MaterializationSourceProtection current = protections.get(protection.referenceId());
             if (!protection.equals(current)) {
-                return CompletableFuture.failedFuture(
-                        new IllegalStateException("stale source protection"));
+                return CompletableFuture.failedFuture(new IllegalStateException("stale source protection"));
             }
             return removalAuthorizer.authorize(current).thenRun(() -> {
                 protections.remove(current.referenceId(), current);

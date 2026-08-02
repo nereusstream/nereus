@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StorageProfile;
@@ -28,8 +28,7 @@ import org.junit.jupiter.api.Test;
 class StreamRegistrationRetirementScannerTest {
     private static final String CLUSTER = "cluster-a";
 
-    private final ScheduledExecutorService scheduler =
-            Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     @AfterEach
     void closeScheduler() {
@@ -38,42 +37,30 @@ class StreamRegistrationRetirementScannerTest {
 
     @Test
     void scansEveryShardAndPageAndCountsEveryCoordinatorOutcome() {
-        GenerationMetadataStore generations = GenerationMetadataStoreTestFactory.inMemory(
-                Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
+        GenerationMetadataStore generations =
+                GenerationMetadataStoreTestFactory.inMemory(Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
         F4Keyspace keys = new F4Keyspace(CLUSTER);
         List<StreamId> streams = streamsInShard(keys, 0, 2);
-        streams.forEach(stream -> generations.createOrVerifyStreamRegistration(
-                CLUSTER, registration(stream)).join());
+        streams.forEach(stream -> generations
+                .createOrVerifyStreamRegistration(CLUSTER, registration(stream))
+                .join());
         ArrayList<StreamId> visited = new ArrayList<>();
-        StreamRegistrationRetirementScanner scanner =
-                new StreamRegistrationRetirementScanner(
-                        CLUSTER,
-                        generations,
-                        stream -> {
-                            visited.add(stream);
-                            StreamRegistrationRetirementStatus status =
-                                    visited.size() == 1
-                                            ? StreamRegistrationRetirementStatus.RETIRED
-                                            : StreamRegistrationRetirementStatus.STREAM_NOT_DELETED;
-                            return CompletableFuture.completedFuture(
-                                    status == StreamRegistrationRetirementStatus.RETIRED
-                                            ? new StreamRegistrationRetirementResult(
-                                                    stream,
-                                                    1,
-                                                    status,
-                                                    0,
-                                                    0,
-                                                    0,
-                                                    0,
-                                                    0,
-                                                    0,
-                                                    false,
-                                                    true)
-                                            : StreamRegistrationRetirementResult.simple(
-                                                    stream, 1, status));
-                        },
-                        config(Duration.ofSeconds(2)),
-                        scheduler);
+        StreamRegistrationRetirementScanner scanner = new StreamRegistrationRetirementScanner(
+                CLUSTER,
+                generations,
+                stream -> {
+                    visited.add(stream);
+                    StreamRegistrationRetirementStatus status = visited.size() == 1
+                            ? StreamRegistrationRetirementStatus.RETIRED
+                            : StreamRegistrationRetirementStatus.STREAM_NOT_DELETED;
+                    return CompletableFuture.completedFuture(
+                            status == StreamRegistrationRetirementStatus.RETIRED
+                                    ? new StreamRegistrationRetirementResult(
+                                            stream, 1, status, 0, 0, 0, 0, 0, 0, false, true)
+                                    : StreamRegistrationRetirementResult.simple(stream, 1, status));
+                },
+                config(Duration.ofSeconds(2)),
+                scheduler);
 
         StreamRegistrationRetirementScanResult result = scanner.scan().join();
 
@@ -87,56 +74,47 @@ class StreamRegistrationRetirementScannerTest {
 
     @Test
     void overlappingScanFailsAndAdmissionRecoversAfterTheFirstPass() {
-        GenerationMetadataStore generations = GenerationMetadataStoreTestFactory.inMemory(
-                Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
+        GenerationMetadataStore generations =
+                GenerationMetadataStoreTestFactory.inMemory(Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
         F4Keyspace keys = new F4Keyspace(CLUSTER);
         StreamId stream = streamsInShard(keys, 0, 1).get(0);
-        generations.createOrVerifyStreamRegistration(CLUSTER, registration(stream)).join();
+        generations
+                .createOrVerifyStreamRegistration(CLUSTER, registration(stream))
+                .join();
         CompletableFuture<StreamRegistrationRetirementResult> held = new CompletableFuture<>();
-        StreamRegistrationRetirementScanner scanner =
-                new StreamRegistrationRetirementScanner(
-                        CLUSTER,
-                        generations,
-                        ignored -> held,
-                        config(Duration.ofSeconds(2)),
-                        scheduler);
+        StreamRegistrationRetirementScanner scanner = new StreamRegistrationRetirementScanner(
+                CLUSTER, generations, ignored -> held, config(Duration.ofSeconds(2)), scheduler);
 
         CompletableFuture<StreamRegistrationRetirementScanResult> first = scanner.scan();
         assertThatThrownBy(() -> scanner.scan().join())
                 .hasRootCauseMessage("a registration-retirement scan is already running");
 
         held.complete(StreamRegistrationRetirementResult.simple(
-                stream,
-                1,
-                StreamRegistrationRetirementStatus.STREAM_NOT_DELETED));
+                stream, 1, StreamRegistrationRetirementStatus.STREAM_NOT_DELETED));
         assertThat(first.join().registrationsScanned()).isEqualTo(1);
         assertThat(scanner.scan().join().registrationsScanned()).isEqualTo(1);
     }
 
     @Test
     void closeRejectsNewPassWithoutClosingBorrowedGenerationStore() {
-        GenerationMetadataStore generations = GenerationMetadataStoreTestFactory.inMemory(
-                Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
-        StreamRegistrationRetirementScanner scanner =
-                new StreamRegistrationRetirementScanner(
-                        CLUSTER,
-                        generations,
-                        stream -> CompletableFuture.completedFuture(
-                                StreamRegistrationRetirementResult.simple(
-                                        stream,
-                                        0,
-                                        StreamRegistrationRetirementStatus.ALREADY_ABSENT)),
-                        config(Duration.ofSeconds(2)),
-                        scheduler);
+        GenerationMetadataStore generations =
+                GenerationMetadataStoreTestFactory.inMemory(Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
+        StreamRegistrationRetirementScanner scanner = new StreamRegistrationRetirementScanner(
+                CLUSTER,
+                generations,
+                stream -> CompletableFuture.completedFuture(StreamRegistrationRetirementResult.simple(
+                        stream, 0, StreamRegistrationRetirementStatus.ALREADY_ABSENT)),
+                config(Duration.ofSeconds(2)),
+                scheduler);
 
         scanner.close();
 
-        assertThatThrownBy(() -> scanner.scan().join())
-                .satisfies(failure -> assertThat(unwrap(failure))
-                        .isInstanceOfSatisfying(NereusException.class, error ->
-                                assertThat(error.code()).isEqualTo(ErrorCode.STORAGE_CLOSED)));
-        assertThat(generations.scanStreamRegistrations(
-                        CLUSTER, 0, java.util.Optional.empty(), 1).join())
+        assertThatThrownBy(() -> scanner.scan().join()).satisfies(failure -> assertThat(unwrap(failure))
+                .isInstanceOfSatisfying(
+                        NereusException.class, error -> assertThat(error.code()).isEqualTo(ErrorCode.STORAGE_CLOSED)));
+        assertThat(generations
+                        .scanStreamRegistrations(CLUSTER, 0, java.util.Optional.empty(), 1)
+                        .join())
                 .isNotNull();
     }
 
@@ -153,8 +131,7 @@ class StreamRegistrationRetirementScannerTest {
                 0);
     }
 
-    private static List<StreamId> streamsInShard(
-            F4Keyspace keys, int shard, int count) {
+    private static List<StreamId> streamsInShard(F4Keyspace keys, int shard, int count) {
         ArrayList<StreamId> streams = new ArrayList<>();
         for (int index = 0; streams.size() < count; index++) {
             StreamId candidate = new StreamId("stream-" + index);

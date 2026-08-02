@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.GcDomainSnapshotProofRecord;
@@ -6,8 +7,7 @@ import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class GcRetirementManifestRecordCodecV1
-        extends AbstractF4RecordCodecV1<GcRetirementManifestRecord> {
+public final class GcRetirementManifestRecordCodecV1 extends AbstractF4RecordCodecV1<GcRetirementManifestRecord> {
     public GcRetirementManifestRecordCodecV1() {
         super(GcRetirementManifestRecord.class);
     }
@@ -46,8 +46,7 @@ public final class GcRetirementManifestRecordCodecV1
             String gcAttemptId = reader.readString("gcAttemptId");
             int referenceSetProtocolVersion = reader.readInt("referenceSetProtocolVersion");
             String queryIdentitySha256 = reader.readString("queryIdentitySha256");
-            int domainCount = reader.readCount(
-                    "domainProofCount", Integer.BYTES * 2 + 128, 32);
+            int domainCount = reader.readCount("domainProofCount", Integer.BYTES * 2 + 128, 32);
             List<GcDomainSnapshotProofRecord> domainProofs = new ArrayList<>(domainCount);
             for (int index = 0; index < domainCount; index++) {
                 domainProofs.add(new GcDomainSnapshotProofRecord(

@@ -19,9 +19,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
-public record RangeReadOptions(
-        Optional<Checksum> expectedChecksum,
-        Duration timeout) {
+public record RangeReadOptions(Optional<Checksum> expectedChecksum, Duration timeout) {
     public RangeReadOptions {
         expectedChecksum = Objects.requireNonNull(expectedChecksum, "expectedChecksum");
         Objects.requireNonNull(timeout, "timeout");

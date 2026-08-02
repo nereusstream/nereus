@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.records.CursorRetentionRecord;
 import com.nereusstream.metadata.oxia.records.CursorStateRecord;
 import org.junit.jupiter.api.Test;
@@ -22,8 +22,7 @@ class F3MetadataCodecsCompatibilityTest {
         assertThat(MetadataRecordCodecFactory.recordType(retentionBytes)).isEqualTo("CursorRetentionRecord");
         assertThat(MetadataRecordCodecFactory.decodeEnvelope(retentionBytes, CursorRetentionRecord.class))
                 .isEqualTo(retention);
-        assertThatThrownBy(() -> MetadataRecordCodecFactory.decodeEnvelope(
-                cursorBytes, CursorRetentionRecord.class))
+        assertThatThrownBy(() -> MetadataRecordCodecFactory.decodeEnvelope(cursorBytes, CursorRetentionRecord.class))
                 .isInstanceOf(MetadataCodecException.class)
                 .hasMessageContaining("record type mismatch");
     }
@@ -31,8 +30,7 @@ class F3MetadataCodecsCompatibilityTest {
     @Test
     void everySingleByteEnvelopeMutationAndEveryTruncationFailsClosed() {
         assertEveryMutationFails(
-                MetadataRecordCodecFactory.encodeEnvelope(
-                        F3MetadataCodecSamples.fullActive(), CursorStateRecord.class),
+                MetadataRecordCodecFactory.encodeEnvelope(F3MetadataCodecSamples.fullActive(), CursorStateRecord.class),
                 CursorStateRecord.class);
         assertEveryMutationFails(
                 MetadataRecordCodecFactory.encodeEnvelope(
@@ -44,12 +42,14 @@ class F3MetadataCodecsCompatibilityTest {
         for (int index = 0; index < canonical.length; index++) {
             byte[] mutated = canonical.clone();
             mutated[index] ^= 1;
-            assertDecodeFails(mutated, recordClass,
-                    "accepted mutated byte " + index + " of " + recordClass.getSimpleName());
+            assertDecodeFails(
+                    mutated, recordClass, "accepted mutated byte " + index + " of " + recordClass.getSimpleName());
         }
         for (int length = 0; length < canonical.length; length++) {
             byte[] truncated = java.util.Arrays.copyOf(canonical, length);
-            assertDecodeFails(truncated, recordClass,
+            assertDecodeFails(
+                    truncated,
+                    recordClass,
                     "accepted truncated length " + length + " of " + recordClass.getSimpleName());
         }
         byte[] trailing = java.util.Arrays.copyOf(canonical, canonical.length + 1);

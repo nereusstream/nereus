@@ -67,8 +67,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 final class GenerationZeroRepairTestSupport {
     static final String CLUSTER = "generation-zero-repair-cluster";
-    static final StreamId STREAM =
-            new StreamId("generation-zero-repair-stream");
+    static final StreamId STREAM = new StreamId("generation-zero-repair-stream");
     static final Duration TIMEOUT = Duration.ofSeconds(5);
 
     private GenerationZeroRepairTestSupport() {}
@@ -80,65 +79,36 @@ final class GenerationZeroRepairTestSupport {
         AtomicInteger protections = new AtomicInteger();
         AppendRecoveryCommit commit = commit();
         AppendRecoveryAnchor anchor = AppendRecoveryAnchor.genesis(STREAM);
-        AppendRecoveryHead head = new AppendRecoveryHead(
-                STREAM, "commit-1", 1, 10, 1, 9);
-        AppendRecoveryTailPage page = new AppendRecoveryTailPage(
-                anchor,
-                head,
-                List.of(commit),
-                true,
-                Optional.empty());
-        OxiaMetadataStore metadata = metadata(
-                trim,
-                tailReads,
-                materializations,
-                page);
+        AppendRecoveryHead head = new AppendRecoveryHead(STREAM, "commit-1", 1, 10, 1, 9);
+        AppendRecoveryTailPage page = new AppendRecoveryTailPage(anchor, head, List.of(commit), true, Optional.empty());
+        OxiaMetadataStore metadata = metadata(trim, tailReads, materializations, page);
         GenerationMetadataStore generations = generations();
         RecordingPublisher publisher = new RecordingPublisher(protections);
-        AnchorAwareCommitWalker walker = new AnchorAwareCommitWalker(
-                CLUSTER, metadata, generations);
-        GenerationZeroRepairScanner scanner = new GenerationZeroRepairScanner(
-                CLUSTER,
-                metadata,
-                walker,
-                publisher,
-                16,
-                4);
-        return new Fixture(
-                scanner,
-                trim,
-                tailReads,
-                materializations,
-                protections);
+        AnchorAwareCommitWalker walker = new AnchorAwareCommitWalker(CLUSTER, metadata, generations);
+        GenerationZeroRepairScanner scanner =
+                new GenerationZeroRepairScanner(CLUSTER, metadata, walker, publisher, 16, 4);
+        return new Fixture(scanner, trim, tailReads, materializations, protections);
     }
 
     private static OxiaMetadataStore metadata(
-            AtomicLong trim,
-            AtomicInteger tailReads,
-            AtomicInteger materializations,
-            AppendRecoveryTailPage page) {
+            AtomicLong trim, AtomicInteger tailReads, AtomicInteger materializations, AppendRecoveryTailPage page) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
                 (proxy, method, arguments) -> switch (method.getName()) {
-                    case "getStreamSnapshot" -> CompletableFuture.completedFuture(
-                            snapshot(trim.get()));
+                    case "getStreamSnapshot" -> CompletableFuture.completedFuture(snapshot(trim.get()));
                     case "readAppendRecoveryTail" -> {
                         tailReads.incrementAndGet();
                         yield CompletableFuture.completedFuture(page);
                     }
                     case "materializeGenerationZero" -> {
                         materializations.incrementAndGet();
-                        ReachableCommittedAppend reachable =
-                                (ReachableCommittedAppend) arguments[1];
-                        yield CompletableFuture.completedFuture(
-                                materialized(
-                                        reachable.committedAppend()));
+                        ReachableCommittedAppend reachable = (ReachableCommittedAppend) arguments[1];
+                        yield CompletableFuture.completedFuture(materialized(reachable.committedAppend()));
                     }
                     case "close" -> null;
                     case "toString" -> "generation-zero-repair-l0";
-                    default -> throw new UnsupportedOperationException(
-                            method.getName());
+                    default -> throw new UnsupportedOperationException(method.getName());
                 });
     }
 
@@ -147,12 +117,10 @@ final class GenerationZeroRepairTestSupport {
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
                 (proxy, method, arguments) -> switch (method.getName()) {
-                    case "getRecoveryRoot" -> CompletableFuture.completedFuture(
-                            Optional.empty());
+                    case "getRecoveryRoot" -> CompletableFuture.completedFuture(Optional.empty());
                     case "close" -> null;
                     case "toString" -> "generation-zero-repair-generations";
-                    default -> throw new UnsupportedOperationException(
-                            method.getName());
+                    default -> throw new UnsupportedOperationException(method.getName());
                 });
     }
 
@@ -168,10 +136,8 @@ final class GenerationZeroRepairTestSupport {
                         1,
                         1,
                         9),
-                new CommittedEndOffsetRecord(
-                        STREAM.value(), 1, 10, 1, 9),
-                new TrimRecord(
-                        STREAM.value(), trimOffset, "test", 1, 9));
+                new CommittedEndOffsetRecord(STREAM.value(), 1, 10, 1, 9),
+                new TrimRecord(STREAM.value(), trimOffset, "test", 1, 9));
     }
 
     private static AppendRecoveryCommit commit() {
@@ -199,13 +165,11 @@ final class GenerationZeroRepairTestSupport {
                 1,
                 1,
                 0);
-        byte[] canonical = MetadataRecordCodecFactory.encodeEnvelope(
-                value, StreamCommitTargetRecord.class);
+        byte[] canonical = MetadataRecordCodecFactory.encodeEnvelope(value, StreamCommitTargetRecord.class);
         Checksum digest = sha256(canonical);
         return new AppendRecoveryCommit(
                 "/commit/commit-1",
-                AppendRecoveryCommitEncoding
-                        .GENERIC_STREAM_COMMIT_TARGET_V1,
+                AppendRecoveryCommitEncoding.GENERIC_STREAM_COMMIT_TARGET_V1,
                 value,
                 7,
                 digest,
@@ -236,31 +200,21 @@ final class GenerationZeroRepairTestSupport {
                         sha));
     }
 
-    private static MaterializedGenerationZero materialized(
-            com.nereusstream.metadata.oxia.CommittedAppend committed) {
-        return new MaterializedGenerationZero(
-                committed,
-                "/index/generation-zero-repair-stream/1/0",
-                11,
-                sha());
+    private static MaterializedGenerationZero materialized(com.nereusstream.metadata.oxia.CommittedAppend committed) {
+        return new MaterializedGenerationZero(committed, "/index/generation-zero-repair-stream/1/0", 11, sha());
     }
 
-    private static ProtectedGenerationZero protectedGeneration(
-            MaterializedGenerationZero materialized) {
-        ObjectKey key = ((ObjectSliceReadTarget)
-                        materialized.committedAppend().readTarget())
-                .objectKey();
+    private static ProtectedGenerationZero protectedGeneration(MaterializedGenerationZero materialized) {
+        ObjectKey key = ((ObjectSliceReadTarget) materialized.committedAppend().readTarget()).objectKey();
         return new ProtectedGenerationZero(
                 materialized,
                 new ObjectProtectionIdentity(
                         ObjectKeyHash.from(key),
                         ObjectProtectionType.VISIBLE_GENERATION,
-                        GenerationZeroProtectionIdentities
-                                .visibleGenerationReferenceId(
-                                        materialized.committedAppend()
-                                                .streamId(),
-                                        materialized.indexKey(),
-                                        materialized.indexRecordSha256())),
+                        GenerationZeroProtectionIdentities.visibleGenerationReferenceId(
+                                materialized.committedAppend().streamId(),
+                                materialized.indexKey(),
+                                materialized.indexRecordSha256())),
                 3,
                 1,
                 4,
@@ -275,9 +229,8 @@ final class GenerationZeroRepairTestSupport {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(
-                            MessageDigest.getInstance("SHA-256")
-                                    .digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (Exception failure) {
             throw new AssertionError(failure);
         }
@@ -290,8 +243,7 @@ final class GenerationZeroRepairTestSupport {
             AtomicInteger materializations,
             AtomicInteger protections) {}
 
-    private static final class RecordingPublisher
-            implements GenerationZeroPhysicalReferencePublisher {
+    private static final class RecordingPublisher implements GenerationZeroPhysicalReferencePublisher {
         private final AtomicInteger protections;
 
         private RecordingPublisher(AtomicInteger protections) {
@@ -300,9 +252,7 @@ final class GenerationZeroRepairTestSupport {
 
         @Override
         public CompletableFuture<Void> authorizeUpload(
-                AppendSession session,
-                PhysicalObjectIdentity object,
-                Duration timeout) {
+                AppendSession session, PhysicalObjectIdentity object, Duration timeout) {
             throw new UnsupportedOperationException();
         }
 
@@ -316,8 +266,7 @@ final class GenerationZeroRepairTestSupport {
         public CompletableFuture<ProtectedGenerationZero> protectVisibleIndex(
                 MaterializedGenerationZero append, Duration timeout) {
             protections.incrementAndGet();
-            return CompletableFuture.completedFuture(
-                    protectedGeneration(append));
+            return CompletableFuture.completedFuture(protectedGeneration(append));
         }
     }
 }

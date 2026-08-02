@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Controls whether one indivisible first entry may exceed the requested read limits. */
+/**
+ * Controls whether one indivisible first entry may exceed the requested read limits.
+ */
 public enum FirstEntryPolicy {
     LEGACY_STRICT_LIMIT,
     ALLOW_FIRST_ENTRY_OVERFLOW

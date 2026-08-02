@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.AppendAttemptId;
@@ -31,7 +32,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Replays one payload-free durable BookKeeper reservation after process loss without another provider write. */
+/**
+ * Replays one payload-free durable BookKeeper reservation after process loss without another provider write.
+ */
 public final class BookKeeperAppendRecoveryCoordinator {
     private final String cluster;
     private final BookKeeperWalConfiguration configuration;
@@ -59,20 +62,14 @@ public final class BookKeeperAppendRecoveryCoordinator {
     }
 
     public CompletableFuture<AppendResult> recoverAfterRestart(
-            AppendSession currentSession,
-            AppendAttemptId attemptId,
-            DurabilityLevel durability,
-            Duration timeout) {
+            AppendSession currentSession, AppendAttemptId attemptId, DurabilityLevel durability, Duration timeout) {
         return recoverAfterRestart(
-                currentSession,
-                attemptId,
-                durability,
-                AppendCompletionPolicy.PROFILE_DEFAULT,
-                null,
-                timeout);
+                currentSession, attemptId, durability, AppendCompletionPolicy.PROFILE_DEFAULT, null, timeout);
     }
 
-    /** Resumes BK-sync producer completion from the durable reservation without another provider append. */
+    /**
+     * Resumes BK-sync producer completion from the durable reservation without another provider append.
+     */
     public CompletableFuture<AppendResult> recoverAfterRestart(
             AppendSession currentSession,
             AppendAttemptId attemptId,
@@ -84,12 +81,12 @@ public final class BookKeeperAppendRecoveryCoordinator {
         AppendAttemptId attempt = Objects.requireNonNull(attemptId, "attemptId");
         Objects.requireNonNull(durability, "durability");
         Objects.requireNonNull(completionPolicy, "completionPolicy");
-        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(
-                Objects.requireNonNull(timeout, "timeout"));
+        BookKeeperOperationDeadline deadline =
+                new BookKeeperOperationDeadline(Objects.requireNonNull(timeout, "timeout"));
         String reservationId = BookKeeperAppendReservationIds.forAttempt(session.streamId(), attempt);
         return deadline.bound(l0.revalidateAppendSession(cluster, session))
-                .thenCompose(ignored -> deadline.bound(writerMetadata.getReservation(
-                        cluster, session.streamId(), reservationId)))
+                .thenCompose(ignored ->
+                        deadline.bound(writerMetadata.getReservation(cluster, session.streamId(), reservationId)))
                 .thenCompose(optional -> recoverReservation(
                         session,
                         attempt,
@@ -136,13 +133,7 @@ public final class BookKeeperAppendRecoveryCoordinator {
                             AppendOutcome.KNOWN_NOT_COMMITTED,
                             "BookKeeper append did not reach durable range completion")));
         }
-        return resumeDurable(
-                        session,
-                        value,
-                        durability,
-                        completionPolicy,
-                        requiredObjectGeneration,
-                        deadline)
+        return resumeDurable(session, value, durability, completionPolicy, requiredObjectGeneration, deadline)
                 .thenCompose(committed -> sealSelectedWriter(
                                 session, deadline, "seal recovered BookKeeper writer after restart")
                         .thenApply(ignored -> toResult(committed)));
@@ -162,8 +153,8 @@ public final class BookKeeperAppendRecoveryCoordinator {
                     "fenced BookKeeper reservation already has stable-commit facts"));
         }
         return abandon(reservation, "append session was fenced")
-                .thenCompose(ignored -> sealSelectedWriter(
-                        newOwner, deadline, "fence old BookKeeper append reservation"))
+                .thenCompose(
+                        ignored -> sealSelectedWriter(newOwner, deadline, "fence old BookKeeper append reservation"))
                 .thenCompose(ignored -> CompletableFuture.failedFuture(failure(
                         ErrorCode.FENCED_APPEND,
                         false,
@@ -189,27 +180,17 @@ public final class BookKeeperAppendRecoveryCoordinator {
         CommitAppendRequest request = request(session, reservation);
         return deadline.bound(l0.prepareStableAppend(cluster, request))
                 .thenCompose(prepared -> deadline.bound(references.protectBeforeHead(
-                        prepared,
-                        (BookKeeperEntryRangeReadTarget) request.readTarget(),
-                        deadline.remaining())))
-                .thenCompose(protectedAppend -> deadline.bound(l0.commitPreparedStableAppend(
-                        cluster,
-                        protectedAppend.prepared(),
-                        protectedAppend.proof())))
+                        prepared, (BookKeeperEntryRangeReadTarget) request.readTarget(), deadline.remaining())))
+                .thenCompose(protectedAppend -> deadline.bound(
+                        l0.commitPreparedStableAppend(cluster, protectedAppend.prepared(), protectedAppend.proof())))
                 // Recovery is intentionally stronger than a fast-path WAL_DURABLE acknowledgement: always finish
                 // generation zero so the terminal result remains readable after this process seals the old ledger.
-                .thenCompose(stable -> deadline.bound(l0.materializeGenerationZero(
-                        cluster, stable.reachableAppend())))
+                .thenCompose(stable -> deadline.bound(l0.materializeGenerationZero(cluster, stable.reachableAppend())))
                 .thenCompose(materialized -> deadline.bound(references.protectVisibleIndex(
-                        materialized,
-                        (BookKeeperEntryRangeReadTarget) request.readTarget(),
-                        deadline.remaining())))
+                        materialized, (BookKeeperEntryRangeReadTarget) request.readTarget(), deadline.remaining())))
                 .thenApply(protectedIndex -> protectedIndex.materialized().committedAppend())
-                .thenCompose(committed -> completeProducerPolicy(
-                        committed,
-                        completionPolicy,
-                        requiredObjectGeneration,
-                        deadline));
+                .thenCompose(committed ->
+                        completeProducerPolicy(committed, completionPolicy, requiredObjectGeneration, deadline));
     }
 
     private CompletableFuture<CommittedAppend> completeProducerPolicy(
@@ -231,9 +212,7 @@ public final class BookKeeperAppendRecoveryCoordinator {
         }
         return deadline.bound(requiredObjectGeneration.complete(
                         new RequiredObjectGenerationRequest(
-                                committed.streamId(),
-                                committed.range(),
-                                committed.commitVersion()),
+                                committed.streamId(), committed.range(), committed.commitVersion()),
                         deadline.remaining()))
                 .thenApply(proof -> {
                     RequiredObjectGenerationRequest expected = new RequiredObjectGenerationRequest(
@@ -250,45 +229,67 @@ public final class BookKeeperAppendRecoveryCoordinator {
     }
 
     private CompletableFuture<Void> sealSelectedWriter(
-            AppendSession owner,
-            BookKeeperOperationDeadline deadline,
-            String reason) {
-        return deadline.bound(writerMetadata.getWriter(cluster, owner.streamId())).thenCompose(optional -> {
-            if (optional.isEmpty()) {
-                return CompletableFuture.completedFuture(null);
-            }
-            BookKeeperWriterLifecycle lifecycle = optional.orElseThrow().value().lifecycle();
-            if (lifecycle != BookKeeperWriterLifecycle.ACTIVE
-                    && lifecycle != BookKeeperWriterLifecycle.RECOVERING) {
-                return CompletableFuture.completedFuture(null);
-            }
-            return deadline.bound(ledgerRecovery.recoverWriter(owner, deadline.remaining(), reason))
-                    .thenApply(ignored -> null);
-        });
+            AppendSession owner, BookKeeperOperationDeadline deadline, String reason) {
+        return deadline.bound(writerMetadata.getWriter(cluster, owner.streamId()))
+                .thenCompose(optional -> {
+                    if (optional.isEmpty()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    BookKeeperWriterLifecycle lifecycle =
+                            optional.orElseThrow().value().lifecycle();
+                    if (lifecycle != BookKeeperWriterLifecycle.ACTIVE
+                            && lifecycle != BookKeeperWriterLifecycle.RECOVERING) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    return deadline.bound(ledgerRecovery.recoverWriter(owner, deadline.remaining(), reason))
+                            .thenApply(ignored -> null);
+                });
     }
 
     private CompletableFuture<BookKeeperVersionedValue<BookKeeperAppendReservationRecord>> abandon(
-            BookKeeperVersionedValue<BookKeeperAppendReservationRecord> reservation,
-            String reason) {
+            BookKeeperVersionedValue<BookKeeperAppendReservationRecord> reservation, String reason) {
         BookKeeperAppendReservationRecord before = reservation.value();
         if (before.lifecycle() == AppendReservationLifecycle.ABANDONED) {
             return CompletableFuture.completedFuture(reservation);
         }
         BookKeeperAppendReservationRecord abandoned = new BookKeeperAppendReservationRecord(
-                before.schemaVersion(), before.reservationId(), before.appendAttemptId(), before.streamId(),
-                before.writerId(), before.writerRunIdHash(), before.appendSessionEpoch(), before.fencingTokenHash(),
-                before.writerStateEpoch(), before.ledgerId(), before.ledgerRootEpoch(), before.ledgerRangeSlot(),
-                before.firstEntryId(), before.entryCount(), before.rangeChecksumSha256(), before.expectedStartOffset(),
-                before.payloadFormat(), before.recordCount(), before.logicalBytes(), before.physicalBytes(),
-                before.schemaRefs(), before.projectionIdentity(), before.minEventTimeMillis(),
-                before.maxEventTimeMillis(), AppendReservationLifecycle.ABANDONED, "", "", 0, "",
-                before.createdAtMillis(), clock.millis(), text(reason, "reason"), 0);
+                before.schemaVersion(),
+                before.reservationId(),
+                before.appendAttemptId(),
+                before.streamId(),
+                before.writerId(),
+                before.writerRunIdHash(),
+                before.appendSessionEpoch(),
+                before.fencingTokenHash(),
+                before.writerStateEpoch(),
+                before.ledgerId(),
+                before.ledgerRootEpoch(),
+                before.ledgerRangeSlot(),
+                before.firstEntryId(),
+                before.entryCount(),
+                before.rangeChecksumSha256(),
+                before.expectedStartOffset(),
+                before.payloadFormat(),
+                before.recordCount(),
+                before.logicalBytes(),
+                before.physicalBytes(),
+                before.schemaRefs(),
+                before.projectionIdentity(),
+                before.minEventTimeMillis(),
+                before.maxEventTimeMillis(),
+                AppendReservationLifecycle.ABANDONED,
+                "",
+                "",
+                0,
+                "",
+                before.createdAtMillis(),
+                clock.millis(),
+                text(reason, "reason"),
+                0);
         return writerMetadata.compareAndSetReservation(cluster, abandoned, reservation.metadataVersion());
     }
 
-    private CommitAppendRequest request(
-            AppendSession session,
-            BookKeeperAppendReservationRecord reservation) {
+    private CommitAppendRequest request(AppendSession session, BookKeeperAppendReservationRecord reservation) {
         if (!reservation.projectionIdentity().equals(CommitAppendRequest.absentProjectionIdentity())) {
             throw failure(
                     ErrorCode.METADATA_INVARIANT_VIOLATION,
@@ -342,9 +343,7 @@ public final class BookKeeperAppendRecoveryCoordinator {
     }
 
     private static void requireAttempt(
-            BookKeeperAppendReservationRecord reservation,
-            StreamId stream,
-            AppendAttemptId attempt) {
+            BookKeeperAppendReservationRecord reservation, StreamId stream, AppendAttemptId attempt) {
         if (!reservation.streamId().equals(stream.value())
                 || !reservation.appendAttemptId().equals(attempt.value())
                 || !reservation.reservationId().equals(BookKeeperAppendReservationIds.forAttempt(stream, attempt))) {
@@ -356,17 +355,15 @@ public final class BookKeeperAppendRecoveryCoordinator {
         }
     }
 
-    private static NereusException failure(
-            ErrorCode code,
-            boolean retriable,
-            AppendOutcome outcome,
-            String message) {
+    private static NereusException failure(ErrorCode code, boolean retriable, AppendOutcome outcome, String message) {
         return new NereusException(code, retriable, message, outcome);
     }
 
     private static String text(String value, String field) {
         Objects.requireNonNull(value, field);
-        if (value.isBlank()) throw new IllegalArgumentException(field + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(field + " cannot be blank");
+        }
         return value;
     }
 }

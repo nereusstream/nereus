@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import com.nereusstream.core.capability.LiveProjectionSubject;
@@ -23,9 +24,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** F3 cursor/retention authority that must be reference-free before stream registration removal. */
-public final class ManagedLedgerStreamRetirementAuthorityReader
-        implements StreamRetirementReferenceAuthorityReader {
+/**
+ * F3 cursor/retention authority that must be reference-free before stream registration removal.
+ */
+public final class ManagedLedgerStreamRetirementAuthorityReader implements StreamRetirementReferenceAuthorityReader {
     private static final String AUTHORITY_DOMAIN = "stream-retirement-cursor-v1";
 
     private final String cluster;
@@ -35,9 +37,7 @@ public final class ManagedLedgerStreamRetirementAuthorityReader
     private final CursorKeyspace keys;
 
     public ManagedLedgerStreamRetirementAuthorityReader(
-            String cluster,
-            CursorMetadataStore metadata,
-            GcReferenceDomainConfig config) {
+            String cluster, CursorMetadataStore metadata, GcReferenceDomainConfig config) {
         this.cluster = requireText(cluster, "cluster");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         GcReferenceDomainConfig exactConfig = Objects.requireNonNull(config, "config");
@@ -47,35 +47,27 @@ public final class ManagedLedgerStreamRetirementAuthorityReader
     }
 
     @Override
-    public CompletableFuture<StreamRetirementReferenceAuthoritySnapshot> capture(
-            LiveProjectionSubject subject) {
+    public CompletableFuture<StreamRetirementReferenceAuthoritySnapshot> capture(LiveProjectionSubject subject) {
         LiveProjectionSubject exact = Objects.requireNonNull(subject, "subject");
         ManagedLedgerGenerationProjectionRefV1 decoded =
                 ManagedLedgerGenerationProjectionRefV1.from(exact.projectionRef());
         if (!decoded.identity().streamId().equals(exact.streamId().value())
-                || !decoded.projectionIdentitySha256()
-                        .equals(exact.projectionIdentitySha256())) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "stream-retirement subject does not match its NPR1 identity"));
+                || !decoded.projectionIdentitySha256().equals(exact.projectionIdentitySha256())) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("stream-retirement subject does not match its NPR1 identity"));
         }
-        return metadata.getRetention(cluster, exact.streamId())
-                .thenCompose(first -> {
-                    Accumulator accumulator = new Accumulator(exact, decoded.identity());
-                    accumulator.addRetention(first);
-                    return scan(
-                                    accumulator,
-                                    first,
-                                    Optional.empty(),
-                                    null)
-                            .thenCompose(ignored -> metadata.getRetention(
-                                    cluster, exact.streamId()))
-                            .thenApply(second -> {
-                                if (!second.equals(first)) {
-                                    accumulator.incomplete = true;
-                                }
-                                return accumulator.snapshot();
-                            });
-                });
+        return metadata.getRetention(cluster, exact.streamId()).thenCompose(first -> {
+            Accumulator accumulator = new Accumulator(exact, decoded.identity());
+            accumulator.addRetention(first);
+            return scan(accumulator, first, Optional.empty(), null)
+                    .thenCompose(ignored -> metadata.getRetention(cluster, exact.streamId()))
+                    .thenApply(second -> {
+                        if (!second.equals(first)) {
+                            accumulator.incomplete = true;
+                        }
+                        return accumulator.snapshot();
+                    });
+        });
     }
 
     private CompletableFuture<Void> scan(
@@ -86,11 +78,7 @@ public final class ManagedLedgerStreamRetirementAuthorityReader
         if (accumulator.incomplete) {
             return CompletableFuture.completedFuture(null);
         }
-        return metadata.scanCursors(
-                        cluster,
-                        accumulator.subject.streamId(),
-                        continuation,
-                        pageSize)
+        return metadata.scanCursors(cluster, accumulator.subject.streamId(), continuation, pageSize)
                 .thenCompose(page -> {
                     requireProgress(accumulator.subject, page, previousKey);
                     for (VersionedCursorState cursor : page.records()) {
@@ -105,21 +93,18 @@ public final class ManagedLedgerStreamRetirementAuthorityReader
                         accumulator.incomplete = true;
                         return CompletableFuture.completedFuture(null);
                     }
-                    VersionedCursorState last = page.records().get(page.records().size() - 1);
+                    VersionedCursorState last =
+                            page.records().get(page.records().size() - 1);
                     return scan(
                             accumulator,
                             retention,
                             page.continuation(),
                             keys.cursorStateKey(
-                                    accumulator.subject.streamId(),
-                                    last.value().cursorName()));
+                                    accumulator.subject.streamId(), last.value().cursorName()));
                 });
     }
 
-    private void requireProgress(
-            LiveProjectionSubject subject,
-            CursorScanPage page,
-            String previousKey) {
+    private void requireProgress(LiveProjectionSubject subject, CursorScanPage page, String previousKey) {
         if (previousKey == null || page.records().isEmpty()) {
             return;
         }
@@ -138,9 +123,7 @@ public final class ManagedLedgerStreamRetirementAuthorityReader
         private long liveReferenceCount;
         private boolean incomplete;
 
-        private Accumulator(
-                LiveProjectionSubject subject,
-                ManagedLedgerProjectionIdentity projection) {
+        private Accumulator(LiveProjectionSubject subject, ManagedLedgerProjectionIdentity projection) {
             this.subject = subject;
             this.projection = projection;
         }
@@ -148,33 +131,23 @@ public final class ManagedLedgerStreamRetirementAuthorityReader
         private void addRetention(Optional<VersionedCursorRetention> retention) {
             String key = keys.retentionKey(subject.streamId());
             if (retention.isEmpty()) {
-                addAuthority(new GcAuthorityToken(
-                        key,
-                        0,
-                        ReferenceDomainIdentityDigests.absence(
-                                AUTHORITY_DOMAIN, key)));
+                addAuthority(
+                        new GcAuthorityToken(key, 0, ReferenceDomainIdentityDigests.absence(AUTHORITY_DOMAIN, key)));
                 return;
             }
             VersionedCursorRetention exact = retention.orElseThrow();
             addAuthority(new GcAuthorityToken(
-                    key,
-                    exact.metadataVersion(),
-                    CursorMetadataDigests.durableValueSha256(exact.value())));
+                    key, exact.metadataVersion(), CursorMetadataDigests.durableValueSha256(exact.value())));
             if (!exact.value().projection().equals(projection)
                     || exact.value().lifecycle() != CursorRetentionLifecycle.ACTIVE) {
                 liveReferenceCount = Math.addExact(liveReferenceCount, 1);
             }
         }
 
-        private boolean addCursor(
-                Optional<VersionedCursorRetention> retention,
-                VersionedCursorState cursor) {
-            String key = keys.cursorStateKey(
-                    subject.streamId(), cursor.value().cursorName());
+        private boolean addCursor(Optional<VersionedCursorRetention> retention, VersionedCursorState cursor) {
+            String key = keys.cursorStateKey(subject.streamId(), cursor.value().cursorName());
             addAuthority(new GcAuthorityToken(
-                    key,
-                    cursor.metadataVersion(),
-                    CursorMetadataDigests.durableValueSha256(cursor.value())));
+                    key, cursor.metadataVersion(), CursorMetadataDigests.durableValueSha256(cursor.value())));
             if (incomplete) {
                 return false;
             }

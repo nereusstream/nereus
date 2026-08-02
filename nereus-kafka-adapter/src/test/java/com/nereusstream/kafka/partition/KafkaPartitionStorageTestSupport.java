@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import com.nereusstream.api.Checksum;
@@ -35,40 +36,28 @@ final class KafkaPartitionStorageTestSupport {
     private KafkaPartitionStorageTestSupport() {}
 
     static KafkaPartitionIdentity identity() {
-        ByteBuffer bytes = ByteBuffer.allocate(16).putLong(0x1234_5678_9abc_def0L).putLong(1);
+        ByteBuffer bytes =
+                ByteBuffer.allocate(16).putLong(0x1234_5678_9abc_def0L).putLong(1);
         return new KafkaPartitionIdentity(
-                "kraft",
-                Base64.getUrlEncoder().withoutPadding().encodeToString(bytes.array()),
-                3,
-                "orders");
+                "kraft", Base64.getUrlEncoder().withoutPadding().encodeToString(bytes.array()), 3, "orders");
     }
 
     static KafkaPartitionBinding binding(StorageProfile profile) {
         KafkaPartitionIdentity identity = identity();
         KafkaPartitionPendingOperationRecord operation = new KafkaPartitionPendingOperationRecord(
-                KafkaPartitionOperationType.CREATE.wireId(),
-                "create-test",
-                "broker-test",
-                1,
-                20_000,
-                1,
-                10_000,
-                "");
+                KafkaPartitionOperationType.CREATE.wireId(), "create-test", "broker-test", 1, 20_000, 1, 10_000, "");
         var creating = KafkaPartitionMetadataTransitions.creating(
                 identity.durableId(), identity.observedTopicName(), profile.name(), 1, 10_000, operation);
         StreamName streamName = new StreamName("kafka-partition-test-stream");
         StreamId streamId = new StreamId("kafka-partition-test-stream-id");
-        var active = KafkaPartitionMetadataTransitions.activate(
-                creating, streamName.value(), streamId.value(), 1, 10_001);
+        var active =
+                KafkaPartitionMetadataTransitions.activate(creating, streamName.value(), streamId.value(), 1, 10_001);
         return new KafkaPartitionBinding(
                 identity,
                 streamName,
                 streamId,
                 new VersionedKafkaPartitionBinding(
-                        "/test/kafka-binding",
-                        active,
-                        0,
-                        new Checksum(ChecksumType.SHA256, "a".repeat(64))));
+                        "/test/kafka-binding", active, 0, new Checksum(ChecksumType.SHA256, "a".repeat(64))));
     }
 
     static KafkaPartitionOpenPlan openPlan(KafkaLeaderAuthority authority) {
@@ -86,7 +75,9 @@ final class KafkaPartitionStorageTestSupport {
             records[index] = new SimpleRecord(timestamp + index, values[index].getBytes());
         }
         ByteBuffer buffer = MemoryRecords.withRecords(
-                baseOffset, Compression.of(type).build(), records).buffer().duplicate();
+                        baseOffset, Compression.of(type).build(), records)
+                .buffer()
+                .duplicate();
         byte[] result = new byte[buffer.remaining()];
         buffer.get(result);
         return result;
@@ -94,22 +85,20 @@ final class KafkaPartitionStorageTestSupport {
 
     static byte[] concat(byte[]... values) {
         int size = 0;
-        for (byte[] value : values) size = Math.addExact(size, value.length);
+        for (byte[] value : values) {
+            size = Math.addExact(size, value.length);
+        }
         ByteBuffer result = ByteBuffer.allocate(size);
-        for (byte[] value : values) result.put(value);
+        for (byte[] value : values) {
+            result.put(value);
+        }
         return result.array();
     }
 
     static ReadBatch readBatch(OffsetRange range, byte[] payload, int ordinal) {
         Checksum checksum = new Checksum(ChecksumType.CRC32C, "00000000");
         EntryIndexRef index = new EntryIndexRef(
-                EntryIndexLocation.OBJECT_FOOTER,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                0,
-                1,
-                checksum);
+                EntryIndexLocation.OBJECT_FOOTER, Optional.empty(), Optional.empty(), Optional.empty(), 0, 1, checksum);
         ObjectSliceReadTarget target = new ObjectSliceReadTarget(
                 1,
                 new ObjectId("kafka-partition-object-" + ordinal),

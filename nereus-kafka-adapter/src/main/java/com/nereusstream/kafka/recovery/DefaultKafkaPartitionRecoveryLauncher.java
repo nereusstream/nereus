@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.recovery;
 
 import com.nereusstream.api.StreamId;
@@ -8,7 +9,9 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-/** Product-owned checkpoint and COMMITTED replay composition around fresh Kafka-fork derived state. */
+/**
+ * Product-owned checkpoint and COMMITTED replay composition around fresh Kafka-fork derived state.
+ */
 public final class DefaultKafkaPartitionRecoveryLauncher implements KafkaPartitionRecoveryLauncher {
     private final KafkaCheckpointRecoveryCoordinator checkpoints;
     private final StreamStorage streams;
@@ -39,33 +42,28 @@ public final class DefaultKafkaPartitionRecoveryLauncher implements KafkaPartiti
     }
 
     @Override
-    public CompletableFuture<? extends KafkaRecoveredPartition<?>> recover(
-            KafkaPartitionRecoveryRequest request) {
+    public CompletableFuture<? extends KafkaRecoveredPartition<?>> recover(KafkaPartitionRecoveryRequest request) {
         Objects.requireNonNull(request, "request");
         KafkaRecoveryState<?> state;
         try {
-            state = Objects.requireNonNull(
-                    stateFactory.create(request), "Kafka recovery state factory returned null");
+            state = Objects.requireNonNull(stateFactory.create(request), "Kafka recovery state factory returned null");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
         return launch(request, state);
     }
 
-    private <S> CompletableFuture<KafkaRecoveredPartition<S>> launch(
-            KafkaPartitionRecoveryRequest request,
-            KafkaRecoveryState<S> state) {
-        StreamId streamId = new StreamId(
-                request.checkpointRequest().binding().value().streamId());
-        KafkaPartitionRecoveryCoordinator<S> coordinator =
-                new KafkaPartitionRecoveryCoordinator<>(
-                        checkpoints,
-                        new DefaultKafkaRecoveryBatchSource(
-                                streams, streamId, chunkRecords, chunkBytes),
-                        state.codec(),
-                        state.publisher(),
-                        recoveryExecutor,
-                        clock);
+    private <StateT> CompletableFuture<KafkaRecoveredPartition<StateT>> launch(
+            KafkaPartitionRecoveryRequest request, KafkaRecoveryState<StateT> state) {
+        StreamId streamId =
+                new StreamId(request.checkpointRequest().binding().value().streamId());
+        KafkaPartitionRecoveryCoordinator<StateT> coordinator = new KafkaPartitionRecoveryCoordinator<>(
+                checkpoints,
+                new DefaultKafkaRecoveryBatchSource(streams, streamId, chunkRecords, chunkBytes),
+                state.codec(),
+                state.publisher(),
+                recoveryExecutor,
+                clock);
         return coordinator.recover(request);
     }
 }

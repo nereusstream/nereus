@@ -16,7 +16,9 @@ package com.nereusstream.api;
 
 import java.util.Objects;
 
-/** Public request for an exact semantic read view and entry-boundary policy. */
+/**
+ * Public request for an exact semantic read view and entry-boundary policy.
+ */
 public record ReadRequest(
         long startOffset,
         ReadView view,
@@ -33,7 +35,9 @@ public record ReadRequest(
         }
     }
 
-    /** Returns true only for the behavior represented by the original {@link StreamStorage#read} method. */
+    /**
+     * Returns true only for the behavior represented by the original {@link StreamStorage#read} method.
+     */
     public boolean isLegacyEquivalent() {
         return view == ReadView.COMMITTED
                 && boundaryMode == ReadBoundaryMode.EXACT_START

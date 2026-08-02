@@ -12,5 +12,7 @@
  * limitations under the License.
  */
 
-/** Test-fixture namespace for the Phase 1 fake Oxia metadata store. */
+/**
+ * Test-fixture namespace for the Phase 1 fake Oxia metadata store.
+ */
 package com.nereusstream.metadata.oxia.testing;

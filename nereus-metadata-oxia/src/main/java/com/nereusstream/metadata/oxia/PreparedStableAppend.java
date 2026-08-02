@@ -1,14 +1,17 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
-import com.nereusstream.api.ReadTargetIdentities;
 import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ObjectType;
+import com.nereusstream.api.ReadTargetIdentities;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import java.util.Objects;
 
-/** Exact immutable generic commit intent prepared without advancing the stream head. */
+/**
+ * Exact immutable generic commit intent prepared without advancing the stream head.
+ */
 public record PreparedStableAppend(
         CommitAppendRequest request,
         String commitId,
@@ -23,9 +26,8 @@ public record PreparedStableAppend(
         commitKey = F4ValueValidation.text(commitKey, "commitKey");
         F4ValueValidation.version(commitMetadataVersion);
         commitRecordSha256 = F4ValueValidation.sha256(commitRecordSha256, "commitRecordSha256");
-        primaryTargetIdentitySha256 = F4ValueValidation.sha256(
-                primaryTargetIdentitySha256,
-                "primaryTargetIdentitySha256");
+        primaryTargetIdentitySha256 =
+                F4ValueValidation.sha256(primaryTargetIdentitySha256, "primaryTargetIdentitySha256");
         if (!commitId.equals(request.commitId())) {
             throw new IllegalArgumentException("commitId does not match the stable append request");
         }
@@ -34,7 +36,9 @@ public record PreparedStableAppend(
         }
     }
 
-    /** Source-compatible Object-WAL constructor retained while callers migrate to canonical target identities. */
+    /**
+     * Source-compatible Object-WAL constructor retained while callers migrate to canonical target identities.
+     */
     @Deprecated(forRemoval = true)
     public PreparedStableAppend(
             CommitAppendRequest request,
@@ -59,7 +63,9 @@ public record PreparedStableAppend(
         }
     }
 
-    /** Object-only compatibility accessor. Provider-neutral code uses {@link #primaryTargetIdentitySha256()}. */
+    /**
+     * Object-only compatibility accessor. Provider-neutral code uses {@link #primaryTargetIdentitySha256()}.
+     */
     @Deprecated(forRemoval = true)
     public ObjectKeyHash objectKeyHash() {
         if (!(request.readTarget() instanceof ObjectSliceReadTarget target)

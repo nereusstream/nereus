@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.api.SchemaRef;
@@ -13,12 +14,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** Strict, bounded primitive codec for Phase 4 metadata payloads. */
+/**
+ * Strict, bounded primitive codec for Phase 4 metadata payloads.
+ */
 final class F4Binary {
     static final int MAX_PAYLOAD_BYTES = 64 * 1024;
 
-    private F4Binary() {
-    }
+    private F4Binary() {}
 
     static final class Writer {
         private final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -102,7 +104,8 @@ final class F4Binary {
 
         int readCount(String name, int minimumElementBytes, int hardMaximum) {
             int count = readInt(name);
-            if (count < 0 || count > hardMaximum
+            if (count < 0
+                    || count > hardMaximum
                     || (minimumElementBytes > 0 && count > buffer.remaining() / minimumElementBytes)) {
                 throw new MetadataCodecException(name + " exceeds its supported bound");
             }
@@ -123,13 +126,11 @@ final class F4Binary {
 
         byte[] readFixedBytes(String name, int expectedLength) {
             if (expectedLength < 0) {
-                throw new IllegalArgumentException(
-                        "expectedLength must be non-negative");
+                throw new IllegalArgumentException("expectedLength must be non-negative");
             }
             int length = readInt(name + "Length");
             if (length != expectedLength) {
-                throw new MetadataCodecException(
-                        name + " must contain exactly " + expectedLength + " bytes");
+                throw new MetadataCodecException(name + " must contain exactly " + expectedLength + " bytes");
             }
             requireRemaining(length, name);
             byte[] value = new byte[length];
@@ -208,8 +209,10 @@ final class F4Binary {
         if (failure instanceof MetadataCodecException codec) {
             return codec;
         }
-        if (failure instanceof IllegalArgumentException || failure instanceof ArithmeticException
-                || failure instanceof NullPointerException || failure instanceof java.nio.BufferUnderflowException) {
+        if (failure instanceof IllegalArgumentException
+                || failure instanceof ArithmeticException
+                || failure instanceof NullPointerException
+                || failure instanceof java.nio.BufferUnderflowException) {
             return new MetadataCodecException("invalid " + recordType + " payload", failure);
         }
         return new MetadataCodecException("failed to decode " + recordType + " payload", failure);
@@ -217,7 +220,8 @@ final class F4Binary {
 
     private static byte[] strictEncode(String value) {
         try {
-            ByteBuffer encoded = StandardCharsets.UTF_8.newEncoder()
+            ByteBuffer encoded = StandardCharsets.UTF_8
+                    .newEncoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .encode(CharBuffer.wrap(value));
@@ -231,7 +235,8 @@ final class F4Binary {
 
     private static String strictDecode(byte[] value, String name) {
         try {
-            return StandardCharsets.UTF_8.newDecoder()
+            return StandardCharsets.UTF_8
+                    .newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .decode(ByteBuffer.wrap(value))

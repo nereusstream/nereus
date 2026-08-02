@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -29,11 +30,12 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.client.api.LedgerMetadata;
 
-/** Complete, bounded, fail-closed capture for one sealed BookKeeper ledger. */
+/**
+ * Complete, bounded, fail-closed capture for one sealed BookKeeper ledger.
+ */
 public final class BookKeeperWalRetentionGate {
     private final String cluster;
     private final BookKeeperWalConfiguration configuration;
@@ -68,20 +70,17 @@ public final class BookKeeperWalRetentionGate {
     }
 
     public CompletableFuture<BookKeeperRetentionEvaluation> evaluate(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> observed,
-            Duration timeout) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> observed, Duration timeout) {
         return evaluate(observed, BookKeeperLedgerLifecycle.SEALED, timeout);
     }
 
     CompletableFuture<BookKeeperRetentionEvaluation> evaluateMarked(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> observed,
-            Duration timeout) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> observed, Duration timeout) {
         return evaluate(observed, BookKeeperLedgerLifecycle.MARKED, timeout);
     }
 
     CompletableFuture<BookKeeperRetentionEvaluation> evaluateDeleting(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> observed,
-            Duration timeout) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> observed, Duration timeout) {
         return evaluate(observed, BookKeeperLedgerLifecycle.DELETING, timeout);
     }
 
@@ -90,21 +89,19 @@ public final class BookKeeperWalRetentionGate {
             BookKeeperLedgerLifecycle requiredLifecycle,
             Duration timeout) {
         BookKeeperVersionedValue<BookKeeperLedgerRootRecord> expected = Objects.requireNonNull(observed, "observed");
-        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(min(
-                Objects.requireNonNull(timeout, "timeout"),
-                configuration.operationTimeout()));
+        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(
+                min(Objects.requireNonNull(timeout, "timeout"), configuration.operationTimeout()));
         var rootFuture = deadline.bound(ledgerMetadata.getRoot(
                 cluster, configuration.providerScopeSha256(), expected.value().ledgerId()));
-        var writerFuture = deadline.bound(writerMetadata.getWriter(
-                cluster, new StreamId(expected.value().streamId())));
-        var protectionsFuture = scanProtections(expected.value().ledgerId(), deadline, Optional.empty(), new ArrayList<>());
+        var writerFuture = deadline.bound(
+                writerMetadata.getWriter(cluster, new StreamId(expected.value().streamId())));
+        var protectionsFuture =
+                scanProtections(expected.value().ledgerId(), deadline, Optional.empty(), new ArrayList<>());
         var readersFuture = scanReaders(expected.value().ledgerId(), deadline, Optional.empty(), new ArrayList<>());
-        var slotFuture = deadline.bound(writerMetadata.getAllocationSlot(
-                cluster, expected.value().allocationSlot()));
-        var namespaceFuture = deadline.bound(
-                namespaceVerifier.requireActive(configuration, deadline.remaining()));
-        var activationFuture = deadline.bound(
-                activationVerifier.requireActive(deadline.remaining()));
+        var slotFuture = deadline.bound(
+                writerMetadata.getAllocationSlot(cluster, expected.value().allocationSlot()));
+        var namespaceFuture = deadline.bound(namespaceVerifier.requireActive(configuration, deadline.remaining()));
+        var activationFuture = deadline.bound(activationVerifier.requireActive(deadline.remaining()));
         var providerFuture = deadline.bound(client.metadata(expected.value().ledgerId(), deadline));
         return CompletableFuture.allOf(
                         rootFuture,
@@ -148,8 +145,12 @@ public final class BookKeeperWalRetentionGate {
             blockers.add(BookKeeperRetentionBlocker.ROOT_CHANGED_OR_INELIGIBLE);
         }
         BookKeeperLedgerRootRecord rootValue = root == null ? expected.value() : root.value();
-        if (rootValue.lateCreateHazard()) blockers.add(BookKeeperRetentionBlocker.LATE_CREATE_HAZARD);
-        if (allocationSlotPresent) blockers.add(BookKeeperRetentionBlocker.ALLOCATION_SLOT_PRESENT);
+        if (rootValue.lateCreateHazard()) {
+            blockers.add(BookKeeperRetentionBlocker.LATE_CREATE_HAZARD);
+        }
+        if (allocationSlotPresent) {
+            blockers.add(BookKeeperRetentionBlocker.ALLOCATION_SLOT_PRESENT);
+        }
         BookKeeperVersionedValue<BookKeeperWriterStateRecord> writer = writerOptional.orElse(null);
         if (writer == null
                 || ((writer.value().lifecycle() == BookKeeperWriterLifecycle.ACTIVE
@@ -162,10 +163,12 @@ public final class BookKeeperWalRetentionGate {
         if (!completeRetiredInventory(rootValue, protections)) {
             blockers.add(BookKeeperRetentionBlocker.PROTECTION_PRESENT);
         }
-        if (!readers.isEmpty()) blockers.add(BookKeeperRetentionBlocker.READER_LEASE_PRESENT);
-        if (protections.size() > Math.multiplyExact(
-                        configuration.maxAppendRangesPerLedger(),
-                        configuration.protectionSlotsPerRange())
+        if (!readers.isEmpty()) {
+            blockers.add(BookKeeperRetentionBlocker.READER_LEASE_PRESENT);
+        }
+        if (protections.size()
+                        > Math.multiplyExact(
+                                configuration.maxAppendRangesPerLedger(), configuration.protectionSlotsPerRange())
                 || readers.size() > configuration.maxReaderLeasesPerLedger()) {
             blockers.add(BookKeeperRetentionBlocker.INVENTORY_LIMIT_EXCEEDED);
         }
@@ -188,15 +191,12 @@ public final class BookKeeperWalRetentionGate {
         } catch (RuntimeException mismatch) {
             blockers.add(BookKeeperRetentionBlocker.PROVIDER_METADATA_MISMATCH);
         }
-        if (!blockers.isEmpty()) return BookKeeperRetentionEvaluation.blocked(blockers);
+        if (!blockers.isEmpty()) {
+            return BookKeeperRetentionEvaluation.blocked(blockers);
+        }
         Checksum referenceSet = referenceSet(root, writer, protections, readers, activation);
         return BookKeeperRetentionEvaluation.admitted(new BookKeeperLedgerRetirementCandidate(
-                root,
-                writer,
-                protections,
-                referenceSet,
-                activation,
-                clock.millis()));
+                root, writer, protections, referenceSet, activation, clock.millis()));
     }
 
     private boolean completeRetiredInventory(
@@ -205,17 +205,25 @@ public final class BookKeeperWalRetentionGate {
         if (protections.stream().anyMatch(value -> value.value().lifecycle() != ProtectionLifecycle.RETIRED)) {
             return false;
         }
-        if (root.sealedLastEntryId() < 0) return protections.isEmpty();
-        if (protections.isEmpty()) return false;
+        if (root.sealedLastEntryId() < 0) {
+            return protections.isEmpty();
+        }
+        if (protections.isEmpty()) {
+            return false;
+        }
         List<BookKeeperLedgerProtectionRecord> mandatory = protections.stream()
                 .map(BookKeeperVersionedValue::value)
                 .filter(value -> value.protectionSlot() < 3)
                 .sorted(Comparator.comparingInt(BookKeeperLedgerProtectionRecord::ledgerRangeSlot)
                         .thenComparingInt(BookKeeperLedgerProtectionRecord::protectionSlot))
                 .toList();
-        if (mandatory.size() % 3 != 0) return false;
+        if (mandatory.size() % 3 != 0) {
+            return false;
+        }
         int ranges = mandatory.size() / 3;
-        if (ranges <= 0 || ranges > configuration.maxAppendRangesPerLedger()) return false;
+        if (ranges <= 0 || ranges > configuration.maxAppendRangesPerLedger()) {
+            return false;
+        }
         List<BookKeeperLedgerProtectionRecord> canonicalRanges = new ArrayList<>(ranges);
         long nextEntry = 0;
         for (int rangeSlot = 0; rangeSlot < ranges; rangeSlot++) {
@@ -226,11 +234,12 @@ public final class BookKeeperWalRetentionGate {
                 BookKeeperLedgerProtectionRecord value = mandatory.get(rangeSlot * 3 + protectionSlot);
                 if (value.ledgerRangeSlot() != rangeSlot
                         || value.protectionSlot() != protectionSlot
-                        || value.protectionType() != switch (protectionSlot) {
-                            case 0 -> BookKeeperProtectionType.REACHABLE_APPEND;
-                            case 1 -> BookKeeperProtectionType.VISIBLE_GENERATION;
-                            default -> BookKeeperProtectionType.APPEND_RECOVERY;
-                        }
+                        || value.protectionType()
+                                != switch (protectionSlot) {
+                                    case 0 -> BookKeeperProtectionType.REACHABLE_APPEND;
+                                    case 1 -> BookKeeperProtectionType.VISIBLE_GENERATION;
+                                    default -> BookKeeperProtectionType.APPEND_RECOVERY;
+                                }
                         || value.firstEntryId() != rangeFirstEntry) {
                     return false;
                 }
@@ -246,9 +255,11 @@ public final class BookKeeperWalRetentionGate {
             }
             nextEntry = Math.addExact(nextEntry, rangeEntryCount);
         }
-        if (nextEntry < Math.addExact(root.sealedLastEntryId(), 1)) return false;
-        for (BookKeeperLedgerProtectionRecord value : protections.stream()
-                .map(BookKeeperVersionedValue::value).toList()) {
+        if (nextEntry < Math.addExact(root.sealedLastEntryId(), 1)) {
+            return false;
+        }
+        for (BookKeeperLedgerProtectionRecord value :
+                protections.stream().map(BookKeeperVersionedValue::value).toList()) {
             if (value.ledgerId() != root.ledgerId()
                     || !value.ledgerIdentitySha256().equals(root.ledgerIdentitySha256())
                     || !value.clusterAlias().equals(root.clusterAlias())
@@ -264,8 +275,7 @@ public final class BookKeeperWalRetentionGate {
     }
 
     private static boolean sameLogicalRange(
-            BookKeeperLedgerProtectionRecord value,
-            BookKeeperLedgerProtectionRecord canonical) {
+            BookKeeperLedgerProtectionRecord value, BookKeeperLedgerProtectionRecord canonical) {
         return value.firstEntryId() == canonical.firstEntryId()
                 && value.entryCount() == canonical.entryCount()
                 && value.rangeChecksumSha256().equals(canonical.rangeChecksumSha256())
@@ -281,16 +291,13 @@ public final class BookKeeperWalRetentionGate {
             List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> values) {
         int pageSize = Math.min(configuration.retentionPageSize(), 1_024);
         return deadline.bound(ledgerMetadata.scanProtections(
-                        cluster,
-                        configuration.providerScopeSha256(),
-                        ledgerId,
-                        continuation,
-                        pageSize))
+                        cluster, configuration.providerScopeSha256(), ledgerId, continuation, pageSize))
                 .thenCompose(page -> {
                     values.addAll(page.values());
-                    if (values.size() > Math.multiplyExact(
-                            configuration.maxAppendRangesPerLedger(),
-                            configuration.protectionSlotsPerRange())) {
+                    if (values.size()
+                            > Math.multiplyExact(
+                                    configuration.maxAppendRangesPerLedger(),
+                                    configuration.protectionSlotsPerRange())) {
                         return CompletableFuture.completedFuture(List.copyOf(values));
                     }
                     return page.continuation().isPresent()
@@ -306,11 +313,7 @@ public final class BookKeeperWalRetentionGate {
             List<BookKeeperVersionedValue<BookKeeperLedgerReaderLeaseRecord>> values) {
         int pageSize = Math.min(configuration.retentionPageSize(), 1_024);
         return deadline.bound(ledgerMetadata.scanReaderLeases(
-                        cluster,
-                        configuration.providerScopeSha256(),
-                        ledgerId,
-                        continuation,
-                        pageSize))
+                        cluster, configuration.providerScopeSha256(), ledgerId, continuation, pageSize))
                 .thenCompose(page -> {
                     values.addAll(page.values());
                     if (values.size() > configuration.maxReaderLeasesPerLedger()) {
@@ -337,9 +340,11 @@ public final class BookKeeperWalRetentionGate {
         frame(digest, writer.key());
         frame(digest, writer.value().streamId());
         frame(digest, writer.value().configurationBindingSha256());
-        protections.stream().sorted(Comparator.comparing(BookKeeperVersionedValue::key))
+        protections.stream()
+                .sorted(Comparator.comparing(BookKeeperVersionedValue::key))
                 .forEach(value -> versioned(digest, value));
-        readers.stream().sorted(Comparator.comparing(BookKeeperVersionedValue::key))
+        readers.stream()
+                .sorted(Comparator.comparing(BookKeeperVersionedValue::key))
                 .forEach(value -> versioned(digest, value));
         frame(digest, Long.toString(activation.activationMetadataVersion()));
         frame(digest, activation.activationRecordSha256().value());
@@ -372,7 +377,9 @@ public final class BookKeeperWalRetentionGate {
 
     private static String text(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 }

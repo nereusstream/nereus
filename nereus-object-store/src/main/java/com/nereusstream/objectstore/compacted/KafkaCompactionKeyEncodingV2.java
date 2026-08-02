@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-/** Closed KCK2 key encoding that keeps empty keys, null keys, and control records distinct. */
+/**
+ * Closed KCK2 key encoding that keeps empty keys, null keys, and control records distinct.
+ */
 public final class KafkaCompactionKeyEncodingV2 {
     public static final String ID = "KCK2";
     public static final int MAX_ENCODED_KEY_BYTES = 1 << 20;
@@ -12,8 +15,7 @@ public final class KafkaCompactionKeyEncodingV2 {
     public static final byte NULL_KEY_TAG = 0x02;
     public static final byte CONTROL_TAG = 0x03;
 
-    private KafkaCompactionKeyEncodingV2() {
-    }
+    private KafkaCompactionKeyEncodingV2() {}
 
     public static ByteBuffer keyed(ByteBuffer rawKey) {
         ByteBuffer key = Objects.requireNonNull(rawKey, "rawKey").asReadOnlyBuffer();
@@ -34,9 +36,7 @@ public final class KafkaCompactionKeyEncodingV2 {
     }
 
     public static void validateForRow(
-            ByteBuffer encoded,
-            long absoluteOffset,
-            KafkaCompactionDispositionV2 disposition) {
+            ByteBuffer encoded, long absoluteOffset, KafkaCompactionDispositionV2 disposition) {
         ByteBuffer key = Objects.requireNonNull(encoded, "encoded").asReadOnlyBuffer();
         Objects.requireNonNull(disposition, "disposition");
         if (!key.hasRemaining() || key.remaining() > MAX_ENCODED_KEY_BYTES) {
@@ -66,9 +66,7 @@ public final class KafkaCompactionKeyEncodingV2 {
     }
 
     private static void requireOffsetIdentity(int actualTag, byte expectedTag, ByteBuffer key, long offset) {
-        if (actualTag != Byte.toUnsignedInt(expectedTag)
-                || key.remaining() != Long.BYTES
-                || key.getLong() != offset) {
+        if (actualTag != Byte.toUnsignedInt(expectedTag) || key.remaining() != Long.BYTES || key.getLong() != offset) {
             throw new CompactedObjectFormatException("KCK2 offset identity does not match the NTC2 row");
         }
     }

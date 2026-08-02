@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.StorageProfile;
@@ -7,7 +8,9 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.Set;
 
-/** Immutable product-side inputs required to assemble one native Kafka storage runtime. */
+/**
+ * Immutable product-side inputs required to assemble one native Kafka storage runtime.
+ */
 public record NereusKafkaRuntimeConfiguration(
         String nereusCluster,
         String kafkaClusterId,
@@ -25,8 +28,7 @@ public record NereusKafkaRuntimeConfiguration(
         kafkaClusterId = nonblank(kafkaClusterId, "kafkaClusterId");
         writerId = nonblank(writerId, "writerId");
         appendSessionTtl = positive(appendSessionTtl, "appendSessionTtl");
-        appendSessionRenewalInterval = positive(
-                appendSessionRenewalInterval, "appendSessionRenewalInterval");
+        appendSessionRenewalInterval = positive(appendSessionRenewalInterval, "appendSessionRenewalInterval");
         operationOwnerId = nonblank(operationOwnerId, "operationOwnerId");
         operationTtl = positive(operationTtl, "operationTtl");
         if (recoveryChunkRecords <= 0 || recoveryChunkBytes <= 0) {
@@ -34,8 +36,7 @@ public record NereusKafkaRuntimeConfiguration(
         }
         executableProfiles = Set.copyOf(Objects.requireNonNull(executableProfiles, "executableProfiles"));
         if (appendSessionRenewalInterval.compareTo(appendSessionTtl) >= 0) {
-            throw new IllegalArgumentException(
-                    "appendSessionRenewalInterval must be shorter than appendSessionTtl");
+            throw new IllegalArgumentException("appendSessionRenewalInterval must be shorter than appendSessionTtl");
         }
         if (operationOwnerEpoch <= 0) {
             throw new IllegalArgumentException("operationOwnerEpoch must be positive");

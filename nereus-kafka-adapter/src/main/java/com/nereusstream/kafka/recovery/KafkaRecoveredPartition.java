@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.recovery;
 
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Complete fresh Kafka state at the exact frozen stable end, ready for atomic publication. */
+/**
+ * Complete fresh Kafka state at the exact frozen stable end, ready for atomic publication.
+ */
 public record KafkaRecoveredPartition<S>(
         S state,
         KafkaCheckpointSourceState frozenSource,

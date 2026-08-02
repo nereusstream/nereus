@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.ErrorCode;
@@ -20,32 +21,34 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
-/** Exact-format physical reader used after generation resolution. */
+/**
+ * Exact-format physical reader used after generation resolution.
+ */
 public interface ReadTargetReader extends AutoCloseable {
     ReadTargetReaderKey key();
 
-    /** Exact target identities accepted by this reader; no physical or logical format wildcard exists. */
+    /**
+     * Exact target identities accepted by this reader; no physical or logical format wildcard exists.
+     */
     default Set<ReadTargetReaderKey> keys() {
         return Set.of(key());
     }
 
     long reservationBytes(ResolvedRange range);
 
-    /** Provider-neutral correctness surface used by common read and materialization code. */
+    /**
+     * Provider-neutral correctness surface used by common read and materialization code.
+     */
     default CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
-            StreamId streamId,
-            long startOffset,
-            List<ResolvedRange> ranges,
-            ReadOptions options) {
-        return readWithStats(streamId, startOffset, ranges, options)
-                .thenApply(result -> fromLegacy(ranges, result));
+            StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
+        return readWithStats(streamId, startOffset, ranges, options).thenApply(result -> fromLegacy(ranges, result));
     }
 
-    /** Request-aware physical read used by ranged-entry callers. */
+    /**
+     * Request-aware physical read used by ranged-entry callers.
+     */
     default CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
-            StreamId streamId,
-            ReadRequest request,
-            List<ResolvedRange> ranges) {
+            StreamId streamId, ReadRequest request, List<ResolvedRange> ranges) {
         if (request.boundaryMode() != ReadBoundaryMode.EXACT_START
                 || request.firstEntryPolicy() != FirstEntryPolicy.LEGACY_STRICT_LIMIT) {
             return CompletableFuture.failedFuture(new NereusException(
@@ -53,51 +56,68 @@ public interface ReadTargetReader extends AutoCloseable {
                     false,
                     "physical reader does not support ranged-entry semantics"));
         }
-        return readPhysicalWithStats(
-                streamId,
-                request.startOffset(),
-                ranges,
-                request.options());
+        return readPhysicalWithStats(streamId, request.startOffset(), ranges, request.options());
     }
 
-    /** Transitional Object-only surface for one milestone; new readers must implement {@link #readPhysicalWithStats}. */
+    /**
+     * Transitional Object-only surface for one milestone; new readers must implement {@link #readPhysicalWithStats}.
+     */
     @Deprecated(forRemoval = true)
     default CompletableFuture<WalReadResult> readWithStats(
-            StreamId streamId,
-            long startOffset,
-            List<ResolvedRange> ranges,
-            ReadOptions options) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException(
-                "reader implements only the provider-neutral physical result"));
+            StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
+        return CompletableFuture.failedFuture(
+                new UnsupportedOperationException("reader implements only the provider-neutral physical result"));
     }
 
     private static PhysicalReadResult fromLegacy(List<ResolvedRange> ranges, WalReadResult result) {
-        List<PhysicalReadStats> stats = result.sliceStats().stream().map(value -> {
-            ResolvedRange range = ranges.stream().filter(candidate ->
-                            candidate.readTarget() instanceof ObjectSliceReadTarget target
+        List<PhysicalReadStats> stats = result.sliceStats().stream()
+                .map(value -> {
+                    ResolvedRange range = ranges.stream()
+                            .filter(candidate -> candidate.readTarget() instanceof ObjectSliceReadTarget target
                                     && target.objectId().equals(value.objectId())
                                     && target.objectOffset() == value.objectOffset()
                                     && target.objectLength() == value.fullSlicePayloadBytes()
                                     && target.entryIndexRef().length() == value.entryIndexBytes())
-                    .findFirst().orElseThrow(() -> new IllegalArgumentException(
-                            "legacy reader reported an unknown Object source"));
-            return new PhysicalReadStats(ReadTargetIdentities.sha256(range.readTarget()),
-                    value.fullSlicePayloadBytes(), value.entryIndexBytes(), value.downloadedPayloadBytes(),
-                    value.downloadedEntryIndexBytes(), value.returnedPayloadBytes());
-        }).toList();
-        List<ReadBatch> batches = result.batches().stream().map(batch -> {
-            ResolvedRange range = ranges.stream().filter(candidate ->
-                            candidate.offsetRange().startOffset() <= batch.range().startOffset()
-                                    && batch.range().endOffset() <= candidate.offsetRange().endOffset()
+                            .findFirst()
+                            .orElseThrow(() ->
+                                    new IllegalArgumentException("legacy reader reported an unknown Object source"));
+                    return new PhysicalReadStats(
+                            ReadTargetIdentities.sha256(range.readTarget()),
+                            value.fullSlicePayloadBytes(),
+                            value.entryIndexBytes(),
+                            value.downloadedPayloadBytes(),
+                            value.downloadedEntryIndexBytes(),
+                            value.returnedPayloadBytes());
+                })
+                .toList();
+        List<ReadBatch> batches = result.batches().stream()
+                .map(batch -> {
+                    ResolvedRange range = ranges.stream()
+                            .filter(candidate -> candidate.offsetRange().startOffset()
+                                            <= batch.range().startOffset()
+                                    && batch.range().endOffset()
+                                            <= candidate.offsetRange().endOffset()
                                     && candidate.readTarget() instanceof ObjectSliceReadTarget target
                                     && target.objectId().equals(batch.sourceObjectId()))
-                    .findFirst().orElseThrow(() -> new IllegalArgumentException(
-                            "legacy reader batch has no exact resolved Object source"));
-            return new ReadBatch(batch.range(), batch.payloadFormat(), batch.payload(), batch.schemaRefs(),
-                    batch.projectionRef(), new ReadSourceRef(range.offsetRange(), range.generation(),
-                            range.commitVersion(), range.readTarget(), ReadTargetIdentities.sha256(range.readTarget())),
-                    batch.sourceObjectOffset(), batch.sourceObjectLength());
-        }).toList();
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalArgumentException(
+                                    "legacy reader batch has no exact resolved Object source"));
+                    return new ReadBatch(
+                            batch.range(),
+                            batch.payloadFormat(),
+                            batch.payload(),
+                            batch.schemaRefs(),
+                            batch.projectionRef(),
+                            new ReadSourceRef(
+                                    range.offsetRange(),
+                                    range.generation(),
+                                    range.commitVersion(),
+                                    range.readTarget(),
+                                    ReadTargetIdentities.sha256(range.readTarget())),
+                            batch.sourceObjectOffset(),
+                            batch.sourceObjectLength());
+                })
+                .toList();
         return new PhysicalReadResult(batches, stats);
     }
 

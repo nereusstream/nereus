@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -63,7 +63,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
@@ -89,8 +88,7 @@ class AbandonedAppendIntentGcTest {
     @TempDir
     Path temporary;
 
-    private final ScheduledExecutorService scheduler =
-            Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     @AfterEach
     void closeScheduler() {
@@ -108,77 +106,54 @@ class AbandonedAppendIntentGcTest {
                 .findFirst()
                 .orElseThrow();
         appendRecovery.veto = true;
-        try (LocalFileObjectStore objects = new LocalFileObjectStore(
-                temporary.resolve("restart"))) {
+        try (LocalFileObjectStore objects = new LocalFileObjectStore(temporary.resolve("restart"))) {
             Fixture fixture = fixture(physical, sources, objects);
-            Assembly firstProcess = assembly(
-                    physical, sources, objects, domains, clock);
+            Assembly firstProcess = assembly(physical, sources, objects, domains, clock);
             clock.setMillis(6_000);
 
             OwnerlessObjectGcExecutor.ExecutionResult vetoed =
                     firstProcess.executor().executeActive(fixture.root()).join();
 
-            assertThat(vetoed.mark().orElseThrow().status())
-                    .isEqualTo(PhysicalGcMarkStatus.DOMAIN_BLOCKED);
+            assertThat(vetoed.mark().orElseThrow().status()).isEqualTo(PhysicalGcMarkStatus.DOMAIN_BLOCKED);
             assertThat(sources.get(COMMIT_ID)).contains(fixture.commit());
             assertThat(protections(physical, fixture.root())).hasSize(1);
             appendRecovery.veto = false;
 
-            OwnerlessObjectGcExecutor.ExecutionResult marked = firstProcess
-                    .executor()
-                    .executeActive(fixture.root())
-                    .join();
+            OwnerlessObjectGcExecutor.ExecutionResult marked =
+                    firstProcess.executor().executeActive(fixture.root()).join();
 
-            assertThat(marked.mark().orElseThrow().status())
-                    .isEqualTo(PhysicalGcMarkStatus.MARKED);
+            assertThat(marked.mark().orElseThrow().status()).isEqualTo(PhysicalGcMarkStatus.MARKED);
             GcPlan plan = marked.mark().orElseThrow().plan().orElseThrow();
             assertThat(plan.plannedProtectionRemovals()).hasSize(1);
-            assertThat(plan.plannedMetadataRemovals())
-                    .singleElement()
-                    .satisfies(removal -> {
-                        assertThat(removal.removalType())
-                                .isEqualTo(GenerationZeroCommitRetirementHandler.REMOVAL_TYPE);
-                        assertThat(removal.key()).isEqualTo(fixture.commit().key());
-                    });
-            assertThat(marked.advance().orElseThrow().status())
-                    .isEqualTo(PhysicalGcAdvanceStatus.WAITING_FOR_GRACE);
+            assertThat(plan.plannedMetadataRemovals()).singleElement().satisfies(removal -> {
+                assertThat(removal.removalType()).isEqualTo(GenerationZeroCommitRetirementHandler.REMOVAL_TYPE);
+                assertThat(removal.key()).isEqualTo(fixture.commit().key());
+            });
+            assertThat(marked.advance().orElseThrow().status()).isEqualTo(PhysicalGcAdvanceStatus.WAITING_FOR_GRACE);
             VersionedPhysicalObjectRoot durableMarked = physical.getRoot(
-                            CLUSTER,
-                            new ObjectKeyHash(
-                                    fixture.root().value().objectKeyHash()))
+                            CLUSTER, new ObjectKeyHash(fixture.root().value().objectKeyHash()))
                     .join()
                     .orElseThrow();
-            assertThat(durableMarked.value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            assertThat(durableMarked.value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.MARKED);
 
             // No process-local candidate, future or journal object is reused after this point.
             sources.loseNextDeleteResponse.set(true);
             clock.setMillis(16_000);
-            Assembly restarted = assembly(
-                    physical, sources, objects, domains, clock);
-            OwnerlessObjectGcExecutor.ExecutionResult deleted = restarted
-                    .executor()
-                    .recoverMarked(durableMarked)
-                    .join();
+            Assembly restarted = assembly(physical, sources, objects, domains, clock);
+            OwnerlessObjectGcExecutor.ExecutionResult deleted =
+                    restarted.executor().recoverMarked(durableMarked).join();
 
-            assertThat(deleted.advance().orElseThrow().status())
-                    .isEqualTo(PhysicalGcAdvanceStatus.DELETE_INTENT);
-            assertThat(deleted.deletion().orElseThrow().status())
-                    .isEqualTo(PhysicalGcDeletionStatus.DELETED);
-            assertThat(deleted.deletion().orElseThrow().metadataRetired())
-                    .isZero();
-            assertThat(deleted.deletion().orElseThrow().metadataAlreadyAbsent())
-                    .isOne();
+            assertThat(deleted.advance().orElseThrow().status()).isEqualTo(PhysicalGcAdvanceStatus.DELETE_INTENT);
+            assertThat(deleted.deletion().orElseThrow().status()).isEqualTo(PhysicalGcDeletionStatus.DELETED);
+            assertThat(deleted.deletion().orElseThrow().metadataRetired()).isZero();
+            assertThat(deleted.deletion().orElseThrow().metadataAlreadyAbsent()).isOne();
             assertThat(sources.get(COMMIT_ID)).isEmpty();
             assertThat(protections(physical, fixture.root())).isEmpty();
-            assertThatThrownBy(() -> objects.headObject(
-                                    OBJECT_KEY,
-                                    new HeadObjectOptions(Duration.ofSeconds(1)))
+            assertThatThrownBy(() -> objects.headObject(OBJECT_KEY, new HeadObjectOptions(Duration.ofSeconds(1)))
                             .join())
                     .hasRootCauseInstanceOf(NereusException.class);
             assertThat(domains)
-                    .allSatisfy(domain -> assertThat(domain.snapshotCalls)
-                            .hasPositiveValue());
+                    .allSatisfy(domain -> assertThat(domain.snapshotCalls).hasPositiveValue());
         }
     }
 
@@ -192,68 +167,50 @@ class AbandonedAppendIntentGcTest {
                 .filter(value -> value.domainId().equals(AppendRecoveryReferenceDomain.DOMAIN_ID))
                 .findFirst()
                 .orElseThrow();
-        try (LocalFileObjectStore objects = new LocalFileObjectStore(
-                temporary.resolve("epoch-rebind"))) {
+        try (LocalFileObjectStore objects = new LocalFileObjectStore(temporary.resolve("epoch-rebind"))) {
             Fixture fixture = fixture(physical, sources, objects);
-            Assembly assembly = assembly(
-                    physical, sources, objects, domains, clock);
-            OwnerlessObjectGcExecutor.ExecutionResult first = assembly
-                    .executor()
-                    .executeActive(fixture.root())
-                    .join();
-            assertThat(first.mark().orElseThrow().status())
-                    .isEqualTo(PhysicalGcMarkStatus.MARKED);
+            Assembly assembly = assembly(physical, sources, objects, domains, clock);
+            OwnerlessObjectGcExecutor.ExecutionResult first =
+                    assembly.executor().executeActive(fixture.root()).join();
+            assertThat(first.mark().orElseThrow().status()).isEqualTo(PhysicalGcMarkStatus.MARKED);
             VersionedPhysicalObjectRoot marked = physical.getRoot(
-                            CLUSTER,
-                            new ObjectKeyHash(
-                                    fixture.root().value().objectKeyHash()))
+                            CLUSTER, new ObjectKeyHash(fixture.root().value().objectKeyHash()))
                     .join()
                     .orElseThrow();
             appendRecovery.veto = true;
             clock.setMillis(16_000);
 
-            OwnerlessObjectGcExecutor.ExecutionResult drifted = assembly
-                    .executor()
-                    .recoverMarked(marked)
-                    .join();
+            OwnerlessObjectGcExecutor.ExecutionResult drifted =
+                    assembly.executor().recoverMarked(marked).join();
 
-            assertThat(drifted.advance().orElseThrow().status())
-                    .isEqualTo(PhysicalGcAdvanceStatus.PLAN_DRIFT_UNMARKED);
+            assertThat(drifted.advance().orElseThrow().status()).isEqualTo(PhysicalGcAdvanceStatus.PLAN_DRIFT_UNMARKED);
             VersionedPhysicalObjectRoot activeAgain = physical.getRoot(
                             CLUSTER, new ObjectKeyHash(fixture.root().value().objectKeyHash()))
                     .join()
                     .orElseThrow();
             assertThat(activeAgain.value().lifecycleEpoch()).isEqualTo(3);
-            assertThat(protections(physical, activeAgain))
-                    .singleElement()
-                    .satisfies(value -> assertThat(value.value().rootLifecycleEpoch())
-                            .isEqualTo(1));
+            assertThat(protections(physical, activeAgain)).singleElement().satisfies(value -> assertThat(
+                            value.value().rootLifecycleEpoch())
+                    .isEqualTo(1));
             appendRecovery.veto = false;
 
-            OwnerlessObjectGcExecutor.ExecutionResult rebound = assembly
-                    .executor()
-                    .executeActive(activeAgain)
-                    .join();
+            OwnerlessObjectGcExecutor.ExecutionResult rebound =
+                    assembly.executor().executeActive(activeAgain).join();
 
             assertThat(rebound.mark()).isEmpty();
-            assertThat(protections(physical, activeAgain))
-                    .singleElement()
-                    .satisfies(value -> assertThat(value.value().rootLifecycleEpoch())
-                            .isEqualTo(3));
+            assertThat(protections(physical, activeAgain)).singleElement().satisfies(value -> assertThat(
+                            value.value().rootLifecycleEpoch())
+                    .isEqualTo(3));
             VersionedPhysicalObjectRoot stillActive = physical.getRoot(
                             CLUSTER, new ObjectKeyHash(activeAgain.value().objectKeyHash()))
                     .join()
                     .orElseThrow();
-            assertThat(stillActive.value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+            assertThat(stillActive.value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.ACTIVE);
 
-            OwnerlessObjectGcExecutor.ExecutionResult retried = assembly
-                    .executor()
-                    .executeActive(stillActive)
-                    .join();
+            OwnerlessObjectGcExecutor.ExecutionResult retried =
+                    assembly.executor().executeActive(stillActive).join();
 
-            assertThat(retried.mark().orElseThrow().status())
-                    .isEqualTo(PhysicalGcMarkStatus.MARKED);
+            assertThat(retried.mark().orElseThrow().status()).isEqualTo(PhysicalGcMarkStatus.MARKED);
         }
     }
 
@@ -262,32 +219,21 @@ class AbandonedAppendIntentGcTest {
         MutableClock clock = new MutableClock(6_000);
         FakePhysicalObjectMetadataStore physical = new FakePhysicalObjectMetadataStore();
         MutableSourceStore sources = new MutableSourceStore();
-        try (LocalFileObjectStore objects = new LocalFileObjectStore(
-                temporary.resolve("owner-appearance"))) {
+        try (LocalFileObjectStore objects = new LocalFileObjectStore(temporary.resolve("owner-appearance"))) {
             Fixture fixture = fixture(physical, sources, objects);
             sources.remove(COMMIT_ID);
             PhysicalGcConfig config = config();
-            ObjectProtectionManager manager = protectionManager(
-                    physical, config, clock);
+            ObjectProtectionManager manager = protectionManager(physical, config, clock);
             AbandonedAppendIntentPlanBuilder builder =
-                    new AbandonedAppendIntentPlanBuilder(
-                            CLUSTER,
-                            physical,
-                            sources,
-                            manager,
-                            config,
-                            scheduler);
+                    new AbandonedAppendIntentPlanBuilder(CLUSTER, physical, sources, manager, config, scheduler);
 
             AbandonedAppendIntentPlanBuilder.Inspection inspection =
                     builder.inspectActive(fixture.root()).join();
             assertThat(inspection.metadataRemovals()).isEmpty();
-            PhysicalObjectIdentity object = PhysicalObjectIdentity.from(
-                    fixture.root().value());
+            PhysicalObjectIdentity object =
+                    PhysicalObjectIdentity.from(fixture.root().value());
             GcReferenceQuery query = GcReferenceQuery.create(
-                    GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
-                    object,
-                    List.of(),
-                    object.identitySha256());
+                    GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE, object, List.of(), object.identitySha256());
             GcCandidate candidate = GcCandidate.fromActiveRoot(
                     config,
                     "c".repeat(52),
@@ -300,8 +246,8 @@ class AbandonedAppendIntentGcTest {
             sources.put(fixture.commit());
             assertThat(builder.reload(candidate, inspection.metadataRemovals()).join())
                     .singleElement()
-                    .satisfies(removal -> assertThat(removal.key())
-                            .isEqualTo(fixture.commit().key()));
+                    .satisfies(removal ->
+                            assertThat(removal.key()).isEqualTo(fixture.commit().key()));
         }
     }
 
@@ -312,62 +258,40 @@ class AbandonedAppendIntentGcTest {
             List<MutableDomain> domainList,
             Clock clock) {
         PhysicalGcConfig config = config();
-        ObjectProtectionManager protections = protectionManager(
-                physical, config, clock);
+        ObjectProtectionManager protections = protectionManager(physical, config, clock);
         AbandonedAppendIntentPlanBuilder builder =
-                new AbandonedAppendIntentPlanBuilder(
-                        CLUSTER,
-                        physical,
-                        sources,
-                        protections,
-                        config,
-                        scheduler);
-        GcReferenceDomainRegistry domains = new GcReferenceDomainRegistry(
+                new AbandonedAppendIntentPlanBuilder(CLUSTER, physical, sources, protections, config, scheduler);
+        GcReferenceDomainRegistry domains =
+                new GcReferenceDomainRegistry(config, scheduler, new ArrayList<>(domainList));
+        DefaultGcRetirementJournal journal = new DefaultGcRetirementJournal(CLUSTER, physical, config);
+        PhysicalObjectGarbageCollector collector = new PhysicalObjectGarbageCollector(
+                CLUSTER,
                 config,
-                scheduler,
-                new ArrayList<>(domainList));
-        DefaultGcRetirementJournal journal = new DefaultGcRetirementJournal(
-                CLUSTER, physical, config);
-        PhysicalObjectGarbageCollector collector =
-                new PhysicalObjectGarbageCollector(
-                        CLUSTER,
-                        config,
-                        physical,
-                        domains,
-                        activationGuard(),
-                        builder,
-                        journal,
-                        new SecureGcIdGenerator(),
-                        clock,
-                        scheduler);
+                physical,
+                domains,
+                activationGuard(),
+                builder,
+                journal,
+                new SecureGcIdGenerator(),
+                clock,
+                scheduler);
         SourceRetirementCoordinator retirement = new SourceRetirementCoordinator(
                 CLUSTER,
                 config,
                 physical,
                 journal,
-                new GcMetadataRetirementRegistry(List.of(
-                        new GenerationZeroCommitRetirementHandler(
-                                CLUSTER, sources))),
+                new GcMetadataRetirementRegistry(List.of(new GenerationZeroCommitRetirementHandler(CLUSTER, sources))),
                 objects,
                 clock,
                 scheduler);
         return new Assembly(
                 builder,
                 new OwnerlessObjectGcExecutor(
-                        CLUSTER,
-                        config,
-                        builder,
-                        domains,
-                        collector,
-                        retirement,
-                        new SecureGcIdGenerator(),
-                        clock));
+                        CLUSTER, config, builder, domains, collector, retirement, new SecureGcIdGenerator(), clock));
     }
 
     private static ObjectProtectionManager protectionManager(
-            FakePhysicalObjectMetadataStore physical,
-            PhysicalGcConfig config,
-            Clock clock) {
+            FakePhysicalObjectMetadataStore physical, PhysicalGcConfig config, Clock clock) {
         return new DefaultObjectProtectionManager(
                 CLUSTER,
                 physical,
@@ -378,9 +302,7 @@ class AbandonedAppendIntentGcTest {
     }
 
     private static Fixture fixture(
-            FakePhysicalObjectMetadataStore physical,
-            MutableSourceStore sources,
-            LocalFileObjectStore objects) {
+            FakePhysicalObjectMetadataStore physical, MutableSourceStore sources, LocalFileObjectStore objects) {
         byte[] bytes = "abandoned-object-wal".getBytes(StandardCharsets.UTF_8);
         PutObjectResult uploaded = objects.putObject(
                         OBJECT_KEY,
@@ -473,8 +395,7 @@ class AbandonedAppendIntentGcTest {
                 0,
                 1,
                 1,
-                sha256(MetadataRecordCodecFactory.encodeEnvelope(
-                        canonical, StreamCommitTargetRecord.class)),
+                sha256(MetadataRecordCodecFactory.encodeEnvelope(canonical, StreamCommitTargetRecord.class)),
                 7,
                 sha('c'));
         sources.put(commit);
@@ -500,18 +421,12 @@ class AbandonedAppendIntentGcTest {
     }
 
     private static List<com.nereusstream.metadata.oxia.VersionedObjectProtection> protections(
-            FakePhysicalObjectMetadataStore physical,
-            VersionedPhysicalObjectRoot root) {
-        ArrayList<com.nereusstream.metadata.oxia.VersionedObjectProtection> result =
-                new ArrayList<>();
-        Optional<com.nereusstream.metadata.oxia.F4ScanToken> continuation =
-                Optional.empty();
+            FakePhysicalObjectMetadataStore physical, VersionedPhysicalObjectRoot root) {
+        ArrayList<com.nereusstream.metadata.oxia.VersionedObjectProtection> result = new ArrayList<>();
+        Optional<com.nereusstream.metadata.oxia.F4ScanToken> continuation = Optional.empty();
         do {
             ObjectProtectionScanPage page = physical.scanProtections(
-                            CLUSTER,
-                            new ObjectKeyHash(root.value().objectKeyHash()),
-                            continuation,
-                            10)
+                            CLUSTER, new ObjectKeyHash(root.value().objectKeyHash()), continuation, 10)
                     .join();
             result.addAll(page.values());
             continuation = page.continuation();
@@ -537,21 +452,11 @@ class AbandonedAppendIntentGcTest {
                     GenerationActivationSubject subject,
                     boolean activateLiveProjectionIfAbsent) {
                 return CompletableFuture.completedFuture(
-                        GenerationActivationProof.create(
-                                operation,
-                                subject,
-                                0,
-                                1,
-                                1,
-                                SHA,
-                                false,
-                                true,
-                                1_000));
+                        GenerationActivationProof.create(operation, subject, 0, 1, 1, SHA, false, true, 1_000));
             }
 
             @Override
-            public CompletableFuture<Void> revalidate(
-                    GenerationActivationProof proof) {
+            public CompletableFuture<Void> revalidate(GenerationActivationProof proof) {
                 return CompletableFuture.completedFuture(null);
             }
         };
@@ -580,29 +485,23 @@ class AbandonedAppendIntentGcTest {
     }
 
     private static Checksum sha(char value) {
-        return new Checksum(
-                ChecksumType.SHA256,
-                String.valueOf(value).repeat(64));
+        return new Checksum(ChecksumType.SHA256, String.valueOf(value).repeat(64));
     }
 
     private static Checksum sha256(byte[] bytes) {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                            .digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException(failure);
         }
     }
 
-    private record Fixture(
-            VersionedPhysicalObjectRoot root,
-            VersionedGenerationZeroCommit commit) { }
+    private record Fixture(VersionedPhysicalObjectRoot root, VersionedGenerationZeroCommit commit) {}
 
-    private record Assembly(
-            AbandonedAppendIntentPlanBuilder builder,
-            OwnerlessObjectGcExecutor executor) { }
+    private record Assembly(AbandonedAppendIntentPlanBuilder builder, OwnerlessObjectGcExecutor executor) {}
 
     private static final class MutableDomain implements GcReferenceDomain {
         private final String domainId;
@@ -624,8 +523,7 @@ class AbandonedAppendIntentGcTest {
         }
 
         @Override
-        public CompletableFuture<GcReferenceSnapshot> snapshot(
-                GcReferenceQuery query) {
+        public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
             snapshotCalls.incrementAndGet();
             return CompletableFuture.completedFuture(GcReferenceSnapshot.create(
                     domainId,
@@ -635,25 +533,18 @@ class AbandonedAppendIntentGcTest {
                     veto,
                     1,
                     0,
-                    List.of(new GcAuthorityToken(
-                            "/authority/" + domainId,
-                            1,
-                            SHA)),
+                    List.of(new GcAuthorityToken("/authority/" + domainId, 1, SHA)),
                     List.of()));
         }
 
         @Override
-        public CompletableFuture<Boolean> stillMatches(
-                GcReferenceQuery query,
-                GcReferenceSnapshot snapshot) {
+        public CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot) {
             return snapshot(query).thenApply(snapshot::equals);
         }
     }
 
-    private static final class MutableSourceStore
-            implements SourceRetirementMetadataStore {
-        private final Map<String, VersionedGenerationZeroCommit> commits =
-                new HashMap<>();
+    private static final class MutableSourceStore implements SourceRetirementMetadataStore {
+        private final Map<String, VersionedGenerationZeroCommit> commits = new HashMap<>();
         private final AtomicBoolean loseNextDeleteResponse = new AtomicBoolean();
 
         private synchronized void put(VersionedGenerationZeroCommit commit) {
@@ -664,31 +555,27 @@ class AbandonedAppendIntentGcTest {
             commits.values().removeIf(value -> value.commitId().equals(commitId));
         }
 
-        private synchronized Optional<VersionedGenerationZeroCommit> get(
-                String commitId) {
+        private synchronized Optional<VersionedGenerationZeroCommit> get(String commitId) {
             return commits.values().stream()
                     .filter(value -> value.commitId().equals(commitId))
                     .findFirst();
         }
 
         @Override
-        public synchronized CompletableFuture<Optional<VersionedGenerationZeroCommit>>
-                getCommitNodeByKey(String cluster, String exactKey) {
-            return CompletableFuture.completedFuture(
-                    Optional.ofNullable(commits.get(exactKey)));
+        public synchronized CompletableFuture<Optional<VersionedGenerationZeroCommit>> getCommitNodeByKey(
+                String cluster, String exactKey) {
+            return CompletableFuture.completedFuture(Optional.ofNullable(commits.get(exactKey)));
         }
 
         @Override
-        public CompletableFuture<Optional<VersionedGenerationZeroMarker>>
-                getCommittedMarkerByKey(String cluster, String exactKey) {
+        public CompletableFuture<Optional<VersionedGenerationZeroMarker>> getCommittedMarkerByKey(
+                String cluster, String exactKey) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
 
         @Override
         public CompletableFuture<Optional<VersionedGenerationZeroMarker>> getCommittedMarker(
-                String cluster,
-                StreamId streamId,
-                GenerationZeroMarkerIdentity marker) {
+                String cluster, StreamId streamId, GenerationZeroMarkerIdentity marker) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
 
@@ -714,10 +601,7 @@ class AbandonedAppendIntentGcTest {
 
         @Override
         public CompletableFuture<Void> deleteCommittedMarkerByKey(
-                String cluster,
-                String exactKey,
-                long expectedVersion,
-                Checksum expectedDurableValueSha256) {
+                String cluster, String exactKey, long expectedVersion, Checksum expectedDurableValueSha256) {
             return unsupported();
         }
 
@@ -737,32 +621,25 @@ class AbandonedAppendIntentGcTest {
 
         @Override
         public synchronized CompletableFuture<Void> deleteCommitNodeByKey(
-                String cluster,
-                String exactKey,
-                long expectedVersion,
-                Checksum expectedDurableValueSha256) {
+                String cluster, String exactKey, long expectedVersion, Checksum expectedDurableValueSha256) {
             VersionedGenerationZeroCommit current = commits.get(exactKey);
             if (current == null
                     || current.metadataVersion() != expectedVersion
-                    || !current.durableValueSha256().equals(
-                            expectedDurableValueSha256)) {
-                return CompletableFuture.failedFuture(
-                        new IllegalStateException("commit delete identity changed"));
+                    || !current.durableValueSha256().equals(expectedDurableValueSha256)) {
+                return CompletableFuture.failedFuture(new IllegalStateException("commit delete identity changed"));
             }
             commits.remove(exactKey);
             return loseNextDeleteResponse.compareAndSet(true, false)
-                    ? CompletableFuture.failedFuture(
-                            new IllegalStateException("lost commit delete response"))
+                    ? CompletableFuture.failedFuture(new IllegalStateException("lost commit delete response"))
                     : CompletableFuture.completedFuture(null);
         }
 
         private static CompletableFuture<Void> unsupported() {
-            return CompletableFuture.failedFuture(
-                    new UnsupportedOperationException("unused source operation"));
+            return CompletableFuture.failedFuture(new UnsupportedOperationException("unused source operation"));
         }
 
         @Override
-        public void close() { }
+        public void close() {}
     }
 
     private static final class MutableClock extends Clock {

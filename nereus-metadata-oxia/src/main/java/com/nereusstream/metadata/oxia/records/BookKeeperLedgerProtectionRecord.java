@@ -1,14 +1,34 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Exact fixed-slot physical reference and complete ledger-to-range inventory row. */
+/**
+ * Exact fixed-slot physical reference and complete ledger-to-range inventory row.
+ */
 public record BookKeeperLedgerProtectionRecord(
-        int schemaVersion, String ledgerIdentitySha256, String clusterAlias, long ledgerId,
-        long rootLifecycleEpoch, int ledgerRangeSlot, int protectionSlot, int protectionTypeId,
-        String referenceId, long firstEntryId, int entryCount, String rangeChecksumSha256,
-        String streamId, long offsetStart, long offsetEnd, long commitVersion, String ownerKey,
-        long ownerMetadataVersion, String ownerIdentitySha256, ProtectionLifecycle lifecycle,
-        long createdAtMillis, long expiresAtMillis, long metadataVersion) {
+        int schemaVersion,
+        String ledgerIdentitySha256,
+        String clusterAlias,
+        long ledgerId,
+        long rootLifecycleEpoch,
+        int ledgerRangeSlot,
+        int protectionSlot,
+        int protectionTypeId,
+        String referenceId,
+        long firstEntryId,
+        int entryCount,
+        String rangeChecksumSha256,
+        String streamId,
+        long offsetStart,
+        long offsetEnd,
+        long commitVersion,
+        String ownerKey,
+        long ownerMetadataVersion,
+        String ownerIdentitySha256,
+        ProtectionLifecycle lifecycle,
+        long createdAtMillis,
+        long expiresAtMillis,
+        long metadataVersion) {
     public BookKeeperLedgerProtectionRecord {
         BookKeeperRecordValidation.version(schemaVersion);
         ledgerIdentitySha256 = BookKeeperRecordValidation.sha256(ledgerIdentitySha256, "ledgerIdentitySha256");
@@ -25,12 +45,16 @@ public record BookKeeperLedgerProtectionRecord(
         rangeChecksumSha256 = BookKeeperRecordValidation.sha256(rangeChecksumSha256, "rangeChecksumSha256");
         streamId = BookKeeperRecordValidation.text(streamId, "streamId");
         BookKeeperRecordValidation.nonNegative(offsetStart, "offsetStart");
-        if (offsetEnd <= offsetStart) throw new IllegalArgumentException("offset range must be non-empty");
+        if (offsetEnd <= offsetStart) {
+            throw new IllegalArgumentException("offset range must be non-empty");
+        }
         BookKeeperRecordValidation.nonNegative(commitVersion, "commitVersion");
         ownerKey = BookKeeperRecordValidation.optional(ownerKey, "ownerKey");
         BookKeeperRecordValidation.nonNegative(ownerMetadataVersion, "ownerMetadataVersion");
         ownerIdentitySha256 = BookKeeperRecordValidation.optionalSha256(ownerIdentitySha256, "ownerIdentitySha256");
-        if (lifecycle == null) throw new NullPointerException("lifecycle");
+        if (lifecycle == null) {
+            throw new NullPointerException("lifecycle");
+        }
         BookKeeperRecordValidation.nonNegative(createdAtMillis, "createdAtMillis");
         BookKeeperRecordValidation.nonNegative(expiresAtMillis, "expiresAtMillis");
         BookKeeperRecordValidation.metadataVersion(metadataVersion);
@@ -42,7 +66,9 @@ public record BookKeeperLedgerProtectionRecord(
             throw new IllegalArgumentException("ACTIVE/RETIRED protection requires exact owner facts");
         }
         if (type == BookKeeperProtectionType.REPAIR) {
-            if (expiresAtMillis <= createdAtMillis) throw new IllegalArgumentException("REPAIR protection must expire");
+            if (expiresAtMillis <= createdAtMillis) {
+                throw new IllegalArgumentException("REPAIR protection must expire");
+            }
         } else if (expiresAtMillis != 0) {
             throw new IllegalArgumentException("permanent protection cannot expire");
         }
@@ -53,9 +79,29 @@ public record BookKeeperLedgerProtectionRecord(
     }
 
     public BookKeeperLedgerProtectionRecord withMetadataVersion(long version) {
-        return new BookKeeperLedgerProtectionRecord(schemaVersion, ledgerIdentitySha256, clusterAlias, ledgerId,
-                rootLifecycleEpoch, ledgerRangeSlot, protectionSlot, protectionTypeId, referenceId, firstEntryId,
-                entryCount, rangeChecksumSha256, streamId, offsetStart, offsetEnd, commitVersion, ownerKey,
-                ownerMetadataVersion, ownerIdentitySha256, lifecycle, createdAtMillis, expiresAtMillis, version);
+        return new BookKeeperLedgerProtectionRecord(
+                schemaVersion,
+                ledgerIdentitySha256,
+                clusterAlias,
+                ledgerId,
+                rootLifecycleEpoch,
+                ledgerRangeSlot,
+                protectionSlot,
+                protectionTypeId,
+                referenceId,
+                firstEntryId,
+                entryCount,
+                rangeChecksumSha256,
+                streamId,
+                offsetStart,
+                offsetEnd,
+                commitVersion,
+                ownerKey,
+                ownerMetadataVersion,
+                ownerIdentitySha256,
+                lifecycle,
+                createdAtMillis,
+                expiresAtMillis,
+                version);
     }
 }

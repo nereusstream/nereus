@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.Collections;
@@ -7,11 +8,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** One whole-entry or partial-batch acknowledgement in stream-offset coordinates. */
+/**
+ * One whole-entry or partial-batch acknowledgement in stream-offset coordinates.
+ */
 public record CursorAckRequest(
-        long entryOffset,
-        Optional<BatchAckState> batchAck,
-        Map<String, Long> positionProperties) {
+        long entryOffset, Optional<BatchAckState> batchAck, Map<String, Long> positionProperties) {
     public CursorAckRequest {
         if (entryOffset < 0) {
             throw new IllegalArgumentException("entryOffset must be non-negative");

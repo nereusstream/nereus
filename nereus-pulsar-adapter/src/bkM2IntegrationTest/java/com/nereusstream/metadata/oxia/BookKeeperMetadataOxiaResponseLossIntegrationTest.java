@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.metadata.oxia.records.BookKeeperWriterStateRecord;
 import com.nereusstream.metadata.oxia.records.LedgerAllocationIntentRecord;
 import com.nereusstream.metadata.oxia.records.LedgerAllocationLifecycle;
@@ -20,17 +20,19 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-/** Real-Oxia proof for the exact reload logic used by every BK metadata allocation stage. */
+/**
+ * Real-Oxia proof for the exact reload logic used by every BK metadata allocation stage.
+ */
 @Testcontainers
 class BookKeeperMetadataOxiaResponseLossIntegrationTest {
     @Container
-    private static final OxiaContainer OXIA = new OxiaContainer(
-            DockerImageName.parse("oxia/oxia:0.16.3")).withShards(4);
+    private static final OxiaContainer OXIA =
+            new OxiaContainer(DockerImageName.parse("oxia/oxia:0.16.3")).withShards(4);
 
     @Test
     void productionAdapterReloadsEveryAppliedBookKeeperMutationResponseLoss() {
-        String cluster = "bk-m2-real-oxia-response-loss-"
-                + UUID.randomUUID().toString().replace("-", "");
+        String cluster =
+                "bk-m2-real-oxia-response-loss-" + UUID.randomUUID().toString().replace("-", "");
         Clock clock = Clock.systemUTC();
         OxiaClientConfiguration configuration = OxiaClientConfiguration.defaults(OXIA.getServiceAddress());
         BookKeeperMetadataStoreConfig storeConfiguration = new BookKeeperMetadataStoreConfig(8, 8, 8, 16);
@@ -38,13 +40,13 @@ class BookKeeperMetadataOxiaResponseLossIntegrationTest {
         try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, clock)) {
             AppliedResponseLossBackend responseLoss = new AppliedResponseLossBackend(runtime.client());
             BookKeeperVersionedValue<BookKeeperWriterStateRecord> updated;
-            String allocationId = "allocation-real-loss-" + UUID.randomUUID().toString().replace("-", "");
+            String allocationId =
+                    "allocation-real-loss-" + UUID.randomUUID().toString().replace("-", "");
             try (OxiaJavaBookKeeperMetadataStore store = new OxiaJavaBookKeeperMetadataStore(
                     new PartitionedOxiaClient(responseLoss), clock, storeConfiguration)) {
                 responseLoss.arm(Operation.PUT_IF_ABSENT);
                 BookKeeperVersionedValue<BookKeeperWriterStateRecord> created = store.createWriter(
-                                cluster,
-                                BookKeeperMetadataStoreContractScenario.activeWriter(3, 3, 300, 2))
+                                cluster, BookKeeperMetadataStoreContractScenario.activeWriter(3, 3, 300, 2))
                         .join();
 
                 responseLoss.arm(Operation.PUT_IF_VERSION);
@@ -67,24 +69,24 @@ class BookKeeperMetadataOxiaResponseLossIntegrationTest {
                         .join();
             }
 
-            try (OxiaJavaBookKeeperMetadataStore restarted = new OxiaJavaBookKeeperMetadataStore(
-                    runtime.client(), clock, storeConfiguration)) {
-                assertThat(restarted.getWriter(
-                                cluster, BookKeeperMetadataStoreContractScenario.STREAM)
-                        .join()).contains(updated);
-                assertThat(restarted.getAllocation(
-                                cluster,
-                                BookKeeperMetadataStoreContractScenario.STREAM,
-                                allocationId)
-                        .join()).isEmpty();
+            try (OxiaJavaBookKeeperMetadataStore restarted =
+                    new OxiaJavaBookKeeperMetadataStore(runtime.client(), clock, storeConfiguration)) {
+                assertThat(restarted
+                                .getWriter(cluster, BookKeeperMetadataStoreContractScenario.STREAM)
+                                .join())
+                        .contains(updated);
+                assertThat(restarted
+                                .getAllocation(cluster, BookKeeperMetadataStoreContractScenario.STREAM, allocationId)
+                                .join())
+                        .isEmpty();
             }
             assertThat(responseLoss.lostResponses()).isEqualTo(3);
         }
     }
 
     private static LedgerAllocationIntentRecord allocation(String allocationId) {
-        LedgerAllocationIntentRecord base = BookKeeperMetadataStoreContractScenario.allocation(
-                LedgerAllocationLifecycle.PREPARED, false, "", 120);
+        LedgerAllocationIntentRecord base =
+                BookKeeperMetadataStoreContractScenario.allocation(LedgerAllocationLifecycle.PREPARED, false, "", 120);
         return new LedgerAllocationIntentRecord(
                 base.schemaVersion(),
                 allocationId,
@@ -138,25 +140,20 @@ class BookKeeperMetadataOxiaResponseLossIntegrationTest {
         @Override
         public CompletableFuture<PartitionedOxiaClient.WriteResult> putIfAbsent(
                 String key, byte[] value, PartitionKey partitionKey) {
-            return loseAfterApply(
-                    Operation.PUT_IF_ABSENT,
-                    delegate.putIfAbsent(key, value, partitionKey));
+            return loseAfterApply(Operation.PUT_IF_ABSENT, delegate.putIfAbsent(key, value, partitionKey));
         }
 
         @Override
         public CompletableFuture<PartitionedOxiaClient.WriteResult> putIfVersion(
                 String key, byte[] value, long expectedVersion, PartitionKey partitionKey) {
             return loseAfterApply(
-                    Operation.PUT_IF_VERSION,
-                    delegate.putIfVersion(key, value, expectedVersion, partitionKey));
+                    Operation.PUT_IF_VERSION, delegate.putIfVersion(key, value, expectedVersion, partitionKey));
         }
 
         @Override
-        public CompletableFuture<Void> deleteIfVersion(
-                String key, long expectedVersion, PartitionKey partitionKey) {
+        public CompletableFuture<Void> deleteIfVersion(String key, long expectedVersion, PartitionKey partitionKey) {
             return loseAfterApply(
-                    Operation.DELETE_IF_VERSION,
-                    delegate.deleteIfVersion(key, expectedVersion, partitionKey));
+                    Operation.DELETE_IF_VERSION, delegate.deleteIfVersion(key, expectedVersion, partitionKey));
         }
 
         @Override
@@ -167,22 +164,16 @@ class BookKeeperMetadataOxiaResponseLossIntegrationTest {
 
         @Override
         public CompletableFuture<List<PartitionedOxiaClient.VersionedValue>> rangeScan(
-                String fromInclusive,
-                String toExclusive,
-                int limit,
-                PartitionKey partitionKey) {
+                String fromInclusive, String toExclusive, int limit, PartitionKey partitionKey) {
             return delegate.rangeScan(fromInclusive, toExclusive, limit, partitionKey);
         }
 
         @Override
-        public WatchRegistration watchPrefix(
-                String prefix, PartitionKey partitionKey, Runnable invalidationCallback) {
+        public WatchRegistration watchPrefix(String prefix, PartitionKey partitionKey, Runnable invalidationCallback) {
             return delegate.watchPrefix(prefix, partitionKey, invalidationCallback);
         }
 
-        private <T> CompletableFuture<T> loseAfterApply(
-                Operation operation,
-                CompletableFuture<T> applied) {
+        private <T> CompletableFuture<T> loseAfterApply(Operation operation, CompletableFuture<T> applied) {
             if (!armed.compareAndSet(operation, null)) {
                 return applied;
             }

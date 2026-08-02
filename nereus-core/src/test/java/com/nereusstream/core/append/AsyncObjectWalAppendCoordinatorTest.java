@@ -15,7 +15,6 @@
 package com.nereusstream.core.append;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
@@ -31,11 +30,11 @@ import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.profile.AppendAckBoundary;
 import com.nereusstream.core.profile.ObjectPublicationMode;
 import com.nereusstream.core.profile.StorageExecutionPlan;
-import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
@@ -65,25 +64,19 @@ class AsyncObjectWalAppendCoordinatorTest {
         AtomicInteger materializeCalls = new AtomicInteger();
         ControlledPublisher publisher = new ControlledPublisher();
         QueuedExecutor executor = new QueuedExecutor();
-        AsyncObjectWalAppendCoordinator coordinator =
-                new AsyncObjectWalAppendCoordinator(
-                        append -> {
-                            materializeCalls.incrementAndGet();
-                            return CompletableFuture.completedFuture(
-                                    materialized);
-                        },
-                        publisher,
-                        TIMEOUT,
-                        executor);
+        AsyncObjectWalAppendCoordinator coordinator = new AsyncObjectWalAppendCoordinator(
+                append -> {
+                    materializeCalls.incrementAndGet();
+                    return CompletableFuture.completedFuture(materialized);
+                },
+                publisher,
+                TIMEOUT,
+                executor);
 
         CompletableFuture<CommittedAppend> acknowledged =
-                coordinator.completeAfterStableCommit(
-                        stable,
-                        DurabilityLevel.WAL_DURABLE,
-                        Duration.ofMillis(1));
+                coordinator.completeAfterStableCommit(stable, DurabilityLevel.WAL_DURABLE, Duration.ofMillis(1));
 
-        assertThat(acknowledged).isCompletedWithValue(
-                stable.reachableAppend().committedAppend());
+        assertThat(acknowledged).isCompletedWithValue(stable.reachableAppend().committedAppend());
         assertThat(materializeCalls).hasValue(0);
         assertThat(publisher.visibleCalls).hasValue(0);
         assertThat(executor.queued()).isOne();
@@ -104,25 +97,16 @@ class AsyncObjectWalAppendCoordinatorTest {
         MaterializedGenerationZero materialized =
                 materialized(stable.reachableAppend().committedAppend());
         ControlledPublisher publisher = new ControlledPublisher();
-        AsyncObjectWalAppendCoordinator coordinator =
-                new AsyncObjectWalAppendCoordinator(
-                        append -> CompletableFuture.completedFuture(
-                                materialized),
-                        publisher,
-                        TIMEOUT,
-                        Runnable::run);
+        AsyncObjectWalAppendCoordinator coordinator = new AsyncObjectWalAppendCoordinator(
+                append -> CompletableFuture.completedFuture(materialized), publisher, TIMEOUT, Runnable::run);
 
         CompletableFuture<CommittedAppend> strict =
-                coordinator.completeAfterStableCommit(
-                        stable,
-                        DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
-                        TIMEOUT);
+                coordinator.completeAfterStableCommit(stable, DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED, TIMEOUT);
 
         assertThat(strict).isNotDone();
         assertThat(publisher.visibleCalls).hasValue(1);
         publisher.visible.complete(protectedGeneration(materialized));
-        assertThat(strict).isCompletedWithValue(
-                stable.reachableAppend().committedAppend());
+        assertThat(strict).isCompletedWithValue(stable.reachableAppend().committedAppend());
     }
 
     @Test
@@ -149,8 +133,7 @@ class AsyncObjectWalAppendCoordinatorTest {
                 DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
                 AppendAckBoundary.REQUIRED_OBJECT_GENERATION);
 
-        CompletableFuture<CommittedAppend> acknowledged =
-                coordinator.completeAfterStableCommit(stable, plan, TIMEOUT);
+        CompletableFuture<CommittedAppend> acknowledged = coordinator.completeAfterStableCommit(stable, plan, TIMEOUT);
 
         assertThat(acknowledged).isNotDone();
         assertThat(observed).hasValue(null);
@@ -162,16 +145,8 @@ class AsyncObjectWalAppendCoordinatorTest {
         assertThat(observed).hasValue(request);
         assertThat(acknowledged).isNotDone();
 
-        required.complete(new RequiredObjectGenerationProof(
-                request,
-                "task-1",
-                1,
-                "/generation/1",
-                3,
-                sha(),
-                sha()));
-        assertThat(acknowledged).isCompletedWithValue(
-                stable.reachableAppend().committedAppend());
+        required.complete(new RequiredObjectGenerationProof(request, "task-1", 1, "/generation/1", 3, sha(), sha()));
+        assertThat(acknowledged).isCompletedWithValue(stable.reachableAppend().committedAppend());
     }
 
     static StableAppendResult stable() {
@@ -228,49 +203,30 @@ class AsyncObjectWalAppendCoordinatorTest {
                 1);
     }
 
-    static MaterializedGenerationZero materialized(
-            CommittedAppend committed) {
-        return new MaterializedGenerationZero(
-                committed,
-                "/index/async-object-stream/1/0",
-                7,
-                sha());
+    static MaterializedGenerationZero materialized(CommittedAppend committed) {
+        return new MaterializedGenerationZero(committed, "/index/async-object-stream/1/0", 7, sha());
     }
 
-    static ProtectedGenerationZero protectedGeneration(
-            MaterializedGenerationZero materialized) {
-        ObjectKey key = ((ObjectSliceReadTarget)
-                        materialized.committedAppend().readTarget())
-                .objectKey();
+    static ProtectedGenerationZero protectedGeneration(MaterializedGenerationZero materialized) {
+        ObjectKey key = ((ObjectSliceReadTarget) materialized.committedAppend().readTarget()).objectKey();
         ObjectProtectionIdentity identity = new ObjectProtectionIdentity(
                 ObjectKeyHash.from(key),
                 ObjectProtectionType.VISIBLE_GENERATION,
-                GenerationZeroProtectionIdentities
-                        .visibleGenerationReferenceId(materialized));
-        return new ProtectedGenerationZero(
-                materialized,
-                identity,
-                3,
-                1,
-                4,
-                sha());
+                GenerationZeroProtectionIdentities.visibleGenerationReferenceId(materialized));
+        return new ProtectedGenerationZero(materialized, identity, 3, 1, 4, sha());
     }
 
     static Checksum sha() {
         return new Checksum(ChecksumType.SHA256, "a".repeat(64));
     }
 
-    static final class ControlledPublisher
-            implements GenerationZeroPhysicalReferencePublisher {
+    static final class ControlledPublisher implements GenerationZeroPhysicalReferencePublisher {
         final AtomicInteger visibleCalls = new AtomicInteger();
-        final CompletableFuture<ProtectedGenerationZero> visible =
-                new CompletableFuture<>();
+        final CompletableFuture<ProtectedGenerationZero> visible = new CompletableFuture<>();
 
         @Override
         public CompletableFuture<Void> authorizeUpload(
-                AppendSession session,
-                PhysicalObjectIdentity object,
-                Duration timeout) {
+                AppendSession session, PhysicalObjectIdentity object, Duration timeout) {
             throw new UnsupportedOperationException();
         }
 

@@ -358,16 +358,16 @@ not a new storage profile or a reopening of P15-M5 durability semantics.
 
 After P15-M6, F2-M1 consumes these facts and must not reimplement them：
 
-| F2 requirement | Phase 1.5 owner |
-| --- | --- |
-| logical generic `AppendResult` | P15-M1/M3 |
-| exact cumulative logical size at the returned commit | P15-M6 |
-| `AppendAttemptId` and exception contract | P15-M1/M4 |
-| exact `recoverAppend` | P15-M4 |
-| paged replay cursor/search | P15-M2/M4 |
-| `seal` / logical `delete` | P15-M4 |
-| lifecycle state operation matrix | P15-M4 |
-| shared metadata codec factory | P15-M2 |
+| F2 requirement                                       | Phase 1.5 owner |
+|------------------------------------------------------|-----------------|
+| logical generic `AppendResult`                       | P15-M1/M3       |
+| exact cumulative logical size at the returned commit | P15-M6          |
+| `AppendAttemptId` and exception contract             | P15-M1/M4       |
+| exact `recoverAppend`                                | P15-M4          |
+| paged replay cursor/search                           | P15-M2/M4       |
+| `seal` / logical `delete`                            | P15-M4          |
+| lifecycle state operation matrix                     | P15-M4          |
+| shared metadata codec factory                        | P15-M2          |
 
 F2 remains owner of projection identity/records、Position/Entry mapping、facade callbacks、hybrid storage-class
 binding and broker admission。The Phase 1.5 final fixture validates only the protocol-neutral prerequisite；it does

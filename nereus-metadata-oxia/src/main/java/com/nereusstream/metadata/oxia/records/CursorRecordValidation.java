@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import java.nio.ByteBuffer;
@@ -21,8 +22,7 @@ final class CursorRecordValidation {
 
     private static final Comparator<String> UNSIGNED_UTF8 = CursorRecordValidation::compareUtf8;
 
-    private CursorRecordValidation() {
-    }
+    private CursorRecordValidation() {}
 
     static String requireString(String value, String fieldName, int maxUtf8Bytes, boolean allowBlank) {
         Objects.requireNonNull(value, fieldName);
@@ -66,9 +66,12 @@ final class CursorRecordValidation {
         for (Map.Entry<String, String> entry : entries) {
             String key = requireString(entry.getKey(), fieldName + " key", 64 * 1024, true);
             String item = requireString(entry.getValue(), fieldName + " value", 64 * 1024, true);
-            bytes = Math.addExact(bytes,
-                    Integer.BYTES + strictUtf8(key, fieldName + " key").length
-                            + Integer.BYTES + strictUtf8(item, fieldName + " value").length);
+            bytes = Math.addExact(
+                    bytes,
+                    Integer.BYTES
+                            + strictUtf8(key, fieldName + " key").length
+                            + Integer.BYTES
+                            + strictUtf8(item, fieldName + " value").length);
             if (bytes > CURSOR_PROPERTIES_MAX_BYTES) {
                 throw new IllegalArgumentException(fieldName + " exceeds the encoded byte limit");
             }
@@ -77,8 +80,7 @@ final class CursorRecordValidation {
         return Collections.unmodifiableMap(result);
     }
 
-    static List<CursorAckRangeRecord> canonicalRanges(
-            List<CursorAckRangeRecord> ranges, long markDeleteOffset) {
+    static List<CursorAckRangeRecord> canonicalRanges(List<CursorAckRangeRecord> ranges, long markDeleteOffset) {
         List<CursorAckRangeRecord> copy = List.copyOf(Objects.requireNonNull(ranges, "ranges"));
         long previousEnd = -1;
         for (CursorAckRangeRecord range : copy) {
@@ -95,20 +97,17 @@ final class CursorRecordValidation {
     }
 
     static List<CursorPartialBatchAckRecord> canonicalPartials(
-            List<CursorPartialBatchAckRecord> partials,
-            long markDeleteOffset,
-            List<CursorAckRangeRecord> ranges) {
-        List<CursorPartialBatchAckRecord> copy = List.copyOf(
-                Objects.requireNonNull(partials, "partials"));
+            List<CursorPartialBatchAckRecord> partials, long markDeleteOffset, List<CursorAckRangeRecord> ranges) {
+        List<CursorPartialBatchAckRecord> copy = List.copyOf(Objects.requireNonNull(partials, "partials"));
         long previousOffset = -1;
         int rangeIndex = 0;
         for (CursorPartialBatchAckRecord partial : copy) {
             Objects.requireNonNull(partial, "partials contains null");
             if (partial.entryOffset() < markDeleteOffset || partial.entryOffset() <= previousOffset) {
-                throw new IllegalArgumentException("partial ack offsets must be unique, sorted, and not below mark-delete");
+                throw new IllegalArgumentException(
+                        "partial ack offsets must be unique, sorted, and not below mark-delete");
             }
-            while (rangeIndex < ranges.size()
-                    && ranges.get(rangeIndex).endOffset() <= partial.entryOffset()) {
+            while (rangeIndex < ranges.size() && ranges.get(rangeIndex).endOffset() <= partial.entryOffset()) {
                 rangeIndex++;
             }
             if (rangeIndex < ranges.size()) {
@@ -124,7 +123,8 @@ final class CursorRecordValidation {
 
     private static byte[] strictUtf8(String value, String fieldName) {
         try {
-            ByteBuffer encoded = StandardCharsets.UTF_8.newEncoder()
+            ByteBuffer encoded = StandardCharsets.UTF_8
+                    .newEncoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .encode(CharBuffer.wrap(value));

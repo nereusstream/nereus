@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendAttemptId;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamMetadata;
@@ -27,8 +27,8 @@ class NereusManagedLedgerFoundationTest {
     void factoryConfigEnforcesClosedF2LimitsAndCloseBudget() {
         NereusManagedLedgerFactoryConfig defaults = NereusManagedLedgerFactoryConfig.defaults(1024);
         assertThat(defaults.storageClassName()).isEqualTo("nereus");
-        assertThat(defaults.closeTimeout()).isGreaterThanOrEqualTo(
-                defaults.appendTimeout().plus(defaults.appendRecoveryTimeout()));
+        assertThat(defaults.closeTimeout())
+                .isGreaterThanOrEqualTo(defaults.appendTimeout().plus(defaults.appendRecoveryTimeout()));
 
         assertThatThrownBy(() -> config("bookkeeper", Duration.ofSeconds(75), 1))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -55,8 +55,7 @@ class NereusManagedLedgerFoundationTest {
 
         assertThat(captured.operationView().storageClassName()).isEqualTo("nereus");
         assertThat(captured.operationView().throttleMarkDelete()).isEqualTo(2.5);
-        assertThat(captured.initialProperties()).containsExactly(
-                Map.entry("a", "1"), Map.entry("z", "2"));
+        assertThat(captured.initialProperties()).containsExactly(Map.entry("a", "1"), Map.entry("z", "2"));
         assertThatThrownBy(() -> captured.initialProperties().put("x", "y"))
                 .isInstanceOf(UnsupportedOperationException.class);
 
@@ -100,7 +99,12 @@ class NereusManagedLedgerFoundationTest {
                                 ManagedLedgerProjectionNames.streamName(NAME, 2),
                                 StreamState.ACTIVE,
                                 StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                                Map.of(), 1, 1, 0, 0, 0))))
+                                Map.of(),
+                                1,
+                                1,
+                                0,
+                                0,
+                                0))))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -112,10 +116,7 @@ class NereusManagedLedgerFoundationTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    private static NereusManagedLedgerFactoryConfig config(
-            String storageClass,
-            Duration close,
-            int limit) {
+    private static NereusManagedLedgerFactoryConfig config(String storageClass, Duration close, int limit) {
         return new NereusManagedLedgerFactoryConfig(
                 storageClass,
                 Duration.ofSeconds(30),

@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 
-public final class ObjectProtectionRecordCodecV1
-        extends AbstractF4RecordCodecV1<ObjectProtectionRecord> {
+public final class ObjectProtectionRecordCodecV1 extends AbstractF4RecordCodecV1<ObjectProtectionRecord> {
     public ObjectProtectionRecordCodecV1() {
         super(ObjectProtectionRecord.class);
     }

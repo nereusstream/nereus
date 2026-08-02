@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
@@ -10,42 +11,33 @@ import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationReco
 import com.nereusstream.metadata.oxia.records.KafkaStorageReadinessRecord;
 import java.util.List;
 
-/** Closed F9 native-Kafka metadata codec family. */
+/**
+ * Closed F9 native-Kafka metadata codec family.
+ */
 public final class KafkaMetadataCodecs {
-    private static final MapMetadataCodecRegistry REGISTRY =
-            new MapMetadataCodecRegistry(
-                    List.of(
-                            registered(
-                                    KafkaPartitionBindingRecord.class,
-                                    new KafkaPartitionBindingRecordCodecV1()),
-                            registered(
-                                    KafkaCheckpointFailureRecord.class,
-                                    new KafkaCheckpointFailureRecordCodecV1()),
-                            registered(
-                                    KafkaCompactionPlanRecord.class,
-                                    new KafkaCompactionPlanRecordCodecV1()),
-                            registered(
-                                    KafkaPartitionRegistryRecord.class,
-                                    new KafkaPartitionRegistryRecordCodecV1()),
-                            registered(
-                                    KafkaStorageProtocolActivationRecord.class,
-                                    new KafkaStorageProtocolActivationRecordCodecV1()),
-                            registered(
-                                    KafkaBrokerCapabilityRecord.class,
-                                    new KafkaBrokerCapabilityRecordCodecV1()),
-                            registered(
-                                    KafkaStorageReadinessRecord.class,
-                                    new KafkaStorageReadinessRecordCodecV1())));
+    private static final MapMetadataCodecRegistry REGISTRY = new MapMetadataCodecRegistry(List.of(
+            registered(KafkaPartitionBindingRecord.class, new KafkaPartitionBindingRecordCodecV1()),
+            registered(KafkaCheckpointFailureRecord.class, new KafkaCheckpointFailureRecordCodecV1()),
+            registered(KafkaCompactionPlanRecord.class, new KafkaCompactionPlanRecordCodecV1()),
+            registered(KafkaPartitionRegistryRecord.class, new KafkaPartitionRegistryRecordCodecV1()),
+            registered(KafkaStorageProtocolActivationRecord.class, new KafkaStorageProtocolActivationRecordCodecV1()),
+            registered(KafkaBrokerCapabilityRecord.class, new KafkaBrokerCapabilityRecordCodecV1()),
+            registered(KafkaStorageReadinessRecord.class, new KafkaStorageReadinessRecordCodecV1())));
 
-    private KafkaMetadataCodecs() { }
+    private KafkaMetadataCodecs() {}
 
-    public static MetadataCodecRegistry registry() { return REGISTRY; }
+    public static MetadataCodecRegistry registry() {
+        return REGISTRY;
+    }
 
     public static <T> byte[] encodeEnvelope(T record, Class<T> type) {
         MetadataRecordCodec<T> codec = REGISTRY.codecForClass(type);
         return MetadataRecordEnvelope.encode(
-                codec.recordType(), codec.schemaVersion(record), codec.minReaderSchemaVersion(record),
-                MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1, codec.encode(record));
+                codec.recordType(),
+                codec.schemaVersion(record),
+                codec.minReaderSchemaVersion(record),
+                MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
+                codec.encode(record));
     }
 
     public static <T> T decodeEnvelope(byte[] bytes, Class<T> type) {

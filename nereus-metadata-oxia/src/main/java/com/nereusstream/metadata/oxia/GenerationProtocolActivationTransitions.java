@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.ErrorCode;
@@ -7,54 +8,43 @@ import com.nereusstream.metadata.oxia.records.GenerationBackfillProofRecord;
 import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationLifecycle;
 import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
 
-/** Closed monotonic transition guard for the cluster generation activation record. */
+/**
+ * Closed monotonic transition guard for the cluster generation activation record.
+ */
 final class GenerationProtocolActivationTransitions {
-    private GenerationProtocolActivationTransitions() {
-    }
+    private GenerationProtocolActivationTransitions() {}
 
     static void requireValidReplacement(
-            GenerationProtocolActivationRecord current,
-            GenerationProtocolActivationRecord replacement) {
+            GenerationProtocolActivationRecord current, GenerationProtocolActivationRecord replacement) {
         if (current.schemaVersion() != replacement.schemaVersion()
                 || current.protocolVersion() != replacement.protocolVersion()
-                || !current.activatingBrokerRunId().equals(
-                        replacement.activatingBrokerRunId())
+                || !current.activatingBrokerRunId().equals(replacement.activatingBrokerRunId())
                 || current.preparedAtMillis() != replacement.preparedAtMillis()) {
-            throw invariant(
-                    "generation activation CAS changed immutable protocol identity");
+            throw invariant("generation activation CAS changed immutable protocol identity");
         }
         if (replacement.updatedAtMillis() < current.updatedAtMillis()) {
-            throw invariant(
-                    "generation activation CAS moved time backward");
+            throw invariant("generation activation CAS moved time backward");
         }
         if (current.lifecycle() == GenerationProtocolActivationLifecycle.ACTIVE
-                && replacement.lifecycle()
-                        != GenerationProtocolActivationLifecycle.ACTIVE) {
+                && replacement.lifecycle() != GenerationProtocolActivationLifecycle.ACTIVE) {
             throw invariant("ACTIVE generation protocol cannot return to PREPARED");
         }
         if (current.publicationEnabled() && !replacement.publicationEnabled()
-                || current.physicalDeleteEnabled()
-                        && !replacement.physicalDeleteEnabled()
-                || current.cursorSnapshotDeleteEnabled()
-                        && !replacement.cursorSnapshotDeleteEnabled()) {
+                || current.physicalDeleteEnabled() && !replacement.physicalDeleteEnabled()
+                || current.cursorSnapshotDeleteEnabled() && !replacement.cursorSnapshotDeleteEnabled()) {
             throw invariant("generation activation capability bits are monotonic");
         }
         if (current.lifecycle() == GenerationProtocolActivationLifecycle.ACTIVE
-                && current.activatedAtMillis()
-                        != replacement.activatedAtMillis()) {
+                && current.activatedAtMillis() != replacement.activatedAtMillis()) {
             throw invariant("generation activation CAS changed activatedAtMillis");
         }
-        boolean mutablePreparedDomainSet = current.lifecycle()
-                        == GenerationProtocolActivationLifecycle.PREPARED
-                && replacement.lifecycle()
-                        == GenerationProtocolActivationLifecycle.PREPARED
+        boolean mutablePreparedDomainSet = current.lifecycle() == GenerationProtocolActivationLifecycle.PREPARED
+                && replacement.lifecycle() == GenerationProtocolActivationLifecycle.PREPARED
                 && !current.publicationEnabled()
                 && !replacement.publicationEnabled();
         if (!mutablePreparedDomainSet
-                && !current.requiredReferenceDomains().equals(
-                        replacement.requiredReferenceDomains())) {
-            throw invariant(
-                    "active generation domain set requires a separate capability transition");
+                && !current.requiredReferenceDomains().equals(replacement.requiredReferenceDomains())) {
+            throw invariant("active generation domain set requires a separate capability transition");
         }
         long currentEpoch = current.brokerCapabilityReadinessEpoch();
         long replacementEpoch = replacement.brokerCapabilityReadinessEpoch();
@@ -77,11 +67,9 @@ final class GenerationProtocolActivationTransitions {
                 replacementEpoch,
                 "cursor-snapshot");
         if (!current.objectStoreCapabilitySha256().isEmpty()
-                && !current.objectStoreCapabilitySha256().equals(
-                        replacement.objectStoreCapabilitySha256())
+                && !current.objectStoreCapabilitySha256().equals(replacement.objectStoreCapabilitySha256())
                 && replacementEpoch == currentEpoch) {
-            throw invariant(
-                    "object-store capability changed without a readiness identity change");
+            throw invariant("object-store capability changed without a readiness identity change");
         }
     }
 
@@ -102,14 +90,12 @@ final class GenerationProtocolActivationTransitions {
             }
             return;
         }
-        if (replacement.complete()
-                && replacement.brokerReadinessEpoch() != replacementEpoch) {
+        if (replacement.complete() && replacement.brokerReadinessEpoch() != replacementEpoch) {
             throw invariant(name + " backfill does not match the changed readiness identity");
         }
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 }

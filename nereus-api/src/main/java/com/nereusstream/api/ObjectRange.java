@@ -16,11 +16,10 @@ package com.nereusstream.api;
 
 import java.util.Objects;
 
-/** Physical byte range inside one object. */
-public record ObjectRange(
-        ObjectKey objectKey,
-        long offset,
-        long length) {
+/**
+ * Physical byte range inside one object.
+ */
+public record ObjectRange(ObjectKey objectKey, long offset, long length) {
     public ObjectRange {
         Objects.requireNonNull(objectKey, "objectKey");
         ApiRangeValidation.requireNonNegativeNonOverflowingRange(offset, length, "object");

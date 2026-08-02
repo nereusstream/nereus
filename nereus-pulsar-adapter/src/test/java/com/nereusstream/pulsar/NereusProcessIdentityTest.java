@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.security.SecureRandom;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
@@ -22,16 +22,15 @@ class NereusProcessIdentityTest {
 
     @Test
     void rejectsIdentityMismatch() {
-        assertThatThrownBy(() -> new NereusProcessIdentity(
-                "aaaaaaaaaaaaaaaaaaaaaaaaaa", "pulsar-f2/different"))
+        assertThatThrownBy(() -> new NereusProcessIdentity("aaaaaaaaaaaaaaaaaaaaaaaaaa", "pulsar-f2/different"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("writerId");
     }
 
     @Test
     void rejectsLegacyBase64UrlIdentity() {
-        assertThatThrownBy(() -> new NereusProcessIdentity(
-                "AAAAAAAAAAAAAAAAAAAAAA", "pulsar-f2/AAAAAAAAAAAAAAAAAAAAAA"))
+        assertThatThrownBy(
+                        () -> new NereusProcessIdentity("AAAAAAAAAAAAAAAAAAAAAA", "pulsar-f2/AAAAAAAAAAAAAAAAAAAAAA"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("lowercase base32");
     }

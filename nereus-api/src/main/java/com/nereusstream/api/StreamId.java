@@ -16,7 +16,9 @@ package com.nereusstream.api;
 
 import java.util.Objects;
 
-/** Stable identifier for an internal Nereus stream. */
+/**
+ * Stable identifier for an internal Nereus stream.
+ */
 public record StreamId(String value) {
     public StreamId {
         Objects.requireNonNull(value, "value");

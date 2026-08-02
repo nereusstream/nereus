@@ -47,8 +47,7 @@ public record AppendSessionRecord(
         Objects.requireNonNull(authorityType, "authorityType");
         Objects.requireNonNull(authorityId, "authorityId");
         Objects.requireNonNull(authorityOwnerId, "authorityOwnerId");
-        if (epoch <= 0 || leaseVersion <= 0 || expiresAtMillis <= 0
-                || authorityEpoch < 0 || authorityOwnerEpoch < 0) {
+        if (epoch <= 0 || leaseVersion <= 0 || expiresAtMillis <= 0 || authorityEpoch < 0 || authorityOwnerEpoch < 0) {
             throw new IllegalArgumentException("append session numeric fields must be positive");
         }
         boolean emptyAuthority = authorityType.isEmpty();
@@ -78,8 +77,7 @@ public record AppendSessionRecord(
         return authorityType.isEmpty()
                 ? Optional.empty()
                 : Optional.of(new AppendAuthority(
-                        authorityType, authorityId, authorityEpoch,
-                        authorityOwnerId, authorityOwnerEpoch));
+                        authorityType, authorityId, authorityEpoch, authorityOwnerId, authorityOwnerEpoch));
     }
 
     private static void requireNonBlank(String value, String fieldName) {

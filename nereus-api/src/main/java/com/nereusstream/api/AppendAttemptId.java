@@ -5,12 +5,15 @@
  *
  *   https://www.apache.org/licenses/LICENSE-2.0
  */
+
 package com.nereusstream.api;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** Opaque process-local identity for recovering one exact append attempt. */
+/**
+ * Opaque process-local identity for recovering one exact append attempt.
+ */
 public record AppendAttemptId(String value) {
     public AppendAttemptId {
         Objects.requireNonNull(value, "value");

@@ -7,10 +7,10 @@ organization-owned fork repositories.
 
 ## Forks
 
-| Repository | Upstream | Purpose |
-| --- | --- | --- |
-| `github.com/nereusstream/pulsar` | `github.com/apache/pulsar` | Pulsar storage hooks, ManagedLedger provider integration, packaging hooks |
-| `github.com/nereusstream/kop` | `github.com/streamnative/kop` | KoP offset projection, group/txn state integration, Nereus adapter hooks |
+| Repository                               | Upstream                                      | Purpose                                                                      |
+|------------------------------------------|-----------------------------------------------|------------------------------------------------------------------------------|
+| `github.com/nereusstream/pulsar`         | `github.com/apache/pulsar`                    | Pulsar storage hooks, ManagedLedger provider integration, packaging hooks    |
+| `github.com/nereusstream/kop`            | `github.com/streamnative/kop`                 | KoP offset projection, group/txn state integration, Nereus adapter hooks     |
 | `github.com/nereusstream/kafka`（planned） | exact pinned `github.com/apache/kafka` commit | F9 native log/storage hooks、broker lifecycle and packaging；separate from KoP |
 
 ## Branch Naming
@@ -28,11 +28,11 @@ nereus/future9-native-kafka-storage
 
 Record the exact upstream commit before implementation in the corresponding organization fork begins.
 
-| Component | Upstream ref | Nereus fork branch | Status |
-| --- | --- | --- | --- |
-| Pulsar | `320fbce6d540b618d35f1dd374e0aaf5fbd3c35c` | `main` or `nereus/main` | initial local planning ref |
-| KoP | `TODO_PIN_EXACT_COMMIT` | `main` or `nereus/main` | pending |
-| Apache Kafka | `TODO_PIN_EXACT_APACHE_KAFKA_COMMIT` | `nereus/future9-native-kafka-storage` | must be pinned before F9-M3 Kafka-fork code starts |
+| Component    | Upstream ref                               | Nereus fork branch                    | Status                                             |
+|--------------|--------------------------------------------|---------------------------------------|----------------------------------------------------|
+| Pulsar       | `320fbce6d540b618d35f1dd374e0aaf5fbd3c35c` | `main` or `nereus/main`               | initial local planning ref                         |
+| KoP          | `TODO_PIN_EXACT_COMMIT`                    | `main` or `nereus/main`               | pending                                            |
+| Apache Kafka | `TODO_PIN_EXACT_APACHE_KAFKA_COMMIT`       | `nereus/future9-native-kafka-storage` | must be pinned before F9-M3 Kafka-fork code starts |
 
 AutoMQ is a reference implementation, not an upstream fork entry. F9-M0 audited local
 `automq/main@1c648d84819d5c3fef2af585f02149c397584870` (`3.9.0-SNAPSHOT`) and recorded exact file/blob evidence in

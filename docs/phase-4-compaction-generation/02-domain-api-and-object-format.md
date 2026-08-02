@@ -21,7 +21,8 @@ config/candidate/plan values、the exact bounded reference-domain registry、rec
 `ACTIVE -> MARKED -> DELETING` root fencing、the 256-shard physical-root scanner、query-bound domain revalidation and
 affected-stream generation/append-recovery/materialization domains are also implemented. The bounded canonical
 reference-snapshot builder and activation-gated global scope now live in core, and affected plus ownerless
-projection-generation/cursor-snapshot domains are implemented over exact F2/F3 authority wrappers. Every domain reference must
+projection-generation/cursor-snapshot domains are implemented over exact F2/F3 authority wrappers. Every domain
+reference must
 match one exact planned metadata removal；active task/live-tail and non-DRAINING higher-generation references veto.
 The collector stops at durable delete intent and deliberately exposes no metadata/protection/object delete call；
 typed source destructive recovery and the separate DELETED-root/Phase 1 audit-retirement coordinator are now
@@ -271,7 +272,8 @@ public interface GenerationProtocolActivationGuard {
 ```
 
 Only a `LiveProjectionSubject` may request first activation. `DomainValidatedDeletionSubject` is legal only for
-`PHYSICAL_DELETE` after the projection reference domain has produced the exact snapshot for that query. The guard checks the
+`PHYSICAL_DELETE` after the projection reference domain has produced the exact snapshot for that query. The guard checks
+the
 operation-specific publication/deletion bit. For a live subject, the product adapter resolves the opaque
 `ProjectionRef` to the current authoritative projection, verifies its complete immutable identity digest and captures
 that record's Oxia version as `subjectValidationVersion`；the caller never supplies a possibly stale mutable version.
@@ -376,11 +378,11 @@ public final class PinnedResolvedRange implements AutoCloseable {
 `PrimaryWalReader` becomes a compatibility subtype or adapter of `ReadTargetReader`; appenders remain keyed by primary
 target type. Initial exact keys are：
 
-| Target | Reader key |
-| --- | --- |
-| Object WAL v1 | `(OBJECT_SLICE, 1, MULTI_STREAM_WAL_OBJECT, WAL_OBJECT_V1)` |
+| Target               | Reader key                                                                |
+|----------------------|---------------------------------------------------------------------------|
+| Object WAL v1        | `(OBJECT_SLICE, 1, MULTI_STREAM_WAL_OBJECT, WAL_OBJECT_V1)`               |
 | F4 committed Parquet | `(OBJECT_SLICE, 1, STREAM_COMPACTED_OBJECT, NEREUS_COMPACTED_PARQUET_V1)` |
-| Future BookKeeper | `(BOOKKEEPER_ENTRY_RANGE, 1, empty, empty)` |
+| Future BookKeeper    | `(BOOKKEEPER_ENTRY_RANGE, 1, empty, empty)`                               |
 
 Duplicate exact keys fail runtime construction. An unknown physical format fails `UNSUPPORTED_READ_TARGET`; it is not
 sent to the Object WAL reader. `ReadTargetDispatcher` groups only adjacent ranges with the same exact key.
@@ -667,7 +669,8 @@ All path components use the existing canonical `KeyComponentCodec`/base32 helper
 ```
 
 `ObjectId` is `co1-` or `rc1-` plus base32 SHA-256 of the canonical object key. Object ID and key hash are checked on
-every metadata decode. F4 writers always use guarded `putObject(... ifAbsent=true)` and compare HEAD length/checksum/metadata on
+every metadata decode. F4 writers always use guarded `putObject(... ifAbsent=true)` and compare HEAD
+length/checksum/metadata on
 an already-existing result. A deleted key is never reused. Publication/task retry chooses the identical key only
 while its physical root is not `DELETING/DELETED`；a new worker output after deletion uses a fresh output-attempt id
 even if content bytes hash the same.
@@ -798,24 +801,25 @@ file policy digest cannot be validated against output identity alone.
 
 The first implementation uses Apache Parquet with these fixed choices：
 
-| Property | V1 value |
-| --- | --- |
-| Parquet format | standard Parquet file, `PAR1` header/footer |
-| Nereus physical format | `NEREUS_COMPACTED_PARQUET_V1` |
-| row order | strictly increasing unsigned/non-negative stream offset |
-| one committed row | exactly one source offset and exact source payload |
-| compression | `ZSTD` by default；`UNCOMPRESSED` allowed；codec stored in policy/file metadata |
-| ZSTD level | `3` when ZSTD is selected |
-| dictionary | disabled for every V1 column |
-| Parquet writer version | `PARQUET_2_0` |
-| data page size | `1 MiB` |
-| bloom filters | disabled for every V1 column |
-| page checksum | enabled；payload CRC remains mandatory |
-| encryption | none in V1；encrypted object support requires a format minor/reader gate |
-| writer time zone | UTC；timestamps are epoch millis, no local-time logical type |
+| Property               | V1 value                                                                      |
+|------------------------|-------------------------------------------------------------------------------|
+| Parquet format         | standard Parquet file, `PAR1` header/footer                                   |
+| Nereus physical format | `NEREUS_COMPACTED_PARQUET_V1`                                                 |
+| row order              | strictly increasing unsigned/non-negative stream offset                       |
+| one committed row      | exactly one source offset and exact source payload                            |
+| compression            | `ZSTD` by default；`UNCOMPRESSED` allowed；codec stored in policy/file metadata |
+| ZSTD level             | `3` when ZSTD is selected                                                     |
+| dictionary             | disabled for every V1 column                                                  |
+| Parquet writer version | `PARQUET_2_0`                                                                 |
+| data page size         | `1 MiB`                                                                       |
+| bloom filters          | disabled for every V1 column                                                  |
+| page checksum          | enabled；payload CRC remains mandatory                                         |
+| encryption             | none in V1；encrypted object support requires a format minor/reader gate       |
+| writer time zone       | UTC；timestamps are epoch millis, no local-time logical type                   |
 
 Writer-library build/version and every option that can alter bytes are stored in file key-value metadata. Different
-writer bytes are allowed because the exact content hash is part of the object key；semantic validation, not deterministic byte output,
+writer bytes are allowed because the exact content hash is part of the object key；semantic validation, not deterministic
+byte output,
 is the publish requirement.
 
 ### 7.2 Dense committed schema
@@ -909,7 +913,8 @@ domain. `WalSliceReadStats` therefore carries resolved target payload/index leng
 separate measured payload/index downloads for metrics. `ParquetCompactedTargetReader` copies
 `CompactedObjectReadResult.physicalBytesRead/footerBytesRead` into those measured fields；returned logical bytes may
 legitimately exceed physical IO. `ioDeltaBytes` is signed, while `amplificationBytes` and
-`compressionSavingsBytes` expose its two non-negative parts. `readsCompressibleLogicalPayloadLargerThanPhysicalParquetIo`
+`compressionSavingsBytes` expose its two non-negative parts.
+`readsCompressibleLogicalPayloadLargerThanPhysicalParquetIo`
 locks the case where two returned 256 KiB rows are larger than the ZSTD Parquet IO and still decode byte-for-byte。
 
 ### 7.4 Footer/index reference

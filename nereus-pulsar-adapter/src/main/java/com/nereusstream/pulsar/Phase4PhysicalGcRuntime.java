@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import com.nereusstream.api.ErrorCode;
@@ -24,10 +25,10 @@ import com.nereusstream.managedledger.retention.ProjectionGenerationReferenceDom
 import com.nereusstream.materialization.MaterializationConfig;
 import com.nereusstream.materialization.gc.AbandonedAppendIntentPlanBuilder;
 import com.nereusstream.materialization.gc.AppendRecoveryReferenceDomain;
+import com.nereusstream.materialization.gc.DefaultGcRetirementJournal;
 import com.nereusstream.materialization.gc.DefaultPhysicalGcLifecycleService;
 import com.nereusstream.materialization.gc.DefaultPhysicalRootBackfillCoordinator;
 import com.nereusstream.materialization.gc.DefaultPhysicalRootTombstoneRetirementCoordinator;
-import com.nereusstream.materialization.gc.DefaultGcRetirementJournal;
 import com.nereusstream.materialization.gc.FutureCatalogSentinelDomain;
 import com.nereusstream.materialization.gc.GcMetadataRetirementRegistry;
 import com.nereusstream.materialization.gc.GcPlanMetadataRevalidator;
@@ -42,9 +43,9 @@ import com.nereusstream.materialization.gc.HigherGenerationPreDrainCoordinator;
 import com.nereusstream.materialization.gc.MaterializationReferenceDomain;
 import com.nereusstream.materialization.gc.ObjectInventoryScanner;
 import com.nereusstream.materialization.gc.OwnerlessObjectGcExecutor;
+import com.nereusstream.materialization.gc.PhysicalGcConfig;
 import com.nereusstream.materialization.gc.PhysicalGcLifecyclePass;
 import com.nereusstream.materialization.gc.PhysicalGcLifecycleService;
-import com.nereusstream.materialization.gc.PhysicalGcConfig;
 import com.nereusstream.materialization.gc.PhysicalObjectGarbageCollector;
 import com.nereusstream.materialization.gc.PhysicalObjectRootScanner;
 import com.nereusstream.materialization.gc.SecureGcIdGenerator;
@@ -95,13 +96,12 @@ public final class Phase4PhysicalGcRuntime
     private final StreamRegistrationRetirementScanner registrationScanner;
     private final ObjectInventoryScanner objectInventoryScanner;
     private final PhysicalGcLifecycleService lifecycleService;
-    private final DefaultPhase4PhysicalDeletionActivationCoordinator
-            deletionActivationCoordinator;
+    private final DefaultPhase4PhysicalDeletionActivationCoordinator deletionActivationCoordinator;
     private final Phase4PhysicalGcStartupGate startupGate;
     private final SourceRetirementMetadataStore sourceRetirementMetadata;
     private final ObjectAuditRetirementStore objectAuditRetirement;
-    private final ConcurrentMap<ObjectKeyHash, ReferencedObjectGcExecutor.ExecutionResult>
-            referencedGcResults = new ConcurrentHashMap<>();
+    private final ConcurrentMap<ObjectKeyHash, ReferencedObjectGcExecutor.ExecutionResult> referencedGcResults =
+            new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public Phase4PhysicalGcRuntime(
@@ -130,50 +130,40 @@ public final class Phase4PhysicalGcRuntime
             Clock clock) {
         String exactCluster = requireText(cluster, "cluster");
         PhysicalGcConfig exactConfig = Objects.requireNonNull(config, "config");
-        MaterializationConfig exactMaterializationConfig = Objects.requireNonNull(
-                materializationConfig, "materializationConfig");
-        CursorStorageConfig exactCursorConfig = Objects.requireNonNull(
-                cursorConfig, "cursorConfig");
-        OxiaMetadataStore exactL0 = Objects.requireNonNull(
-                l0Metadata, "l0Metadata");
-        GenerationMetadataStore exactGenerations = Objects.requireNonNull(
-                generations, "generations");
-        ManagedLedgerProjectionMetadataStore exactProjections = Objects.requireNonNull(
-                projections, "projections");
+        MaterializationConfig exactMaterializationConfig =
+                Objects.requireNonNull(materializationConfig, "materializationConfig");
+        CursorStorageConfig exactCursorConfig = Objects.requireNonNull(cursorConfig, "cursorConfig");
+        OxiaMetadataStore exactL0 = Objects.requireNonNull(l0Metadata, "l0Metadata");
+        GenerationMetadataStore exactGenerations = Objects.requireNonNull(generations, "generations");
+        ManagedLedgerProjectionMetadataStore exactProjections = Objects.requireNonNull(projections, "projections");
         CursorMetadataStore exactCursors = Objects.requireNonNull(cursors, "cursors");
-        PhysicalObjectMetadataStore exactPhysical = Objects.requireNonNull(
-                physicalMetadata, "physicalMetadata");
-        GenerationProtocolActivationStore exactActivationStore = Objects.requireNonNull(
-                activationStore, "activationStore");
-        Phase4GcReferenceDomainAssembly exactReferenceDomains = Objects.requireNonNull(
-                referenceDomains, "referenceDomains");
+        PhysicalObjectMetadataStore exactPhysical = Objects.requireNonNull(physicalMetadata, "physicalMetadata");
+        GenerationProtocolActivationStore exactActivationStore =
+                Objects.requireNonNull(activationStore, "activationStore");
+        Phase4GcReferenceDomainAssembly exactReferenceDomains =
+                Objects.requireNonNull(referenceDomains, "referenceDomains");
         GcGlobalReferenceScope exactGlobalScope = exactReferenceDomains.globalScope();
-        ProjectionGenerationReferenceDomain exactProjectionReferenceDomain =
-                exactReferenceDomains.projectionDomain();
-        GenerationProtocolActivationGuard exactActivationGuard = Objects.requireNonNull(
-                activationGuard, "activationGuard");
-        GenerationCapabilityReadinessProvider exactReadinessProvider = Objects.requireNonNull(
-                readinessProvider, "readinessProvider");
-        ObjectProtectionManager exactObjectProtection = Objects.requireNonNull(
-                objectProtectionManager, "objectProtectionManager");
-        SourceRetirementMetadataStore exactSourceRetirement = Objects.requireNonNull(
-                sourceRetirementMetadata, "sourceRetirementMetadata");
-        ObjectAuditRetirementStore exactObjectAudit = Objects.requireNonNull(
-                objectAuditRetirement, "objectAuditRetirement");
+        ProjectionGenerationReferenceDomain exactProjectionReferenceDomain = exactReferenceDomains.projectionDomain();
+        GenerationProtocolActivationGuard exactActivationGuard =
+                Objects.requireNonNull(activationGuard, "activationGuard");
+        GenerationCapabilityReadinessProvider exactReadinessProvider =
+                Objects.requireNonNull(readinessProvider, "readinessProvider");
+        ObjectProtectionManager exactObjectProtection =
+                Objects.requireNonNull(objectProtectionManager, "objectProtectionManager");
+        SourceRetirementMetadataStore exactSourceRetirement =
+                Objects.requireNonNull(sourceRetirementMetadata, "sourceRetirementMetadata");
+        ObjectAuditRetirementStore exactObjectAudit =
+                Objects.requireNonNull(objectAuditRetirement, "objectAuditRetirement");
         ObjectStore exactObjectStore = Objects.requireNonNull(objectStore, "objectStore");
-        ObjectStoreDeleteCapabilityProbe exactCapabilityProbe = Objects.requireNonNull(
-                capabilityProbe, "capabilityProbe");
-        Duration exactObjectStoreRequestTimeout = Objects.requireNonNull(
-                objectStoreRequestTimeout, "objectStoreRequestTimeout");
-        RecoveryCheckpointCodecV1 exactCheckpointCodec = Objects.requireNonNull(
-                checkpointCodec, "checkpointCodec");
-        ScheduledExecutorService exactScheduler = Objects.requireNonNull(
-                scheduler, "scheduler");
-        Executor exactCallbackExecutor = Objects.requireNonNull(
-                callbackExecutor, "callbackExecutor");
+        ObjectStoreDeleteCapabilityProbe exactCapabilityProbe =
+                Objects.requireNonNull(capabilityProbe, "capabilityProbe");
+        Duration exactObjectStoreRequestTimeout =
+                Objects.requireNonNull(objectStoreRequestTimeout, "objectStoreRequestTimeout");
+        RecoveryCheckpointCodecV1 exactCheckpointCodec = Objects.requireNonNull(checkpointCodec, "checkpointCodec");
+        ScheduledExecutorService exactScheduler = Objects.requireNonNull(scheduler, "scheduler");
+        Executor exactCallbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         Clock exactClock = Objects.requireNonNull(clock, "clock");
-        if (exactCursorConfig.cursorRecordsPerStreamMax()
-                > CursorSnapshotGcScanner.MAX_INVENTORY_VALUES) {
+        if (exactCursorConfig.cursorRecordsPerStreamMax() > CursorSnapshotGcScanner.MAX_INVENTORY_VALUES) {
             throw new IllegalArgumentException(
                     "cursorRecordsPerStreamMax exceeds the complete cursor-GC inventory bound");
         }
@@ -182,48 +172,24 @@ public final class Phase4PhysicalGcRuntime
         this.sourceRetirementMetadata = exactSourceRetirement;
         this.objectAuditRetirement = exactObjectAudit;
 
-        List<GcReferenceDomainVersion> installedDomains =
-                NereusGenerationProtocolReferenceDomains.currentGcV1();
-        GcReferenceDomainConfig cursorReferenceDomainConfig =
-                new GcReferenceDomainConfig(
-                        Math.min(
-                                exactConfig.metadataScanPageSize(),
-                                exactCursorConfig.cursorScanPageSize()),
-                        exactConfig.maxAuthoritiesPerDomainSnapshot(),
-                        exactConfig.maxReferencesPerDomainSnapshot());
+        List<GcReferenceDomainVersion> installedDomains = NereusGenerationProtocolReferenceDomains.currentGcV1();
+        GcReferenceDomainConfig cursorReferenceDomainConfig = new GcReferenceDomainConfig(
+                Math.min(exactConfig.metadataScanPageSize(), exactCursorConfig.cursorScanPageSize()),
+                exactConfig.maxAuthoritiesPerDomainSnapshot(),
+                exactConfig.maxReferencesPerDomainSnapshot());
         List<GcReferenceDomain> domains = List.of(
                 new AppendRecoveryReferenceDomain(
-                        exactCluster,
-                        exactL0,
-                        exactGenerations,
-                        exactConfig,
-                        exactGlobalScope),
+                        exactCluster, exactL0, exactGenerations, exactConfig, exactGlobalScope),
                 new CursorSnapshotReferenceDomain(
-                        exactCluster,
-                        exactCursors,
-                        cursorReferenceDomainConfig,
-                        exactGlobalScope),
+                        exactCluster, exactCursors, cursorReferenceDomainConfig, exactGlobalScope),
                 new FutureCatalogSentinelDomain(
-                        exactCluster,
-                        exactActivationStore,
-                        exactConfig.referenceDomainConfig(),
-                        installedDomains),
-                new GenerationReferenceDomain(
-                        exactCluster,
-                        exactGenerations,
-                        exactConfig,
-                        exactGlobalScope),
-                new MaterializationReferenceDomain(
-                        exactCluster,
-                        exactGenerations,
-                        exactConfig,
-                        exactGlobalScope),
+                        exactCluster, exactActivationStore, exactConfig.referenceDomainConfig(), installedDomains),
+                new GenerationReferenceDomain(exactCluster, exactGenerations, exactConfig, exactGlobalScope),
+                new MaterializationReferenceDomain(exactCluster, exactGenerations, exactConfig, exactGlobalScope),
                 exactProjectionReferenceDomain);
-        GcReferenceDomainRegistry registry = new GcReferenceDomainRegistry(
-                exactConfig, exactScheduler, domains);
+        GcReferenceDomainRegistry registry = new GcReferenceDomainRegistry(exactConfig, exactScheduler, domains);
         if (!registry.requiredDomains().equals(installedDomains)) {
-            throw new IllegalArgumentException(
-                    "runtime GC domain set differs from the generation activation contract");
+            throw new IllegalArgumentException("runtime GC domain set differs from the generation activation contract");
         }
 
         var coverageBackfill = new DefaultPhysicalRootBackfillCoordinator(
@@ -236,24 +202,20 @@ public final class Phase4PhysicalGcRuntime
                 exactPhysical,
                 exactObjectProtection,
                 exactObjectStore,
-                new ManagedLedgerGenerationProjectionAuthorityReader(
-                        exactCluster, exactProjections),
+                new ManagedLedgerGenerationProjectionAuthorityReader(exactCluster, exactProjections),
                 exactConfig.metadataScanPageSize(),
-                Math.min(
-                        exactConfig.metadataScanPageSize(),
-                        exactCursorConfig.cursorScanPageSize()),
+                Math.min(exactConfig.metadataScanPageSize(), exactCursorConfig.cursorScanPageSize()),
                 exactObjectStoreRequestTimeout,
                 exactClock);
-        this.deletionActivationCoordinator =
-                new DefaultPhase4PhysicalDeletionActivationCoordinator(
-                        exactCluster,
-                        exactConfig.mutationsAllowed(),
-                        exactReadinessProvider,
-                        exactActivationStore,
-                        NereusGenerationProtocolReferenceDomains.currentV1(),
-                        coverageBackfill,
-                        exactCapabilityProbe,
-                        exactClock);
+        this.deletionActivationCoordinator = new DefaultPhase4PhysicalDeletionActivationCoordinator(
+                exactCluster,
+                exactConfig.mutationsAllowed(),
+                exactReadinessProvider,
+                exactActivationStore,
+                NereusGenerationProtocolReferenceDomains.currentV1(),
+                coverageBackfill,
+                exactCapabilityProbe,
+                exactClock);
         this.startupGate = new Phase4PhysicalGcStartupGate(
                 exactCluster,
                 exactActivationStore,
@@ -281,8 +243,7 @@ public final class Phase4PhysicalGcRuntime
                         exactConfig.operationTimeout()),
                 exactClock,
                 exactScheduler);
-        DefaultGcRetirementJournal journal = new DefaultGcRetirementJournal(
-                exactCluster, exactPhysical, exactConfig);
+        DefaultGcRetirementJournal journal = new DefaultGcRetirementJournal(exactCluster, exactPhysical, exactConfig);
         SourceRetirementPlanBuilder sourcePlans = new SourceRetirementPlanBuilder(
                 exactCluster,
                 exactL0,
@@ -291,39 +252,26 @@ public final class Phase4PhysicalGcRuntime
                 exactSourceRetirement,
                 exactCheckpointCodec,
                 exactConfig);
-        HigherGenerationPreDrainCoordinator preDrain =
-                new HigherGenerationPreDrainCoordinator(
-                        exactCluster,
-                        exactL0,
-                        exactGenerations,
-                        exactPhysical,
-                        exactCheckpointCodec,
-                        exactConfig,
-                        exactClock,
-                        exactScheduler);
-        AbandonedAppendIntentPlanBuilder abandonedAppendIntents =
-                new AbandonedAppendIntentPlanBuilder(
-                        exactCluster,
-                        exactPhysical,
-                        exactSourceRetirement,
-                        exactObjectProtection,
-                        exactConfig,
-                        exactScheduler);
+        HigherGenerationPreDrainCoordinator preDrain = new HigherGenerationPreDrainCoordinator(
+                exactCluster,
+                exactL0,
+                exactGenerations,
+                exactPhysical,
+                exactCheckpointCodec,
+                exactConfig,
+                exactClock,
+                exactScheduler);
+        AbandonedAppendIntentPlanBuilder abandonedAppendIntents = new AbandonedAppendIntentPlanBuilder(
+                exactCluster, exactPhysical, exactSourceRetirement, exactObjectProtection, exactConfig, exactScheduler);
         GcPlanMetadataRevalidator metadataRevalidator = (candidate, expected) -> {
             var kind = candidate.referenceQuery().kind();
-            if (kind
-                    == com.nereusstream.core.physical.GcReferenceQueryKind
-                            .REFERENCED_OBJECT) {
+            if (kind == com.nereusstream.core.physical.GcReferenceQueryKind.REFERENCED_OBJECT) {
                 return sourcePlans.reload(candidate, expected);
             }
-            if (kind
-                    == com.nereusstream.core.physical.GcReferenceQueryKind
-                            .OWNERLESS_ORPHAN_CANDIDATE) {
+            if (kind == com.nereusstream.core.physical.GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE) {
                 return abandonedAppendIntents.reload(candidate, expected);
             }
-            if (kind
-                            != com.nereusstream.core.physical.GcReferenceQueryKind
-                                    .CURSOR_SNAPSHOT_CANDIDATE
+            if (kind != com.nereusstream.core.physical.GcReferenceQueryKind.CURSOR_SNAPSHOT_CANDIDATE
                     || !expected.isEmpty()) {
                 return CompletableFuture.failedFuture(new IllegalArgumentException(
                         "runtime-managed cursor GC accepts only empty metadata-removal plans"));
@@ -341,21 +289,11 @@ public final class Phase4PhysicalGcRuntime
                 new SecureGcIdGenerator(),
                 exactClock,
                 exactScheduler);
-        GcMetadataRetirementRegistry metadataRetirements =
-                new GcMetadataRetirementRegistry(List.of(
-                        new GenerationZeroIndexRetirementHandler(
-                                exactCluster,
-                                exactGenerations,
-                                exactSourceRetirement),
-                        new GenerationZeroCommitRetirementHandler(
-                                exactCluster,
-                                exactSourceRetirement),
-                        new GenerationZeroMarkerRetirementHandler(
-                                exactCluster,
-                                exactSourceRetirement),
-                        new HigherGenerationIndexRetirementHandler(
-                                exactCluster,
-                                exactGenerations)));
+        GcMetadataRetirementRegistry metadataRetirements = new GcMetadataRetirementRegistry(List.of(
+                new GenerationZeroIndexRetirementHandler(exactCluster, exactGenerations, exactSourceRetirement),
+                new GenerationZeroCommitRetirementHandler(exactCluster, exactSourceRetirement),
+                new GenerationZeroMarkerRetirementHandler(exactCluster, exactSourceRetirement),
+                new HigherGenerationIndexRetirementHandler(exactCluster, exactGenerations)));
         SourceRetirementCoordinator retirement = new SourceRetirementCoordinator(
                 exactCluster,
                 exactConfig,
@@ -365,22 +303,21 @@ public final class Phase4PhysicalGcRuntime
                 exactObjectStore,
                 exactClock,
                 exactScheduler);
-        ReferencedObjectGcExecutor referencedExecutor =
-                new ReferencedObjectGcExecutor(
-                        exactCluster,
-                        exactConfig,
-                        exactMaterializationConfig,
-                        exactPhysical,
-                        exactObjectProtection,
-                        preDrain,
-                        sourcePlans,
-                        registry,
-                        collector,
-                        retirement,
-                        journal,
-                        new SecureGcIdGenerator(),
-                        exactClock,
-                        exactScheduler);
+        ReferencedObjectGcExecutor referencedExecutor = new ReferencedObjectGcExecutor(
+                exactCluster,
+                exactConfig,
+                exactMaterializationConfig,
+                exactPhysical,
+                exactObjectProtection,
+                preDrain,
+                sourcePlans,
+                registry,
+                collector,
+                retirement,
+                journal,
+                new SecureGcIdGenerator(),
+                exactClock,
+                exactScheduler);
         this.objectInventoryScanner = new ObjectInventoryScanner(
                 exactCluster,
                 exactConfig,
@@ -390,12 +327,7 @@ public final class Phase4PhysicalGcRuntime
                 exactClock,
                 exactScheduler);
         this.cursorExecutor = new CursorSnapshotGcExecutor(
-                exactConfig,
-                cursorScanner,
-                registry,
-                collector,
-                retirement,
-                new SecureGcIdGenerator());
+                exactConfig, cursorScanner, registry, collector, retirement, new SecureGcIdGenerator());
         OwnerlessObjectGcExecutor ownerlessExecutor = new OwnerlessObjectGcExecutor(
                 exactCluster,
                 exactConfig,
@@ -414,31 +346,22 @@ public final class Phase4PhysicalGcRuntime
                 exactObjectStore,
                 exactClock,
                 exactScheduler);
-        StreamRegistrationRetirementCoordinator registrationRetirement =
-                new StreamRegistrationRetirementCoordinator(
-                        exactCluster,
-                        exactL0,
-                        exactGenerations,
-                        exactPhysical,
-                        new ManagedLedgerGenerationProjectionAuthorityReader(
-                                exactCluster, exactProjections),
-                        new ManagedLedgerStreamRetirementAuthorityReader(
-                                exactCluster,
-                                exactCursors,
-                                cursorReferenceDomainConfig),
-                        exactCheckpointCodec,
-                        exactConfig,
-                        exactMaterializationConfig.metadataAuditGrace(),
-                        exactClock,
-                        exactScheduler);
-        this.rootScanner = new PhysicalObjectRootScanner(
-                exactCluster, exactConfig, exactPhysical, exactScheduler);
-        this.registrationScanner = new StreamRegistrationRetirementScanner(
+        StreamRegistrationRetirementCoordinator registrationRetirement = new StreamRegistrationRetirementCoordinator(
                 exactCluster,
+                exactL0,
                 exactGenerations,
-                registrationRetirement,
+                exactPhysical,
+                new ManagedLedgerGenerationProjectionAuthorityReader(exactCluster, exactProjections),
+                new ManagedLedgerStreamRetirementAuthorityReader(
+                        exactCluster, exactCursors, cursorReferenceDomainConfig),
+                exactCheckpointCodec,
                 exactConfig,
+                exactMaterializationConfig.metadataAuditGrace(),
+                exactClock,
                 exactScheduler);
+        this.rootScanner = new PhysicalObjectRootScanner(exactCluster, exactConfig, exactPhysical, exactScheduler);
+        this.registrationScanner = new StreamRegistrationRetirementScanner(
+                exactCluster, exactGenerations, registrationRetirement, exactConfig, exactScheduler);
         PhysicalGcLifecyclePass lifecyclePass = new PhysicalGcLifecyclePass(
                 rootScanner,
                 () -> {
@@ -451,16 +374,12 @@ public final class Phase4PhysicalGcRuntime
                             ownerlessExecutor,
                             retirement,
                             tombstones,
-                            result -> referencedGcResults.put(
-                                    result.object(), result));
+                            result -> referencedGcResults.put(result.object(), result));
                 },
                 registrationScanner,
                 objectInventoryScanner);
         this.lifecycleService = new DefaultPhysicalGcLifecycleService(
-                lifecyclePass,
-                exactConfig,
-                exactScheduler,
-                exactCallbackExecutor);
+                lifecyclePass, exactConfig, exactScheduler, exactCallbackExecutor);
     }
 
     /**
@@ -485,8 +404,7 @@ public final class Phase4PhysicalGcRuntime
     public CompletableFuture<ManagedLedgerPhysicalDeletionActivationResult> activate(
             ManagedLedgerPhysicalDeletionActivationRequest request) {
         if (closed.get()) {
-            return CompletableFuture.failedFuture(
-                    new IllegalStateException("Phase 4 physical GC runtime is closed"));
+            return CompletableFuture.failedFuture(new IllegalStateException("Phase 4 physical GC runtime is closed"));
         }
         final ManagedLedgerPhysicalDeletionActivationRequest exact;
         try {
@@ -494,9 +412,9 @@ public final class Phase4PhysicalGcRuntime
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return deletionActivationCoordinator.activate(exact)
-                .thenCompose(result -> startMutatingLifecycleIfAuthorized(true)
-                        .thenApply(ignored -> result));
+        return deletionActivationCoordinator
+                .activate(exact)
+                .thenCompose(result -> startMutatingLifecycleIfAuthorized(true).thenApply(ignored -> result));
     }
 
     @Override
@@ -506,54 +424,46 @@ public final class Phase4PhysicalGcRuntime
             Duration timeout,
             VersionedGenerationProtocolActivation current) {
         if (closed.get()) {
-            return CompletableFuture.failedFuture(
-                    new IllegalStateException("Phase 4 physical GC runtime is closed"));
+            return CompletableFuture.failedFuture(new IllegalStateException("Phase 4 physical GC runtime is closed"));
         }
         final GenerationRegistrationBackfillCompletion exactRegistration;
         final Duration exactTimeout;
         final VersionedGenerationProtocolActivation exactCurrent;
         try {
-            exactRegistration = Objects.requireNonNull(
-                    registration, "registration");
+            exactRegistration = Objects.requireNonNull(registration, "registration");
             exactTimeout = Objects.requireNonNull(timeout, "timeout");
             exactCurrent = Objects.requireNonNull(current, "current");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
         return deletionActivationCoordinator
-                .rollover(
-                        exactRegistration,
-                        maxConcurrentStreams,
-                        exactTimeout,
-                        exactCurrent)
-                .thenCompose(installed -> startMutatingLifecycleIfAuthorized(true)
-                        .thenApply(ignored -> installed));
+                .rollover(exactRegistration, maxConcurrentStreams, exactTimeout, exactCurrent)
+                .thenCompose(
+                        installed -> startMutatingLifecycleIfAuthorized(true).thenApply(ignored -> installed));
     }
 
     public String expectedObjectStoreCapabilitySha256() {
         return startupGate.expectedCapabilitySha256();
     }
 
-    private CompletableFuture<Void> startMutatingLifecycleIfAuthorized(
-            boolean requireAuthorized) {
-        return startupGate.destructiveLifecycleAuthorized()
-                .thenCompose(authorized -> {
-                    if (!authorized) {
-                        return requireAuthorized
-                                ? CompletableFuture.failedFuture(new NereusException(
-                                        ErrorCode.METADATA_CONDITION_FAILED,
-                                        true,
-                                        "physical deletion activation was not durably visible before lifecycle start"))
-                                : CompletableFuture.completedFuture(null);
-                    }
-                    if (!config.mutationsAllowed()) {
-                        return CompletableFuture.failedFuture(new NereusException(
+    private CompletableFuture<Void> startMutatingLifecycleIfAuthorized(boolean requireAuthorized) {
+        return startupGate.destructiveLifecycleAuthorized().thenCompose(authorized -> {
+            if (!authorized) {
+                return requireAuthorized
+                        ? CompletableFuture.failedFuture(new NereusException(
                                 ErrorCode.METADATA_CONDITION_FAILED,
                                 true,
-                                "mutating physical-GC lifecycle is disabled by local configuration"));
-                    }
-                    return lifecycleService.start();
-                });
+                                "physical deletion activation was not durably visible before lifecycle start"))
+                        : CompletableFuture.completedFuture(null);
+            }
+            if (!config.mutationsAllowed()) {
+                return CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.METADATA_CONDITION_FAILED,
+                        true,
+                        "mutating physical-GC lifecycle is disabled by local configuration"));
+            }
+            return lifecycleService.start();
+        });
     }
 
     public CursorSnapshotGcExecutor cursorExecutor() {
@@ -577,9 +487,10 @@ public final class Phase4PhysicalGcRuntime
         return lifecycleService;
     }
 
-    /** Last completed or in-flight root-pass outcome for every referenced root visited in this process. */
-    public Map<ObjectKeyHash, ReferencedObjectGcExecutor.ExecutionResult>
-            referencedGcResults() {
+    /**
+     * Last completed or in-flight root-pass outcome for every referenced root visited in this process.
+     */
+    public Map<ObjectKeyHash, ReferencedObjectGcExecutor.ExecutionResult> referencedGcResults() {
         if (closed.get()) {
             throw new IllegalStateException("Phase 4 physical GC runtime is closed");
         }
@@ -598,8 +509,8 @@ public final class Phase4PhysicalGcRuntime
             closeOne(sourceRetirementMetadata, failures);
             closeOne(objectAuditRetirement, failures);
             if (!failures.isEmpty()) {
-                RuntimeException aggregate = new RuntimeException(
-                        "failed to close one or more Phase 4 physical-GC resources");
+                RuntimeException aggregate =
+                        new RuntimeException("failed to close one or more Phase 4 physical-GC resources");
                 failures.forEach(aggregate::addSuppressed);
                 throw aggregate;
             }

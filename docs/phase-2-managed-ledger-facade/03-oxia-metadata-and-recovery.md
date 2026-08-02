@@ -239,7 +239,8 @@ create and every update；otherwise a property mutation could enable a shadow/pr
 passing F2 admission。
 
 Every mutable-topic CAS compares `ManagedLedgerProjectionIdentity` as well as the Oxia version. A stale facade receives
-`ManagedLedgerProjectionIdentityMismatchException` containing expected/actual binding generation, incarnation, stream ID and
+`ManagedLedgerProjectionIdentityMismatchException` containing expected/actual binding generation, incarnation, stream ID
+and
 virtual ledger ID, and must close/fence locally; it never reloads a newer incarnation and
 retries its old property or lifecycle mutation against that new topic lifetime.
 
@@ -291,13 +292,13 @@ must exactly equal the authoritative topic record；property/state metadata-vers
 
 ### 3.5 Index ownership and cardinality
 
-| Data | Durable location | Cardinality / lifecycle |
-| --- | --- | --- |
-| Current topic/incarnation/virtual-ledger identity | one authoritative topic projection key | `O(current managed-ledger names)` |
-| Virtual-ledger and Position formula mirrors | two derived keys under each incarnation stream | `O(topic incarnations)`; old-incarnation cleanup is an F4 GC obligation, never an open-path alias mechanism |
-| Logical committed range to physical target | L0 Oxia offset index | `O(committed append ranges)` in F2; one Pulsar Entry per append is therefore approximately `O(entries)` until F4 publishes coalesced ranges and retires superseded keys |
-| Entry byte boundaries | immutable Object WAL/compacted-object entry index | one bounded item per stored Entry inside an object; object and entry-index limits bound each value |
-| Pulsar batch membership | exact opaque Pulsar Entry bytes plus bounded entry attributes | no Oxia key per message or batch index; all batch MessageIds share the Entry's stream offset |
+| Data                                              | Durable location                                              | Cardinality / lifecycle                                                                                                                                                 |
+|---------------------------------------------------|---------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Current topic/incarnation/virtual-ledger identity | one authoritative topic projection key                        | `O(current managed-ledger names)`                                                                                                                                       |
+| Virtual-ledger and Position formula mirrors       | two derived keys under each incarnation stream                | `O(topic incarnations)`; old-incarnation cleanup is an F4 GC obligation, never an open-path alias mechanism                                                             |
+| Logical committed range to physical target        | L0 Oxia offset index                                          | `O(committed append ranges)` in F2; one Pulsar Entry per append is therefore approximately `O(entries)` until F4 publishes coalesced ranges and retires superseded keys |
+| Entry byte boundaries                             | immutable Object WAL/compacted-object entry index             | one bounded item per stored Entry inside an object; object and entry-index limits bound each value                                                                      |
+| Pulsar batch membership                           | exact opaque Pulsar Entry bytes plus bounded entry attributes | no Oxia key per message or batch index; all batch MessageIds share the Entry's stream offset                                                                            |
 
 Higher-generation publication alone does not bound metadata count. F4 must define source-index tombstone/removal after
 reader/task/recovery references are gone; until then retaining the lower generation is a safe leak, not permission to
@@ -424,7 +425,8 @@ Topic properties live in the authoritative topic record. Updates:
 2. validate it exactly equals the caller's `ManagedLedgerProjectionIdentity`;
 3. apply a bounded canonical map update;
 4. CAS the same key by `metadataVersion`;
-5. retry conflicts until the operation deadline only while `ManagedLedgerProjectionIdentity` is unchanged; a newer incarnation fails
+5. retry conflicts until the operation deadline only while `ManagedLedgerProjectionIdentity` is unchanged; a newer
+   incarnation fails
    immediately.
 
 Facade state mirroring is similar, but L0 lifecycle is authoritative:

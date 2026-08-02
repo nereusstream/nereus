@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -19,7 +20,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-/** Complete 64-shard driver for proof-driven, registration-last stream retirement. */
+/**
+ * Complete 64-shard driver for proof-driven, registration-last stream retirement.
+ */
 public final class StreamRegistrationRetirementScanner implements AutoCloseable {
     private final String cluster;
     private final GenerationMetadataStore generations;
@@ -60,45 +63,34 @@ public final class StreamRegistrationRetirementScanner implements AutoCloseable 
 
     public CompletableFuture<StreamRegistrationRetirementScanResult> scan() {
         if (closed.get()) {
-            return CompletableFuture.failedFuture(closed(
-                    "registration-retirement scan rejected after close"));
+            return CompletableFuture.failedFuture(closed("registration-retirement scan rejected after close"));
         }
         if (!scanning.compareAndSet(false, true)) {
-            return CompletableFuture.failedFuture(new IllegalStateException(
-                    "a registration-retirement scan is already running"));
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("a registration-retirement scan is already running"));
         }
         if (closed.get()) {
             scanning.set(false);
-            return CompletableFuture.failedFuture(closed(
-                    "registration-retirement scan raced close"));
+            return CompletableFuture.failedFuture(closed("registration-retirement scan raced close"));
         }
         Counts counts = new Counts();
-        CompletableFuture<StreamRegistrationRetirementScanResult> result =
-                scanShard(0, counts);
+        CompletableFuture<StreamRegistrationRetirementScanResult> result = scanShard(0, counts);
         result.whenComplete((ignored, failure) -> scanning.set(false));
         return result;
     }
 
-    private CompletableFuture<StreamRegistrationRetirementScanResult> scanShard(
-            int shard, Counts counts) {
+    private CompletableFuture<StreamRegistrationRetirementScanResult> scanShard(int shard, Counts counts) {
         if (shard == F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS) {
             return CompletableFuture.completedFuture(counts.result(shard));
         }
-        return scanPage(shard, Optional.empty(), null, counts).thenCompose(ignored ->
-                scanShard(shard + 1, counts));
+        return scanPage(shard, Optional.empty(), null, counts).thenCompose(ignored -> scanShard(shard + 1, counts));
     }
 
     private CompletableFuture<Void> scanPage(
-            int shard,
-            Optional<F4ScanToken> continuation,
-            String previousKey,
-            Counts counts) {
+            int shard, Optional<F4ScanToken> continuation, String previousKey, Counts counts) {
         return bound(
                         () -> generations.scanStreamRegistrations(
-                                cluster,
-                                shard,
-                                continuation,
-                                config.metadataScanPageSize()),
+                                cluster, shard, continuation, config.metadataScanPageSize()),
                         "scan stream-registration retirement shard " + shard)
                 .thenCompose(page -> {
                     requireProgress(page, previousKey);
@@ -106,44 +98,31 @@ public final class StreamRegistrationRetirementScanner implements AutoCloseable 
                         if (page.continuation().isEmpty()) {
                             return CompletableFuture.completedFuture(null);
                         }
-                        String lastKey = page.values()
-                                .get(page.values().size() - 1)
-                                .key();
-                        return scanPage(
-                                shard,
-                                page.continuation(),
-                                lastKey,
-                                counts);
+                        String lastKey =
+                                page.values().get(page.values().size() - 1).key();
+                        return scanPage(shard, page.continuation(), lastKey, counts);
                     });
                 });
     }
 
-    private CompletableFuture<Void> visitPage(
-            int shard,
-            StreamRegistrationScanPage page,
-            int index,
-            Counts counts) {
+    private CompletableFuture<Void> visitPage(int shard, StreamRegistrationScanPage page, int index, Counts counts) {
         if (index == page.values().size()) {
             return CompletableFuture.completedFuture(null);
         }
         VersionedMaterializationStreamRegistration registration = page.values().get(index);
         StreamId stream = requireExactRegistration(shard, registration);
         counts.scanned = Math.addExact(counts.scanned, 1);
-        return bound(
-                        () -> retire.apply(stream),
-                        "retire deleted stream registration " + stream.value())
+        return bound(() -> retire.apply(stream), "retire deleted stream registration " + stream.value())
                 .thenAccept(result -> {
                     if (!result.streamId().equals(stream)) {
-                        throw invariant(
-                                "registration-retirement coordinator returned another stream");
+                        throw invariant("registration-retirement coordinator returned another stream");
                     }
                     counts.add(result.status());
                 })
                 .thenCompose(ignored -> visitPage(shard, page, index + 1, counts));
     }
 
-    private StreamId requireExactRegistration(
-            int shard, VersionedMaterializationStreamRegistration registration) {
+    private StreamId requireExactRegistration(int shard, VersionedMaterializationStreamRegistration registration) {
         StreamId stream = new StreamId(registration.value().streamId());
         if (keys.materializationRegistryShard(stream) != shard
                 || !registration.key().equals(keys.materializationRegistryKey(stream))) {
@@ -152,17 +131,14 @@ public final class StreamRegistrationRetirementScanner implements AutoCloseable 
         return stream;
     }
 
-    private <T> CompletableFuture<T> bound(
-            Supplier<CompletableFuture<T>> operation, String stage) {
-        MaterializationDeadline deadline = new MaterializationDeadline(
-                config.operationTimeout(), scheduler);
+    private <T> CompletableFuture<T> bound(Supplier<CompletableFuture<T>> operation, String stage) {
+        MaterializationDeadline deadline = new MaterializationDeadline(config.operationTimeout(), scheduler);
         CompletableFuture<T> result = deadline.bound(operation, stage);
         result.whenComplete((ignored, failure) -> deadline.close());
         return result;
     }
 
-    private static void requireProgress(
-            StreamRegistrationScanPage page, String previousKey) {
+    private static void requireProgress(StreamRegistrationScanPage page, String previousKey) {
         if (previousKey != null
                 && !page.values().isEmpty()
                 && page.values().get(0).key().compareTo(previousKey) <= 0) {
@@ -188,8 +164,7 @@ public final class StreamRegistrationRetirementScanner implements AutoCloseable 
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static final class Counts {
@@ -198,20 +173,17 @@ public final class StreamRegistrationRetirementScanner implements AutoCloseable 
         private long scanned;
 
         private Counts() {
-            for (StreamRegistrationRetirementStatus status :
-                    StreamRegistrationRetirementStatus.values()) {
+            for (StreamRegistrationRetirementStatus status : StreamRegistrationRetirementStatus.values()) {
                 statuses.put(status, 0L);
             }
         }
 
         private void add(StreamRegistrationRetirementStatus status) {
-            statuses.compute(Objects.requireNonNull(status, "status"),
-                    (ignored, count) -> Math.addExact(count, 1));
+            statuses.compute(Objects.requireNonNull(status, "status"), (ignored, count) -> Math.addExact(count, 1));
         }
 
         private StreamRegistrationRetirementScanResult result(int shards) {
-            return new StreamRegistrationRetirementScanResult(
-                    shards, scanned, statuses);
+            return new StreamRegistrationRetirementScanResult(shards, scanned, statuses);
         }
     }
 }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
 import com.nereusstream.api.StorageProfile;
@@ -13,7 +14,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** Immutable local broker facts and timing used to publish one epoch-scoped capability. */
+/**
+ * Immutable local broker facts and timing used to publish one epoch-scoped capability.
+ */
 public final class KafkaBrokerCapabilitySpecification {
     private final String kafkaClusterId;
     private final KafkaBrokerIdentity identity;
@@ -51,8 +54,7 @@ public final class KafkaBrokerCapabilitySpecification {
         this.javaVersion = nonblank(javaVersion, "javaVersion");
         this.supportedStorageProfiles = canonicalProfiles(supportedStorageProfiles);
         StorageProfile exactDefault = Objects.requireNonNull(defaultStorageProfile, "defaultStorageProfile");
-        if (exactDefault.canonical() != exactDefault
-                || !this.supportedStorageProfiles.contains(exactDefault.name())) {
+        if (exactDefault.canonical() != exactDefault || !this.supportedStorageProfiles.contains(exactDefault.name())) {
             throw new IllegalArgumentException("defaultStorageProfile must be canonical and supported");
         }
         this.defaultStorageProfile = exactDefault.name();
@@ -79,16 +81,13 @@ public final class KafkaBrokerCapabilitySpecification {
         return record(nowMillis, nowMillis, addExact(nowMillis, expiry.toMillis()));
     }
 
-    public KafkaBrokerCapabilityRecord heartbeatRecord(
-            KafkaBrokerCapabilityRecord current, long nowMillis) {
+    public KafkaBrokerCapabilityRecord heartbeatRecord(KafkaBrokerCapabilityRecord current, long nowMillis) {
         KafkaBrokerCapabilityRecord exact = Objects.requireNonNull(current, "current");
         if (!matchesImmutableFacts(exact)) {
             throw new IllegalArgumentException("stored capability does not match local immutable facts");
         }
         long heartbeat = Math.max(nowMillis, addExact(exact.heartbeatAtMillis(), 1));
-        long expires = Math.max(
-                addExact(heartbeat, expiry.toMillis()),
-                addExact(exact.expiresAtMillis(), 1));
+        long expires = Math.max(addExact(heartbeat, expiry.toMillis()), addExact(exact.expiresAtMillis(), 1));
         return record(exact.startedAtMillis(), heartbeat, expires);
     }
 
@@ -137,12 +136,29 @@ public final class KafkaBrokerCapabilitySpecification {
                 0);
     }
 
-    public String kafkaClusterId() { return kafkaClusterId; }
-    public KafkaBrokerIdentity identity() { return identity; }
-    public List<String> supportedStorageProfiles() { return supportedStorageProfiles; }
-    public String defaultStorageProfile() { return defaultStorageProfile; }
-    public byte[] providerScopeSha256() { return providerScopeSha256.clone(); }
-    public Duration heartbeatInterval() { return heartbeatInterval; }
+    public String kafkaClusterId() {
+        return kafkaClusterId;
+    }
+
+    public KafkaBrokerIdentity identity() {
+        return identity;
+    }
+
+    public List<String> supportedStorageProfiles() {
+        return supportedStorageProfiles;
+    }
+
+    public String defaultStorageProfile() {
+        return defaultStorageProfile;
+    }
+
+    public byte[] providerScopeSha256() {
+        return providerScopeSha256.clone();
+    }
+
+    public Duration heartbeatInterval() {
+        return heartbeatInterval;
+    }
 
     private static List<String> canonicalProfiles(Set<StorageProfile> supplied) {
         Set<StorageProfile> exact = Set.copyOf(Objects.requireNonNull(supplied, "supportedStorageProfiles"));
@@ -159,13 +175,17 @@ public final class KafkaBrokerCapabilitySpecification {
 
     private static String nonblank(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " must be nonblank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " must be nonblank");
+        }
         return value;
     }
 
     private static byte[] sha256(byte[] supplied, String name) {
         byte[] exact = Objects.requireNonNull(supplied, name).clone();
-        if (exact.length != 32) throw new IllegalArgumentException(name + " must contain 32 bytes");
+        if (exact.length != 32) {
+            throw new IllegalArgumentException(name + " must contain 32 bytes");
+        }
         return exact;
     }
 

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.callbacks;
 
 import com.nereusstream.api.ErrorCode;
@@ -11,7 +12,9 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-/** Executes terminal callbacks in admission order even when operation futures finish out of order. */
+/**
+ * Executes terminal callbacks in admission order even when operation futures finish out of order.
+ */
 public final class SerialCallbackLane implements AutoCloseable {
     private final Executor executor;
     private final int maxPending;
@@ -40,8 +43,7 @@ public final class SerialCallbackLane implements AutoCloseable {
                     ErrorCode.BACKPRESSURE_REJECTED, true, "callback lane pending bound is exhausted");
         }
         if (nextAdmission == Long.MAX_VALUE) {
-            throw new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION, false, "callback sequence exhausted");
+            throw new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, "callback sequence exhausted");
         }
         long sequence = nextAdmission++;
         admitted.add(sequence);

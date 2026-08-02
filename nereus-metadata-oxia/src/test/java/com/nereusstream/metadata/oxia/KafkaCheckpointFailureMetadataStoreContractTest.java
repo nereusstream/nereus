@@ -1,70 +1,63 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureRecord;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
-
 import org.junit.jupiter.api.Test;
 
 class KafkaCheckpointFailureMetadataStoreContractTest {
     @Test
     void immutableCreateIsIdempotentAcrossConcurrentFailureClassifications() {
-        OxiaJavaKafkaCheckpointFailureMetadataStore store =
-                store(new InMemoryPartitionedOxiaBackend());
+        OxiaJavaKafkaCheckpointFailureMetadataStore store = store(new InMemoryPartitionedOxiaBackend());
         KafkaCheckpointFailureRecord first = failure(1, 2);
-        KafkaCheckpointFailureRecord raced =
-                new KafkaCheckpointFailureRecord(
-                        1,
-                        first.kafkaClusterId(),
-                        first.topicId(),
-                        first.partitionId(),
-                        first.partitionIncarnation(),
-                        first.objectId(),
-                        first.referenceSha256(),
-                        KafkaCheckpointFailureSource.RETENTION.wireId(),
-                        "UNSUPPORTED_FORMAT",
-                        bytes(3),
-                        first.quarantinedAtMillis() + 1,
-                        0);
+        KafkaCheckpointFailureRecord raced = new KafkaCheckpointFailureRecord(
+                1,
+                first.kafkaClusterId(),
+                first.topicId(),
+                first.partitionId(),
+                first.partitionIncarnation(),
+                first.objectId(),
+                first.referenceSha256(),
+                KafkaCheckpointFailureSource.RETENTION.wireId(),
+                "UNSUPPORTED_FORMAT",
+                bytes(3),
+                first.quarantinedAtMillis() + 1,
+                0);
 
         VersionedKafkaCheckpointFailure created = store.putIfAbsent(first).join();
         VersionedKafkaCheckpointFailure recovered = store.putIfAbsent(raced).join();
 
         assertThat(recovered).isEqualTo(created);
-        assertThat(
-                        store.get(first.identity(), first.partitionIncarnation(), first.objectId())
-                                .join())
+        assertThat(store.get(first.identity(), first.partitionIncarnation(), first.objectId())
+                        .join())
                 .contains(created);
         assertThat(created.value().source()).isEqualTo(KafkaCheckpointFailureSource.RECOVERY);
     }
 
     @Test
     void sameKeyCannotAliasAnotherExactReference() {
-        OxiaJavaKafkaCheckpointFailureMetadataStore store =
-                store(new InMemoryPartitionedOxiaBackend());
+        OxiaJavaKafkaCheckpointFailureMetadataStore store = store(new InMemoryPartitionedOxiaBackend());
         KafkaCheckpointFailureRecord first = failure(1, 2);
         store.putIfAbsent(first).join();
-        KafkaCheckpointFailureRecord conflict =
-                new KafkaCheckpointFailureRecord(
-                        first.formatVersion(),
-                        first.kafkaClusterId(),
-                        first.topicId(),
-                        first.partitionId(),
-                        first.partitionIncarnation(),
-                        first.objectId(),
-                        bytes(9),
-                        first.sourceId(),
-                        first.failureCode(),
-                        first.failureSha256(),
-                        first.quarantinedAtMillis(),
-                        0);
+        KafkaCheckpointFailureRecord conflict = new KafkaCheckpointFailureRecord(
+                first.formatVersion(),
+                first.kafkaClusterId(),
+                first.topicId(),
+                first.partitionId(),
+                first.partitionIncarnation(),
+                first.objectId(),
+                bytes(9),
+                first.sourceId(),
+                first.failureCode(),
+                first.failureSha256(),
+                first.quarantinedAtMillis(),
+                0);
 
         assertThatThrownBy(() -> store.putIfAbsent(conflict).join())
-                .hasRootCauseMessage(
-                        "existing Kafka checkpoint quarantine conflicts with exact reference");
+                .hasRootCauseMessage("existing Kafka checkpoint quarantine conflicts with exact reference");
     }
 
     @Test
@@ -80,8 +73,7 @@ class KafkaCheckpointFailureMetadataStoreContractTest {
         assertThat(recovered.value().withMetadataVersion(0)).isEqualTo(requested);
     }
 
-    private static OxiaJavaKafkaCheckpointFailureMetadataStore store(
-            PartitionedOxiaClient.Backend backend) {
+    private static OxiaJavaKafkaCheckpointFailureMetadataStore store(PartitionedOxiaClient.Backend backend) {
         return new OxiaJavaKafkaCheckpointFailureMetadataStore(
                 new PartitionedOxiaClient(backend), new KafkaPartitionKeyspace("nereus", "kraft"));
     }

@@ -20,7 +20,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 
-/** Owned Kafka Fetch bytes plus logical and virtual-position facts required by the fork. */
+/**
+ * Owned Kafka Fetch bytes plus logical and virtual-position facts required by the fork.
+ */
 public final class KafkaFetchAssembly {
     private final byte[] encodedRecords;
     private final OptionalLong actualFirstBatchBaseOffset;
@@ -40,9 +42,10 @@ public final class KafkaFetchAssembly {
             long virtualSegmentBaseOffset,
             long relativeLogicalBytePosition,
             List<KafkaAbortedTransaction> abortedTransactions) {
-        this.encodedRecords = Objects.requireNonNull(encodedRecords, "encodedRecords").clone();
-        this.actualFirstBatchBaseOffset = Objects.requireNonNull(
-                actualFirstBatchBaseOffset, "actualFirstBatchBaseOffset");
+        this.encodedRecords =
+                Objects.requireNonNull(encodedRecords, "encodedRecords").clone();
+        this.actualFirstBatchBaseOffset =
+                Objects.requireNonNull(actualFirstBatchBaseOffset, "actualFirstBatchBaseOffset");
         this.nextLogicalOffset = nextLogicalOffset;
         this.sourceCoverageEndOffset = sourceCoverageEndOffset;
         this.firstEntryOverflow = firstEntryOverflow;
@@ -55,7 +58,9 @@ public final class KafkaFetchAssembly {
         return encodedRecords.clone();
     }
 
-    /** Returns a new read-only Kafka MemoryRecords-compatible buffer on every call. */
+    /**
+     * Returns a new read-only Kafka MemoryRecords-compatible buffer on every call.
+     */
     public ByteBuffer recordsBuffer() {
         return ByteBuffer.wrap(encodedRecords).asReadOnlyBuffer();
     }
@@ -94,15 +99,16 @@ public final class KafkaFetchAssembly {
 
     @Override
     public boolean equals(Object other) {
-        return this == other || other instanceof KafkaFetchAssembly that
-                && nextLogicalOffset == that.nextLogicalOffset
-                && sourceCoverageEndOffset == that.sourceCoverageEndOffset
-                && firstEntryOverflow == that.firstEntryOverflow
-                && virtualSegmentBaseOffset == that.virtualSegmentBaseOffset
-                && relativeLogicalBytePosition == that.relativeLogicalBytePosition
-                && Arrays.equals(encodedRecords, that.encodedRecords)
-                && actualFirstBatchBaseOffset.equals(that.actualFirstBatchBaseOffset)
-                && abortedTransactions.equals(that.abortedTransactions);
+        return this == other
+                || other instanceof KafkaFetchAssembly that
+                        && nextLogicalOffset == that.nextLogicalOffset
+                        && sourceCoverageEndOffset == that.sourceCoverageEndOffset
+                        && firstEntryOverflow == that.firstEntryOverflow
+                        && virtualSegmentBaseOffset == that.virtualSegmentBaseOffset
+                        && relativeLogicalBytePosition == that.relativeLogicalBytePosition
+                        && Arrays.equals(encodedRecords, that.encodedRecords)
+                        && actualFirstBatchBaseOffset.equals(that.actualFirstBatchBaseOffset)
+                        && abortedTransactions.equals(that.abortedTransactions);
     }
 
     @Override

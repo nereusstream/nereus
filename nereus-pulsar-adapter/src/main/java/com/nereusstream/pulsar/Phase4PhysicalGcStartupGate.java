@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import com.nereusstream.api.ErrorCode;
@@ -31,8 +32,7 @@ final class Phase4PhysicalGcStartupGate {
         this.cluster = new OxiaKeyspace(cluster).cluster();
         this.activations = Objects.requireNonNull(activations, "activations");
         this.requiredDomains = canonicalDomains(requiredDomains);
-        this.expectedCapabilitySha256 = requireSha256(
-                expectedCapabilitySha256, "expectedCapabilitySha256");
+        this.expectedCapabilitySha256 = requireSha256(expectedCapabilitySha256, "expectedCapabilitySha256");
     }
 
     String expectedCapabilitySha256() {
@@ -48,53 +48,41 @@ final class Phase4PhysicalGcStartupGate {
             if (optional.isEmpty()) {
                 return false;
             }
-            GenerationProtocolActivationRecord activation = optional.orElseThrow().value();
-            if (!activation.physicalDeleteEnabled()
-                    && !activation.cursorSnapshotDeleteEnabled()) {
+            GenerationProtocolActivationRecord activation =
+                    optional.orElseThrow().value();
+            if (!activation.physicalDeleteEnabled() && !activation.cursorSnapshotDeleteEnabled()) {
                 return false;
             }
-            if (activation.lifecycle()
-                            != GenerationProtocolActivationLifecycle.ACTIVE
+            if (activation.lifecycle() != GenerationProtocolActivationLifecycle.ACTIVE
                     || !activation.publicationEnabled()
                     || !activation.physicalDeleteEnabled()
                     || !activation.cursorSnapshotDeleteEnabled()
                     || !activation.streamRegistrationBackfill().complete()
                     || !activation.physicalRootBackfill().complete()
                     || !activation.cursorSnapshotBackfill().complete()) {
-                throw invariant(
-                        "durable physical-deletion authority is internally incomplete");
+                throw invariant("durable physical-deletion authority is internally incomplete");
             }
             if (!activation.requiredReferenceDomains().equals(requiredDomains)) {
-                throw invariant(
-                        "durable physical-deletion domain set differs from the local runtime");
+                throw invariant("durable physical-deletion domain set differs from the local runtime");
             }
-            if (!activation.objectStoreCapabilitySha256()
-                    .equals(expectedCapabilitySha256)) {
-                throw invariant(
-                        "durable physical-deletion authority belongs to another configured object-store scope");
+            if (!activation.objectStoreCapabilitySha256().equals(expectedCapabilitySha256)) {
+                throw invariant("durable physical-deletion authority belongs to another configured object-store scope");
             }
             return true;
         });
     }
 
-    private static List<ReferenceDomainVersionRecord> canonicalDomains(
-            List<ReferenceDomainVersionRecord> supplied) {
-        List<ReferenceDomainVersionRecord> domains = Objects.requireNonNull(
-                        supplied, "requiredDomains")
-                .stream()
+    private static List<ReferenceDomainVersionRecord> canonicalDomains(List<ReferenceDomainVersionRecord> supplied) {
+        List<ReferenceDomainVersionRecord> domains = Objects.requireNonNull(supplied, "requiredDomains").stream()
                 .sorted(Comparator.naturalOrder())
                 .toList();
-        if (domains.isEmpty()
-                || domains.size()
-                        > GenerationProtocolActivationRecord.MAX_REFERENCE_DOMAINS) {
-            throw new IllegalArgumentException(
-                    "requiredDomains must be non-empty and bounded");
+        if (domains.isEmpty() || domains.size() > GenerationProtocolActivationRecord.MAX_REFERENCE_DOMAINS) {
+            throw new IllegalArgumentException("requiredDomains must be non-empty and bounded");
         }
         HashSet<String> ids = new HashSet<>();
         for (ReferenceDomainVersionRecord domain : domains) {
             if (!ids.add(domain.domainId())) {
-                throw new IllegalArgumentException(
-                        "requiredDomains must use unique domain ids");
+                throw new IllegalArgumentException("requiredDomains must use unique domain ids");
             }
         }
         return domains;
@@ -103,22 +91,18 @@ final class Phase4PhysicalGcStartupGate {
     private static String requireSha256(String value, String field) {
         Objects.requireNonNull(value, field);
         if (value.length() != 64) {
-            throw new IllegalArgumentException(
-                    field + " must be lowercase SHA-256");
+            throw new IllegalArgumentException(field + " must be lowercase SHA-256");
         }
         for (int index = 0; index < value.length(); index++) {
             char character = value.charAt(index);
-            if (!((character >= '0' && character <= '9')
-                    || (character >= 'a' && character <= 'f'))) {
-                throw new IllegalArgumentException(
-                        field + " must be lowercase SHA-256");
+            if (!((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f'))) {
+                throw new IllegalArgumentException(field + " must be lowercase SHA-256");
             }
         }
         return value;
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 }

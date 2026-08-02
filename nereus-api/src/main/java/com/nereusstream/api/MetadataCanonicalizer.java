@@ -23,20 +23,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Canonical ordering and size helpers for API metadata copied into durable records. */
+/**
+ * Canonical ordering and size helpers for API metadata copied into durable records.
+ */
 public final class MetadataCanonicalizer {
-    private static final Comparator<SchemaRef> SCHEMA_REF_COMPARATOR =
-            Comparator.comparing(SchemaRef::namespace, MetadataCanonicalizer::compareUtf8)
-                    .thenComparing(SchemaRef::id, MetadataCanonicalizer::compareUtf8)
-                    .thenComparingLong(SchemaRef::version);
+    private static final Comparator<SchemaRef> SCHEMA_REF_COMPARATOR = Comparator.comparing(
+                    SchemaRef::namespace, MetadataCanonicalizer::compareUtf8)
+            .thenComparing(SchemaRef::id, MetadataCanonicalizer::compareUtf8)
+            .thenComparingLong(SchemaRef::version);
 
-    private MetadataCanonicalizer() {
-    }
+    private MetadataCanonicalizer() {}
 
     public static Map<String, String> canonicalStringMap(
-            Map<String, String> value,
-            int maxEncodedBytes,
-            String fieldName) {
+            Map<String, String> value, int maxEncodedBytes, String fieldName) {
         Objects.requireNonNull(value, fieldName);
         requirePositiveLimit(maxEncodedBytes, fieldName);
 
@@ -73,8 +72,8 @@ public final class MetadataCanonicalizer {
         }
         int encodedBytes = encodedSchemaRefsBytes(sorted);
         if (encodedBytes > ApiLimits.MAX_SCHEMA_REFS_ENCODED_BYTES) {
-            throw new IllegalArgumentException("schemaRefs encoded size exceeds "
-                    + ApiLimits.MAX_SCHEMA_REFS_ENCODED_BYTES + " bytes");
+            throw new IllegalArgumentException(
+                    "schemaRefs encoded size exceeds " + ApiLimits.MAX_SCHEMA_REFS_ENCODED_BYTES + " bytes");
         }
         return List.copyOf(sorted);
     }
@@ -95,9 +94,7 @@ public final class MetadataCanonicalizer {
     }
 
     private static int encodedStringMapBytes(
-            List<Map.Entry<String, String>> entries,
-            int maxEncodedBytes,
-            String fieldName) {
+            List<Map.Entry<String, String>> entries, int maxEncodedBytes, String fieldName) {
         long encodedBytes = 0;
         for (Map.Entry<String, String> entry : entries) {
             String key = Objects.requireNonNull(entry.getKey(), fieldName + " contains null key");
@@ -105,8 +102,7 @@ public final class MetadataCanonicalizer {
             encodedBytes += Integer.BYTES + utf8Length(key);
             encodedBytes += Integer.BYTES + utf8Length(value);
             if (encodedBytes > maxEncodedBytes) {
-                throw new IllegalArgumentException(fieldName + " encoded size exceeds "
-                        + maxEncodedBytes + " bytes");
+                throw new IllegalArgumentException(fieldName + " encoded size exceeds " + maxEncodedBytes + " bytes");
             }
         }
         return (int) encodedBytes;

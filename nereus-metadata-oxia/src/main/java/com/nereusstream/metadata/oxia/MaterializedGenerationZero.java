@@ -1,15 +1,15 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
 import java.util.Objects;
 
-/** Exact durable generation-zero index identity produced for one reachable append. */
+/**
+ * Exact durable generation-zero index identity produced for one reachable append.
+ */
 public record MaterializedGenerationZero(
-        CommittedAppend committedAppend,
-        String indexKey,
-        long indexMetadataVersion,
-        Checksum indexRecordSha256) {
+        CommittedAppend committedAppend, String indexKey, long indexMetadataVersion, Checksum indexRecordSha256) {
     public MaterializedGenerationZero {
         Objects.requireNonNull(committedAppend, "committedAppend");
         indexKey = F4ValueValidation.text(indexKey, "indexKey");

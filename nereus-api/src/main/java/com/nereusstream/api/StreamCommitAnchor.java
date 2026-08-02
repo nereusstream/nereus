@@ -1,16 +1,15 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.api;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** Exact append-only commit-chain position used as the descendant of a reachability proof. */
+/**
+ * Exact append-only commit-chain position used as the descendant of a reachability proof.
+ */
 public record StreamCommitAnchor(
-        StreamId streamId,
-        String lastCommitId,
-        long committedEndOffset,
-        long cumulativeSize,
-        long commitVersion) {
+        StreamId streamId, String lastCommitId, long committedEndOffset, long cumulativeSize, long commitVersion) {
     public StreamCommitAnchor {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(lastCommitId, "lastCommitId");

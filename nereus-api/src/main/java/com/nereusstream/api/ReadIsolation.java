@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Read isolation level. */
+/**
+ * Read isolation level.
+ */
 public enum ReadIsolation {
     COMMITTED
 }

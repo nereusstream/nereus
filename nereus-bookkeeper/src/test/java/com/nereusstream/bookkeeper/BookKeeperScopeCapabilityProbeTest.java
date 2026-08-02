@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -35,8 +35,7 @@ final class BookKeeperScopeCapabilityProbeTest {
     private static final String CLUSTER = "cluster-a";
     private static final String DEPLOYMENT = "deployment-a";
     private static final byte[] PASSWORD = "bookkeeper-secret".getBytes(StandardCharsets.UTF_8);
-    private static final Clock CLOCK = Clock.fixed(
-            Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
+    private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
 
     @Test
     void provesRealCreateWriteReadFenceDeleteAndDualAbsence() {
@@ -44,22 +43,19 @@ final class BookKeeperScopeCapabilityProbeTest {
         BookKeeperLedgerIdNamespaceReservation namespace = namespace(configuration);
         FakeOperations operations = new FakeOperations();
         try (FakeBookKeeperMetadataStore metadata = metadata(configuration)) {
-            BookKeeperScopeCapabilityProbe probe = probe(
-                    configuration, namespace, metadata, operations);
+            BookKeeperScopeCapabilityProbe probe = probe(configuration, namespace, metadata, operations);
 
             BookKeeperScopeCapabilityProof proof = probe.probe(request()).join();
 
             assertThat(proof.canaryLedgerId()).isPositive();
-            assertThat(configuration.ledgerIdNamespace().contains(proof.canaryLedgerId())).isTrue();
+            assertThat(configuration.ledgerIdNamespace().contains(proof.canaryLedgerId()))
+                    .isTrue();
             assertThat(operations.createCalls).hasValue(1);
             assertThat(operations.writeCalls).hasValue(1);
             assertThat(operations.recoveryOpenCalls).hasValue(1);
             assertThat(operations.deleteCalls).hasValue(1);
             assertThat(operations.ledgers).isEmpty();
-            assertThat(metadata.getRoot(
-                                    CLUSTER,
-                                    configuration.providerScopeSha256(),
-                                    proof.canaryLedgerId())
+            assertThat(metadata.getRoot(CLUSTER, configuration.providerScopeSha256(), proof.canaryLedgerId())
                             .join())
                     .get()
                     .extracting(value -> value.value().lifecycle())
@@ -75,8 +71,7 @@ final class BookKeeperScopeCapabilityProbeTest {
         operations.loseFirstCreateResponse = true;
         operations.loseFirstDeleteResponse = true;
         try (FakeBookKeeperMetadataStore metadata = metadata(configuration)) {
-            BookKeeperScopeCapabilityProof proof = probe(
-                            configuration, namespace, metadata, operations)
+            BookKeeperScopeCapabilityProof proof = probe(configuration, namespace, metadata, operations)
                     .probe(request())
                     .join();
 
@@ -93,11 +88,9 @@ final class BookKeeperScopeCapabilityProbeTest {
             BookKeeperLedgerIdNamespaceReservation namespace,
             FakeBookKeeperMetadataStore metadata,
             FakeOperations operations) {
-        BookKeeperLedgerIdNamespaceReservationVerifier verifier =
-                new BookKeeperLedgerIdNamespaceReservationVerifier(
-                        (scope, bits, prefix, timeout) ->
-                                CompletableFuture.completedFuture(Optional.of(namespace)),
-                        DEPLOYMENT);
+        BookKeeperLedgerIdNamespaceReservationVerifier verifier = new BookKeeperLedgerIdNamespaceReservationVerifier(
+                (scope, bits, prefix, timeout) -> CompletableFuture.completedFuture(Optional.of(namespace)),
+                DEPLOYMENT);
         return new BookKeeperScopeCapabilityProbe(
                 CLUSTER,
                 configuration,
@@ -113,15 +106,11 @@ final class BookKeeperScopeCapabilityProbeTest {
     private static BookKeeperScopeCapabilityRequest request() {
         return new BookKeeperScopeCapabilityRequest(
                 "scope_run_0001",
-                new BookKeeperBrokerReadiness(
-                        7,
-                        new Checksum(ChecksumType.SHA256, "88".repeat(32)),
-                        2),
+                new BookKeeperBrokerReadiness(7, new Checksum(ChecksumType.SHA256, "88".repeat(32)), 2),
                 Duration.ofSeconds(10));
     }
 
-    private static BookKeeperLedgerIdNamespaceReservation namespace(
-            BookKeeperWalConfiguration configuration) {
+    private static BookKeeperLedgerIdNamespaceReservation namespace(BookKeeperWalConfiguration configuration) {
         return new BookKeeperLedgerIdNamespaceReservation(
                 1,
                 configuration.ledgerIdNamespaceReservationId(),
@@ -140,8 +129,7 @@ final class BookKeeperScopeCapabilityProbeTest {
                 "/bookkeeper/scope-probe-reservation");
     }
 
-    private static FakeBookKeeperMetadataStore metadata(
-            BookKeeperWalConfiguration configuration) {
+    private static FakeBookKeeperMetadataStore metadata(BookKeeperWalConfiguration configuration) {
         return new FakeBookKeeperMetadataStore(new BookKeeperMetadataStoreConfig(
                 configuration.maxAppendRangesPerLedger(),
                 configuration.protectionSlotsPerRange(),
@@ -168,15 +156,13 @@ final class BookKeeperScopeCapabilityProbeTest {
             createCalls.incrementAndGet();
             LedgerState state = new LedgerState(configuration, customMetadata);
             if (ledgers.putIfAbsent(ledgerId, state) != null) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.PRIMARY_WAL_WRITE_FAILED, false, "ledger exists"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.PRIMARY_WAL_WRITE_FAILED, false, "ledger exists"));
             }
             if (loseFirstCreateResponse) {
                 loseFirstCreateResponse = false;
                 return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.PRIMARY_WAL_WRITE_FAILED,
-                        true,
-                        "injected applied create response loss"));
+                        ErrorCode.PRIMARY_WAL_WRITE_FAILED, true, "injected applied create response loss"));
             }
             return CompletableFuture.completedFuture(writeHandle(ledgerId, state));
         }
@@ -201,10 +187,7 @@ final class BookKeeperScopeCapabilityProbeTest {
 
         @Override
         public CompletableFuture<Long> write(
-                WriteAdvHandle handle,
-                long entryId,
-                ByteBuf entry,
-                BookKeeperOperationDeadline deadline) {
+                WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
             LedgerState state = ledgers.get(handle.getId());
             if (state == null) {
                 return absent();
@@ -218,53 +201,39 @@ final class BookKeeperScopeCapabilityProbeTest {
 
         @Override
         public CompletableFuture<LedgerEntries> readUnconfirmed(
-                ReadHandle handle,
-                long firstEntryId,
-                long lastEntryIdInclusive,
-                BookKeeperOperationDeadline deadline) {
+                ReadHandle handle, long firstEntryId, long lastEntryIdInclusive, BookKeeperOperationDeadline deadline) {
             LedgerState state = ledgers.get(handle.getId());
             if (state == null) {
                 return absent();
             }
-            List<LedgerEntry> values = state.entries
-                    .subMap(firstEntryId, true, lastEntryIdInclusive, true)
-                    .entrySet()
-                    .stream()
-                    .map(entry -> ledgerEntry(
-                            handle.getId(), entry.getKey(), entry.getValue()))
-                    .toList();
+            List<LedgerEntry> values =
+                    state.entries.subMap(firstEntryId, true, lastEntryIdInclusive, true).entrySet().stream()
+                            .map(entry -> ledgerEntry(handle.getId(), entry.getKey(), entry.getValue()))
+                            .toList();
             return CompletableFuture.completedFuture(ledgerEntries(values));
         }
 
         @Override
-        public CompletableFuture<LedgerMetadata> metadata(
-                long ledgerId, BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
             LedgerState state = ledgers.get(ledgerId);
-            return state == null
-                    ? absent()
-                    : CompletableFuture.completedFuture(ledgerMetadata(ledgerId, state));
+            return state == null ? absent() : CompletableFuture.completedFuture(ledgerMetadata(ledgerId, state));
         }
 
         @Override
-        public CompletableFuture<Void> delete(
-                long ledgerId, BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
             deleteCalls.incrementAndGet();
             ledgers.remove(ledgerId);
             if (loseFirstDeleteResponse) {
                 loseFirstDeleteResponse = false;
                 return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.PRIMARY_WAL_WRITE_FAILED,
-                        true,
-                        "injected applied delete response loss"));
+                        ErrorCode.PRIMARY_WAL_WRITE_FAILED, true, "injected applied delete response loss"));
             }
             return CompletableFuture.completedFuture(null);
         }
 
         private static <T> CompletableFuture<T> absent() {
-            return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND,
-                    false,
-                    "ledger is absent"));
+            return CompletableFuture.failedFuture(
+                    new NereusException(ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND, false, "ledger is absent"));
         }
     }
 
@@ -281,7 +250,7 @@ final class BookKeeperScopeCapabilityProbeTest {
                     }
                     case "force" -> CompletableFuture.completedFuture(null);
                     case "getLastAddConfirmed", "getLastAddPushed" ->
-                            state.entries.isEmpty() ? -1L : state.entries.lastKey();
+                        state.entries.isEmpty() ? -1L : state.entries.lastKey();
                     case "getLength" -> state.length();
                     case "isClosed" -> state.closed;
                     case "toString" -> "scope-write-handle-" + ledgerId;
@@ -297,8 +266,7 @@ final class BookKeeperScopeCapabilityProbeTest {
                     case "getId" -> ledgerId;
                     case "getLedgerMetadata" -> ledgerMetadata(ledgerId, state);
                     case "closeAsync" -> CompletableFuture.completedFuture(null);
-                    case "getLastAddConfirmed" ->
-                            state.entries.isEmpty() ? -1L : state.entries.lastKey();
+                    case "getLastAddConfirmed" -> state.entries.isEmpty() ? -1L : state.entries.lastKey();
                     case "getLength" -> state.length();
                     case "isClosed" -> state.closed;
                     case "toString" -> "scope-read-handle-" + ledgerId;
@@ -317,8 +285,7 @@ final class BookKeeperScopeCapabilityProbeTest {
                     case "getAckQuorumSize" -> state.configuration.ackQuorumSize();
                     case "getDigestType" -> state.configuration.digestType().toClientType();
                     case "getCustomMetadata" -> state.customMetadata;
-                    case "getLastEntryId" ->
-                            state.entries.isEmpty() ? -1L : state.entries.lastKey();
+                    case "getLastEntryId" -> state.entries.isEmpty() ? -1L : state.entries.lastKey();
                     case "getLength" -> state.length();
                     case "getCtime", "getCToken" -> 0L;
                     case "isClosed" -> state.closed;
@@ -330,8 +297,7 @@ final class BookKeeperScopeCapabilityProbeTest {
                 });
     }
 
-    private static LedgerEntry ledgerEntry(
-            long ledgerId, long entryId, byte[] value) {
+    private static LedgerEntry ledgerEntry(long ledgerId, long entryId, byte[] value) {
         ByteBuf buffer = Unpooled.wrappedBuffer(value.clone());
         return (LedgerEntry) Proxy.newProxyInstance(
                 LedgerEntry.class.getClassLoader(),
@@ -407,14 +373,11 @@ final class BookKeeperScopeCapabilityProbeTest {
         private final TreeMap<Long, byte[]> entries = new TreeMap<>();
         private boolean closed;
 
-        private LedgerState(
-                BookKeeperWalConfiguration configuration,
-                Map<String, byte[]> customMetadata) {
+        private LedgerState(BookKeeperWalConfiguration configuration, Map<String, byte[]> customMetadata) {
             this.configuration = configuration;
-            this.customMetadata = customMetadata.entrySet().stream().collect(
-                    java.util.stream.Collectors.toUnmodifiableMap(
-                            Map.Entry::getKey,
-                            entry -> entry.getValue().clone()));
+            this.customMetadata = customMetadata.entrySet().stream()
+                    .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                            Map.Entry::getKey, entry -> entry.getValue().clone()));
         }
 
         private long length() {

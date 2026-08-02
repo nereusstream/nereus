@@ -14,8 +14,9 @@
 
 package com.nereusstream.managedledger;
 
-/** Boundary for the Pulsar ManagedLedger facade. */
+/**
+ * Boundary for the Pulsar ManagedLedger facade.
+ */
 public final class ManagedLedgerModule {
-    private ManagedLedgerModule() {
-    }
+    private ManagedLedgerModule() {}
 }

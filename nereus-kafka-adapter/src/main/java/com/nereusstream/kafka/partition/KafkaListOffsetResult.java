@@ -18,7 +18,9 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
-/** Exact ListOffsets answer and the immutable stable snapshot that bounded its lookup. */
+/**
+ * Exact ListOffsets answer and the immutable stable snapshot that bounded its lookup.
+ */
 public record KafkaListOffsetResult(
         KafkaListOffsetQuery query,
         OptionalLong timestampMillis,
@@ -30,8 +32,8 @@ public record KafkaListOffsetResult(
         Objects.requireNonNull(timestampMillis, "timestampMillis");
         Objects.requireNonNull(leaderEpoch, "leaderEpoch");
         Objects.requireNonNull(sourceSnapshot, "sourceSnapshot");
-        boolean recordTimestampQuery = query == KafkaListOffsetQuery.TIMESTAMP
-                || query == KafkaListOffsetQuery.MAX_TIMESTAMP;
+        boolean recordTimestampQuery =
+                query == KafkaListOffsetQuery.TIMESTAMP || query == KafkaListOffsetQuery.MAX_TIMESTAMP;
         if (recordTimestampQuery != timestampMillis.isPresent()) {
             throw new IllegalArgumentException("record timestamp queries require an exact timestamp result");
         }

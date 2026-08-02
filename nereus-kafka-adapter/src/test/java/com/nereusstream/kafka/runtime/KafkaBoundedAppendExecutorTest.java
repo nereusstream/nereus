@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
@@ -42,8 +42,7 @@ class KafkaBoundedAppendExecutorTest {
     @Test
     void admittedTaskOwnsAWritableBudgetedSnapshotForKafkaOffsetAssignment() {
         KafkaByteBudget budget = new KafkaByteBudget(16);
-        KafkaBoundedAppendExecutor executor =
-                new KafkaBoundedAppendExecutor(1, 1, budget, "f9-writable-append");
+        KafkaBoundedAppendExecutor executor = new KafkaBoundedAppendExecutor(1, 1, budget, "f9-writable-append");
         ByteBuffer request = bytes(1);
 
         CompletableFuture<Integer> result = executor.submit(request, owned -> {
@@ -121,8 +120,10 @@ class KafkaBoundedAppendExecutorTest {
         assertThatThrownBy(failed::join).hasRootCauseMessage("task failure");
         assertThat(executor.ownedBufferBytes()).isZero();
         executor.close();
-        assertFailure(executor.submit(bytes(2), ByteBuffer::getInt),
-                ErrorCode.STORAGE_CLOSED, AppendOutcome.KNOWN_NOT_COMMITTED);
+        assertFailure(
+                executor.submit(bytes(2), ByteBuffer::getInt),
+                ErrorCode.STORAGE_CLOSED,
+                AppendOutcome.KNOWN_NOT_COMMITTED);
     }
 
     @Test
@@ -208,19 +209,18 @@ class KafkaBoundedAppendExecutorTest {
         return ByteBuffer.allocate(4).putInt(value).flip();
     }
 
-    private static void assertFailure(
-            CompletableFuture<?> future, ErrorCode code, AppendOutcome outcome) {
-        assertThatThrownBy(future::join)
-                .isInstanceOf(CompletionException.class)
-                .satisfies(value -> {
-                    assertThat(value.getCause()).isInstanceOf(NereusException.class);
-                    NereusException failure = (NereusException) value.getCause();
-                    assertThat(failure.code()).isEqualTo(code);
-                    assertThat(failure.appendOutcome()).contains(outcome);
-                });
+    private static void assertFailure(CompletableFuture<?> future, ErrorCode code, AppendOutcome outcome) {
+        assertThatThrownBy(future::join).isInstanceOf(CompletionException.class).satisfies(value -> {
+            assertThat(value.getCause()).isInstanceOf(NereusException.class);
+            NereusException failure = (NereusException) value.getCause();
+            assertThat(failure.code()).isEqualTo(code);
+            assertThat(failure.appendOutcome()).contains(outcome);
+        });
     }
 
     private static void require(boolean value) {
-        if (!value) throw new AssertionError("timed out waiting for deterministic test event");
+        if (!value) {
+            throw new AssertionError("timed out waiting for deterministic test event");
+        }
     }
 }

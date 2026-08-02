@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -13,7 +14,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable NCP1/NTC1 writer facts; all values are copied into Parquet metadata. */
+/**
+ * Immutable NCP1/NTC1 writer facts; all values are copied into Parquet metadata.
+ */
 public record CompactedObjectWriteRequest(
         String cluster,
         ReadView view,
@@ -49,8 +52,7 @@ public record CompactedObjectWriteRequest(
         requireSha256(policySha256, "policySha256");
         Objects.requireNonNull(payloadFormat, "payloadFormat");
         logicalFormat = requireText(logicalFormat, "logicalFormat");
-        projectionIdentitySha256 = Objects.requireNonNull(
-                        projectionIdentitySha256, "projectionIdentitySha256")
+        projectionIdentitySha256 = Objects.requireNonNull(projectionIdentitySha256, "projectionIdentitySha256")
                 .map(value -> requireSha256(value, "projectionIdentitySha256"));
         long coverageRecords = sourceCoverage.recordCount();
         if (sourceRecordCount <= 0

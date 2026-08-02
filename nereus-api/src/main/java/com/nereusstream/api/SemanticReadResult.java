@@ -17,11 +17,10 @@ package com.nereusstream.api;
 import java.util.List;
 import java.util.Objects;
 
-/** A read result paired with the semantic view and exclusive source coverage consumed. */
-public record SemanticReadResult(
-        ReadView view,
-        ReadResult result,
-        long sourceCoverageEndOffset) {
+/**
+ * A read result paired with the semantic view and exclusive source coverage consumed.
+ */
+public record SemanticReadResult(ReadView view, ReadResult result, long sourceCoverageEndOffset) {
     public SemanticReadResult {
         Objects.requireNonNull(view, "view");
         Objects.requireNonNull(result, "result");
@@ -33,11 +32,10 @@ public record SemanticReadResult(
         }
     }
 
-    /** Creates and validates a result against the exact request that produced it. */
-    public static SemanticReadResult forRequest(
-            ReadRequest request,
-            ReadResult result,
-            long sourceCoverageEndOffset) {
+    /**
+     * Creates and validates a result against the exact request that produced it.
+     */
+    public static SemanticReadResult forRequest(ReadRequest request, ReadResult result, long sourceCoverageEndOffset) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(result, "result");
         if (result.requestedOffset() != request.startOffset()) {
@@ -58,14 +56,12 @@ public record SemanticReadResult(
         OffsetRange first = batches.get(0).range();
         if (request.boundaryMode() == ReadBoundaryMode.EXACT_START
                 && (first.startOffset() < request.startOffset()
-                        || (request.view() == ReadView.COMMITTED
-                                && first.startOffset() != request.startOffset()))) {
+                        || (request.view() == ReadView.COMMITTED && first.startOffset() != request.startOffset()))) {
             throw new IllegalArgumentException("EXACT_START result must begin at the requested offset");
         }
         if (request.boundaryMode() == ReadBoundaryMode.CONTAINING_ENTRY
                 && !first.contains(request.startOffset())
-                && (request.view() == ReadView.COMMITTED
-                        || first.startOffset() < request.startOffset())) {
+                && (request.view() == ReadView.COMMITTED || first.startOffset() < request.startOffset())) {
             throw new IllegalArgumentException("CONTAINING_ENTRY result must contain the requested offset");
         }
         long previousEnd = first.endOffset();

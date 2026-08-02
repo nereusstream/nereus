@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.lang.reflect.Method;
@@ -26,12 +26,17 @@ import org.junit.jupiter.api.Test;
 class BookKeeperClientApiContractTest {
     @Test
     void compilesAgainstPinnedPublic418Surface() throws Exception {
-        assertThat(BookKeeper.class.getMethod("newCreateLedgerOp").getReturnType().getName())
+        assertThat(BookKeeper.class
+                        .getMethod("newCreateLedgerOp")
+                        .getReturnType()
+                        .getName())
                 .isEqualTo("org.apache.bookkeeper.client.api.CreateBuilder");
         assertThat(CreateAdvBuilder.class.getMethod("withLedgerId", long.class)).isNotNull();
         assertThat(OpenBuilder.class.getMethod("withRecovery", boolean.class)).isNotNull();
         assertThat(DeleteBuilder.class.getMethods()).extracting(Method::getName).contains("withLedgerId");
-        assertThat(WriteAdvHandle.class.getMethods()).extracting(Method::getName).contains("writeAsync");
+        assertThat(WriteAdvHandle.class.getMethods())
+                .extracting(Method::getName)
+                .contains("writeAsync");
         assertThat(ReadHandle.class.getMethods()).extracting(Method::getName).contains("readUnconfirmedAsync");
     }
 
@@ -85,13 +90,19 @@ class BookKeeperClientApiContractTest {
                 yield createRef.get();
             }
             case "makeAdv" -> advanced;
-            case "withEnsembleSize", "withWriteQuorumSize", "withAckQuorumSize", "withPassword",
-                    "withCustomMetadata", "withDigestType" -> createRef.get();
+            case "withEnsembleSize",
+                    "withWriteQuorumSize",
+                    "withAckQuorumSize",
+                    "withPassword",
+                    "withCustomMetadata",
+                    "withDigestType" -> createRef.get();
             default -> throw new UnsupportedOperationException(method.getName());
         });
         createRef.set(create);
         BookKeeper client = proxy(BookKeeper.class, (method, arguments) -> {
-            if (method.getName().equals("newCreateLedgerOp")) return create;
+            if (method.getName().equals("newCreateLedgerOp")) {
+                return create;
+            }
             throw new UnsupportedOperationException(method.getName());
         });
         BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();

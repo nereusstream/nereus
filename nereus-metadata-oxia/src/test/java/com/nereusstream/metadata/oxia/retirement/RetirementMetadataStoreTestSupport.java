@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.retirement;
 
 import com.nereusstream.api.Checksum;
@@ -37,8 +38,7 @@ final class RetirementMetadataStoreTestSupport {
     static final String COMMIT_ID = "commit-f4";
     static final long OFFSET_END = 2;
 
-    private RetirementMetadataStoreTestSupport() {
-    }
+    private RetirementMetadataStoreTestSupport() {}
 
     static OffsetIndexTargetRecord genericIndex() {
         return new OffsetIndexTargetRecord(
@@ -93,8 +93,7 @@ final class RetirementMetadataStoreTestSupport {
     }
 
     static CommittedSliceRecord legacyMarker() {
-        return new CommittedSliceRecord(
-                STREAM, OBJECT_ID, SLICE_ID, 0, OFFSET_END, 0, 1, 0);
+        return new CommittedSliceRecord(STREAM, OBJECT_ID, SLICE_ID, 0, OFFSET_END, 0, 1, 0);
     }
 
     static CommittedAppendRecord genericMarker() {
@@ -201,11 +200,7 @@ final class RetirementMetadataStoreTestSupport {
 
     static ObjectReferenceRecord references(String objectId) {
         return new ObjectReferenceRecord(
-                objectId,
-                List.of(new VisibleSliceReferenceRecord(
-                        STREAM, SLICE_ID, 0, OFFSET_END, 0, 1)),
-                30,
-                0);
+                objectId, List.of(new VisibleSliceReferenceRecord(STREAM, SLICE_ID, 0, OFFSET_END, 0, 1)), 30, 0);
     }
 
     static Checksum digest(Object record, Class<?> type) {
@@ -221,15 +216,15 @@ final class RetirementMetadataStoreTestSupport {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException(failure);
         }
     }
 
     private static EntryIndexReferenceRecord inlineIndex() {
-        return new EntryIndexReferenceRecord(
-                "INLINE", "", "", new byte[] {1}, 0, 0, "CRC32C", "01020304");
+        return new EntryIndexReferenceRecord("INLINE", "", "", new byte[] {1}, 0, 0, "CRC32C", "01020304");
     }
 
     static final class FakeClient implements RetirementMetadataClient {
@@ -256,13 +251,12 @@ final class RetirementMetadataStoreTestSupport {
         }
 
         @Override
-        public CompletableFuture<Void> deleteIfVersion(
-                RetirementMetadataKey key, long expectedVersion) {
+        public CompletableFuture<Void> deleteIfVersion(RetirementMetadataKey key, long expectedVersion) {
             ScopedKey scoped = new ScopedKey(key.key(), key.partitionKey());
             RetirementMetadataValue current = values.get(scoped);
             if (current == null || current.version() != expectedVersion) {
-                return CompletableFuture.failedFuture(new F4MetadataConditionFailedException(
-                        "fake conditional delete failed"));
+                return CompletableFuture.failedFuture(
+                        new F4MetadataConditionFailedException("fake conditional delete failed"));
             }
             values.remove(scoped, current);
             if (loseNextDeleteResponse.compareAndSet(true, false)) {
@@ -272,6 +266,5 @@ final class RetirementMetadataStoreTestSupport {
         }
     }
 
-    private record ScopedKey(String key, PartitionKey partition) {
-    }
+    private record ScopedKey(String key, PartitionKey partition) {}
 }

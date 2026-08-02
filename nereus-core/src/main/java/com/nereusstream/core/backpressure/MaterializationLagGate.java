@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.backpressure;
 
 import com.nereusstream.api.ErrorCode;
@@ -27,14 +28,11 @@ public final class MaterializationLagGate {
             MaterializationLagThresholds thresholds,
             ScheduledExecutorService scheduler) {
         this.reader = Objects.requireNonNull(reader, "reader");
-        this.thresholds = Objects.requireNonNull(
-                thresholds, "thresholds");
+        this.thresholds = Objects.requireNonNull(thresholds, "thresholds");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
-    public CompletableFuture<MaterializationLagSnapshot> admit(
-            StreamId streamId,
-            Duration timeout) {
+    public CompletableFuture<MaterializationLagSnapshot> admit(StreamId streamId, Duration timeout) {
         final StreamId exactStream;
         final Deadline deadline;
         try {
@@ -43,36 +41,23 @@ public final class MaterializationLagGate {
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return measure(exactStream, deadline)
-                .thenCompose(first -> {
-                    requireNotRejected(first);
-                    if (!isThrottled(first)) {
-                        return CompletableFuture.completedFuture(first);
-                    }
-                    return delay(deadline)
-                            .thenCompose(ignored -> measure(
-                                    exactStream, deadline))
-                            .thenApply(second -> {
-                                requireNotRejected(second);
-                                return second;
-                            });
-                });
+        return measure(exactStream, deadline).thenCompose(first -> {
+            requireNotRejected(first);
+            if (!isThrottled(first)) {
+                return CompletableFuture.completedFuture(first);
+            }
+            return delay(deadline)
+                    .thenCompose(ignored -> measure(exactStream, deadline))
+                    .thenApply(second -> {
+                        requireNotRejected(second);
+                        return second;
+                    });
+        });
     }
 
-    private CompletableFuture<MaterializationLagSnapshot> measure(
-            StreamId streamId,
-            Deadline deadline) {
+    private CompletableFuture<MaterializationLagSnapshot> measure(StreamId streamId, Deadline deadline) {
         if (thresholds.allDisabled()) {
-            return CompletableFuture.completedFuture(
-                    new MaterializationLagSnapshot(
-                            streamId,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0));
+            return CompletableFuture.completedFuture(new MaterializationLagSnapshot(streamId, 0, 0, 0, 0, 0, 0, 0));
         }
         return reader.measure(streamId, deadline.remaining());
     }
@@ -81,16 +66,11 @@ public final class MaterializationLagGate {
         long delayNanos = thresholds.throttleDelay().toNanos();
         if (delayNanos >= deadline.remaining().toNanos()) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.TIMEOUT,
-                    true,
-                    "materialization lag throttle exceeds the append admission deadline"));
+                    ErrorCode.TIMEOUT, true, "materialization lag throttle exceeds the append admission deadline"));
         }
         CompletableFuture<Void> result = new CompletableFuture<>();
         try {
-            scheduler.schedule(
-                    () -> result.complete(null),
-                    delayNanos,
-                    TimeUnit.NANOSECONDS);
+            scheduler.schedule(() -> result.complete(null), delayNanos, TimeUnit.NANOSECONDS);
         } catch (RejectedExecutionException failure) {
             result.completeExceptionally(new NereusException(
                     ErrorCode.STORAGE_CLOSED,
@@ -101,45 +81,31 @@ public final class MaterializationLagGate {
         return result;
     }
 
-    private void requireNotRejected(
-            MaterializationLagSnapshot snapshot) {
+    private void requireNotRejected(MaterializationLagSnapshot snapshot) {
         String reason = rejectionReason(snapshot);
         if (reason != null) {
             throw new NereusException(
-                    ErrorCode.BACKPRESSURE_REJECTED,
-                    true,
-                    "async append rejected by materialization lag " + reason);
+                    ErrorCode.BACKPRESSURE_REJECTED, true, "async append rejected by materialization lag " + reason);
         }
     }
 
-    private String rejectionReason(
-            MaterializationLagSnapshot snapshot) {
-        if (thresholds.rejectRecords() > 0
-                && snapshot.lagRecords()
-                        >= thresholds.rejectRecords()) {
+    private String rejectionReason(MaterializationLagSnapshot snapshot) {
+        if (thresholds.rejectRecords() > 0 && snapshot.lagRecords() >= thresholds.rejectRecords()) {
             return "records threshold";
         }
-        if (thresholds.rejectBytes() > 0
-                && snapshot.lagBytes()
-                        >= thresholds.rejectBytes()) {
+        if (thresholds.rejectBytes() > 0 && snapshot.lagBytes() >= thresholds.rejectBytes()) {
             return "bytes threshold";
         }
         if (!thresholds.rejectAge().isZero()
-                && snapshot.oldestLagMillis()
-                        >= thresholds.rejectAge().toMillis()) {
+                && snapshot.oldestLagMillis() >= thresholds.rejectAge().toMillis()) {
             return "age threshold";
         }
         return null;
     }
 
-    private boolean isThrottled(
-            MaterializationLagSnapshot snapshot) {
-        return thresholds.throttleRecords() > 0
-                        && snapshot.lagRecords()
-                                >= thresholds.throttleRecords()
-                || thresholds.throttleBytes() > 0
-                        && snapshot.lagBytes()
-                                >= thresholds.throttleBytes();
+    private boolean isThrottled(MaterializationLagSnapshot snapshot) {
+        return thresholds.throttleRecords() > 0 && snapshot.lagRecords() >= thresholds.throttleRecords()
+                || thresholds.throttleBytes() > 0 && snapshot.lagBytes() >= thresholds.throttleBytes();
     }
 
     private static final class Deadline {
@@ -148,8 +114,7 @@ public final class MaterializationLagGate {
         private Deadline(Duration timeout) {
             Objects.requireNonNull(timeout, "timeout");
             if (timeout.isZero() || timeout.isNegative()) {
-                throw new IllegalArgumentException(
-                        "timeout must be positive");
+                throw new IllegalArgumentException("timeout must be positive");
             }
             long now = System.nanoTime();
             long nanos;
@@ -158,20 +123,13 @@ public final class MaterializationLagGate {
             } catch (ArithmeticException failure) {
                 nanos = Long.MAX_VALUE;
             }
-            deadlineNanos = nanos >= Long.MAX_VALUE - now
-                    ? Long.MAX_VALUE
-                    : now + nanos;
+            deadlineNanos = nanos >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + nanos;
         }
 
         private Duration remaining() {
-            long remaining = deadlineNanos == Long.MAX_VALUE
-                    ? Long.MAX_VALUE
-                    : deadlineNanos - System.nanoTime();
+            long remaining = deadlineNanos == Long.MAX_VALUE ? Long.MAX_VALUE : deadlineNanos - System.nanoTime();
             if (remaining <= 0) {
-                throw new NereusException(
-                        ErrorCode.TIMEOUT,
-                        true,
-                        "materialization lag admission deadline expired");
+                throw new NereusException(ErrorCode.TIMEOUT, true, "materialization lag admission deadline expired");
             }
             return Duration.ofNanos(remaining);
         }

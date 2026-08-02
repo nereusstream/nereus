@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -44,30 +44,25 @@ class MetadataGenerationReadFailureHandlerTest {
         FakePhysicalObjectMetadataStore physical = new FakePhysicalObjectMetadataStore();
         AtomicReference<VersionedGenerationIndex> index = new AtomicReference<>(versionedIndex(10));
         ObjectSliceReadTarget target = target(index.get());
-        var createdRoot = physical.createRoot(
-                CLUSTER,
-                root(target)).join();
+        var createdRoot = physical.createRoot(CLUSTER, root(target)).join();
         GenerationMetadataStore generations = generationStore(index);
         MetadataGenerationReadFailureHandler handler = new MetadataGenerationReadFailureHandler(
-                CLUSTER,
-                generations,
-                physical,
-                Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
+                CLUSTER, generations, physical, Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
 
         handler.handle(
                         STREAM,
                         candidate(index.get()),
-                        new NereusException(
-                                ErrorCode.OBJECT_CHECKSUM_MISMATCH,
-                                false,
-                                "bad checksum"))
+                        new NereusException(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "bad checksum"))
                 .join();
 
         assertThat(physical.getRoot(
-                        CLUSTER,
-                        new com.nereusstream.api.ObjectKeyHash(
-                                createdRoot.value().objectKeyHash()))
-                .join().orElseThrow().value().lifecycle())
+                                CLUSTER,
+                                new com.nereusstream.api.ObjectKeyHash(
+                                        createdRoot.value().objectKeyHash()))
+                        .join()
+                        .orElseThrow()
+                        .value()
+                        .lifecycle())
                 .isEqualTo(PhysicalObjectLifecycle.QUARANTINED);
         assertThat(index.get().value().lifecycle()).isEqualTo(GenerationLifecycle.QUARANTINED);
         assertThat(index.get().value().stateReason())
@@ -79,14 +74,9 @@ class MetadataGenerationReadFailureHandlerTest {
     void transientObjectReadFailureDoesNotQuarantineHealthyMetadata() {
         FakePhysicalObjectMetadataStore physical = new FakePhysicalObjectMetadataStore();
         AtomicReference<VersionedGenerationIndex> index = new AtomicReference<>(versionedIndex(10));
-        physical.createRoot(
-                CLUSTER,
-                root(target(index.get()))).join();
-        MetadataGenerationReadFailureHandler handler = new MetadataGenerationReadFailureHandler(
-                CLUSTER,
-                generationStore(index),
-                physical,
-                Clock.systemUTC());
+        physical.createRoot(CLUSTER, root(target(index.get()))).join();
+        MetadataGenerationReadFailureHandler handler =
+                new MetadataGenerationReadFailureHandler(CLUSTER, generationStore(index), physical, Clock.systemUTC());
 
         handler.handle(
                         STREAM,
@@ -100,10 +90,10 @@ class MetadataGenerationReadFailureHandlerTest {
     @Test
     void quarantinesEveryDiscoveredCommittedIndexThatReferencesTheCorruptObject() {
         FakePhysicalObjectMetadataStore physical = new FakePhysicalObjectMetadataStore();
-        AtomicReference<VersionedGenerationIndex> first = new AtomicReference<>(
-                versionedIndex(10, 3, "/generation/index/3"));
-        AtomicReference<VersionedGenerationIndex> second = new AtomicReference<>(
-                versionedIndex(20, 4, "/generation/index/4"));
+        AtomicReference<VersionedGenerationIndex> first =
+                new AtomicReference<>(versionedIndex(10, 3, "/generation/index/3"));
+        AtomicReference<VersionedGenerationIndex> second =
+                new AtomicReference<>(versionedIndex(20, 4, "/generation/index/4"));
         ObjectSliceReadTarget target = target(first.get());
         physical.createRoot(CLUSTER, root(target)).join();
         MetadataGenerationReadFailureHandler handler = new MetadataGenerationReadFailureHandler(
@@ -113,24 +103,20 @@ class MetadataGenerationReadFailureHandlerTest {
                 Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
 
         handler.handle(
-                STREAM,
-                candidate(first.get()),
-                new NereusException(
-                        ErrorCode.OBJECT_CHECKSUM_MISMATCH,
-                        false,
-                        "bad checksum")).join();
+                        STREAM,
+                        candidate(first.get()),
+                        new NereusException(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "bad checksum"))
+                .join();
 
         assertThat(first.get().value().lifecycle()).isEqualTo(GenerationLifecycle.QUARANTINED);
         assertThat(second.get().value().lifecycle()).isEqualTo(GenerationLifecycle.QUARANTINED);
     }
 
-    private static GenerationMetadataStore generationStore(
-            AtomicReference<VersionedGenerationIndex> index) {
+    private static GenerationMetadataStore generationStore(AtomicReference<VersionedGenerationIndex> index) {
         return generationStore(List.of(index));
     }
 
-    private static GenerationMetadataStore generationStore(
-            List<AtomicReference<VersionedGenerationIndex>> indexes) {
+    private static GenerationMetadataStore generationStore(List<AtomicReference<VersionedGenerationIndex>> indexes) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 MetadataGenerationReadFailureHandlerTest.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -144,18 +130,17 @@ class MetadataGenerationReadFailureHandlerTest {
                                         && value.value().offsetEnd() == identity.offsetEnd())
                                 .findFirst());
                     }
-                    case "scanIndex" -> CompletableFuture.completedFuture(
-                            new GenerationScanPage(
-                                    indexes.stream()
-                                            .<VersionedGenerationCandidate>map(AtomicReference::get)
-                                            .toList(),
-                                    Optional.empty()));
+                    case "scanIndex" ->
+                        CompletableFuture.completedFuture(new GenerationScanPage(
+                                indexes.stream()
+                                        .<VersionedGenerationCandidate>map(AtomicReference::get)
+                                        .toList(),
+                                Optional.empty()));
                     case "compareAndSetIndex" -> {
                         GenerationIndexRecord replacement = (GenerationIndexRecord) args[1];
                         long expectedVersion = (long) args[2];
                         AtomicReference<VersionedGenerationIndex> reference = indexes.stream()
-                                .filter(candidate -> candidate.get().value().generation()
-                                        == replacement.generation())
+                                .filter(candidate -> candidate.get().value().generation() == replacement.generation())
                                 .findFirst()
                                 .orElseThrow();
                         VersionedGenerationIndex current = reference.get();
@@ -179,12 +164,8 @@ class MetadataGenerationReadFailureHandlerTest {
         return versionedIndex(version, 3, "/generation/index");
     }
 
-    private static VersionedGenerationIndex versionedIndex(
-            long version,
-            long generation,
-            String key) {
-        GenerationIndexRecord sample = F4MetadataTestValues.generation(
-                GenerationLifecycle.COMMITTED);
+    private static VersionedGenerationIndex versionedIndex(long version, long generation, String key) {
+        GenerationIndexRecord sample = F4MetadataTestValues.generation(GenerationLifecycle.COMMITTED);
         GenerationIndexRecord value = new GenerationIndexRecord(
                 sample.schemaVersion(),
                 sample.streamId(),
@@ -216,11 +197,7 @@ class MetadataGenerationReadFailureHandlerTest {
                 sample.stateReason(),
                 sample.stateChangedAtMillis(),
                 version);
-        return new VersionedGenerationIndex(
-                key,
-                value,
-                version,
-                new Checksum(ChecksumType.SHA256, "e".repeat(64)));
+        return new VersionedGenerationIndex(key, value, version, new Checksum(ChecksumType.SHA256, "e".repeat(64)));
     }
 
     private static GenerationReadCandidate candidate(VersionedGenerationIndex index) {
@@ -247,8 +224,8 @@ class MetadataGenerationReadFailureHandlerTest {
     }
 
     private static ObjectSliceReadTarget target(VersionedGenerationIndex index) {
-        return (ObjectSliceReadTarget) ReadTargetCodecRegistry.phase15()
-                .decode(index.value().readTarget());
+        return (ObjectSliceReadTarget)
+                ReadTargetCodecRegistry.phase15().decode(index.value().readTarget());
     }
 
     private static PhysicalObjectRootRecord root(ObjectSliceReadTarget target) {

@@ -49,9 +49,15 @@ public record StreamSliceDescriptor(
         schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         RangeChecks.requireNonNegativeNonOverflowingRange(payloadOffset, payloadLength, "slice payload");
         RangeChecks.requireNonNegativeNonOverflowingRange(entryIndexOffset, entryIndexLength, "entry index");
-        if (sliceOrdinal < 0 || writerEpoch < 0 || relativeBaseOffset < 0 || entryCount <= 0
-                || recordCount <= 0 || logicalBytes < 0 || entryIndexLength <= 0
-                || minEventTimeMillis < 0 || maxEventTimeMillis < minEventTimeMillis) {
+        if (sliceOrdinal < 0
+                || writerEpoch < 0
+                || relativeBaseOffset < 0
+                || entryCount <= 0
+                || recordCount <= 0
+                || logicalBytes < 0
+                || entryIndexLength <= 0
+                || minEventTimeMillis < 0
+                || maxEventTimeMillis < minEventTimeMillis) {
             throw new IllegalArgumentException("slice descriptor numeric fields are invalid");
         }
     }

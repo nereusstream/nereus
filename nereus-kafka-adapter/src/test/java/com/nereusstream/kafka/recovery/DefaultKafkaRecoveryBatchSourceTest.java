@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.recovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -44,16 +44,10 @@ class DefaultKafkaRecoveryBatchSourceTest {
             assertThat(streamId).isEqualTo(STREAM_ID);
             captured.set(request);
             ReadResult result = new ReadResult(
-                    STREAM_ID,
-                    2,
-                    4,
-                    List.of(batch(new OffsetRange(2, 4), PayloadFormat.KAFKA_RECORD_BATCH)),
-                    false);
-            return CompletableFuture.completedFuture(
-                    SemanticReadResult.forRequest(request, result, 4));
+                    STREAM_ID, 2, 4, List.of(batch(new OffsetRange(2, 4), PayloadFormat.KAFKA_RECORD_BATCH)), false);
+            return CompletableFuture.completedFuture(SemanticReadResult.forRequest(request, result, 4));
         });
-        DefaultKafkaRecoveryBatchSource source =
-                new DefaultKafkaRecoveryBatchSource(streams, STREAM_ID, 17, 4_096);
+        DefaultKafkaRecoveryBatchSource source = new DefaultKafkaRecoveryBatchSource(streams, STREAM_ID, 17, 4_096);
 
         KafkaRecoveryBatchPage page =
                 source.readCommittedPage(2, 5, Duration.ofSeconds(3)).join();
@@ -67,8 +61,7 @@ class DefaultKafkaRecoveryBatchSourceTest {
         });
         assertThat(captured.get().view()).isEqualTo(ReadView.COMMITTED);
         assertThat(captured.get().boundaryMode()).isEqualTo(ReadBoundaryMode.EXACT_START);
-        assertThat(captured.get().firstEntryPolicy())
-                .isEqualTo(FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW);
+        assertThat(captured.get().firstEntryPolicy()).isEqualTo(FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW);
         assertThat(captured.get().options().maxRecords()).isEqualTo(17);
         assertThat(captured.get().options().maxBytes()).isEqualTo(4_096);
     }
@@ -78,11 +71,9 @@ class DefaultKafkaRecoveryBatchSourceTest {
         TestStreamStorage empty = new TestStreamStorage();
         empty.semanticReader((streamId, request) -> {
             ReadResult result = new ReadResult(STREAM_ID, 2, 2, List.of(), false);
-            return CompletableFuture.completedFuture(
-                    SemanticReadResult.forRequest(request, result, 2));
+            return CompletableFuture.completedFuture(SemanticReadResult.forRequest(request, result, 2));
         });
-        DefaultKafkaRecoveryBatchSource emptySource =
-                new DefaultKafkaRecoveryBatchSource(empty, STREAM_ID, 10, 1_024);
+        DefaultKafkaRecoveryBatchSource emptySource = new DefaultKafkaRecoveryBatchSource(empty, STREAM_ID, 10, 1_024);
 
         assertThatThrownBy(() -> emptySource
                         .readCommittedPage(2, 5, Duration.ofSeconds(1))
@@ -93,13 +84,8 @@ class DefaultKafkaRecoveryBatchSourceTest {
         TestStreamStorage wrongFormat = new TestStreamStorage();
         wrongFormat.semanticReader((streamId, request) -> {
             ReadResult result = new ReadResult(
-                    STREAM_ID,
-                    2,
-                    4,
-                    List.of(batch(new OffsetRange(2, 4), PayloadFormat.OPAQUE_RECORD_BATCH)),
-                    false);
-            return CompletableFuture.completedFuture(
-                    SemanticReadResult.forRequest(request, result, 4));
+                    STREAM_ID, 2, 4, List.of(batch(new OffsetRange(2, 4), PayloadFormat.OPAQUE_RECORD_BATCH)), false);
+            return CompletableFuture.completedFuture(SemanticReadResult.forRequest(request, result, 4));
         });
         DefaultKafkaRecoveryBatchSource wrongFormatSource =
                 new DefaultKafkaRecoveryBatchSource(wrongFormat, STREAM_ID, 10, 1_024);
@@ -108,21 +94,14 @@ class DefaultKafkaRecoveryBatchSourceTest {
                         .readCommittedPage(2, 5, Duration.ofSeconds(1))
                         .join())
                 .hasRootCauseInstanceOf(NereusException.class)
-                .hasRootCauseMessage(
-                        "Kafka recovery read returned a non-Kafka or out-of-range batch");
+                .hasRootCauseMessage("Kafka recovery read returned a non-Kafka or out-of-range batch");
     }
 
     private static ReadBatch batch(OffsetRange range, PayloadFormat format) {
         byte[] payload = new byte[] {2, 3, 4};
         Checksum checksum = new Checksum(ChecksumType.CRC32C, "00000000");
         EntryIndexRef index = new EntryIndexRef(
-                EntryIndexLocation.OBJECT_FOOTER,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                0,
-                1,
-                checksum);
+                EntryIndexLocation.OBJECT_FOOTER, Optional.empty(), Optional.empty(), Optional.empty(), 0, 1, checksum);
         ObjectSliceReadTarget target = new ObjectSliceReadTarget(
                 1,
                 new ObjectId("recovery-object"),
@@ -141,11 +120,6 @@ class DefaultKafkaRecoveryBatchSourceTest {
                 payload,
                 List.of(),
                 Optional.empty(),
-                new ReadSourceRef(
-                        range,
-                        0,
-                        1,
-                        target,
-                        ReadTargetIdentities.sha256(target)));
+                new ReadSourceRef(range, 0, 1, target, ReadTargetIdentities.sha256(target)));
     }
 }

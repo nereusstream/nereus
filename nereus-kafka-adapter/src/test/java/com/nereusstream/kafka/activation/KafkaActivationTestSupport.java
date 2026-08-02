@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
 import com.nereusstream.api.StorageProfile;
@@ -10,7 +11,7 @@ final class KafkaActivationTestSupport {
     static final String CLUSTER = "kraft-cluster";
     static final KafkaBrokerIdentity BROKER = new KafkaBrokerIdentity(1, 11);
 
-    private KafkaActivationTestSupport() { }
+    private KafkaActivationTestSupport() {}
 
     static KafkaBrokerCapabilitySpecification specification(int providerSeed) {
         return specification(BROKER, "runtime-1", providerSeed);
@@ -36,7 +37,9 @@ final class KafkaActivationTestSupport {
 
     static byte[] bytes(int seed) {
         byte[] value = new byte[32];
-        for (int index = 0; index < value.length; index++) value[index] = (byte) (seed + index);
+        for (int index = 0; index < value.length; index++) {
+            value[index] = (byte) (seed + index);
+        }
         return value;
     }
 }

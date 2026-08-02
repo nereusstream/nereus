@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
 import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
@@ -10,11 +11,13 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 
-/** Domain-separated canonical capability digest shared by readiness and activation records. */
+/**
+ * Domain-separated canonical capability digest shared by readiness and activation records.
+ */
 public final class KafkaStorageCapabilityDigests {
     private static final byte[] DOMAIN = "nereus-kafka-capability-v1".getBytes(StandardCharsets.US_ASCII);
 
-    private KafkaStorageCapabilityDigests() { }
+    private KafkaStorageCapabilityDigests() {}
 
     /**
      * Hashes compatibility facts, not broker identity, build labels or lease times. Compatible rolling binaries may

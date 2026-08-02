@@ -16,12 +16,14 @@ package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.kafka.partition.KafkaPartitionStorageManager;
 
-/** Late-bound background graph that may depend on the process-current partition manager. */
+/**
+ * Late-bound background graph that may depend on the process-current partition manager.
+ */
 @FunctionalInterface
 public interface KafkaRuntimeBackgroundServiceFactory {
-  KafkaRuntimeBackgroundService create(KafkaPartitionStorageManager partitions);
+    KafkaRuntimeBackgroundService create(KafkaPartitionStorageManager partitions);
 
-  static KafkaRuntimeBackgroundServiceFactory none() {
-    return ignored -> KafkaRuntimeBackgroundService.none();
-  }
+    static KafkaRuntimeBackgroundServiceFactory none() {
+        return ignored -> KafkaRuntimeBackgroundService.none();
+    }
 }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.ErrorCode;
@@ -9,13 +10,14 @@ import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationReco
 import com.nereusstream.metadata.oxia.records.KafkaStorageReadinessRecord;
 import java.util.Arrays;
 
-/** Monotonic replacement guards for F9 activation control-plane records. */
+/**
+ * Monotonic replacement guards for F9 activation control-plane records.
+ */
 final class KafkaStorageActivationTransitions {
-    private KafkaStorageActivationTransitions() { }
+    private KafkaStorageActivationTransitions() {}
 
     static void requireActivationReplacement(
-            KafkaStorageProtocolActivationRecord current,
-            KafkaStorageProtocolActivationRecord replacement) {
+            KafkaStorageProtocolActivationRecord current, KafkaStorageProtocolActivationRecord replacement) {
         if (!sameActivationFacts(current, replacement)) {
             throw invariant("Kafka storage activation changed immutable protocol facts");
         }
@@ -33,8 +35,7 @@ final class KafkaStorageActivationTransitions {
     }
 
     static void requireCapabilityHeartbeat(
-            KafkaBrokerCapabilityRecord current,
-            KafkaBrokerCapabilityRecord replacement) {
+            KafkaBrokerCapabilityRecord current, KafkaBrokerCapabilityRecord replacement) {
         if (!sameCapabilityFacts(current, replacement)) {
             throw invariant("Kafka broker heartbeat changed immutable capability facts");
         }
@@ -45,8 +46,7 @@ final class KafkaStorageActivationTransitions {
     }
 
     static void requireReadinessReplacement(
-            KafkaStorageReadinessRecord current,
-            KafkaStorageReadinessRecord replacement) {
+            KafkaStorageReadinessRecord current, KafkaStorageReadinessRecord replacement) {
         if (!current.kafkaClusterId().equals(replacement.kafkaClusterId())) {
             throw invariant("Kafka readiness replacement changed cluster identity");
         }
@@ -58,8 +58,7 @@ final class KafkaStorageActivationTransitions {
     }
 
     private static boolean sameActivationFacts(
-            KafkaStorageProtocolActivationRecord left,
-            KafkaStorageProtocolActivationRecord right) {
+            KafkaStorageProtocolActivationRecord left, KafkaStorageProtocolActivationRecord right) {
         return left.recordVersion() == right.recordVersion()
                 && left.kafkaClusterId().equals(right.kafkaClusterId())
                 && left.protocolVersion() == right.protocolVersion()
@@ -74,8 +73,7 @@ final class KafkaStorageActivationTransitions {
                 && left.compactionStrategyVersion() == right.compactionStrategyVersion()
                 && left.allowedStorageProfiles().equals(right.allowedStorageProfiles())
                 && left.defaultStorageProfile().equals(right.defaultStorageProfile())
-                && Arrays.equals(
-                        left.requiredCapabilitySha256(), right.requiredCapabilitySha256())
+                && Arrays.equals(left.requiredCapabilitySha256(), right.requiredCapabilitySha256())
                 && Arrays.equals(left.requiredBrokerSetSha256(), right.requiredBrokerSetSha256())
                 && left.kafkaFeatureLevel() == right.kafkaFeatureLevel()
                 && left.preparedAtMetadataOffset() == right.preparedAtMetadataOffset()
@@ -83,9 +81,7 @@ final class KafkaStorageActivationTransitions {
                 && left.preparedAtMillis() == right.preparedAtMillis();
     }
 
-    private static boolean sameCapabilityFacts(
-            KafkaBrokerCapabilityRecord left,
-            KafkaBrokerCapabilityRecord right) {
+    private static boolean sameCapabilityFacts(KafkaBrokerCapabilityRecord left, KafkaBrokerCapabilityRecord right) {
         return left.recordVersion() == right.recordVersion()
                 && left.kafkaClusterId().equals(right.kafkaClusterId())
                 && left.identity().equals(right.identity())
@@ -105,8 +101,7 @@ final class KafkaStorageActivationTransitions {
                 && left.compactionStrategyVersion() == right.compactionStrategyVersion()
                 && left.kafkaFeatureLevel() == right.kafkaFeatureLevel()
                 && left.supportedStorageProfiles().equals(right.supportedStorageProfiles())
-                && Arrays.equals(
-                        left.configCompatibilitySha256(), right.configCompatibilitySha256())
+                && Arrays.equals(left.configCompatibilitySha256(), right.configCompatibilitySha256())
                 && Arrays.equals(left.codeCapabilitySha256(), right.codeCapabilitySha256())
                 && Arrays.equals(left.providerScopeSha256(), right.providerScopeSha256())
                 && left.startedAtMillis() == right.startedAtMillis();

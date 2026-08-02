@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
-import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.ResolvedRange;
@@ -40,14 +40,17 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 
-/** Authoritative view-scoped generation resolver with durable object pinning and same-view fallback. */
+/**
+ * Authoritative view-scoped generation resolver with durable object pinning and same-view fallback.
+ */
 public final class GenerationReadResolver {
     public static final long MAX_GENERATION_RANGE_RECORDS = 1_048_576L;
     public static final int GENERATION_SCAN_PAGE_SIZE = 512;
     public static final int MAX_GENERATION_CANDIDATES_PER_RESOLVE = 4_096;
 
-    private static final Comparator<GenerationReadCandidate> GENERATION_DESCENDING = Comparator
-            .comparingLong((GenerationReadCandidate value) -> value.resolvedRange().generation())
+    private static final String OFFSET_TRIMMED_DURING_REPAIR = "requested offset was trimmed during index repair";
+    private static final Comparator<GenerationReadCandidate> GENERATION_DESCENDING = Comparator.comparingLong(
+                    (GenerationReadCandidate value) -> value.resolvedRange().generation())
             .reversed();
 
     private final String cluster;
@@ -80,8 +83,7 @@ public final class GenerationReadResolver {
                 readers,
                 identityResolver,
                 pinManager,
-                new MetadataGenerationIndexRepairer(
-                        cluster, l0Store, maxRepairCommits),
+                new MetadataGenerationIndexRepairer(cluster, l0Store, maxRepairCommits),
                 clock,
                 callbackExecutor);
     }
@@ -110,10 +112,7 @@ public final class GenerationReadResolver {
     }
 
     public CompletableFuture<Optional<PinnedResolvedRange>> resolve(
-            StreamId streamId,
-            long offset,
-            ReadView view,
-            Duration timeout) {
+            StreamId streamId, long offset, ReadView view, Duration timeout) {
         return resolve(
                 Objects.requireNonNull(streamId, "streamId"),
                 offset,
@@ -125,11 +124,7 @@ public final class GenerationReadResolver {
     }
 
     CompletableFuture<Optional<PinnedResolvedRange>> resolve(
-            StreamId streamId,
-            long offset,
-            ReadView view,
-            ReadOperationDeadline deadline,
-            boolean allowRepair) {
+            StreamId streamId, long offset, ReadView view, ReadOperationDeadline deadline, boolean allowRepair) {
         return resolve(streamId, offset, view, deadline, allowRepair, Set.of(), null);
     }
 
@@ -140,8 +135,7 @@ public final class GenerationReadResolver {
             ReadOperationDeadline deadline,
             boolean allowRepair,
             Set<GenerationReadCandidate> excludedCandidates) {
-        return resolve(
-                streamId, offset, view, deadline, allowRepair, excludedCandidates, null);
+        return resolve(streamId, offset, view, deadline, allowRepair, excludedCandidates, null);
     }
 
     CompletableFuture<Optional<PinnedResolvedRange>> resolve(
@@ -152,8 +146,8 @@ public final class GenerationReadResolver {
             boolean allowRepair,
             Set<GenerationReadCandidate> excludedCandidates,
             GenerationReadConstraint constraint) {
-        Set<GenerationReadCandidate> exclusions = Set.copyOf(
-                Objects.requireNonNull(excludedCandidates, "excludedCandidates"));
+        Set<GenerationReadCandidate> exclusions =
+                Set.copyOf(Objects.requireNonNull(excludedCandidates, "excludedCandidates"));
         if (constraint != null
                 && (!constraint.streamId().equals(streamId)
                         || constraint.view() != view
@@ -164,97 +158,91 @@ public final class GenerationReadResolver {
                     "generation constraint does not cover the requested stream/view/offset");
         }
         if (offset < 0) {
-            return NereusException.failedFuture(
-                    ErrorCode.INVALID_ARGUMENT, false, "read offset must be non-negative");
+            return NereusException.failedFuture(ErrorCode.INVALID_ARGUMENT, false, "read offset must be non-negative");
         }
-        return loadSnapshot(streamId, deadline).thenComposeAsync(snapshot -> {
-            StorageProfile profile = validateReadable(streamId, offset, snapshot);
-            if (offset >= snapshot.committedEnd().committedEndOffset()) {
-                return CompletableFuture.completedFuture(Optional.empty());
-            }
-            long maximumEnd = Math.min(
-                    snapshot.committedEnd().committedEndOffset(),
-                    saturatingAdd(offset, MAX_GENERATION_RANGE_RECORDS));
-            return scanAll(
-                            streamId,
-                            view,
-                            Math.addExact(offset, 1),
-                            maximumEnd,
-                            Optional.empty(),
-                            new ArrayList<>(),
-                            deadline)
-                    .thenCompose(wrappers -> candidates(
-                            streamId,
-                            offset,
-                            view,
-                            snapshot,
-                            wrappers,
-                            view != ReadView.COMMITTED
-                                    || profile.objectMaterializationEnabled(),
-                            constraint))
-                    .thenCompose(candidates -> {
-                        List<GenerationReadCandidate> admitted = candidates.stream()
-                                .filter(candidate -> !exclusions.contains(candidate))
-                                .toList();
-                        if (!admitted.isEmpty()) {
-                            long maximumReadDeadlineMillis = maximumReadDeadlineMillis(deadline);
-                            return pinNext(
-                                    streamId,
-                                    offset,
-                                    view,
-                                    admitted,
-                                    0,
-                                    maximumReadDeadlineMillis,
-                                    deadline,
-                                    null);
-                        }
-                        if (!candidates.isEmpty() && !exclusions.isEmpty()) {
-                            return CompletableFuture.failedFuture(new NereusException(
-                                    ErrorCode.READ_RESOLUTION_FAILED,
-                                    true,
-                                    "all same-view generation candidates failed during this read"));
-                        }
-                        if (allowRepair && view == ReadView.COMMITTED) {
-                            return deadline.bound(
-                                            () -> repairer.repair(
+        return loadSnapshot(streamId, deadline)
+                .thenComposeAsync(
+                        snapshot -> {
+                            StorageProfile profile = validateReadable(streamId, offset, snapshot);
+                            if (offset >= snapshot.committedEnd().committedEndOffset()) {
+                                return CompletableFuture.completedFuture(Optional.empty());
+                            }
+                            long maximumEnd = Math.min(
+                                    snapshot.committedEnd().committedEndOffset(),
+                                    saturatingAdd(offset, MAX_GENERATION_RANGE_RECORDS));
+                            return scanAll(
+                                            streamId,
+                                            view,
+                                            Math.addExact(offset, 1),
+                                            maximumEnd,
+                                            Optional.empty(),
+                                            new ArrayList<>(),
+                                            deadline)
+                                    .thenCompose(wrappers -> candidates(
+                                            streamId,
+                                            offset,
+                                            view,
+                                            snapshot,
+                                            wrappers,
+                                            view != ReadView.COMMITTED || profile.objectMaterializationEnabled(),
+                                            constraint))
+                                    .thenCompose(candidates -> {
+                                        List<GenerationReadCandidate> admitted = candidates.stream()
+                                                .filter(candidate -> !exclusions.contains(candidate))
+                                                .toList();
+                                        if (!admitted.isEmpty()) {
+                                            long maximumReadDeadlineMillis = maximumReadDeadlineMillis(deadline);
+                                            return pinNext(
                                                     streamId,
                                                     offset,
-                                                    deadline.remaining()),
-                                            "repair committed generation index")
-                                    .thenCompose(result -> {
-                                        requireRepairResult(streamId, offset, result);
-                                        if (result.source()
-                                                == GenerationIndexRepairSource.TRIMMED) {
-                                            return CompletableFuture.failedFuture(
-                                                    new NereusException(
-                                                            ErrorCode.OFFSET_TRIMMED,
-                                                            false,
-                                                            "requested offset was trimmed during index repair"));
+                                                    view,
+                                                    admitted,
+                                                    0,
+                                                    maximumReadDeadlineMillis,
+                                                    deadline,
+                                                    null);
                                         }
-                                        return resolve(
-                                                streamId,
-                                                offset,
-                                                view,
-                                                deadline,
-                                                false,
-                                                exclusions,
-                                                constraint);
+                                        if (!candidates.isEmpty() && !exclusions.isEmpty()) {
+                                            return CompletableFuture.failedFuture(new NereusException(
+                                                    ErrorCode.READ_RESOLUTION_FAILED,
+                                                    true,
+                                                    "all same-view generation candidates failed during this read"));
+                                        }
+                                        if (allowRepair && view == ReadView.COMMITTED) {
+                                            return deadline.bound(
+                                                            () -> repairer.repair(
+                                                                    streamId, offset, deadline.remaining()),
+                                                            "repair committed generation index")
+                                                    .thenCompose(result -> {
+                                                        requireRepairResult(streamId, offset, result);
+                                                        if (result.source() == GenerationIndexRepairSource.TRIMMED) {
+                                                            return CompletableFuture.failedFuture(new NereusException(
+                                                                    ErrorCode.OFFSET_TRIMMED,
+                                                                    false,
+                                                                    OFFSET_TRIMMED_DURING_REPAIR));
+                                                        }
+                                                        return resolve(
+                                                                streamId,
+                                                                offset,
+                                                                view,
+                                                                deadline,
+                                                                false,
+                                                                exclusions,
+                                                                constraint);
+                                                    });
+                                        }
+                                        return CompletableFuture.failedFuture(new NereusException(
+                                                ErrorCode.READ_RESOLUTION_FAILED,
+                                                true,
+                                                "no committed generation covers a committed offset"));
                                     });
-                        }
-                        return CompletableFuture.failedFuture(new NereusException(
-                                ErrorCode.READ_RESOLUTION_FAILED,
-                                true,
-                                "no committed generation covers a committed offset"));
-                    });
-        }, callbackExecutor);
+                        },
+                        callbackExecutor);
     }
 
-    private CompletableFuture<StreamMetadataSnapshot> loadSnapshot(
-            StreamId streamId,
-            ReadOperationDeadline deadline) {
+    private CompletableFuture<StreamMetadataSnapshot> loadSnapshot(StreamId streamId, ReadOperationDeadline deadline) {
         return deadline.bound(
-                () -> l0Store.getStreamSnapshot(cluster, streamId),
-                "load stream head for generation resolve");
+                () -> l0Store.getStreamSnapshot(cluster, streamId), "load stream head for generation resolve");
     }
 
     private CompletableFuture<List<VersionedGenerationCandidate>> scanAll(
@@ -269,22 +257,9 @@ public final class GenerationReadResolver {
         int pageSize = Math.min(GENERATION_SCAN_PAGE_SIZE, Math.max(1, remaining));
         return deadline.bound(
                         () -> generationStore.scanIndex(
-                                cluster,
-                                streamId,
-                                view,
-                                minimumEnd,
-                                maximumEnd,
-                                continuation,
-                                pageSize),
+                                cluster, streamId, view, minimumEnd, maximumEnd, continuation, pageSize),
                         "scan generation index")
-                .thenCompose(page -> appendPage(
-                        streamId,
-                        view,
-                        minimumEnd,
-                        maximumEnd,
-                        accumulated,
-                        page,
-                        deadline));
+                .thenCompose(page -> appendPage(streamId, view, minimumEnd, maximumEnd, accumulated, page, deadline));
     }
 
     private CompletableFuture<List<VersionedGenerationCandidate>> appendPage(
@@ -305,26 +280,13 @@ public final class GenerationReadResolver {
         if (accumulated.size() == MAX_GENERATION_CANDIDATES_PER_RESOLVE) {
             return deadline.bound(
                             () -> generationStore.scanIndex(
-                                    cluster,
-                                    streamId,
-                                    view,
-                                    minimumEnd,
-                                    maximumEnd,
-                                    page.continuation(),
-                                    1),
+                                    cluster, streamId, view, minimumEnd, maximumEnd, page.continuation(), 1),
                             "probe generation candidate limit")
                     .thenCompose(probe -> probe.values().isEmpty()
                             ? CompletableFuture.completedFuture(List.copyOf(accumulated))
                             : metadataLimit());
         }
-        return scanAll(
-                streamId,
-                view,
-                minimumEnd,
-                maximumEnd,
-                page.continuation(),
-                accumulated,
-                deadline);
+        return scanAll(streamId, view, minimumEnd, maximumEnd, page.continuation(), accumulated, deadline);
     }
 
     private CompletableFuture<List<GenerationReadCandidate>> candidates(
@@ -340,9 +302,8 @@ public final class GenerationReadResolver {
         for (VersionedGenerationCandidate wrapper : wrappers) {
             if (wrapper instanceof VersionedGenerationIndex higher) {
                 if (!higherGenerationsAllowed) {
-                    return CompletableFuture.failedFuture(invariant(
-                            "a primary-WAL-only profile contains a higher generation",
-                            null));
+                    return CompletableFuture.failedFuture(
+                            invariant("a primary-WAL-only profile contains a higher generation", null));
                 }
                 if (higher.value().lifecycle() != GenerationLifecycle.COMMITTED) {
                     continue;
@@ -350,11 +311,11 @@ public final class GenerationReadResolver {
                 if (constraint != null && !constraint.admits(higher)) {
                     continue;
                 }
-                String previous = positiveGenerationKeys.putIfAbsent(
-                        higher.value().generation(), higher.key());
+                String previous =
+                        positiveGenerationKeys.putIfAbsent(higher.value().generation(), higher.key());
                 if (previous != null && !previous.equals(higher.key())) {
-                    return CompletableFuture.failedFuture(invariant(
-                            "one stream/view contains duplicate positive generation numbers", null));
+                    return CompletableFuture.failedFuture(
+                            invariant("one stream/view contains duplicate positive generation numbers", null));
                 }
                 ResolvedRange resolved = indexValidator.requireSemantic(
                         higher,
@@ -374,24 +335,19 @@ public final class GenerationReadResolver {
                 }
             } else if (wrapper instanceof VersionedGenerationZeroIndex zero) {
                 if (view != ReadView.COMMITTED) {
-                    return CompletableFuture.failedFuture(invariant(
-                            "generation zero appeared outside COMMITTED view", null));
+                    return CompletableFuture.failedFuture(
+                            invariant("generation zero appeared outside COMMITTED view", null));
                 }
                 OffsetIndexEntry entry = zero.value();
                 if (!entry.tombstoned()
                         && entry.commitVersion() <= snapshot.committedEnd().commitVersion()
                         && entry.offsetEnd() <= snapshot.committedEnd().committedEndOffset()
                         && covers(entry, offset)) {
-                    result.add(toCandidate(
-                            view,
-                            entry,
-                            zero.key(),
-                            zero.durableValueSha256(),
-                            Optional.empty()));
+                    result.add(toCandidate(view, entry, zero.key(), zero.durableValueSha256(), Optional.empty()));
                 }
             } else {
-                return CompletableFuture.failedFuture(invariant(
-                        "generation scan returned an unknown candidate wrapper", null));
+                return CompletableFuture.failedFuture(
+                        invariant("generation scan returned an unknown candidate wrapper", null));
             }
         }
         result.sort(GENERATION_DESCENDING);
@@ -424,22 +380,13 @@ public final class GenerationReadResolver {
         if (!(candidate.resolvedRange().readTarget() instanceof ObjectSliceReadTarget objectTarget)) {
             if (!candidate.generationZero()) {
                 return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.UNSUPPORTED_READ_TARGET,
-                        false,
-                        "higher generations require an object-slice target"));
+                        ErrorCode.UNSUPPORTED_READ_TARGET, false, "higher generations require an object-slice target"));
             }
             return CompletableFuture.completedFuture(Optional.of(new PinnedResolvedRange(candidate)));
         }
-        return deadline.bound(
-                        () -> identityResolver.resolve(objectTarget, view),
-                        "resolve physical object identity")
-                .thenCompose(identity -> acquire(
-                        streamId,
-                        offset,
-                        candidate,
-                        identity,
-                        maximumReadDeadlineMillis,
-                        deadline))
+        return deadline.bound(() -> identityResolver.resolve(objectTarget, view), "resolve physical object identity")
+                .thenCompose(
+                        identity -> acquire(streamId, offset, candidate, identity, maximumReadDeadlineMillis, deadline))
                 .handle((pinned, failure) -> {
                     if (failure == null) {
                         return CompletableFuture.completedFuture(Optional.of(pinned));
@@ -449,14 +396,7 @@ public final class GenerationReadResolver {
                         return CompletableFuture.<Optional<PinnedResolvedRange>>failedFuture(cause);
                     }
                     return pinNext(
-                            streamId,
-                            offset,
-                            view,
-                            candidates,
-                            index + 1,
-                            maximumReadDeadlineMillis,
-                            deadline,
-                            cause);
+                            streamId, offset, view, candidates, index + 1, maximumReadDeadlineMillis, deadline, cause);
                 })
                 .thenCompose(value -> value);
     }
@@ -478,8 +418,7 @@ public final class GenerationReadResolver {
     }
 
     private CompletableFuture<PinnedResolvedRange> wrapPinned(
-            GenerationReadCandidate candidate,
-            ObjectReadLease lease) {
+            GenerationReadCandidate candidate, ObjectReadLease lease) {
         try {
             return CompletableFuture.completedFuture(new PinnedResolvedRange(candidate, lease));
         } catch (Throwable failure) {
@@ -493,22 +432,18 @@ public final class GenerationReadResolver {
     }
 
     private CompletableFuture<Void> revalidate(
-            StreamId streamId,
-            long offset,
-            GenerationReadCandidate expected,
-            ReadOperationDeadline deadline) {
+            StreamId streamId, long offset, GenerationReadCandidate expected, ReadOperationDeadline deadline) {
         long offsetEnd = expected.resolvedRange().offsetRange().endOffset();
         long generation = expected.resolvedRange().generation();
         return deadline.bound(
-                        () -> generationStore.getCandidate(
-                                cluster, streamId, expected.view(), offsetEnd, generation),
+                        () -> generationStore.getCandidate(cluster, streamId, expected.view(), offsetEnd, generation),
                         "reload exact generation index after reader pin")
                 .thenCompose(optional -> {
-                    VersionedGenerationCandidate actual = optional.orElseThrow(() -> condition(
-                            "selected generation index disappeared during reader pin"));
+                    VersionedGenerationCandidate actual = optional.orElseThrow(
+                            () -> condition("selected generation index disappeared during reader pin"));
                     if (!sameWrapperIdentity(expected, actual)) {
-                        return CompletableFuture.failedFuture(condition(
-                                "selected generation index changed during reader pin"));
+                        return CompletableFuture.failedFuture(
+                                condition("selected generation index changed during reader pin"));
                     }
                     return loadSnapshot(streamId, deadline).thenApply(snapshot -> {
                         validateReadable(streamId, offset, snapshot);
@@ -524,9 +459,7 @@ public final class GenerationReadResolver {
                 });
     }
 
-    private static boolean sameWrapperIdentity(
-            GenerationReadCandidate expected,
-            VersionedGenerationCandidate actual) {
+    private static boolean sameWrapperIdentity(GenerationReadCandidate expected, VersionedGenerationCandidate actual) {
         if (!actual.key().equals(expected.indexKey())
                 || actual.metadataVersion() != expected.indexMetadataVersion()
                 || !actual.durableValueSha256().equals(expected.indexRecordSha256())) {
@@ -541,20 +474,17 @@ public final class GenerationReadResolver {
             return !expected.generationZero()
                     && higher.value().lifecycle() == GenerationLifecycle.COMMITTED
                     && higher.value().generation() == expected.resolvedRange().generation()
-                    && expected.publicationId().orElseThrow().value()
+                    && expected.publicationId()
+                            .orElseThrow()
+                            .value()
                             .equals(higher.value().publicationId());
         }
         return false;
     }
 
-    private static void requireRepairResult(
-            StreamId streamId,
-            long offset,
-            GenerationIndexRepairResult result) {
-        if (!result.streamId().equals(streamId)
-                || result.targetOffset() != offset) {
-            throw invariant(
-                    "generation index repair returned another target", null);
+    private static void requireRepairResult(StreamId streamId, long offset, GenerationIndexRepairResult result) {
+        if (!result.streamId().equals(streamId) || result.targetOffset() != offset) {
+            throw invariant("generation index repair returned another target", null);
         }
     }
 
@@ -576,23 +506,14 @@ public final class GenerationReadResolver {
                 entry.projectionRef(),
                 entry.commitVersion());
         return new GenerationReadCandidate(
-                view,
-                resolved,
-                key,
-                entry.metadataVersion(),
-                durableSha256,
-                entry.generation() == 0,
-                publicationId);
+                view, resolved, key, entry.metadataVersion(), durableSha256, entry.generation() == 0, publicationId);
     }
 
     private static boolean covers(OffsetIndexEntry entry, long offset) {
         return entry.offsetStart() <= offset && offset < entry.offsetEnd();
     }
 
-    private static StorageProfile validateReadable(
-            StreamId streamId,
-            long offset,
-            StreamMetadataSnapshot snapshot) {
+    private static StorageProfile validateReadable(StreamId streamId, long offset, StreamMetadataSnapshot snapshot) {
         if (!snapshot.metadata().streamId().equals(streamId.value())) {
             throw invariant("stream snapshot belongs to another stream", null);
         }
@@ -612,9 +533,7 @@ public final class GenerationReadResolver {
         }
         if (offset < snapshot.trim().trimOffset()) {
             throw new NereusException(
-                    ErrorCode.OFFSET_TRIMMED,
-                    false,
-                    "requested offset is below the stream trim offset");
+                    ErrorCode.OFFSET_TRIMMED, false, "requested offset is below the stream trim offset");
         }
         return profile;
     }

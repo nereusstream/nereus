@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.ReadView;
@@ -8,7 +9,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Flow;
 
-/** Closed NCP2 Parquet writer; V1 schemas and validation are not reused or reinterpreted. */
+/**
+ * Closed NCP2 Parquet writer; V1 schemas and validation are not reused or reinterpreted.
+ */
 public final class ParquetRangedCompactedObjectWriter implements RangedCompactedObjectWriter {
     private final ParquetV2WriterSupport support;
 
@@ -18,8 +21,7 @@ public final class ParquetRangedCompactedObjectWriter implements RangedCompacted
 
     @Override
     public CompletableFuture<RangedCompactedObjectWriteResult> write(
-            RangedCompactedObjectWriteRequest request,
-            Flow.Publisher<RangedCompactedObjectRow> rows) {
+            RangedCompactedObjectWriteRequest request, Flow.Publisher<RangedCompactedObjectRow> rows) {
         Objects.requireNonNull(request, "request");
         return support.write(
                 new ParquetV2WriterSupport.WriteSpec<>(

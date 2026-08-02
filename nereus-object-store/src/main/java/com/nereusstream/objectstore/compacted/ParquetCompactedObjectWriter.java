@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -48,30 +49,27 @@ import org.apache.parquet.io.PositionOutputStream;
 import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.MessageType;
 
-/** Apache Parquet NCP1/NTC1 writer with exact record-bounded row groups and private staging. */
+/**
+ * Apache Parquet NCP1/NTC1 writer with exact record-bounded row groups and private staging.
+ */
 public final class ParquetCompactedObjectWriter implements CompactedObjectWriter {
     private static final int COLUMN_INDEX_TRUNCATE_LENGTH = 64;
 
     private final StagingFileManager stagingFiles;
     private final Executor writerExecutor;
 
-    public ParquetCompactedObjectWriter(
-            StagingFileManager stagingFiles,
-            Executor writerExecutor) {
+    public ParquetCompactedObjectWriter(StagingFileManager stagingFiles, Executor writerExecutor) {
         this.stagingFiles = Objects.requireNonNull(stagingFiles, "stagingFiles");
         this.writerExecutor = Objects.requireNonNull(writerExecutor, "writerExecutor");
     }
 
     @Override
     public CompletableFuture<CompactedObjectWriteResult> write(
-            CompactedObjectWriteRequest request,
-            Flow.Publisher<CompactedObjectRow> rows) {
+            CompactedObjectWriteRequest request, Flow.Publisher<CompactedObjectRow> rows) {
         CompletableFuture<CompactedObjectWriteResult> result = new CompletableFuture<>();
         if (request == null || rows == null) {
             result.completeExceptionally(new NereusException(
-                    ErrorCode.INVALID_ARGUMENT,
-                    false,
-                    "compacted write request and row publisher are required"));
+                    ErrorCode.INVALID_ARGUMENT, false, "compacted write request and row publisher are required"));
             return result;
         }
         SerialExecutor serial = new SerialExecutor(writerExecutor);
@@ -91,10 +89,7 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
             });
         } catch (RejectedExecutionException failure) {
             result.completeExceptionally(new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    "compacted writer executor rejected the operation",
-                    failure));
+                    ErrorCode.STORAGE_CLOSED, false, "compacted writer executor rejected the operation", failure));
         }
         result.whenComplete((ignored, failure) -> {
             if (result.isCancelled()) {
@@ -119,7 +114,8 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
         private WritingSubscriber(
                 CompactedObjectWriteRequest request,
                 CompletableFuture<CompactedObjectWriteResult> result,
-                SerialExecutor serial) throws IOException {
+                SerialExecutor serial)
+                throws IOException {
             this.request = request;
             this.result = result;
             this.serial = serial;
@@ -251,9 +247,8 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
         private int rowGroupCount;
         private boolean finished;
 
-        private ParquetSink(
-                CompactedObjectWriteRequest request,
-                PrivateStagedObjectFile stagingFile) throws IOException {
+        private ParquetSink(CompactedObjectWriteRequest request, PrivateStagedObjectFile stagingFile)
+                throws IOException {
             this.request = request;
             this.stagingFile = stagingFile;
             this.schema = CompactedObjectFormatV1.schema(request.view());
@@ -327,8 +322,7 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
             fileWriter.close();
             codecFactory.release();
             if (output.getPos() > CompactedObjectFormatV1.MAX_OBJECT_BYTES) {
-                throw new CompactedObjectFormatException(
-                        "compacted Parquet object exceeds the V1 1 GiB limit");
+                throw new CompactedObjectFormatException("compacted Parquet object exceeds the V1 1 GiB limit");
             }
             PrivateStagedObjectFile sealed = stagingFile.seal();
             Checksum footerCrc32c = Crc32cChecksums.checksum(footer);
@@ -370,21 +364,22 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
             if (!request.sourceCoverage().contains(row.streamOffset())) {
                 throw new CompactedObjectFormatException("row offset is outside dense source coverage");
             }
-            row.messageKey().ifPresent(value -> requireSize(
-                    value, CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES, "message key"));
-            row.orderingKey().ifPresent(value -> requireSize(
-                    value, CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES, "ordering key"));
-            row.compactionKey().ifPresent(value -> requireSize(
-                    value, CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES, "compaction key"));
+            row.messageKey()
+                    .ifPresent(value ->
+                            requireSize(value, CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES, "message key"));
+            row.orderingKey()
+                    .ifPresent(value ->
+                            requireSize(value, CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES, "ordering key"));
+            row.compactionKey()
+                    .ifPresent(value ->
+                            requireSize(value, CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES, "compaction key"));
             row.schemaIdentity().ifPresent(value -> {
-                if (value.getBytes(StandardCharsets.UTF_8).length
-                        > CompactedObjectFormatV1.MAX_SCHEMA_IDENTITY_BYTES) {
+                if (value.getBytes(StandardCharsets.UTF_8).length > CompactedObjectFormatV1.MAX_SCHEMA_IDENTITY_BYTES) {
                     throw new CompactedObjectFormatException("schema identity exceeds the V1 limit");
                 }
             });
             if (request.view() == ReadView.COMMITTED) {
-                long expectedOffset = Math.addExact(
-                        request.sourceCoverage().startOffset(), outputRecords);
+                long expectedOffset = Math.addExact(request.sourceCoverage().startOffset(), outputRecords);
                 if (row.streamOffset() != expectedOffset
                         || row.sparseDisposition().isPresent()
                         || row.compactionKey().isPresent()) {
@@ -400,8 +395,7 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
                 throw new CompactedObjectFormatException(
                         "topic-compacted rows must be increasing and carry disposition/key");
             }
-            TopicCompactionKeyEncodingV1.validateForOffset(
-                    row.compactionKey().orElseThrow(), row.streamOffset());
+            TopicCompactionKeyEncodingV1.validateForOffset(row.compactionKey().orElseThrow(), row.streamOffset());
             int disposition = row.sparseDisposition().getAsInt();
             if (disposition != 1 && disposition != 2) {
                 throw new CompactedObjectFormatException("unknown topic-compaction disposition");
@@ -427,14 +421,17 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
                 group.append("payload_crc32c", row.payloadCrc32c());
                 row.publishTimeMillis().ifPresent(value -> group.append("publish_time_millis", value));
                 row.eventTimeMillis().ifPresent(value -> group.append("event_time_millis", value));
-                row.messageKey().ifPresent(value -> group.append(
-                        "message_key", Binary.fromConstantByteArray(bytes(value,
-                                CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES, "message key"))));
-                row.orderingKey().ifPresent(value -> group.append(
-                        "ordering_key", Binary.fromConstantByteArray(bytes(value,
-                                CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES, "ordering key"))));
-                row.schemaIdentity().ifPresent(value -> group.append(
-                        "schema_identity", Binary.fromString(value)));
+                row.messageKey()
+                        .ifPresent(value -> group.append(
+                                "message_key",
+                                Binary.fromConstantByteArray(bytes(
+                                        value, CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES, "message key"))));
+                row.orderingKey()
+                        .ifPresent(value -> group.append(
+                                "ordering_key",
+                                Binary.fromConstantByteArray(bytes(
+                                        value, CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES, "ordering key"))));
+                row.schemaIdentity().ifPresent(value -> group.append("schema_identity", Binary.fromString(value)));
                 row.producerId().ifPresent(value -> group.append("producer_id", value));
                 row.producerSequenceId().ifPresent(value -> group.append("producer_sequence_id", value));
                 row.batchMessageCount().ifPresent(value -> group.append("batch_message_count", value));
@@ -442,10 +439,12 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
             }
             int disposition = row.sparseDisposition().orElseThrow();
             group.append("disposition", disposition);
-            group.append("compaction_key", Binary.fromConstantByteArray(bytes(
-                    row.compactionKey().orElseThrow(),
-                    CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES,
-                    "compaction key")));
+            group.append(
+                    "compaction_key",
+                    Binary.fromConstantByteArray(bytes(
+                            row.compactionKey().orElseThrow(),
+                            CompactedObjectFormatV1.MAX_OPTIONAL_BINARY_BYTES,
+                            "compaction key")));
             if (disposition == 1) {
                 group.append("payload", Binary.fromConstantByteArray(payload));
                 group.append("payload_crc32c", row.payloadCrc32c());
@@ -474,8 +473,7 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
             ColumnWriteStore columnStore = properties.newColumnWriteStore(schema, pageStore, pageStore);
             try {
                 MessageColumnIO columnIo = new ColumnIOFactory(true).getColumnIO(schema);
-                GroupWriter groupWriter = new GroupWriter(
-                        columnIo.getRecordWriter(columnStore), schema);
+                GroupWriter groupWriter = new GroupWriter(columnIo.getRecordWriter(columnStore), schema);
                 for (Group group : rowGroup) {
                     groupWriter.write(group);
                 }
@@ -498,8 +496,7 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
             if (request.view() == ReadView.COMMITTED) {
                 if (previousOffset != request.sourceCoverage().endOffset() - 1
                         || totalPayloadBytes != request.logicalBytes()) {
-                    throw new CompactedObjectFormatException(
-                            "committed compacted row coverage/bytes are not exact");
+                    throw new CompactedObjectFormatException("committed compacted row coverage/bytes are not exact");
                 }
             }
         }
@@ -533,20 +530,16 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
                     || endBytes[end - 1] != '1') {
                 throw new CompactedObjectFormatException("Parquet footer magic is missing");
             }
-            long metadataLength = Integer.toUnsignedLong(
-                    (endBytes[end - 8] & 0xff)
-                            | ((endBytes[end - 7] & 0xff) << 8)
-                            | ((endBytes[end - 6] & 0xff) << 16)
-                            | ((endBytes[end - 5] & 0xff) << 24));
+            long metadataLength = Integer.toUnsignedLong((endBytes[end - 8] & 0xff)
+                    | ((endBytes[end - 7] & 0xff) << 8)
+                    | ((endBytes[end - 6] & 0xff) << 16)
+                    | ((endBytes[end - 5] & 0xff) << 24));
             long footerLength = Math.addExact(metadataLength, 8);
-            if (footerLength > CompactedObjectFormatV1.MAX_FOOTER_BYTES
-                    || footerLength > endBytes.length) {
+            if (footerLength > CompactedObjectFormatV1.MAX_FOOTER_BYTES || footerLength > endBytes.length) {
                 throw new CompactedObjectFormatException("Parquet footer length trailer is inconsistent");
             }
             return java.util.Arrays.copyOfRange(
-                    endBytes,
-                    Math.toIntExact(endBytes.length - footerLength),
-                    endBytes.length);
+                    endBytes, Math.toIntExact(endBytes.length - footerLength), endBytes.length);
         }
     }
 

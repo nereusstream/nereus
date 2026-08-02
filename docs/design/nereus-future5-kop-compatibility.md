@@ -31,15 +31,15 @@ Future 5 实现必须增加明确的 payload/projection contract，使 Kafka bat
 
 ## 2. 坐标映射
 
-| Kafka 概念 | Nereus 概念 |
-| --- | --- |
-| Topic partition | Stream |
-| Kafka offset | `streamId + recordOffset` |
-| Log end offset | `committedEndOffset` |
-| Fetch offset | offset index lookup |
-| Consumer committed offset | Oxia group offset state |
-| Record batch base offset | Oxia commit result base offset |
-| Transaction marker | stream transaction marker / txn state |
+| Kafka 概念                  | Nereus 概念                             |
+|---------------------------|---------------------------------------|
+| Topic partition           | Stream                                |
+| Kafka offset              | `streamId + recordOffset`             |
+| Log end offset            | `committedEndOffset`                  |
+| Fetch offset              | offset index lookup                   |
+| Consumer committed offset | Oxia group offset state               |
+| Record batch base offset  | Oxia commit result base offset        |
+| Transaction marker        | stream transaction marker / txn state |
 
 Kafka offset 直接等于 stream record offset，但前提是 stream 的 mapping version 保证一条 Kafka
 record 消耗一个 L0 offset。Pulsar MessageId 是另一个 projection，不能影响 Kafka offset。
@@ -47,12 +47,12 @@ F2 `PULSAR_ENTRY_V1` 将 batch 内所有 message 放在同一 offset，因此不
 
 Future 5 必须在打开 partition 前读取并校验 L0 的 `nereus.payloadMapping` stream attribute：
 
-| Mapping | KoP admission |
-| --- | --- |
-| `KAFKA_RECORD_V1` or reviewed canonical mapping | allow |
+| Mapping                                            | KoP admission                 |
+|----------------------------------------------------|-------------------------------|
+| `KAFKA_RECORD_V1` or reviewed canonical mapping    | allow                         |
 | `PULSAR_ENTRY_V1` with only single-message entries | reject by default；不依赖历史数据扫描猜测 |
-| `PULSAR_ENTRY_V1` with batched entries | reject |
-| missing/unknown mapping | reject |
+| `PULSAR_ENTRY_V1` with batched entries             | reject                        |
+| missing/unknown mapping                            | reject                        |
 
 即使历史上恰好都是 single-message entry，mapping attribute 也是持久化协议；不能靠扫描样本
 动态猜测兼容性。
@@ -180,10 +180,10 @@ base offset。
 
 两种策略：
 
-| 策略 | 说明 |
-| --- | --- |
-| Read-time rewrite | 根据 Oxia offset index result 重写 record batch base offset |
-| Finalized segment rewrite | compaction 时写入最终 base offset 到 compacted object |
+| 策略                        | 说明                                                      |
+|---------------------------|---------------------------------------------------------|
+| Read-time rewrite         | 根据 Oxia offset index result 重写 record batch base offset |
+| Finalized segment rewrite | compaction 时写入最终 base offset 到 compacted object         |
 
 默认：
 
@@ -211,19 +211,19 @@ base offset。
 
 ## 10. Future 5 Design Gate
 
-| Design question | Required answer |
-| --- | --- |
-| Produce offset | ProduceResponse base offset 必须来自 stable stream-head commit result |
-| Fetch from WAL object | read-time offset rewrite 必须有 checksum 分层策略 |
-| Fetch from compacted object | finalized offset 必须与 stream offset 一致 |
-| Consumer group failover | group coordinator 是 locality role，group state 从 Oxia 恢复 |
-| Offset commit CAS | stale generation 必须被拒绝，retry 必须幂等 |
-| Idempotent producer retry | producer id / sequence 不得重复推进 committed end offset |
-| Kafka transaction commit | `read_committed` 只能看到 committed transaction records |
-| Kafka transaction abort | aborted records and offset commits 必须不可见 |
-| Topic compaction | latest value by key，offset coverage 不出现 gap |
-| Payload mapping | every Kafka record consumes exactly one L0 offset and mapping version is durable |
-| Mixed Pulsar/Kafka access | only a reviewed canonical mapping is admitted；`PULSAR_ENTRY_V1` is rejected |
+| Design question             | Required answer                                                                  |
+|-----------------------------|----------------------------------------------------------------------------------|
+| Produce offset              | ProduceResponse base offset 必须来自 stable stream-head commit result                |
+| Fetch from WAL object       | read-time offset rewrite 必须有 checksum 分层策略                                       |
+| Fetch from compacted object | finalized offset 必须与 stream offset 一致                                            |
+| Consumer group failover     | group coordinator 是 locality role，group state 从 Oxia 恢复                          |
+| Offset commit CAS           | stale generation 必须被拒绝，retry 必须幂等                                                |
+| Idempotent producer retry   | producer id / sequence 不得重复推进 committed end offset                               |
+| Kafka transaction commit    | `read_committed` 只能看到 committed transaction records                              |
+| Kafka transaction abort     | aborted records and offset commits 必须不可见                                         |
+| Topic compaction            | latest value by key，offset coverage 不出现 gap                                      |
+| Payload mapping             | every Kafka record consumes exactly one L0 offset and mapping version is durable |
+| Mixed Pulsar/Kafka access   | only a reviewed canonical mapping is admitted；`PULSAR_ENTRY_V1` is rejected      |
 
 ## 11. 与 Ursa 的目标设计对齐
 

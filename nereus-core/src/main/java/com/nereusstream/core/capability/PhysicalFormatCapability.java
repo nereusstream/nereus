@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.capability;
 
 import com.nereusstream.api.PayloadFormat;
@@ -6,7 +7,9 @@ import com.nereusstream.api.ReadView;
 import com.nereusstream.core.read.ReadTargetReaderKey;
 import java.util.Objects;
 
-/** One exact physical+logical format capability advertised by a runtime. */
+/**
+ * One exact physical+logical format capability advertised by a runtime.
+ */
 public record PhysicalFormatCapability(
         ReadTargetReaderKey readerKey,
         ReadView readView,

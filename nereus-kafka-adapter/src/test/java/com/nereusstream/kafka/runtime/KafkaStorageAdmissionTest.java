@@ -1,6 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import java.util.List;
@@ -8,16 +11,13 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 class KafkaStorageAdmissionTest {
     @Test
     void readinessCanRecoverBeforeDrainButDrainAndCloseAreIrreversible() {
         KafkaStorageAdmission admission = new KafkaStorageAdmission();
 
-        assertThat(admission.health()).isEqualTo(new KafkaStorageHealth(
-                KafkaStorageAdmissionState.STARTING, false, "runtime starting"));
+        assertThat(admission.health())
+                .isEqualTo(new KafkaStorageHealth(KafkaStorageAdmissionState.STARTING, false, "runtime starting"));
         assertThat(admission.markReady()).isTrue();
         admission.requireReady("produce");
         assertThat(admission.markNotReady("provider circuit open")).isTrue();
@@ -48,8 +48,7 @@ class KafkaStorageAdmissionTest {
         admission.close();
         assertRejected(admission, ErrorCode.STORAGE_CLOSED, false, "CLOSED");
 
-        assertThatThrownBy(() -> admission.requireReady(" "))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> admission.requireReady(" ")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -61,13 +60,15 @@ class KafkaStorageAdmissionTest {
                 .toList();
 
         try (var executor = Executors.newFixedThreadPool(8)) {
-            long winners = executor.invokeAll(drains).stream().filter(future -> {
-                try {
-                    return future.get();
-                } catch (Exception failure) {
-                    throw new AssertionError(failure);
-                }
-            }).count();
+            long winners = executor.invokeAll(drains).stream()
+                    .filter(future -> {
+                        try {
+                            return future.get();
+                        } catch (Exception failure) {
+                            throw new AssertionError(failure);
+                        }
+                    })
+                    .count();
             assertThat(winners).isEqualTo(1);
         }
         assertThat(admission.state()).isEqualTo(KafkaStorageAdmissionState.DRAINING);
@@ -75,19 +76,14 @@ class KafkaStorageAdmissionTest {
 
     @Test
     void healthRejectsAmbiguousReadinessAndBlankDetails() {
-        assertThatThrownBy(() -> new KafkaStorageHealth(
-                KafkaStorageAdmissionState.NOT_READY, true, "invalid"))
+        assertThatThrownBy(() -> new KafkaStorageHealth(KafkaStorageAdmissionState.NOT_READY, true, "invalid"))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new KafkaStorageHealth(
-                KafkaStorageAdmissionState.READY, true, " "))
+        assertThatThrownBy(() -> new KafkaStorageHealth(KafkaStorageAdmissionState.READY, true, " "))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static void assertRejected(
-            KafkaStorageAdmission admission,
-            ErrorCode code,
-            boolean retriable,
-            String messageFragment) {
+            KafkaStorageAdmission admission, ErrorCode code, boolean retriable, String messageFragment) {
         assertThatThrownBy(() -> admission.requireReady("fetch"))
                 .isInstanceOfSatisfying(NereusException.class, failure -> {
                     assertThat(failure.code()).isEqualTo(code);

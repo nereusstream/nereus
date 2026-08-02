@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -42,7 +43,9 @@ import org.apache.parquet.io.MessageColumnIO;
 import org.apache.parquet.io.RecordReader;
 import org.apache.parquet.schema.MessageType;
 
-/** Strict shared Parquet transport for NCP2/NTC2; each closed schema has its own decoder. */
+/**
+ * Strict shared Parquet transport for NCP2/NTC2; each closed schema has its own decoder.
+ */
 final class ParquetV2ReaderSupport {
     private static final Set<Encoding> DICTIONARY_ENCODINGS =
             Set.of(Encoding.PLAIN_DICTIONARY, Encoding.RLE_DICTIONARY);
@@ -55,25 +58,38 @@ final class ParquetV2ReaderSupport {
         this.readerExecutor = Objects.requireNonNull(readerExecutor, "readerExecutor");
     }
 
-    CompletableFuture<RangedCompactedObjectReadResult> readNcp2(
-            RangedCompactedObjectReadRequest request) {
+    CompletableFuture<RangedCompactedObjectReadResult> readNcp2(RangedCompactedObjectReadRequest request) {
         return supply(() -> {
-            ReadSession session = open(
-                    request.target(), request.timeout(), CompactedObjectFormatV2.COMMITTED_SCHEMA);
+            ReadSession session = open(request.target(), request.timeout(), CompactedObjectFormatV2.COMMITTED_SCHEMA);
             try (session) {
                 RangedCompactedObjectMetadata metadata = validateFile(
-                        session.reader(), request.target(), request.streamId(), request.sourceCoverage(),
-                        request.payloadFormat(), ReadView.COMMITTED);
+                        session.reader(),
+                        request.target(),
+                        request.streamId(),
+                        request.sourceCoverage(),
+                        request.payloadFormat(),
+                        ReadView.COMMITTED);
                 List<RangedCompactedObjectRow> rows = new ArrayList<>();
                 Selection selection = new Selection(
-                        request.startOffset(), request.boundaryMode(), request.firstEntryPolicy(),
-                        request.maxRecords(), request.maxBytes());
+                        request.startOffset(),
+                        request.boundaryMode(),
+                        request.firstEntryPolicy(),
+                        request.maxRecords(),
+                        request.maxBytes());
                 DecodeTotals totals = decodeAll(session.reader(), metadata, group -> {
                     RangedCompactedObjectRow row = decodeNcp2(group);
-                    selection.consider(row.streamOffsetStart(), row.endOffset(), row.recordCount(),
-                            row.exactPayload().remaining(), row);
-                    return new RowFacts(row.streamOffsetStart(), row.endOffset(), row.recordCount(),
-                            row.exactPayload().remaining(), row.entryOrdinal());
+                    selection.consider(
+                            row.streamOffsetStart(),
+                            row.endOffset(),
+                            row.recordCount(),
+                            row.exactPayload().remaining(),
+                            row);
+                    return new RowFacts(
+                            row.streamOffsetStart(),
+                            row.endOffset(),
+                            row.recordCount(),
+                            row.exactPayload().remaining(),
+                            row.entryOrdinal());
                 });
                 for (Object row : selection.rows()) {
                     rows.add((RangedCompactedObjectRow) row);
@@ -81,31 +97,48 @@ final class ParquetV2ReaderSupport {
                 requireNcp2Totals(metadata, totals);
                 selection.requireExactBoundary();
                 return new RangedCompactedObjectReadResult(
-                        metadata, rows, selection.coverageEnd(metadata.sourceCoverage()),
-                        session.budget().used(), session.footerBytes());
+                        metadata,
+                        rows,
+                        selection.coverageEnd(metadata.sourceCoverage()),
+                        session.budget().used(),
+                        session.footerBytes());
             }
         });
     }
 
-    CompletableFuture<KafkaTopicCompactedObjectReadResult> readNtc2(
-            KafkaTopicCompactedObjectReadRequest request) {
+    CompletableFuture<KafkaTopicCompactedObjectReadResult> readNtc2(KafkaTopicCompactedObjectReadRequest request) {
         return supply(() -> {
-            ReadSession session = open(
-                    request.target(), request.timeout(), CompactedObjectFormatV2.TOPIC_COMPACTED_SCHEMA);
+            ReadSession session =
+                    open(request.target(), request.timeout(), CompactedObjectFormatV2.TOPIC_COMPACTED_SCHEMA);
             try (session) {
                 RangedCompactedObjectMetadata metadata = validateFile(
-                        session.reader(), request.target(), request.streamId(), request.sourceCoverage(),
-                        com.nereusstream.api.PayloadFormat.KAFKA_RECORD_BATCH, ReadView.TOPIC_COMPACTED);
+                        session.reader(),
+                        request.target(),
+                        request.streamId(),
+                        request.sourceCoverage(),
+                        com.nereusstream.api.PayloadFormat.KAFKA_RECORD_BATCH,
+                        ReadView.TOPIC_COMPACTED);
                 List<KafkaTopicCompactedObjectRow> rows = new ArrayList<>();
                 Selection selection = new Selection(
-                        request.startOffset(), request.boundaryMode(), request.firstEntryPolicy(),
-                        request.maxRecords(), request.maxBytes());
+                        request.startOffset(),
+                        request.boundaryMode(),
+                        request.firstEntryPolicy(),
+                        request.maxRecords(),
+                        request.maxBytes());
                 DecodeTotals totals = decodeAll(session.reader(), metadata, group -> {
                     KafkaTopicCompactedObjectRow row = decodeNtc2(group);
-                    selection.consider(row.streamOffsetStart(), row.endOffset(), row.recordCount(),
-                            row.exactPayload().remaining(), row);
-                    return new RowFacts(row.streamOffsetStart(), row.endOffset(), row.recordCount(),
-                            row.exactPayload().remaining(), -1);
+                    selection.consider(
+                            row.streamOffsetStart(),
+                            row.endOffset(),
+                            row.recordCount(),
+                            row.exactPayload().remaining(),
+                            row);
+                    return new RowFacts(
+                            row.streamOffsetStart(),
+                            row.endOffset(),
+                            row.recordCount(),
+                            row.exactPayload().remaining(),
+                            -1);
                 });
                 for (Object row : selection.rows()) {
                     rows.add((KafkaTopicCompactedObjectRow) row);
@@ -113,39 +146,39 @@ final class ParquetV2ReaderSupport {
                 requireNtc2Totals(metadata, totals);
                 selection.requireExactBoundary();
                 return new KafkaTopicCompactedObjectReadResult(
-                        metadata, rows, selection.coverageEnd(metadata.sourceCoverage()),
-                        session.budget().used(), session.footerBytes());
+                        metadata,
+                        rows,
+                        selection.coverageEnd(metadata.sourceCoverage()),
+                        session.budget().used(),
+                        session.footerBytes());
             }
         });
     }
 
     private <T> CompletableFuture<T> supply(ThrowingSupplier<T> operation) {
         try {
-            return CompletableFuture.supplyAsync(() -> {
-                try {
-                    return operation.get();
-                } catch (Throwable failure) {
-                    throw new CompletionException(mapFailure(failure));
-                }
-            }, readerExecutor);
+            return CompletableFuture.supplyAsync(
+                    () -> {
+                        try {
+                            return operation.get();
+                        } catch (Throwable failure) {
+                            throw new CompletionException(mapFailure(failure));
+                        }
+                    },
+                    readerExecutor);
         } catch (RejectedExecutionException failure) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    "V2 compacted reader executor rejected the operation",
-                    failure));
+                    ErrorCode.STORAGE_CLOSED, false, "V2 compacted reader executor rejected the operation", failure));
         }
     }
 
-    private ReadSession open(
-            ObjectSliceReadTarget target,
-            java.time.Duration timeout,
-            MessageType schema) throws IOException {
+    private ReadSession open(ObjectSliceReadTarget target, java.time.Duration timeout, MessageType schema)
+            throws IOException {
         validateTargetIdentity(target);
-        ObjectStoreParquetInputFile.ReadDeadline deadline =
-                new ObjectStoreParquetInputFile.ReadDeadline(timeout);
+        ObjectStoreParquetInputFile.ReadDeadline deadline = new ObjectStoreParquetInputFile.ReadDeadline(timeout);
         long footerBytes = target.entryIndexRef().length();
-        RangeReadResult footer = objectStore.readRange(
+        RangeReadResult footer = objectStore
+                .readRange(
                         target.objectKey(),
                         target.entryIndexRef().offset(),
                         footerBytes,
@@ -156,7 +189,9 @@ final class ParquetV2ReaderSupport {
                 || footer.length() != footerBytes
                 || footer.payload().remaining() != footerBytes
                 || (footer.checksum().isPresent()
-                        && !footer.checksum().orElseThrow().equals(target.entryIndexRef().checksum()))) {
+                        && !footer.checksum()
+                                .orElseThrow()
+                                .equals(target.entryIndexRef().checksum()))) {
             throw new CompactedObjectFormatException("object store returned a mismatched V2 footer range");
         }
         ObjectStoreParquetInputFile.ReadBudget budget = new ObjectStoreParquetInputFile.ReadBudget(
@@ -185,8 +220,8 @@ final class ParquetV2ReaderSupport {
             OffsetRange coverage,
             com.nereusstream.api.PayloadFormat payloadFormat,
             ReadView view) {
-        RangedCompactedObjectMetadata metadata = CompactedObjectFormatV2.parseMetadata(
-                reader.getFileMetaData().getKeyValueMetaData());
+        RangedCompactedObjectMetadata metadata =
+                CompactedObjectFormatV2.parseMetadata(reader.getFileMetaData().getKeyValueMetaData());
         if (metadata.view() != view
                 || !metadata.streamId().equals(streamId)
                 || !metadata.sourceCoverage().equals(coverage)
@@ -199,9 +234,7 @@ final class ParquetV2ReaderSupport {
         return metadata;
     }
 
-    private static void validateRowGroups(
-            List<BlockMetaData> blocks,
-            RangedCompactedObjectMetadata metadata) {
+    private static void validateRowGroups(List<BlockMetaData> blocks, RangedCompactedObjectMetadata metadata) {
         if (blocks.size() > CompactedObjectFormatV2.MAX_ROW_GROUPS
                 || (metadata.entryCount() > 0 && blocks.isEmpty())
                 || (metadata.entryCount() == 0 && !blocks.isEmpty())) {
@@ -209,9 +242,8 @@ final class ParquetV2ReaderSupport {
         }
         long rows = 0;
         long previousMaximum = -1;
-        CompressionCodecName expectedCodec = metadata.compression().equals("ZSTD")
-                ? CompressionCodecName.ZSTD
-                : CompressionCodecName.UNCOMPRESSED;
+        CompressionCodecName expectedCodec =
+                metadata.compression().equals("ZSTD") ? CompressionCodecName.ZSTD : CompressionCodecName.UNCOMPRESSED;
         for (BlockMetaData block : blocks) {
             if (block.getRowCount() <= 0 || block.getRowCount() > metadata.targetRowGroupRecords()) {
                 throw new CompactedObjectFormatException("V2 row group exceeds its row bound");
@@ -219,8 +251,7 @@ final class ParquetV2ReaderSupport {
             ColumnChunkMetaData offsetColumn = block.getColumns().stream()
                     .filter(column -> column.getPath().toDotString().equals("stream_offset_start"))
                     .findFirst()
-                    .orElseThrow(() -> new CompactedObjectFormatException(
-                            "V2 row group omits stream_offset_start"));
+                    .orElseThrow(() -> new CompactedObjectFormatException("V2 row group omits stream_offset_start"));
             Statistics<?> statistics = offsetColumn.getStatistics();
             if (!statistics.hasNonNullValue()
                     || !(statistics.genericGetMin() instanceof Long minimum)
@@ -247,9 +278,7 @@ final class ParquetV2ReaderSupport {
     }
 
     private static DecodeTotals decodeAll(
-            ParquetFileReader reader,
-            RangedCompactedObjectMetadata metadata,
-            RowDecoder decoder) throws IOException {
+            ParquetFileReader reader, RangedCompactedObjectMetadata metadata, RowDecoder decoder) throws IOException {
         MessageType schema = CompactedObjectFormatV2.schema(metadata.view());
         MessageColumnIO columnIo = new ColumnIOFactory(true).getColumnIO(schema);
         long previousEnd = -1;
@@ -269,7 +298,9 @@ final class ParquetV2ReaderSupport {
                         throw new CompactedObjectFormatException("V2 decoded row range ordering is invalid");
                     }
                     if (metadata.view() == ReadView.COMMITTED
-                            && ((rows == 0 && facts.startOffset() != metadata.sourceCoverage().startOffset())
+                            && ((rows == 0
+                                            && facts.startOffset()
+                                                    != metadata.sourceCoverage().startOffset())
                                     || (rows > 0 && facts.startOffset() != previousEnd)
                                     || facts.ordinal() != rows)) {
                         throw new CompactedObjectFormatException("NCP2 decoded rows are not dense/ordinal");
@@ -318,9 +349,7 @@ final class ParquetV2ReaderSupport {
         return row;
     }
 
-    private static void requireNcp2Totals(
-            RangedCompactedObjectMetadata metadata,
-            DecodeTotals totals) {
+    private static void requireNcp2Totals(RangedCompactedObjectMetadata metadata, DecodeTotals totals) {
         if (totals.rows() != metadata.entryCount()
                 || totals.records() != metadata.sourceRecordCount()
                 || totals.bytes() != metadata.logicalBytes()
@@ -329,9 +358,7 @@ final class ParquetV2ReaderSupport {
         }
     }
 
-    private static void requireNtc2Totals(
-            RangedCompactedObjectMetadata metadata,
-            DecodeTotals totals) {
+    private static void requireNtc2Totals(RangedCompactedObjectMetadata metadata, DecodeTotals totals) {
         if (totals.rows() != metadata.entryCount()
                 || totals.records() != metadata.outputRecordCount()
                 || totals.bytes() != metadata.logicalBytes()) {
@@ -370,7 +397,8 @@ final class ParquetV2ReaderSupport {
 
     private static void validateObjectKey(ObjectKey key, RangedCompactedObjectMetadata metadata) {
         String expectedView = metadata.view() == ReadView.COMMITTED ? "committed" : "topic-compacted-kafka";
-        String stream = com.nereusstream.api.keys.KeyComponentCodec.encodeComponent(metadata.streamId().value());
+        String stream = com.nereusstream.api.keys.KeyComponentCodec.encodeComponent(
+                metadata.streamId().value());
         String range = com.nereusstream.api.keys.KeyComponentCodec.encodeNonNegativeLong(
                         metadata.sourceCoverage().startOffset())
                 + "-"
@@ -442,9 +470,7 @@ final class ParquetV2ReaderSupport {
             if (start < requested && requested < end) {
                 requestInsideEntry = true;
             }
-            boolean candidate = boundaryMode == ReadBoundaryMode.EXACT_START
-                    ? start >= requested
-                    : end > requested;
+            boolean candidate = boundaryMode == ReadBoundaryMode.EXACT_START ? start >= requested : end > requested;
             if (!candidate || limited) {
                 return;
             }
@@ -452,8 +478,7 @@ final class ParquetV2ReaderSupport {
                 return;
             }
             boolean exceeds = records > maxRecords - returnedRecords || bytes > maxBytes - returnedBytes;
-            boolean allowOverflow = rows.isEmpty()
-                    && firstEntryPolicy == FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW;
+            boolean allowOverflow = rows.isEmpty() && firstEntryPolicy == FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW;
             if (exceeds && !allowOverflow) {
                 if (rows.isEmpty()) {
                     throw new NereusException(
@@ -474,9 +499,7 @@ final class ParquetV2ReaderSupport {
         private void requireExactBoundary() {
             if (boundaryMode == ReadBoundaryMode.EXACT_START && requestInsideEntry) {
                 throw new NereusException(
-                        ErrorCode.OFFSET_NOT_AVAILABLE,
-                        false,
-                        "requested offset is inside a ranged V2 entry");
+                        ErrorCode.OFFSET_NOT_AVAILABLE, false, "requested offset is inside a ranged V2 entry");
             }
         }
 
@@ -493,9 +516,8 @@ final class ParquetV2ReaderSupport {
     }
 
     private record ReadSession(
-            ParquetFileReader reader,
-            ObjectStoreParquetInputFile.ReadBudget budget,
-            long footerBytes) implements AutoCloseable {
+            ParquetFileReader reader, ObjectStoreParquetInputFile.ReadBudget budget, long footerBytes)
+            implements AutoCloseable {
         @Override
         public void close() {
             try {
@@ -506,20 +528,9 @@ final class ParquetV2ReaderSupport {
         }
     }
 
-    private record RowFacts(
-            long startOffset,
-            long endOffset,
-            int recordCount,
-            int payloadBytes,
-            int ordinal) {
-    }
+    private record RowFacts(long startOffset, long endOffset, int recordCount, int payloadBytes, int ordinal) {}
 
-    private record DecodeTotals(
-            int rows,
-            long records,
-            long bytes,
-            long previousEndOffset) {
-    }
+    private record DecodeTotals(int rows, long records, long bytes, long previousEndOffset) {}
 
     @FunctionalInterface
     private interface RowDecoder {

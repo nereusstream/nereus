@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.fetch;
 
 import java.util.List;
 import java.util.Objects;
 
-/** Final owned response facts delivered once on the callback executor. */
+/**
+ * Final owned response facts delivered once on the callback executor.
+ */
 public record KafkaFetchOperationResult(
         List<KafkaFetchPartitionResult> partitions,
         int responseBytes,

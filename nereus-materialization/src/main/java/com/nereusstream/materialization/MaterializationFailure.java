@@ -20,6 +20,8 @@ import com.nereusstream.metadata.oxia.records.TaskFailureClass;
  * Typed materialization failure whose durable task transition must not depend on exception text.
  */
 public interface MaterializationFailure {
-    /** Returns the non-{@link TaskFailureClass#NONE} durable failure category. */
+    /**
+     * Returns the non-{@link TaskFailureClass#NONE} durable failure category.
+     */
     TaskFailureClass failureClass();
 }

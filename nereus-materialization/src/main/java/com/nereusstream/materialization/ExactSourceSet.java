@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -8,12 +9,11 @@ import com.nereusstream.api.ReadView;
 import java.util.List;
 import java.util.Objects;
 
-/** Canonical gap-free source identities for one exact logical range. */
+/**
+ * Canonical gap-free source identities for one exact logical range.
+ */
 public record ExactSourceSet(
-        ReadView view,
-        OffsetRange coverage,
-        List<SourceGeneration> sources,
-        Checksum sourceSetSha256) {
+        ReadView view, OffsetRange coverage, List<SourceGeneration> sources, Checksum sourceSetSha256) {
     public ExactSourceSet {
         Objects.requireNonNull(view, "view");
         Objects.requireNonNull(coverage, "coverage");
@@ -45,20 +45,13 @@ public record ExactSourceSet(
         }
         if (nextOffset != coverage.endOffset()
                 || !sourceSetSha256.equals(MaterializationCanonical.sourceSetDigest(sources))) {
-            throw new IllegalArgumentException(
-                    "exact source coverage or canonical source-set digest changed");
+            throw new IllegalArgumentException("exact source coverage or canonical source-set digest changed");
         }
     }
 
-    public static ExactSourceSet create(
-            ReadView view, OffsetRange coverage, List<SourceGeneration> sources) {
+    public static ExactSourceSet create(ReadView view, OffsetRange coverage, List<SourceGeneration> sources) {
         List<SourceGeneration> canonical =
-                MaterializationCanonical.canonicalSources(
-                        Objects.requireNonNull(sources, "sources"));
-        return new ExactSourceSet(
-                view,
-                coverage,
-                canonical,
-                MaterializationCanonical.sourceSetDigest(canonical));
+                MaterializationCanonical.canonicalSources(Objects.requireNonNull(sources, "sources"));
+        return new ExactSourceSet(view, coverage, canonical, MaterializationCanonical.sourceSetDigest(canonical));
     }
 }

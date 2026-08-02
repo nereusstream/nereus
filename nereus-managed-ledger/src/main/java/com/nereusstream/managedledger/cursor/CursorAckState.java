@@ -1,22 +1,20 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableMap;
-import java.util.Objects;
 import java.util.TreeMap;
 
-/** Full normalized durable acknowledgement truth for one cursor generation. */
+/**
+ * Full normalized durable acknowledgement truth for one cursor generation.
+ */
 public record CursorAckState(
-        long markDeleteOffset,
-        List<OffsetRange> wholeAckRanges,
-        NavigableMap<Long, BatchAckState> partialBatchAcks) {
+        long markDeleteOffset, List<OffsetRange> wholeAckRanges, NavigableMap<Long, BatchAckState> partialBatchAcks) {
     public CursorAckState {
-        AckNormalizer.Normalized normalized = AckNormalizer.normalize(
-                markDeleteOffset,
-                wholeAckRanges,
-                partialBatchAcks);
+        AckNormalizer.Normalized normalized =
+                AckNormalizer.normalize(markDeleteOffset, wholeAckRanges, partialBatchAcks);
         markDeleteOffset = normalized.markDeleteOffset();
         wholeAckRanges = normalized.wholeAckRanges();
         partialBatchAcks = normalized.partialBatchAcks();

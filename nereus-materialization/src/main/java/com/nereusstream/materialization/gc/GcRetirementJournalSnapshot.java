@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -15,7 +16,9 @@ import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import java.util.List;
 import java.util.Objects;
 
-/** Fully scanned and digest-verified view of one sealed GC retirement journal. */
+/**
+ * Fully scanned and digest-verified view of one sealed GC retirement journal.
+ */
 public final class GcRetirementJournalSnapshot {
     private final VersionedGcRetirementManifest manifest;
     private final List<VersionedGcRetirementProtection> protectionEntries;
@@ -30,17 +33,14 @@ public final class GcRetirementJournalSnapshot {
             List<VersionedGcRetirementProtection> protectionEntries,
             List<VersionedGcRetirementRemoval> removalEntries) {
         this.manifest = Objects.requireNonNull(manifest, "manifest");
-        this.protectionEntries = List.copyOf(Objects.requireNonNull(
-                protectionEntries, "protectionEntries"));
-        this.removalEntries = List.copyOf(Objects.requireNonNull(
-                removalEntries, "removalEntries"));
+        this.protectionEntries = List.copyOf(Objects.requireNonNull(protectionEntries, "protectionEntries"));
+        this.removalEntries = List.copyOf(Objects.requireNonNull(removalEntries, "removalEntries"));
         GcRetirementManifestRecord manifestValue = manifest.value();
         ObjectKeyHash object = new ObjectKeyHash(manifestValue.objectKeyHash());
         String attempt = manifestValue.gcAttemptId();
         if (this.protectionEntries.size() != manifestValue.protectionCount()
                 || this.removalEntries.size() != manifestValue.metadataRemovalCount()) {
-            throw new IllegalArgumentException(
-                    "GC retirement journal entry counts do not match its manifest");
+            throw new IllegalArgumentException("GC retirement journal entry counts do not match its manifest");
         }
         this.protectionEntries.forEach(entry -> requireJournalIdentity(
                 object, attempt, entry.value().objectKeyHash(), entry.value().gcAttemptId()));
@@ -71,13 +71,9 @@ public final class GcRetirementJournalSnapshot {
                 "plannedMetadataRemovals");
         Checksum query = sha256(manifestValue.queryIdentitySha256());
         this.referenceSetSha256 = GcPlanValidation.referenceSetSha256(
-                query,
-                domainProofs,
-                plannedProtectionRemovals,
-                plannedMetadataRemovals);
+                query, domainProofs, plannedProtectionRemovals, plannedMetadataRemovals);
         if (!referenceSetSha256.value().equals(manifestValue.referenceSetSha256())) {
-            throw new IllegalArgumentException(
-                    "GC retirement journal digest does not match its manifest");
+            throw new IllegalArgumentException("GC retirement journal digest does not match its manifest");
         }
     }
 
@@ -129,8 +125,7 @@ public final class GcRetirementJournalSnapshot {
                 sha256(value.snapshotSha256()));
     }
 
-    static GcPlannedProtectionRemoval plannedProtection(
-            VersionedGcRetirementProtection entry) {
+    static GcPlannedProtectionRemoval plannedProtection(VersionedGcRetirementProtection entry) {
         GcRetirementProtectionRecord value = entry.value();
         VersionedObjectProtection source = new VersionedObjectProtection(
                 value.protectionKey(),
@@ -140,8 +135,7 @@ public final class GcRetirementJournalSnapshot {
         return new GcPlannedProtectionRemoval(source);
     }
 
-    static GcPlannedMetadataRemoval plannedRemoval(
-            VersionedGcRetirementRemoval entry) {
+    static GcPlannedMetadataRemoval plannedRemoval(VersionedGcRetirementRemoval entry) {
         GcRetirementRemovalRecord value = entry.value();
         return new GcPlannedMetadataRemoval(
                 value.removalType(),
@@ -151,13 +145,9 @@ public final class GcRetirementJournalSnapshot {
     }
 
     private static void requireJournalIdentity(
-            ObjectKeyHash object,
-            String attempt,
-            String entryObject,
-            String entryAttempt) {
+            ObjectKeyHash object, String attempt, String entryObject, String entryAttempt) {
         if (!object.value().equals(entryObject) || !attempt.equals(entryAttempt)) {
-            throw new IllegalArgumentException(
-                    "GC retirement journal entry belongs to another object or attempt");
+            throw new IllegalArgumentException("GC retirement journal entry belongs to another object or attempt");
         }
     }
 

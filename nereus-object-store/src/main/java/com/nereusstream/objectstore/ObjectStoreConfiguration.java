@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import java.net.URI;
@@ -10,7 +11,9 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Validated bootstrap configuration containing secret references, never plaintext credentials. */
+/**
+ * Validated bootstrap configuration containing secret references, never plaintext credentials.
+ */
 public record ObjectStoreConfiguration(
         String providerClassName,
         URI endpoint,
@@ -52,7 +55,9 @@ public record ObjectStoreConfiguration(
         }
     }
 
-    /** Source-compatible constructor for pre-F4 callers; guarded PUTs use the bounded default policy. */
+    /**
+     * Source-compatible constructor for pre-F4 callers; guarded PUTs use the bounded default policy.
+     */
     public ObjectStoreConfiguration(
             String providerClassName,
             URI endpoint,
@@ -139,7 +144,8 @@ public record ObjectStoreConfiguration(
 
     private static void requireStrictUtf8(String value, String name) {
         try {
-            StandardCharsets.UTF_8.newEncoder()
+            StandardCharsets.UTF_8
+                    .newEncoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .encode(CharBuffer.wrap(value));

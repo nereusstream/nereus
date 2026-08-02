@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.testing;
 
 import com.nereusstream.api.Checksum;
@@ -28,7 +29,9 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 
-/** Deterministic codec-backed fake for F9 binding state-machine tests. */
+/**
+ * Deterministic codec-backed fake for F9 binding state-machine tests.
+ */
 public final class FakeKafkaPartitionMetadataStore implements KafkaPartitionMetadataStore {
     private final KafkaPartitionKeyspace keys;
     private final Map<String, Stored> bindings = new TreeMap<>();
@@ -40,12 +43,14 @@ public final class FakeKafkaPartitionMetadataStore implements KafkaPartitionMeta
         this.keys = new KafkaPartitionKeyspace(nereusCluster, kafkaClusterId);
     }
 
-    public KafkaPartitionKeyspace keyspace() { return keys; }
+    public KafkaPartitionKeyspace keyspace() {
+        return keys;
+    }
 
     @Override
     public synchronized CompletableFuture<Optional<VersionedKafkaPartitionBinding>> get(KafkaPartitionId id) {
-        return complete(() -> Optional.ofNullable(bindings.get(keys.bindingRootKey(id)))
-                .map(stored -> binding(stored, id)));
+        return complete(
+                () -> Optional.ofNullable(bindings.get(keys.bindingRootKey(id))).map(stored -> binding(stored, id)));
     }
 
     @Override
@@ -63,7 +68,8 @@ public final class FakeKafkaPartitionMetadataStore implements KafkaPartitionMeta
                 if (!decoded.value().storageProfile().equals(value.storageProfile())
                         || decoded.value().createdMetadataOffset() != value.createdMetadataOffset()) {
                     throw new NereusException(
-                            ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                            ErrorCode.METADATA_INVARIANT_VIOLATION,
+                            false,
                             "deterministic Kafka binding creation conflicts with existing root");
                 }
                 return decoded;
@@ -100,9 +106,11 @@ public final class FakeKafkaPartitionMetadataStore implements KafkaPartitionMeta
             String key = keys.registryKey(value.identity());
             Stored current = registry.get(key);
             if (current != null) {
-                KafkaPartitionRegistryRecord existing = KafkaMetadataCodecs.decodeEnvelope(
-                        current.bytes, KafkaPartitionRegistryRecord.class);
-                if (existing.bindingEpoch() > value.bindingEpoch()) return null;
+                KafkaPartitionRegistryRecord existing =
+                        KafkaMetadataCodecs.decodeEnvelope(current.bytes, KafkaPartitionRegistryRecord.class);
+                if (existing.bindingEpoch() > value.bindingEpoch()) {
+                    return null;
+                }
             }
             byte[] bytes = KafkaMetadataCodecs.encodeEnvelope(value, KafkaPartitionRegistryRecord.class);
             registry.put(key, new Stored(key, bytes, nextVersion++));
@@ -117,14 +125,15 @@ public final class FakeKafkaPartitionMetadataStore implements KafkaPartitionMeta
             if (limit <= 0 || limit > 1_024) {
                 throw new IllegalArgumentException("registry scan limit must be in [1,1024]");
             }
-            Objects.requireNonNull(continuation, "continuation")
-                    .ifPresent(key -> keys.parseRegistryKey(shard, key));
+            Objects.requireNonNull(continuation, "continuation").ifPresent(key -> keys.parseRegistryKey(shard, key));
             String prefix = keys.registryShardPrefix(shard) + "/";
             String after = continuation.orElse("");
             ArrayList<VersionedKafkaPartitionRegistry> values = new ArrayList<>();
             boolean more = false;
             for (Stored stored : registry.values()) {
-                if (!stored.key.startsWith(prefix) || (!after.isEmpty() && stored.key.compareTo(after) <= 0)) continue;
+                if (!stored.key.startsWith(prefix) || (!after.isEmpty() && stored.key.compareTo(after) <= 0)) {
+                    continue;
+                }
                 if (values.size() == limit) {
                     more = true;
                     break;
@@ -132,8 +141,7 @@ public final class FakeKafkaPartitionMetadataStore implements KafkaPartitionMeta
                 values.add(registry(stored, shard));
             }
             return new KafkaPartitionScanPage(
-                    values,
-                    more ? Optional.of(values.get(values.size() - 1).key()) : Optional.empty());
+                    values, more ? Optional.of(values.get(values.size() - 1).key()) : Optional.empty());
         });
     }
 
@@ -148,31 +156,31 @@ public final class FakeKafkaPartitionMetadataStore implements KafkaPartitionMeta
 
     private VersionedKafkaPartitionBinding binding(Stored stored, KafkaPartitionId id) {
         KafkaPartitionBindingRecord value = KafkaMetadataCodecs.decodeEnvelope(
-                stored.bytes, KafkaPartitionBindingRecord.class).withMetadataVersion(stored.version);
+                        stored.bytes, KafkaPartitionBindingRecord.class)
+                .withMetadataVersion(stored.version);
         if (!value.identity().equals(id) || !stored.key.equals(keys.bindingRootKey(id))) {
             throw new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION, false,
-                    "fake Kafka binding key/value identity mismatch");
+                    ErrorCode.METADATA_INVARIANT_VIOLATION, false, "fake Kafka binding key/value identity mismatch");
         }
         return new VersionedKafkaPartitionBinding(stored.key, value, stored.version, sha256(stored.bytes));
     }
 
     private VersionedKafkaPartitionRegistry registry(Stored stored, int shard) {
         KafkaPartitionRegistryRecord value = KafkaMetadataCodecs.decodeEnvelope(
-                stored.bytes, KafkaPartitionRegistryRecord.class).withMetadataVersion(stored.version);
+                        stored.bytes, KafkaPartitionRegistryRecord.class)
+                .withMetadataVersion(stored.version);
         KafkaPartitionId id = keys.parseRegistryKey(shard, stored.key);
         if (!id.equals(value.identity())) {
             throw new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION, false,
-                    "fake Kafka registry key/value identity mismatch");
+                    ErrorCode.METADATA_INVARIANT_VIOLATION, false, "fake Kafka registry key/value identity mismatch");
         }
         return new VersionedKafkaPartitionRegistry(stored.key, value, stored.version, sha256(stored.bytes));
     }
 
     private <T> CompletableFuture<T> complete(java.util.concurrent.Callable<T> operation) {
         if (closed) {
-            return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.STORAGE_CLOSED, false, "fake Kafka metadata store is closed"));
+            return CompletableFuture.failedFuture(
+                    new NereusException(ErrorCode.STORAGE_CLOSED, false, "fake Kafka metadata store is closed"));
         }
         try {
             return CompletableFuture.completedFuture(operation.call());
@@ -182,14 +190,17 @@ public final class FakeKafkaPartitionMetadataStore implements KafkaPartitionMeta
     }
 
     private static void requireWritable(long version, String type) {
-        if (version != 0) throw new IllegalArgumentException(
-                "encoded Kafka " + type + " metadataVersion must be zero");
+        if (version != 0) {
+            throw new IllegalArgumentException("encoded Kafka " + type + " metadataVersion must be zero");
+        }
     }
 
     private static Checksum sha256(byte[] value) {
         try {
-            return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256").digest(value)));
+            return new Checksum(
+                    ChecksumType.SHA256,
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }

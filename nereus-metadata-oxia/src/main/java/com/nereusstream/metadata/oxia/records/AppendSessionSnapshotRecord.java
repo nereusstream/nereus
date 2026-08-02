@@ -31,11 +31,7 @@ public record AppendSessionSnapshotRecord(
             new AppendSessionSnapshotRecord("", 0, "", 0, 0, "", "", 0, "", 0);
 
     public AppendSessionSnapshotRecord(
-            String writerId,
-            long epoch,
-            String fencingToken,
-            long leaseVersion,
-            long expiresAtMillis) {
+            String writerId, long epoch, String fencingToken, long leaseVersion, long expiresAtMillis) {
         this(writerId, epoch, fencingToken, leaseVersion, expiresAtMillis, "", "", 0, "", 0);
     }
 
@@ -45,8 +41,7 @@ public record AppendSessionSnapshotRecord(
         Objects.requireNonNull(authorityType, "authorityType");
         Objects.requireNonNull(authorityId, "authorityId");
         Objects.requireNonNull(authorityOwnerId, "authorityOwnerId");
-        if (epoch < 0 || leaseVersion < 0 || expiresAtMillis < 0
-                || authorityEpoch < 0 || authorityOwnerEpoch < 0) {
+        if (epoch < 0 || leaseVersion < 0 || expiresAtMillis < 0 || authorityEpoch < 0 || authorityOwnerEpoch < 0) {
             throw new IllegalArgumentException("append session fields must be non-negative");
         }
         if (writerId.isEmpty() != fencingToken.isEmpty()) {

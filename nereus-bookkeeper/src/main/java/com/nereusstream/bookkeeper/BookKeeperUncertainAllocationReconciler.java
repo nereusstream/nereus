@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.ErrorCode;
@@ -23,7 +24,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.client.api.LedgerMetadata;
 
-/** Bounded fixed-slot reconciliation for create requests whose provider outcome was uncertain. */
+/**
+ * Bounded fixed-slot reconciliation for create requests whose provider outcome was uncertain.
+ */
 public final class BookKeeperUncertainAllocationReconciler {
     private final String cluster;
     private final BookKeeperWalConfiguration configuration;
@@ -64,7 +67,8 @@ public final class BookKeeperUncertainAllocationReconciler {
         BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(
                 min(Objects.requireNonNull(timeout, "timeout"), configuration.allocationTimeout()));
         MutableResult result = new MutableResult();
-        return namespaceVerifier.requireActive(configuration, deadline.remaining())
+        return namespaceVerifier
+                .requireActive(configuration, deadline.remaining())
                 .thenCompose(namespace -> scanShards(namespace, 0, deadline, result))
                 .thenApply(ignored -> result.snapshot());
     }
@@ -115,27 +119,28 @@ public final class BookKeeperUncertainAllocationReconciler {
         CompletableFuture<Optional<BookKeeperVersionedValue<LedgerAllocationIntentRecord>>> allocationFuture =
                 writerMetadata.getAllocation(cluster, stream, slotValue.allocationId());
         CompletableFuture<Optional<BookKeeperVersionedValue<BookKeeperLedgerRootRecord>>> rootFuture =
-                ledgerMetadata.getRoot(
-                        cluster, configuration.providerScopeSha256(), slotValue.candidateLedgerId());
-        return deadline.bound(CompletableFuture.allOf(allocationFuture, rootFuture)).thenCompose(ignored -> {
-            BookKeeperVersionedValue<LedgerAllocationIntentRecord> allocation = allocationFuture.join().orElseThrow(
-                    () -> invariant("CREATE_UNCERTAIN slot has no allocation intent"));
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root = rootFuture.join().orElseThrow(
-                    () -> invariant("CREATE_UNCERTAIN slot has no ledger root"));
-            requireIdentity(namespace, slotValue, allocation.value(), root.value());
-            if (allocation.value().lifecycle() == LedgerAllocationLifecycle.FOREIGN_COLLISION
-                    || root.value().lifecycle() == BookKeeperLedgerLifecycle.QUARANTINED) {
-                result.quarantinedLedgers++;
-                return CompletableFuture.completedFuture(null);
-            }
-            return probe(namespace, allocation, root, deadline).thenAccept(outcome -> {
-                switch (outcome) {
-                    case ABSENT -> result.absentLedgers++;
-                    case RECOVERED -> result.recoveredLedgers++;
-                    case QUARANTINED -> result.quarantinedLedgers++;
-                }
-            });
-        });
+                ledgerMetadata.getRoot(cluster, configuration.providerScopeSha256(), slotValue.candidateLedgerId());
+        return deadline.bound(CompletableFuture.allOf(allocationFuture, rootFuture))
+                .thenCompose(ignored -> {
+                    BookKeeperVersionedValue<LedgerAllocationIntentRecord> allocation = allocationFuture
+                            .join()
+                            .orElseThrow(() -> invariant("CREATE_UNCERTAIN slot has no allocation intent"));
+                    BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root =
+                            rootFuture.join().orElseThrow(() -> invariant("CREATE_UNCERTAIN slot has no ledger root"));
+                    requireIdentity(namespace, slotValue, allocation.value(), root.value());
+                    if (allocation.value().lifecycle() == LedgerAllocationLifecycle.FOREIGN_COLLISION
+                            || root.value().lifecycle() == BookKeeperLedgerLifecycle.QUARANTINED) {
+                        result.quarantinedLedgers++;
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    return probe(namespace, allocation, root, deadline).thenAccept(outcome -> {
+                        switch (outcome) {
+                            case ABSENT -> result.absentLedgers++;
+                            case RECOVERED -> result.recoveredLedgers++;
+                            case QUARANTINED -> result.quarantinedLedgers++;
+                        }
+                    });
+                });
     }
 
     private CompletableFuture<Outcome> probe(
@@ -162,7 +167,8 @@ public final class BookKeeperUncertainAllocationReconciler {
                             root.value().allocationId());
                     try {
                         String metadataSha256 = expected.requireExactImmutableLedgerMetadata(
-                                root.value().ledgerId(), configuration, value).value();
+                                        root.value().ledgerId(), configuration, value)
+                                .value();
                         return recoverMatching(allocation, root, metadataSha256, deadline);
                     } catch (Throwable mismatch) {
                         return quarantine(allocation, root, "late BookKeeper create has foreign metadata");
@@ -189,8 +195,8 @@ public final class BookKeeperUncertainAllocationReconciler {
         } else if (allocation.value().lifecycle() == LedgerAllocationLifecycle.PHYSICAL_CREATED) {
             physical = CompletableFuture.completedFuture(allocation);
         } else {
-            return CompletableFuture.failedFuture(invariant(
-                    "uncertain allocation has an invalid matching-provider lifecycle"));
+            return CompletableFuture.failedFuture(
+                    invariant("uncertain allocation has an invalid matching-provider lifecycle"));
         }
         return physical.thenCompose(ignored -> {
             if (root.value().lifecycle() == BookKeeperLedgerLifecycle.SEALED) {
@@ -198,12 +204,12 @@ public final class BookKeeperUncertainAllocationReconciler {
             }
             if (root.value().lifecycle() != BookKeeperLedgerLifecycle.ALLOCATING
                     && root.value().lifecycle() != BookKeeperLedgerLifecycle.SEALING) {
-                return CompletableFuture.failedFuture(invariant(
-                        "matching uncertain ledger root cannot be recovery-sealed"));
+                return CompletableFuture.failedFuture(
+                        invariant("matching uncertain ledger root cannot be recovery-sealed"));
             }
-            return ledgerRecovery.sealUnowned(
-                            root, deadline.remaining(), "bounded late CreateAdv reconciliation")
-                    .thenApply(sealed -> Outcome.RECOVERED);
+            return ledgerRecovery
+                    .sealUnowned(root, deadline.remaining(), "bounded late CreateAdv reconciliation")
+                    .thenApply(sealedRoot -> Outcome.RECOVERED);
         });
     }
 
@@ -224,7 +230,8 @@ public final class BookKeeperUncertainAllocationReconciler {
             if (allocation.value().lifecycle() == LedgerAllocationLifecycle.FOREIGN_COLLISION) {
                 return CompletableFuture.completedFuture(Outcome.QUARANTINED);
             }
-            return writerMetadata.compareAndSetAllocation(
+            return writerMetadata
+                    .compareAndSetAllocation(
                             cluster,
                             replaceAllocation(
                                     allocation.value(),
@@ -238,9 +245,11 @@ public final class BookKeeperUncertainAllocationReconciler {
 
     private void requireSlot(BookKeeperAllocationSlotRecord slot) {
         if (!configuration.ledgerIdNamespace().contains(slot.candidateLedgerId())
-                || !slot.configurationBindingSha256().equals(configuration.configurationBindingSha256().value())
-                || !slot.ledgerIdentitySha256().equals(
-                        keys.ledgerIdentitySha256(configuration.providerScopeSha256(), slot.candidateLedgerId()))) {
+                || !slot.configurationBindingSha256()
+                        .equals(configuration.configurationBindingSha256().value())
+                || !slot.ledgerIdentitySha256()
+                        .equals(keys.ledgerIdentitySha256(
+                                configuration.providerScopeSha256(), slot.candidateLedgerId()))) {
             throw invariant("CREATE_UNCERTAIN allocation slot binding drifted");
         }
     }
@@ -262,7 +271,8 @@ public final class BookKeeperUncertainAllocationReconciler {
                 || root.allocationSlot() != slot.slot()
                 || !root.ledgerIdentitySha256().equals(slot.ledgerIdentitySha256())
                 || !root.configurationBindingSha256().equals(slot.configurationBindingSha256())
-                || !root.ledgerIdNamespaceSha256().equals(namespace.ledgerIdNamespaceSha256().value())
+                || !root.ledgerIdNamespaceSha256()
+                        .equals(namespace.ledgerIdNamespaceSha256().value())
                 || !root.lateCreateHazard()) {
             throw invariant("CREATE_UNCERTAIN slot/allocation/root identity drifted");
         }
@@ -297,9 +307,7 @@ public final class BookKeeperUncertainAllocationReconciler {
     }
 
     private BookKeeperLedgerRootRecord replaceRoot(
-            BookKeeperLedgerRootRecord before,
-            BookKeeperLedgerLifecycle lifecycle,
-            String reason) {
+            BookKeeperLedgerRootRecord before, BookKeeperLedgerLifecycle lifecycle, String reason) {
         return new BookKeeperLedgerRootRecord(
                 before.schemaVersion(),
                 before.ledgerIdentitySha256(),
@@ -344,8 +352,7 @@ public final class BookKeeperUncertainAllocationReconciler {
 
     private static CompletableFuture<Outcome> absentOrFailure(Throwable failure) {
         Throwable cause = unwrap(failure);
-        if (cause instanceof NereusException nereus
-                && nereus.code() == ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND) {
+        if (cause instanceof NereusException nereus && nereus.code() == ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND) {
             return CompletableFuture.completedFuture(Outcome.ABSENT);
         }
         return CompletableFuture.failedFuture(cause);
@@ -392,11 +399,7 @@ public final class BookKeeperUncertainAllocationReconciler {
 
         private BookKeeperUncertainAllocationRecoveryResult snapshot() {
             return new BookKeeperUncertainAllocationRecoveryResult(
-                    scannedSlots,
-                    uncertainSlots,
-                    absentLedgers,
-                    recoveredLedgers,
-                    quarantinedLedgers);
+                    scannedSlots, uncertainSlots, absentLedgers, recoveredLedgers, quarantinedLedgers);
         }
     }
 }

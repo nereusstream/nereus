@@ -16,7 +16,6 @@ package com.nereusstream.kafka.compaction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.OffsetRange;
@@ -41,202 +40,177 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class KafkaCompactionSourceResolverTest {
-  @Test
-  void derivesTheExactOutputTaskFromTheAuthoritativeDecisionPrefix() {
-    KafkaCompactionPlanCodecV1Test.Fixture fixture =
-        KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED");
-    FakeCommittedSources committed = committedSources(fixture);
-    KafkaCompactionSourceResolver resolver = new KafkaCompactionSourceResolver(committed);
+    @Test
+    void derivesTheExactOutputTaskFromTheAuthoritativeDecisionPrefix() {
+        KafkaCompactionPlanCodecV1Test.Fixture fixture = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED");
+        FakeCommittedSources committed = committedSources(fixture);
+        KafkaCompactionSourceResolver resolver = new KafkaCompactionSourceResolver(committed);
 
-    KafkaCompactionSourceResolver.ResolvedSources resolved =
-        resolver
-            .resolve(
-                fixture.outputTask().streamId(),
-                fixture.plan().candidate(),
-                fixture.outputTask().policy())
-            .join();
-
-    assertThat(committed.requestedCoverages())
-        .containsExactly(
-            fixture.plan().candidate().outputCoverage(),
-            new OffsetRange(
-                fixture.plan().candidate().outputCoverage().endOffset(),
-                fixture.plan().candidate().decisionHorizon().endOffset()));
-    assertThat(resolved.decisionSources()).isEqualTo(fixture.plan().decisionSources());
-    assertThat(resolved.outputSources()).isEqualTo(fixture.plan().outputSources());
-    assertThat(resolved.outputTask()).isEqualTo(fixture.outputTask());
-  }
-
-  @Test
-  void rejectsAuthorityDriftBetweenTheOutputAndTailResolutions() {
-    KafkaCompactionPlanCodecV1Test.Fixture fixture =
-        KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED");
-    ExactSourceSet output = fixture.plan().outputSources();
-    ExactSourceSet tail = tailSources(fixture);
-    KafkaCompactionSourceResolver resolver =
-        new KafkaCompactionSourceResolver(
-            new FakeCommittedSources(
-                Map.of(
-                    output.coverage(),
-                    resolution(output, fixture.plan().decisionSources()),
-                    tail.coverage(),
-                    resolution(tail, tail))));
-
-    assertThatThrownBy(
-            () ->
-                resolver
-                    .resolve(
+        KafkaCompactionSourceResolver.ResolvedSources resolved = resolver.resolve(
                         fixture.outputTask().streamId(),
                         fixture.plan().candidate(),
                         fixture.outputTask().policy())
-                    .join())
-        .hasRootCauseMessage(
-            "COMMITTED source authority changed between Kafka compaction output and tail"
-                + " resolution");
-  }
+                .join();
 
-  @Test
-  void revalidatesSourcesBeforeTheBindingAuthorityGuard() {
-    KafkaCompactionPlanCodecV1Test.Fixture fixture =
-        KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED");
-    FakeCommittedSources committed = committedSources(fixture);
-    KafkaCompactionSourceResolver resolver = new KafkaCompactionSourceResolver(committed);
-    KafkaCompactionSourceResolver.ResolvedSources resolved =
-        resolver
-            .resolve(
-                fixture.outputTask().streamId(),
-                fixture.plan().candidate(),
-                fixture.outputTask().policy())
-            .join();
-    AtomicInteger authorityChecks = new AtomicInteger();
+        assertThat(committed.requestedCoverages())
+                .containsExactly(
+                        fixture.plan().candidate().outputCoverage(),
+                        new OffsetRange(
+                                fixture.plan().candidate().outputCoverage().endOffset(),
+                                fixture.plan().candidate().decisionHorizon().endOffset()));
+        assertThat(resolved.decisionSources()).isEqualTo(fixture.plan().decisionSources());
+        assertThat(resolved.outputSources()).isEqualTo(fixture.plan().outputSources());
+        assertThat(resolved.outputTask()).isEqualTo(fixture.outputTask());
+    }
 
-    resolver
-        .mutationGuard(
-            resolved,
-            () -> {
-              assertThat(committed.revalidationCount()).isEqualTo(1);
-              authorityChecks.incrementAndGet();
-              return CompletableFuture.completedFuture(null);
-            })
-        .revalidate()
-        .join();
+    @Test
+    void rejectsAuthorityDriftBetweenTheOutputAndTailResolutions() {
+        KafkaCompactionPlanCodecV1Test.Fixture fixture = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED");
+        ExactSourceSet output = fixture.plan().outputSources();
+        ExactSourceSet tail = tailSources(fixture);
+        KafkaCompactionSourceResolver resolver = new KafkaCompactionSourceResolver(new FakeCommittedSources(Map.of(
+                output.coverage(),
+                resolution(output, fixture.plan().decisionSources()),
+                tail.coverage(),
+                resolution(tail, tail))));
 
-    assertThat(authorityChecks).hasValue(1);
-    assertThat(committed.revalidated()).isEqualTo(resolved.resolution());
-  }
+        assertThatThrownBy(() -> resolver.resolve(
+                                fixture.outputTask().streamId(),
+                                fixture.plan().candidate(),
+                                fixture.outputTask().policy())
+                        .join())
+                .hasRootCauseMessage(
+                        "COMMITTED source authority changed between Kafka compaction output and tail" + " resolution");
+    }
 
-  private static FakeCommittedSources committedSources(
-      KafkaCompactionPlanCodecV1Test.Fixture fixture) {
-    ExactSourceSet decision = fixture.plan().decisionSources();
-    ExactSourceSet output = fixture.plan().outputSources();
-    ExactSourceSet tail = tailSources(fixture);
-    return new FakeCommittedSources(
-        Map.of(
-            output.coverage(),
-            resolution(output, decision),
-            tail.coverage(),
-            resolution(tail, decision)));
-  }
+    @Test
+    void revalidatesSourcesBeforeTheBindingAuthorityGuard() {
+        KafkaCompactionPlanCodecV1Test.Fixture fixture = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED");
+        FakeCommittedSources committed = committedSources(fixture);
+        KafkaCompactionSourceResolver resolver = new KafkaCompactionSourceResolver(committed);
+        KafkaCompactionSourceResolver.ResolvedSources resolved = resolver.resolve(
+                        fixture.outputTask().streamId(),
+                        fixture.plan().candidate(),
+                        fixture.outputTask().policy())
+                .join();
+        AtomicInteger authorityChecks = new AtomicInteger();
 
-  private static ExactSourceSet tailSources(KafkaCompactionPlanCodecV1Test.Fixture fixture) {
-    ExactSourceSet decision = fixture.plan().decisionSources();
-    int outputSourceCount = fixture.plan().outputSources().sources().size();
-    return ExactSourceSet.create(
-        decision.view(),
-        new OffsetRange(
-            fixture.plan().candidate().outputCoverage().endOffset(),
-            fixture.plan().candidate().decisionHorizon().endOffset()),
-        decision.sources().subList(outputSourceCount, decision.sources().size()));
-  }
+        resolver.mutationGuard(resolved, () -> {
+                    assertThat(committed.revalidationCount()).isEqualTo(1);
+                    authorityChecks.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                })
+                .revalidate()
+                .join();
 
-  private static CommittedSourceSetResolution resolution(
-      ExactSourceSet sourceSet, ExactSourceSet authoritySet) {
-    var streamId = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED").outputTask().streamId();
-    long metadataVersion = 1;
-    var authoritativeLast =
-        authoritySet.sources().get(authoritySet.sources().size() - 1);
-    StreamMetadataSnapshot snapshot =
-        new StreamMetadataSnapshot(
-            new StreamMetadataRecord(
+        assertThat(authorityChecks).hasValue(1);
+        assertThat(committed.revalidated()).isEqualTo(resolved.resolution());
+    }
+
+    private static FakeCommittedSources committedSources(KafkaCompactionPlanCodecV1Test.Fixture fixture) {
+        ExactSourceSet decision = fixture.plan().decisionSources();
+        ExactSourceSet output = fixture.plan().outputSources();
+        ExactSourceSet tail = tailSources(fixture);
+        return new FakeCommittedSources(
+                Map.of(output.coverage(), resolution(output, decision), tail.coverage(), resolution(tail, decision)));
+    }
+
+    private static ExactSourceSet tailSources(KafkaCompactionPlanCodecV1Test.Fixture fixture) {
+        ExactSourceSet decision = fixture.plan().decisionSources();
+        int outputSourceCount = fixture.plan().outputSources().sources().size();
+        return ExactSourceSet.create(
+                decision.view(),
+                new OffsetRange(
+                        fixture.plan().candidate().outputCoverage().endOffset(),
+                        fixture.plan().candidate().decisionHorizon().endOffset()),
+                decision.sources().subList(outputSourceCount, decision.sources().size()));
+    }
+
+    private static CommittedSourceSetResolution resolution(ExactSourceSet sourceSet, ExactSourceSet authoritySet) {
+        var streamId = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED")
+                .outputTask()
+                .streamId();
+        long metadataVersion = 1;
+        var authoritativeLast =
+                authoritySet.sources().get(authoritySet.sources().size() - 1);
+        StreamMetadataSnapshot snapshot = new StreamMetadataSnapshot(
+                new StreamMetadataRecord(
+                        streamId.value(),
+                        "kafka-source-resolution",
+                        "stream-hash",
+                        StreamState.ACTIVE.name(),
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                        Map.of(),
+                        1,
+                        1,
+                        metadataVersion),
+                new CommittedEndOffsetRecord(
+                        streamId.value(),
+                        authoritySet.coverage().endOffset(),
+                        authoritativeLast.cumulativeSizeAtEnd(),
+                        authoritativeLast.commitVersion(),
+                        metadataVersion),
+                new TrimRecord(streamId.value(), authoritySet.coverage().startOffset(), "", 1, metadataVersion));
+        MaterializationStreamRegistrationRecord registration = new MaterializationStreamRegistrationRecord(
+                1,
                 streamId.value(),
-                "kafka-source-resolution",
-                "stream-hash",
-                StreamState.ACTIVE.name(),
+                ProjectionIdentity.encode(Optional.empty()),
+                "a".repeat(64),
                 StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
-                Map.of(),
                 1,
                 1,
-                metadataVersion),
-            new CommittedEndOffsetRecord(
-                streamId.value(),
-                authoritySet.coverage().endOffset(),
-                authoritativeLast.cumulativeSizeAtEnd(),
-                authoritativeLast.commitVersion(),
-                metadataVersion),
-            new TrimRecord(
-                streamId.value(), authoritySet.coverage().startOffset(), "", 1, metadataVersion));
-    MaterializationStreamRegistrationRecord registration =
-        new MaterializationStreamRegistrationRecord(
-            1,
-            streamId.value(),
-            ProjectionIdentity.encode(Optional.empty()),
-            "a".repeat(64),
-            StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
-            1,
-            1,
-            1,
-            metadataVersion);
-    return new CommittedSourceSetResolution(
-        streamId,
-        sourceSet,
-        snapshot,
-        Optional.of(
-            new VersionedMaterializationStreamRegistration(
-                "/registration/" + streamId.value(),
-                registration,
-                metadataVersion,
-                new Checksum(ChecksumType.SHA256, "b".repeat(64)))));
-  }
-
-  private static final class FakeCommittedSources implements CommittedSourceSetResolver {
-    private final Map<OffsetRange, CommittedSourceSetResolution> resolutions;
-    private final ArrayList<OffsetRange> requestedCoverages = new ArrayList<>();
-    private int revalidationCount;
-    private CommittedSourceSetResolution revalidated;
-
-    private FakeCommittedSources(Map<OffsetRange, CommittedSourceSetResolution> resolutions) {
-      this.resolutions = Map.copyOf(resolutions);
+                1,
+                metadataVersion);
+        return new CommittedSourceSetResolution(
+                streamId,
+                sourceSet,
+                snapshot,
+                Optional.of(new VersionedMaterializationStreamRegistration(
+                        "/registration/" + streamId.value(),
+                        registration,
+                        metadataVersion,
+                        new Checksum(ChecksumType.SHA256, "b".repeat(64)))));
     }
 
-    @Override
-    public CompletableFuture<CommittedSourceSetResolution> resolve(
-        com.nereusstream.api.StreamId streamId, OffsetRange coverage) {
-      requestedCoverages.add(coverage);
-      CommittedSourceSetResolution resolution = resolutions.get(coverage);
-      if (resolution == null) {
-        return CompletableFuture.failedFuture(
-            new IllegalArgumentException("unexpected requested coverage " + coverage));
-      }
-      return CompletableFuture.completedFuture(resolution);
-    }
+    private static final class FakeCommittedSources implements CommittedSourceSetResolver {
+        private final Map<OffsetRange, CommittedSourceSetResolution> resolutions;
+        private final ArrayList<OffsetRange> requestedCoverages = new ArrayList<>();
+        private int revalidationCount;
+        private CommittedSourceSetResolution revalidated;
 
-    @Override
-    public CompletableFuture<Void> revalidate(CommittedSourceSetResolution expected) {
-      revalidated = expected;
-      revalidationCount++;
-      return CompletableFuture.completedFuture(null);
-    }
+        private FakeCommittedSources(Map<OffsetRange, CommittedSourceSetResolution> resolutions) {
+            this.resolutions = Map.copyOf(resolutions);
+        }
 
-    private List<OffsetRange> requestedCoverages() {
-      return List.copyOf(requestedCoverages);
-    }
+        @Override
+        public CompletableFuture<CommittedSourceSetResolution> resolve(
+                com.nereusstream.api.StreamId streamId, OffsetRange coverage) {
+            requestedCoverages.add(coverage);
+            CommittedSourceSetResolution resolution = resolutions.get(coverage);
+            if (resolution == null) {
+                return CompletableFuture.failedFuture(
+                        new IllegalArgumentException("unexpected requested coverage " + coverage));
+            }
+            return CompletableFuture.completedFuture(resolution);
+        }
 
-    private int revalidationCount() {
-      return revalidationCount;
-    }
+        @Override
+        public CompletableFuture<Void> revalidate(CommittedSourceSetResolution expected) {
+            revalidated = expected;
+            revalidationCount++;
+            return CompletableFuture.completedFuture(null);
+        }
 
-    private CommittedSourceSetResolution revalidated() {
-      return revalidated;
+        private List<OffsetRange> requestedCoverages() {
+            return List.copyOf(requestedCoverages);
+        }
+
+        private int revalidationCount() {
+            return revalidationCount;
+        }
+
+        private CommittedSourceSetResolution revalidated() {
+            return revalidated;
+        }
     }
-  }
 }

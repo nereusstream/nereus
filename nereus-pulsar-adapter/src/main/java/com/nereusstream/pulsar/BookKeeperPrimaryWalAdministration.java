@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import com.nereusstream.bookkeeper.BookKeeperDeletionActivationCoordinator;
@@ -23,7 +24,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Explicit operator surface; broker bootstrap never invokes its mutation methods. */
+/**
+ * Explicit operator surface; broker bootstrap never invokes its mutation methods.
+ */
 public final class BookKeeperPrimaryWalAdministration {
     private final NereusBookKeeperRuntimeConfiguration configuration;
     private final BookKeeperLedgerIdNamespaceReservationVerifier namespaceVerifier;
@@ -40,14 +43,11 @@ public final class BookKeeperPrimaryWalAdministration {
         Objects.requireNonNull(configuration, "configuration");
         OxiaBookKeeperLedgerIdNamespaceReservationStore namespaces =
                 new OxiaBookKeeperLedgerIdNamespaceReservationStore(
-                        Objects.requireNonNull(oxia, "oxia"),
-                        Objects.requireNonNull(runtime, "runtime"));
-        OxiaBookKeeperProtocolActivationStore activations =
-                new OxiaBookKeeperProtocolActivationStore(oxia, runtime);
+                        Objects.requireNonNull(oxia, "oxia"), Objects.requireNonNull(runtime, "runtime"));
+        OxiaBookKeeperProtocolActivationStore activations = new OxiaBookKeeperProtocolActivationStore(oxia, runtime);
         return new BookKeeperPrimaryWalAdministration(
                 configuration,
-                new BookKeeperLedgerIdNamespaceReservationVerifier(
-                        namespaces, configuration.deploymentId()),
+                new BookKeeperLedgerIdNamespaceReservationVerifier(namespaces, configuration.deploymentId()),
                 new BookKeeperLedgerIdNamespaceProvisioningCoordinator(
                         namespaces, Objects.requireNonNull(clock, "clock")),
                 activations,
@@ -67,24 +67,18 @@ public final class BookKeeperPrimaryWalAdministration {
         this.namespaceCoordinator = Objects.requireNonNull(namespaceCoordinator, "namespaceCoordinator");
         this.activationStore = Objects.requireNonNull(activationStore, "activationStore");
         this.activationCoordinator = Objects.requireNonNull(activationCoordinator, "activationCoordinator");
-        this.deletionActivationCoordinator = Objects.requireNonNull(
-                deletionActivationCoordinator, "deletionActivationCoordinator");
+        this.deletionActivationCoordinator =
+                Objects.requireNonNull(deletionActivationCoordinator, "deletionActivationCoordinator");
     }
 
     public CompletableFuture<BookKeeperLedgerIdNamespaceReservation> provisionNamespace(
-            String operatorEvidenceSha256,
-            Duration timeout) {
+            String operatorEvidenceSha256, Duration timeout) {
         return namespaceCoordinator.provision(
-                configuration.wal(),
-                configuration.deploymentId(),
-                operatorEvidenceSha256,
-                timeout);
+                configuration.wal(), configuration.deploymentId(), operatorEvidenceSha256, timeout);
     }
 
     public CompletableFuture<BookKeeperLedgerIdNamespaceReservation> revokeNamespace(
-            String revocationEvidenceSha256,
-            long expectedMetadataVersion,
-            Duration timeout) {
+            String revocationEvidenceSha256, long expectedMetadataVersion, Duration timeout) {
         return namespaceCoordinator.revoke(
                 configuration.wal(),
                 configuration.deploymentId(),
@@ -94,52 +88,41 @@ public final class BookKeeperPrimaryWalAdministration {
     }
 
     public CompletableFuture<BookKeeperProtocolActivation> prepareActivation(
-            long brokerReadinessEpoch,
-            String brokerReadinessSha256,
-            Duration timeout) {
+            long brokerReadinessEpoch, String brokerReadinessSha256, Duration timeout) {
         BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(timeout);
         BookKeeperWalConfiguration wal = configuration.wal();
-        return namespaceVerifier.requireActive(wal, deadline.remaining())
+        return namespaceVerifier
+                .requireActive(wal, deadline.remaining())
                 .thenCompose(namespace -> activationCoordinator.prepare(
-                        wal,
-                        namespace,
-                        brokerReadinessEpoch,
-                        brokerReadinessSha256,
-                        deadline.remaining()));
+                        wal, namespace, brokerReadinessEpoch, brokerReadinessSha256, deadline.remaining()));
     }
 
     public CompletableFuture<BookKeeperProtocolActivation> activate(
-            BookKeeperProtocolActivationUpdate update,
-            Duration timeout) {
+            BookKeeperProtocolActivationUpdate update, Duration timeout) {
         if (Objects.requireNonNull(update, "update").ledgerDeletionEnabled()) {
             return CompletableFuture.failedFuture(new IllegalArgumentException(
                     "ledger deletion must use activateDeletion so proof digests are producer-owned"));
         }
         BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(timeout);
         BookKeeperWalConfiguration wal = configuration.wal();
-        return namespaceVerifier.requireActive(wal, deadline.remaining())
-                .thenCompose(namespace -> activationCoordinator.activate(
-                        wal,
-                        namespace,
-                        update,
-                        deadline.remaining()));
+        return namespaceVerifier
+                .requireActive(wal, deadline.remaining())
+                .thenCompose(namespace -> activationCoordinator.activate(wal, namespace, update, deadline.remaining()));
     }
 
-    public CompletableFuture<Optional<BookKeeperProtocolActivation>> readActivation(
-            Duration timeout) {
+    public CompletableFuture<Optional<BookKeeperProtocolActivation>> readActivation(Duration timeout) {
         BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(timeout);
         BookKeeperWalConfiguration wal = configuration.wal();
-        return namespaceVerifier.requireActive(wal, deadline.remaining())
-                .thenCompose(namespace -> activationStore.read(
-                        wal, namespace, deadline.remaining()));
+        return namespaceVerifier
+                .requireActive(wal, deadline.remaining())
+                .thenCompose(namespace -> activationStore.read(wal, namespace, deadline.remaining()));
     }
 
     public CompletableFuture<BookKeeperDeletionActivationResult> activateDeletion(
             BookKeeperDeletionActivationRequest request) {
         return deletionActivationCoordinator
                 .map(coordinator -> coordinator.activate(request))
-                .orElseGet(() -> CompletableFuture.failedFuture(
-                        new IllegalStateException(
-                                "BookKeeper deletion proof producers are unavailable on this administration surface")));
+                .orElseGet(() -> CompletableFuture.failedFuture(new IllegalStateException(
+                        "BookKeeper deletion proof producers are unavailable on this administration surface")));
     }
 }

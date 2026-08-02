@@ -1,9 +1,16 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Durable deletion fence state for one immutable physical object key. */
+/**
+ * Durable deletion fence state for one immutable physical object key.
+ */
 public enum PhysicalObjectLifecycle {
-    ACTIVE(1), MARKED(2), DELETING(3), DELETED(4), QUARANTINED(5);
+    ACTIVE(1),
+    MARKED(2),
+    DELETING(3),
+    DELETED(4),
+    QUARANTINED(5);
 
     private final int wireId;
 

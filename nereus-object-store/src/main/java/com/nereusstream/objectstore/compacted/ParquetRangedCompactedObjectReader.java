@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.objectstore.ObjectStore;
@@ -6,7 +7,9 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-/** Closed NCP2 reader facade over the shared bounded Parquet transport. */
+/**
+ * Closed NCP2 reader facade over the shared bounded Parquet transport.
+ */
 public final class ParquetRangedCompactedObjectReader implements RangedCompactedObjectReader {
     private final ParquetV2ReaderSupport support;
 

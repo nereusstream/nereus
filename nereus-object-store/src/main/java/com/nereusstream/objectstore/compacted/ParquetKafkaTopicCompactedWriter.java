@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.ReadView;
@@ -8,7 +9,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Flow;
 
-/** Closed NTC2 Parquet writer with Kafka-specific row validation. */
+/**
+ * Closed NTC2 Parquet writer with Kafka-specific row validation.
+ */
 public final class ParquetKafkaTopicCompactedWriter implements KafkaTopicCompactedObjectWriter {
     private final ParquetV2WriterSupport support;
 
@@ -18,8 +21,7 @@ public final class ParquetKafkaTopicCompactedWriter implements KafkaTopicCompact
 
     @Override
     public CompletableFuture<RangedCompactedObjectWriteResult> write(
-            KafkaTopicCompactedObjectWriteRequest request,
-            Flow.Publisher<KafkaTopicCompactedObjectRow> rows) {
+            KafkaTopicCompactedObjectWriteRequest request, Flow.Publisher<KafkaTopicCompactedObjectRow> rows) {
         Objects.requireNonNull(request, "request");
         return support.write(
                 new ParquetV2WriterSupport.WriteSpec<>(

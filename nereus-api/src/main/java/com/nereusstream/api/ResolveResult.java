@@ -17,7 +17,9 @@ package com.nereusstream.api;
 import java.util.List;
 import java.util.Objects;
 
-/** Physical targets selected by the resolver for a logical offset. */
+/**
+ * Physical targets selected by the resolver for a logical offset.
+ */
 public record ResolveResult(
         StreamId streamId,
         long requestedOffset,

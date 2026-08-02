@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
@@ -7,9 +8,10 @@ import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionPendingOperationRecord;
 import java.util.ArrayList;
 
-/** Closed explicit field-order codec for the authoritative Kafka partition root. */
-public final class KafkaPartitionBindingRecordCodecV1
-        extends AbstractF4RecordCodecV1<KafkaPartitionBindingRecord> {
+/**
+ * Closed explicit field-order codec for the authoritative Kafka partition root.
+ */
+public final class KafkaPartitionBindingRecordCodecV1 extends AbstractF4RecordCodecV1<KafkaPartitionBindingRecord> {
     private static final int MAX_CHECKPOINTS = 3;
 
     public KafkaPartitionBindingRecordCodecV1() {
@@ -89,11 +91,31 @@ public final class KafkaPartitionBindingRecordCodecV1
             long metadataVersion = reader.readLong("metadataVersion");
             reader.requireConsumed();
             return new KafkaPartitionBindingRecord(
-                    formatVersion, kafkaClusterId, topicId, partitionId, observedTopicName, incarnation,
-                    streamName, streamId, payloadMappingId, storageProfile, lifecycleId, bindingEpoch,
-                    createdMetadataOffset, lastAppliedMetadataOffset, observedLeaderId, observedLeaderEpoch,
-                    observedBrokerEpoch, observedLogStartOffset, observedStableEndOffset, coverage,
-                    checkpoints, operation, createdAtMillis, updatedAtMillis, metadataVersion);
+                    formatVersion,
+                    kafkaClusterId,
+                    topicId,
+                    partitionId,
+                    observedTopicName,
+                    incarnation,
+                    streamName,
+                    streamId,
+                    payloadMappingId,
+                    storageProfile,
+                    lifecycleId,
+                    bindingEpoch,
+                    createdMetadataOffset,
+                    lastAppliedMetadataOffset,
+                    observedLeaderId,
+                    observedLeaderEpoch,
+                    observedBrokerEpoch,
+                    observedLogStartOffset,
+                    observedStableEndOffset,
+                    coverage,
+                    checkpoints,
+                    operation,
+                    createdAtMillis,
+                    updatedAtMillis,
+                    metadataVersion);
         } catch (RuntimeException failure) {
             throw malformed(failure);
         }
@@ -111,9 +133,12 @@ public final class KafkaPartitionBindingRecordCodecV1
 
     private static KafkaCompactionCoverageRecord readCoverage(F4Binary.Reader reader) {
         return new KafkaCompactionCoverageRecord(
-                reader.readInt("coverageVersion"), reader.readLong("coverageStartOffset"),
-                reader.readLong("coverageEndOffset"), reader.readLong("coverageActivationEpoch"),
-                reader.readBytes("generationSetSha256"), reader.readBytes("policySha256"),
+                reader.readInt("coverageVersion"),
+                reader.readLong("coverageStartOffset"),
+                reader.readLong("coverageEndOffset"),
+                reader.readLong("coverageActivationEpoch"),
+                reader.readBytes("generationSetSha256"),
+                reader.readBytes("policySha256"),
                 reader.readLong("coverageActivatedAtMillis"));
     }
 
@@ -133,11 +158,16 @@ public final class KafkaPartitionBindingRecordCodecV1
 
     private static KafkaCheckpointReferenceRecord readCheckpoint(F4Binary.Reader reader) {
         return new KafkaCheckpointReferenceRecord(
-                reader.readInt("referenceVersion"), reader.readString("checkpointObjectId"),
-                reader.readString("checkpointObjectKey"), reader.readLong("checkpointObjectLength"),
-                reader.readFixedBytes("checkpointObjectSha256", 32), reader.readLong("checkpointOffset"),
-                reader.readLong("checkpointLogStartOffset"), reader.readLong("checkpointSourceCommitVersion"),
-                reader.readFixedBytes("checkpointSourceHeadSha256", 32), reader.readString("checkpointWriterBuild"),
+                reader.readInt("referenceVersion"),
+                reader.readString("checkpointObjectId"),
+                reader.readString("checkpointObjectKey"),
+                reader.readLong("checkpointObjectLength"),
+                reader.readFixedBytes("checkpointObjectSha256", 32),
+                reader.readLong("checkpointOffset"),
+                reader.readLong("checkpointLogStartOffset"),
+                reader.readLong("checkpointSourceCommitVersion"),
+                reader.readFixedBytes("checkpointSourceHeadSha256", 32),
+                reader.readString("checkpointWriterBuild"),
                 reader.readLong("checkpointCreatedAtMillis"));
     }
 

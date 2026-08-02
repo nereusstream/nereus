@@ -25,20 +25,20 @@ remain the frozen M0 input；the complete F1-BK delivery is final-gated at the c
 
 Audit baseline：clean `main@35c58c575c3da220633c53e48a581f16756ea047`。
 
-| Source | Git blob | Audit result |
-| --- | --- | --- |
-| `nereus-api/.../target/ReadTarget.java` | `37d2c3c31fe60d5ee044f19743ada68258501508` | sealed provider-neutral target union exists |
-| `nereus-api/.../target/BookKeeperEntryRangeReadTarget.java` | `49df4be558caacc54e9c72231091f3e2f9192d0c` | V1 durable BK target is reserved and validated |
-| `nereus-api/.../target/BookKeeperEntryMapping.java` | `bf608c0da2eec8de4580be0970789ad390ecfe38` | only one-entry-per-Nereus-entry mapping is admitted |
-| `nereus-api/.../ReadBatch.java` | `b481a32070384bf3ed7e54729f1d2f4afec65add` | incorrectly requires ObjectId/object offsets and entry-index ref |
-| `nereus-core/.../wal/PrimaryWalAppender.java` | `d4084fbc0bfbc7d8f327e5a5c147d673f453549c` | generic prepare/persist/revalidate SPI exists |
-| `nereus-core/.../wal/PrimaryWalReader.java` | `245e6d6978e10d338d9d694c9266beeb9db1cd18` | reader marker exists |
-| `nereus-core/.../wal/PrimaryWalRegistry.java` | `49de6c3b88adfd7854738a0119cdf7f653eff9d7` | registry exists and BookKeeper remains unregistered |
-| `nereus-core/.../append/AppendCoordinator.java` | `eecfd8eadfa1acb0cf2999a6092e60828099b0b1` | production coordinator is still Object-WAL concrete |
-| `nereus-core/.../read/ReadCoordinator.java` | `b1fd30d6c5ba4114046eca8013e77ce640045f78` | accounting converts every target to `ResolvedObjectRange` |
-| `nereus-metadata-oxia/.../PreparedStableAppend.java` | `77c28e5c3f407c8650fcff08cf8ab4c0ced476d6` | stable append metadata preparation forces Object target/hash |
-| `nereus-materialization/.../SourceGeneration.java` | `bde37ed08d225a8820dcdf4c7b4f7eff3e155ac0` | already carries encoded generic target + identity digest |
-| `nereus-materialization/.../MaterializationTask.java` | `6e509e7d8194497c904f6ba23545799d2003fa47` | reusable exact-source task; no BK-specific task is needed |
+| Source                                                      | Git blob                                   | Audit result                                                     |
+|-------------------------------------------------------------|--------------------------------------------|------------------------------------------------------------------|
+| `nereus-api/.../target/ReadTarget.java`                     | `37d2c3c31fe60d5ee044f19743ada68258501508` | sealed provider-neutral target union exists                      |
+| `nereus-api/.../target/BookKeeperEntryRangeReadTarget.java` | `49df4be558caacc54e9c72231091f3e2f9192d0c` | V1 durable BK target is reserved and validated                   |
+| `nereus-api/.../target/BookKeeperEntryMapping.java`         | `bf608c0da2eec8de4580be0970789ad390ecfe38` | only one-entry-per-Nereus-entry mapping is admitted              |
+| `nereus-api/.../ReadBatch.java`                             | `b481a32070384bf3ed7e54729f1d2f4afec65add` | incorrectly requires ObjectId/object offsets and entry-index ref |
+| `nereus-core/.../wal/PrimaryWalAppender.java`               | `d4084fbc0bfbc7d8f327e5a5c147d673f453549c` | generic prepare/persist/revalidate SPI exists                    |
+| `nereus-core/.../wal/PrimaryWalReader.java`                 | `245e6d6978e10d338d9d694c9266beeb9db1cd18` | reader marker exists                                             |
+| `nereus-core/.../wal/PrimaryWalRegistry.java`               | `49de6c3b88adfd7854738a0119cdf7f653eff9d7` | registry exists and BookKeeper remains unregistered              |
+| `nereus-core/.../append/AppendCoordinator.java`             | `eecfd8eadfa1acb0cf2999a6092e60828099b0b1` | production coordinator is still Object-WAL concrete              |
+| `nereus-core/.../read/ReadCoordinator.java`                 | `b1fd30d6c5ba4114046eca8013e77ce640045f78` | accounting converts every target to `ResolvedObjectRange`        |
+| `nereus-metadata-oxia/.../PreparedStableAppend.java`        | `77c28e5c3f407c8650fcff08cf8ab4c0ced476d6` | stable append metadata preparation forces Object target/hash     |
+| `nereus-materialization/.../SourceGeneration.java`          | `bde37ed08d225a8820dcdf4c7b4f7eff3e155ac0` | already carries encoded generic target + identity digest         |
+| `nereus-materialization/.../MaterializationTask.java`       | `6e509e7d8194497c904f6ba23545799d2003fa47` | reusable exact-source task; no BK-specific task is needed        |
 
 All shortened paths are below `src/main/java/com/nereusstream/...`。
 
@@ -51,15 +51,15 @@ configuration、exact profile first-create capability barrier and independent li
 without changing the pinned BookKeeper version。The checkout pins
 `org.apache.bookkeeper:*` to **4.18.0** in `gradle/libs.versions.toml`; it is local master, not an `M1-SNAPSHOT`.
 
-| Source | Git blob | Audit result |
-| --- | --- | --- |
-| `pulsar-broker/.../ManagedLedgerClientFactory.java` | `3dece00e89a7f0d2f72bff71eabe9d2dff519d37` | owns stock BK client lifecycle |
-| `pulsar-broker/.../storage/BookkeeperManagedLedgerStorageClass.java` | `1f05cde72a5b52c2e868abcd38a8e3cabf09a403` | exposes concrete borrowed `BookKeeper` client |
-| `pulsar-broker/.../storage/nereus/NereusManagedLedgerStorage.java` | `0e4b37de74eb49e65be9b2e1157194502b3a9393` | fail-closes on a non-BK/null stock class，passes the exact borrowed client plus live BK readiness provider and installs the verified BK capability sink |
-| `pulsar-broker/.../storage/nereus/NereusBookKeeperPrimaryWalCapability.java` | `3642d44786341be191c58c80abcb64700ac49882` | freezes reserved config/namespace/stable-publication/sync properties and profile requirements |
-| `pulsar-broker/.../storage/nereus/NereusBrokerCapabilityCoordinator.java` | `4dacbfd0dd1ffc83941d80fdd7d39ec259a16f67` | computes independent two-snapshot generation and BK deletion readiness domains and invalidates both on broker-registry drift |
-| `pulsar-broker/.../storage/nereus/NereusBookKeeperPrimaryWalCapabilityTest.java` | `127709efc15ee9bb076a76cde0d945b2700dcf90` | freezes stable publication binding、strongest-profile deletion readiness and broker/property drift rejection |
-| `pulsar-broker/.../nereus/NereusManagedLedgerStorageBookKeeperClientTest.java` | `c88aaf3848b20b00a2b6694260d0d1f293c098b6` | freezes same-instance handoff and both fail-closed cases |
+| Source                                                                           | Git blob                                   | Audit result                                                                                                                                           |
+|----------------------------------------------------------------------------------|--------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `pulsar-broker/.../ManagedLedgerClientFactory.java`                              | `3dece00e89a7f0d2f72bff71eabe9d2dff519d37` | owns stock BK client lifecycle                                                                                                                         |
+| `pulsar-broker/.../storage/BookkeeperManagedLedgerStorageClass.java`             | `1f05cde72a5b52c2e868abcd38a8e3cabf09a403` | exposes concrete borrowed `BookKeeper` client                                                                                                          |
+| `pulsar-broker/.../storage/nereus/NereusManagedLedgerStorage.java`               | `0e4b37de74eb49e65be9b2e1157194502b3a9393` | fail-closes on a non-BK/null stock class，passes the exact borrowed client plus live BK readiness provider and installs the verified BK capability sink |
+| `pulsar-broker/.../storage/nereus/NereusBookKeeperPrimaryWalCapability.java`     | `3642d44786341be191c58c80abcb64700ac49882` | freezes reserved config/namespace/stable-publication/sync properties and profile requirements                                                          |
+| `pulsar-broker/.../storage/nereus/NereusBrokerCapabilityCoordinator.java`        | `4dacbfd0dd1ffc83941d80fdd7d39ec259a16f67` | computes independent two-snapshot generation and BK deletion readiness domains and invalidates both on broker-registry drift                           |
+| `pulsar-broker/.../storage/nereus/NereusBookKeeperPrimaryWalCapabilityTest.java` | `127709efc15ee9bb076a76cde0d945b2700dcf90` | freezes stable publication binding、strongest-profile deletion readiness and broker/property drift rejection                                            |
+| `pulsar-broker/.../nereus/NereusManagedLedgerStorageBookKeeperClientTest.java`   | `c88aaf3848b20b00a2b6694260d0d1f293c098b6` | freezes same-instance handoff and both fail-closed cases                                                                                               |
 
 BookKeeper 4.18.0 public client API locally verified from the pinned jar：
 
@@ -290,18 +290,18 @@ signals, not a correctness proof of non-creation.
 
 ## 5. Gap-to-milestone ownership
 
-| Blocking gap | Owner/milestone |
-| --- | --- |
-| Object-concrete append prepare/persist/metadata path | core + metadata BK-M1 |
-| Object-shaped `ReadBatch`/stats/accounting | API/core/object-store BK-M1 |
-| no BookKeeper module/client adapter | new `nereus-bookkeeper` BK-M1 |
-| no ledger allocation/root/lifecycle/protection metadata | metadata + bookkeeper BK-M1/M2 |
-| no exact BK read/write/fencing/restart recovery | bookkeeper BK-M1/M2 |
-| no whole-ledger retention proof | metadata/bookkeeper/materialization BK-M2 |
-| Object-only exact-source/protection/retirement branches | materialization/core BK-M3 |
-| no required-higher-generation producer barrier | closed by core/materialization BK-M4；publication activation control plane closed by BK-M5 checkpoint D，deletion proof production/scheduling remains M5 |
-| no broker client/capability/profile admission wiring | pulsar-adapter + local Pulsar BK-M5 |
-| no real multi-broker/scale/chaos evidence | BK-M5/M6 |
+| Blocking gap                                            | Owner/milestone                                                                                                                                        |
+|---------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Object-concrete append prepare/persist/metadata path    | core + metadata BK-M1                                                                                                                                  |
+| Object-shaped `ReadBatch`/stats/accounting              | API/core/object-store BK-M1                                                                                                                            |
+| no BookKeeper module/client adapter                     | new `nereus-bookkeeper` BK-M1                                                                                                                          |
+| no ledger allocation/root/lifecycle/protection metadata | metadata + bookkeeper BK-M1/M2                                                                                                                         |
+| no exact BK read/write/fencing/restart recovery         | bookkeeper BK-M1/M2                                                                                                                                    |
+| no whole-ledger retention proof                         | metadata/bookkeeper/materialization BK-M2                                                                                                              |
+| Object-only exact-source/protection/retirement branches | materialization/core BK-M3                                                                                                                             |
+| no required-higher-generation producer barrier          | closed by core/materialization BK-M4；publication activation control plane closed by BK-M5 checkpoint D，deletion proof production/scheduling remains M5 |
+| no broker client/capability/profile admission wiring    | pulsar-adapter + local Pulsar BK-M5                                                                                                                    |
+| no real multi-broker/scale/chaos evidence               | BK-M5/M6                                                                                                                                               |
 
 ## 6. Audit answer
 

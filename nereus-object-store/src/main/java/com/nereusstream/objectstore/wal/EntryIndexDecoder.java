@@ -19,14 +19,10 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class EntryIndexDecoder {
-    private EntryIndexDecoder() {
-    }
+    private EntryIndexDecoder() {}
 
     public static EntryIndex decode(
-            byte[] bytes,
-            long slicePayloadLength,
-            long minEventTimeMillis,
-            long maxEventTimeMillis) {
+            byte[] bytes, long slicePayloadLength, long minEventTimeMillis, long maxEventTimeMillis) {
         Objects.requireNonNull(bytes, "bytes");
         try {
             return decodeInternal(bytes, slicePayloadLength, minEventTimeMillis, maxEventTimeMillis);
@@ -38,10 +34,7 @@ public final class EntryIndexDecoder {
     }
 
     private static EntryIndex decodeInternal(
-            byte[] bytes,
-            long slicePayloadLength,
-            long minEventTimeMillis,
-            long maxEventTimeMillis) {
+            byte[] bytes, long slicePayloadLength, long minEventTimeMillis, long maxEventTimeMillis) {
         WalBinary.Reader reader = new WalBinary.Reader(bytes);
         int entryCount = reader.int32();
         int recordCount = reader.int32();
@@ -87,7 +80,8 @@ public final class EntryIndexDecoder {
             long minEventTimeMillis,
             long maxEventTimeMillis,
             long previousPayloadEnd) {
-        if (item.payloadOffset() > slicePayloadLength || item.payloadLength() > slicePayloadLength - item.payloadOffset()) {
+        if (item.payloadOffset() > slicePayloadLength
+                || item.payloadLength() > slicePayloadLength - item.payloadOffset()) {
             throw WalBinary.corrupt("entry payload range exceeds slice payload");
         }
         if (item.payloadLength() > 0 && item.payloadOffset() < previousPayloadEnd) {

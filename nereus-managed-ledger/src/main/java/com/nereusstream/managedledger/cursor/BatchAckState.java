@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Remaining-message bitset for one persisted Pulsar batch entry. */
+/**
+ * Remaining-message bitset for one persisted Pulsar batch entry.
+ */
 public record BatchAckState(int batchSize, long[] remainingWords) {
     public BatchAckState {
         if (batchSize <= 0) {
@@ -36,9 +39,10 @@ public record BatchAckState(int batchSize, long[] remainingWords) {
 
     @Override
     public boolean equals(Object other) {
-        return this == other || (other instanceof BatchAckState that
-                && batchSize == that.batchSize
-                && Arrays.equals(remainingWords, that.remainingWords));
+        return this == other
+                || (other instanceof BatchAckState that
+                        && batchSize == that.batchSize
+                        && Arrays.equals(remainingWords, that.remainingWords));
     }
 
     @Override

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
 import com.nereusstream.api.Checksum;
@@ -44,8 +45,7 @@ import java.util.concurrent.CompletableFuture;
  * Produces NBKKAFKASTREAM1 only after all Kafka binding and materialization registry shards agree
  * with the exact L0 authority for every live BookKeeper-backed partition.
  */
-public final class KafkaBookKeeperStreamCoverageProofProducer
-        implements BookKeeperStreamCoverageProofProvider {
+public final class KafkaBookKeeperStreamCoverageProofProducer implements BookKeeperStreamCoverageProofProvider {
     private static final String DOMAIN = "NBKKAFKASTREAM1";
 
     private final String cluster;
@@ -68,13 +68,9 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
             KafkaPartitionMetadataStore bindings) {
         this.cluster = text(cluster, "cluster");
         this.configuration = Objects.requireNonNull(configuration, "configuration");
-        this.ledgerIdNamespaceSha256 =
-                new Checksum(
-                                ChecksumType.SHA256,
-                                Objects.requireNonNull(
-                                        ledgerIdNamespaceSha256,
-                                        "ledgerIdNamespaceSha256"))
-                        .value();
+        this.ledgerIdNamespaceSha256 = new Checksum(
+                        ChecksumType.SHA256, Objects.requireNonNull(ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256"))
+                .value();
         this.generations = Objects.requireNonNull(generations, "generations");
         this.l0 = Objects.requireNonNull(l0, "l0");
         this.bindings = Objects.requireNonNull(bindings, "bindings");
@@ -85,70 +81,34 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
 
     @Override
     public CompletableFuture<BookKeeperStreamCoverageProof> produce(
-            BookKeeperBrokerReadiness readiness,
-            Duration timeout) {
+            BookKeeperBrokerReadiness readiness, Duration timeout) {
         final Accumulator accumulator;
         final BookKeeperOperationDeadline deadline;
         try {
-            accumulator =
-                    new Accumulator(
-                            Objects.requireNonNull(readiness, "readiness"));
+            accumulator = new Accumulator(Objects.requireNonNull(readiness, "readiness"));
             deadline = new BookKeeperOperationDeadline(timeout);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return scanBindingShard(
-                        0,
-                        Optional.empty(),
-                        accumulator,
-                        deadline)
-                .thenCompose(
-                        ignored ->
-                                scanMaterializationShard(
-                                        0,
-                                        Optional.empty(),
-                                        accumulator,
-                                        deadline))
+        return scanBindingShard(0, Optional.empty(), accumulator, deadline)
+                .thenCompose(ignored -> scanMaterializationShard(0, Optional.empty(), accumulator, deadline))
                 .thenApply(ignored -> accumulator.finish());
     }
 
     private CompletableFuture<Void> scanBindingShard(
-            int shard,
-            Optional<String> continuation,
-            Accumulator accumulator,
-            BookKeeperOperationDeadline deadline) {
+            int shard, Optional<String> continuation, Accumulator accumulator, BookKeeperOperationDeadline deadline) {
         if (shard == KafkaPartitionKeyspace.REGISTRY_SHARDS) {
             return CompletableFuture.completedFuture(null);
         }
-        return deadline.bound(
-                        bindings.scanRegistry(
-                                shard,
-                                continuation,
-                                pageSize))
-                .thenCompose(
-                        page ->
-                                processBindingHints(
-                                                page.values(),
-                                                0,
-                                                shard,
-                                                accumulator,
-                                                deadline)
-                                        .thenCompose(
-                                                ignored -> {
-                                                    if (page.continuation().isPresent()) {
-                                                        return scanBindingShard(
-                                                                shard,
-                                                                page.continuation(),
-                                                                accumulator,
-                                                                deadline);
-                                                    }
-                                                    accumulator.completeBindingShard(shard);
-                                                    return scanBindingShard(
-                                                            shard + 1,
-                                                            Optional.empty(),
-                                                            accumulator,
-                                                            deadline);
-                                                }));
+        return deadline.bound(bindings.scanRegistry(shard, continuation, pageSize))
+                .thenCompose(page -> processBindingHints(page.values(), 0, shard, accumulator, deadline)
+                        .thenCompose(ignored -> {
+                            if (page.continuation().isPresent()) {
+                                return scanBindingShard(shard, page.continuation(), accumulator, deadline);
+                            }
+                            accumulator.completeBindingShard(shard);
+                            return scanBindingShard(shard + 1, Optional.empty(), accumulator, deadline);
+                        }));
     }
 
     private CompletableFuture<Void> processBindingHints(
@@ -164,28 +124,13 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
         accumulator.observeBindingHint(shard, hint.key());
         requireCanonicalHint(shard, hint);
         return deadline.bound(bindings.get(hint.value().identity()))
-                .thenCompose(
-                        optional -> {
-                            VersionedKafkaPartitionBinding binding =
-                                    optional.orElseThrow(
-                                            () ->
-                                                    invariant(
-                                                            "Kafka registry hint has no authoritative binding root"));
-                            requireHintBinding(hint, binding);
-                            return observeBinding(
-                                    hint,
-                                    binding,
-                                    accumulator,
-                                    deadline);
-                        })
-                .thenCompose(
-                        ignored ->
-                                processBindingHints(
-                                        hints,
-                                        index + 1,
-                                        shard,
-                                        accumulator,
-                                        deadline));
+                .thenCompose(optional -> {
+                    VersionedKafkaPartitionBinding binding = optional.orElseThrow(
+                            () -> invariant("Kafka registry hint has no authoritative binding root"));
+                    requireHintBinding(hint, binding);
+                    return observeBinding(hint, binding, accumulator, deadline);
+                })
+                .thenCompose(ignored -> processBindingHints(hints, index + 1, shard, accumulator, deadline));
     }
 
     private CompletableFuture<Void> observeBinding(
@@ -204,17 +149,13 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
             return CompletableFuture.completedFuture(null);
         }
         if (value.lifecycle() != KafkaPartitionLifecycle.ACTIVE) {
-            return CompletableFuture.failedFuture(
-                    invariant(
-                            "live BookKeeper Kafka binding is not ACTIVE"));
+            return CompletableFuture.failedFuture(invariant("live BookKeeper Kafka binding is not ACTIVE"));
         }
         StreamId streamId = new StreamId(value.streamId());
-        return deadline.bound(l0.getStreamSnapshot(cluster, streamId))
-                .thenAccept(
-                        snapshot -> {
-                            requireL0Binding(binding, profile, snapshot);
-                            accumulator.binding(hint, binding, snapshot);
-                        });
+        return deadline.bound(l0.getStreamSnapshot(cluster, streamId)).thenAccept(snapshot -> {
+            requireL0Binding(binding, profile, snapshot);
+            accumulator.binding(hint, binding, snapshot);
+        });
     }
 
     private CompletableFuture<Void> scanMaterializationShard(
@@ -225,36 +166,15 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
         if (shard == F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS) {
             return CompletableFuture.completedFuture(null);
         }
-        return deadline.bound(
-                        generations.scanStreamRegistrations(
-                                cluster,
-                                shard,
-                                continuation,
-                                pageSize))
-                .thenCompose(
-                        page ->
-                                processRegistrations(
-                                                page.values(),
-                                                0,
-                                                shard,
-                                                accumulator)
-                                        .thenCompose(
-                                                ignored -> {
-                                                    if (page.continuation().isPresent()) {
-                                                        return scanMaterializationShard(
-                                                                shard,
-                                                                page.continuation(),
-                                                                accumulator,
-                                                                deadline);
-                                                    }
-                                                    accumulator.completeMaterializationShard(
-                                                            shard);
-                                                    return scanMaterializationShard(
-                                                            shard + 1,
-                                                            Optional.empty(),
-                                                            accumulator,
-                                                            deadline);
-                                                }));
+        return deadline.bound(generations.scanStreamRegistrations(cluster, shard, continuation, pageSize))
+                .thenCompose(page -> processRegistrations(page.values(), 0, shard, accumulator)
+                        .thenCompose(ignored -> {
+                            if (page.continuation().isPresent()) {
+                                return scanMaterializationShard(shard, page.continuation(), accumulator, deadline);
+                            }
+                            accumulator.completeMaterializationShard(shard);
+                            return scanMaterializationShard(shard + 1, Optional.empty(), accumulator, deadline);
+                        }));
     }
 
     private CompletableFuture<Void> processRegistrations(
@@ -265,91 +185,60 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
         if (index == registrations.size()) {
             return CompletableFuture.completedFuture(null);
         }
-        VersionedMaterializationStreamRegistration registration =
-                registrations.get(index);
+        VersionedMaterializationStreamRegistration registration = registrations.get(index);
         accumulator.observeRegistration(shard, registration.key());
         accumulator.registration(registration, shard);
-        return processRegistrations(
-                registrations,
-                index + 1,
-                shard,
-                accumulator);
+        return processRegistrations(registrations, index + 1, shard, accumulator);
     }
 
-    private void requireCanonicalHint(
-            int shard,
-            VersionedKafkaPartitionRegistry hint) {
-        if (!bindingKeys
-                        .parseRegistryKey(shard, hint.key())
-                        .equals(hint.value().identity())
+    private void requireCanonicalHint(int shard, VersionedKafkaPartitionRegistry hint) {
+        if (!bindingKeys.parseRegistryKey(shard, hint.key()).equals(hint.value().identity())
                 || !hint.value()
                         .bindingRootKey()
-                        .equals(
-                                bindingKeys.bindingRootKey(
-                                        hint.value().identity()))) {
-            throw invariant(
-                    "Kafka partition registry key/root identity is not canonical");
+                        .equals(bindingKeys.bindingRootKey(hint.value().identity()))) {
+            throw invariant("Kafka partition registry key/root identity is not canonical");
         }
     }
 
     private static void requireHintBinding(
-            VersionedKafkaPartitionRegistry hint,
-            VersionedKafkaPartitionBinding binding) {
+            VersionedKafkaPartitionRegistry hint, VersionedKafkaPartitionBinding binding) {
         if (!binding.key().equals(hint.value().bindingRootKey())
-                || !binding.value()
-                        .identity()
-                        .equals(hint.value().identity())
-                || binding.value().bindingEpoch()
-                        < hint.value().bindingEpoch()) {
-            throw invariant(
-                    "Kafka partition registry and authoritative binding disagree");
+                || !binding.value().identity().equals(hint.value().identity())
+                || binding.value().bindingEpoch() < hint.value().bindingEpoch()) {
+            throw invariant("Kafka partition registry and authoritative binding disagree");
         }
-        if (binding.value().bindingEpoch()
-                        == hint.value().bindingEpoch()
+        if (binding.value().bindingEpoch() == hint.value().bindingEpoch()
                 && !MessageDigest.isEqual(
-                        HexFormat.of()
-                                .parseHex(
-                                        binding.durableValueSha256().value()),
+                        HexFormat.of().parseHex(binding.durableValueSha256().value()),
                         hint.value().bindingRootSha256())) {
-            throw invariant(
-                    "Kafka partition registry digest disagrees with its authoritative binding");
+            throw invariant("Kafka partition registry digest disagrees with its authoritative binding");
         }
     }
 
     private static void requireL0Binding(
-            VersionedKafkaPartitionBinding binding,
-            StorageProfile profile,
-            StreamMetadataSnapshot snapshot) {
+            VersionedKafkaPartitionBinding binding, StorageProfile profile, StreamMetadataSnapshot snapshot) {
         KafkaPartitionBindingRecord value = binding.value();
         final StreamState state;
         try {
             state = StreamState.valueOf(snapshot.metadata().state());
         } catch (IllegalArgumentException failure) {
-            throw invariant(
-                    "BookKeeper Kafka stream has an unknown L0 lifecycle",
-                    failure);
+            throw invariant("BookKeeper Kafka stream has an unknown L0 lifecycle", failure);
         }
         if (!snapshot.metadata().streamId().equals(value.streamId())
                 || !snapshot.metadata().streamName().equals(value.streamName())
                 || !snapshot.metadata().profile().equals(profile.name())
-                || (state != StreamState.ACTIVE
-                        && state != StreamState.SEALED)
-                || value.observedLogStartOffset()
-                        != snapshot.trim().trimOffset()
-                || value.observedStableEndOffset()
-                        != snapshot.committedEnd().committedEndOffset()) {
-            throw invariant(
-                    "Kafka BookKeeper binding and L0 stream authority disagree");
+                || (state != StreamState.ACTIVE && state != StreamState.SEALED)
+                || value.observedLogStartOffset() != snapshot.trim().trimOffset()
+                || value.observedStableEndOffset() != snapshot.committedEnd().committedEndOffset()) {
+            throw invariant("Kafka BookKeeper binding and L0 stream authority disagree");
         }
     }
 
     private final class Accumulator {
         private final BookKeeperBrokerReadiness readiness;
         private final MessageDigest digest = sha256();
-        private final Map<String, BindingAuthority> bookKeeperBindings =
-                new LinkedHashMap<>();
-        private final Map<String, BindingAuthority> requiredMaterializations =
-                new LinkedHashMap<>();
+        private final Map<String, BindingAuthority> bookKeeperBindings = new LinkedHashMap<>();
+        private final Map<String, BindingAuthority> requiredMaterializations = new LinkedHashMap<>();
         private int bindingShardsScanned;
         private int materializationShardsScanned;
         private long bindingRegistrationsScanned;
@@ -363,12 +252,8 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
             this.readiness = readiness;
             frame(digest, DOMAIN);
             frame(digest, cluster);
-            frame(
-                    digest,
-                    bindingKeys.kafkaClusterId());
-            frame(
-                    digest,
-                    configuration.configurationBindingSha256().value());
+            frame(digest, bindingKeys.kafkaClusterId());
+            frame(digest, configuration.configurationBindingSha256().value());
             frame(digest, ledgerIdNamespaceSha256);
             number(digest, readiness.brokerReadinessEpoch());
             frame(digest, readiness.brokerSetSha256().value());
@@ -379,18 +264,15 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
                 activeBindingShard = shard;
                 previousBindingKey = null;
             }
-            if (previousBindingKey != null
-                    && previousBindingKey.compareTo(key) >= 0) {
-                throw invariant(
-                        "Kafka partition registry scan is not strictly ordered and unique");
+            if (previousBindingKey != null && previousBindingKey.compareTo(key) >= 0) {
+                throw invariant("Kafka partition registry scan is not strictly ordered and unique");
             }
             previousBindingKey = key;
         }
 
         private void completeBindingShard(int shard) {
             if (shard != bindingShardsScanned) {
-                throw invariant(
-                        "Kafka partition registry shards were not completed in canonical order");
+                throw invariant("Kafka partition registry shards were not completed in canonical order");
             }
             bindingShardsScanned++;
             previousBindingKey = null;
@@ -401,18 +283,15 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
                 activeMaterializationShard = shard;
                 previousRegistrationKey = null;
             }
-            if (previousRegistrationKey != null
-                    && previousRegistrationKey.compareTo(key) >= 0) {
-                throw invariant(
-                        "Kafka materialization registry scan is not strictly ordered and unique");
+            if (previousRegistrationKey != null && previousRegistrationKey.compareTo(key) >= 0) {
+                throw invariant("Kafka materialization registry scan is not strictly ordered and unique");
             }
             previousRegistrationKey = key;
         }
 
         private void completeMaterializationShard(int shard) {
             if (shard != materializationShardsScanned) {
-                throw invariant(
-                        "Kafka materialization registry shards were not completed in canonical order");
+                throw invariant("Kafka materialization registry shards were not completed in canonical order");
             }
             materializationShardsScanned++;
             previousRegistrationKey = null;
@@ -422,8 +301,7 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
                 VersionedKafkaPartitionRegistry hint,
                 VersionedKafkaPartitionBinding binding,
                 StreamMetadataSnapshot snapshot) {
-            bindingRegistrationsScanned =
-                    Math.addExact(bindingRegistrationsScanned, 1);
+            bindingRegistrationsScanned = Math.addExact(bindingRegistrationsScanned, 1);
             frame(digest, hint.key());
             number(digest, hint.metadataVersion());
             frame(digest, hint.durableValueSha256().value());
@@ -445,78 +323,43 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
             number(digest, snapshot.committedEnd().commitVersion());
             number(digest, snapshot.committedEnd().committedEndOffset());
             number(digest, snapshot.trim().trimOffset());
-            BindingAuthority authority =
-                    new BindingAuthority(binding, snapshot);
-            if (bookKeeperBindings.putIfAbsent(
-                            value.streamId(),
-                            authority)
-                    != null) {
-                throw invariant(
-                        "multiple live Kafka bindings identify one BookKeeper stream");
+            BindingAuthority authority = new BindingAuthority(binding, snapshot);
+            if (bookKeeperBindings.putIfAbsent(value.streamId(), authority) != null) {
+                throw invariant("multiple live Kafka bindings identify one BookKeeper stream");
             }
             StorageProfile profile = profile(value.storageProfile());
             if (profile.objectMaterializationEnabled()) {
-                requiredMaterializations.put(
-                        value.streamId(),
-                        authority);
+                requiredMaterializations.put(value.streamId(), authority);
             }
         }
 
-        private void registration(
-                VersionedMaterializationStreamRegistration registration,
-                int shard) {
-            materializationRegistrationsScanned =
-                    Math.addExact(materializationRegistrationsScanned, 1);
-            MaterializationStreamRegistrationRecord value =
-                    registration.value();
+        private void registration(VersionedMaterializationStreamRegistration registration, int shard) {
+            materializationRegistrationsScanned = Math.addExact(materializationRegistrationsScanned, 1);
+            MaterializationStreamRegistrationRecord value = registration.value();
             StorageProfile profile = profile(value.storageProfile());
             if (!isBookKeeper(profile)) {
                 return;
             }
             StreamId streamId = new StreamId(value.streamId());
-            if (!registration
-                            .key()
-                            .equals(
-                                    generationKeys.materializationRegistryKey(
-                                            streamId))
-                    || generationKeys.materializationRegistryShard(
-                                    streamId)
-                            != shard
-                    || value.metadataVersion()
-                            != registration.metadataVersion()) {
-                throw invariant(
-                        "Kafka BookKeeper materialization registration is not canonical");
+            if (!registration.key().equals(generationKeys.materializationRegistryKey(streamId))
+                    || generationKeys.materializationRegistryShard(streamId) != shard
+                    || value.metadataVersion() != registration.metadataVersion()) {
+                throw invariant("Kafka BookKeeper materialization registration is not canonical");
             }
             if (!profile.objectMaterializationEnabled()) {
                 throw invariant(
                         "BookKeeper WAL-only Kafka stream unexpectedly has an object-materialization registration");
             }
-            BindingAuthority authority =
-                    requiredMaterializations.remove(streamId.value());
+            BindingAuthority authority = requiredMaterializations.remove(streamId.value());
             if (authority == null
-                    || !authority
-                            .binding()
-                            .value()
-                            .storageProfile()
-                            .equals(profile.name())
-                    || !value.projectionRef()
-                            .equals(
-                                    DirectMaterializationStreamAuthority
-                                            .encodedProjectionRef())
+                    || !authority.binding().value().storageProfile().equals(profile.name())
+                    || !value.projectionRef().equals(DirectMaterializationStreamAuthority.encodedProjectionRef())
                     || !value.projectionIdentitySha256()
-                            .equals(
-                                    DirectMaterializationStreamAuthority
-                                            .identitySha256(
-                                                    streamId,
-                                                    profile)
-                                            .value())
+                            .equals(DirectMaterializationStreamAuthority.identitySha256(streamId, profile)
+                                    .value())
                     || value.lastHintCommitVersion()
-                            > authority
-                                    .snapshot()
-                                    .committedEnd()
-                                    .commitVersion()) {
-                throw invariant(
-                        "Kafka BookKeeper materialization registration and direct stream authority disagree");
+                            > authority.snapshot().committedEnd().commitVersion()) {
+                throw invariant("Kafka BookKeeper materialization registration and direct stream authority disagree");
             }
             frame(digest, registration.key());
             number(digest, registration.metadataVersion());
@@ -524,16 +367,12 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
         }
 
         private BookKeeperStreamCoverageProof finish() {
-            if (bindingShardsScanned
-                            != KafkaPartitionKeyspace.REGISTRY_SHARDS
-                    || materializationShardsScanned
-                            != F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS) {
-                throw invariant(
-                        "Kafka BookKeeper stream coverage did not scan every registry shard");
+            if (bindingShardsScanned != KafkaPartitionKeyspace.REGISTRY_SHARDS
+                    || materializationShardsScanned != F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS) {
+                throw invariant("Kafka BookKeeper stream coverage did not scan every registry shard");
             }
             if (!requiredMaterializations.isEmpty()) {
-                throw invariant(
-                        "live BookKeeper Kafka binding lacks its direct materialization registration");
+                throw invariant("live BookKeeper Kafka binding lacks its direct materialization registration");
             }
             number(digest, bindingRegistrationsScanned);
             number(digest, materializationRegistrationsScanned);
@@ -544,10 +383,7 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
                     materializationShardsScanned,
                     bindingRegistrationsScanned,
                     bookKeeperBindings.size(),
-                    new Checksum(
-                            ChecksumType.SHA256,
-                            HexFormat.of()
-                                    .formatHex(digest.digest())));
+                    new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest())));
         }
     }
 
@@ -556,80 +392,55 @@ public final class KafkaBookKeeperStreamCoverageProofProducer
             StorageProfile parsed = StorageProfile.valueOf(value);
             StorageProfile canonical = parsed.canonical();
             if (!canonical.name().equals(value)) {
-                throw invariant(
-                        "Kafka binding uses a non-canonical storage profile");
+                throw invariant("Kafka binding uses a non-canonical storage profile");
             }
             return canonical;
         } catch (IllegalArgumentException failure) {
-            throw invariant(
-                    "Kafka binding contains an unknown storage profile",
-                    failure);
+            throw invariant("Kafka binding contains an unknown storage profile", failure);
         }
     }
 
     private static boolean isBookKeeper(StorageProfile profile) {
-        return profile
-                        == StorageProfile.BOOKKEEPER_WAL_ONLY
-                || profile
-                        == StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
-                || profile
-                        == StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT;
+        return profile == StorageProfile.BOOKKEEPER_WAL_ONLY
+                || profile == StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
+                || profile == StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT;
     }
 
     private static MessageDigest sha256() {
         try {
             return MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException(
-                    "SHA-256 is unavailable",
-                    impossible);
+            throw new IllegalStateException("SHA-256 is unavailable", impossible);
         }
     }
 
     private static void frame(MessageDigest digest, String value) {
-        byte[] bytes =
-                Objects.requireNonNull(value, "value")
-                        .getBytes(StandardCharsets.UTF_8);
-        digest.update(
-                ByteBuffer.allocate(Integer.BYTES)
-                        .putInt(bytes.length)
-                        .array());
+        byte[] bytes = Objects.requireNonNull(value, "value").getBytes(StandardCharsets.UTF_8);
+        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
         digest.update(bytes);
     }
 
     private static void number(MessageDigest digest, long value) {
-        digest.update(
-                ByteBuffer.allocate(Long.BYTES)
-                        .putLong(value)
-                        .array());
+        digest.update(ByteBuffer.allocate(Long.BYTES).putLong(value).array());
     }
 
     private static NereusException invariant(String message) {
         return invariant(message, null);
     }
 
-    private static NereusException invariant(
-            String message,
-            Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message,
-                cause);
+    private static NereusException invariant(String message, Throwable cause) {
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static String text(String value, String name) {
         String exact = Objects.requireNonNull(value, name);
         if (exact.isBlank()) {
-            throw new IllegalArgumentException(
-                    name + " cannot be blank");
+            throw new IllegalArgumentException(name + " cannot be blank");
         }
         return exact;
     }
 
-    private record BindingAuthority(
-            VersionedKafkaPartitionBinding binding,
-            StreamMetadataSnapshot snapshot) {
+    private record BindingAuthority(VersionedKafkaPartitionBinding binding, StreamMetadataSnapshot snapshot) {
         private BindingAuthority {
             Objects.requireNonNull(binding, "binding");
             Objects.requireNonNull(snapshot, "snapshot");

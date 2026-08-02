@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -45,8 +46,7 @@ public record DecodedCompactionRecord(
         }
         try {
             if (Math.addExact(sourceBatchBaseOffset, sourceRecordIndex) != absoluteOffset) {
-                throw new IllegalArgumentException(
-                        "source record index does not identify the absolute offset");
+                throw new IllegalArgumentException("source record index does not identify the absolute offset");
             }
         } catch (ArithmeticException failure) {
             throw new IllegalArgumentException("source record identity overflows", failure);
@@ -57,17 +57,14 @@ public record DecodedCompactionRecord(
         if (keyKind == KeyKind.CONTROL && tombstone) {
             throw new IllegalArgumentException("control records cannot be tombstones");
         }
-        if ((keyKind == KeyKind.CONTROL)
-                != (controlKind != ControlKind.NONE && coordinatorEpoch >= 0)) {
+        if ((keyKind == KeyKind.CONTROL) != (controlKind != ControlKind.NONE && coordinatorEpoch >= 0)) {
             throw new IllegalArgumentException("invalid ranged compaction control-marker facts");
         }
-        if (keyKind != KeyKind.CONTROL
-                && (controlKind != ControlKind.NONE || coordinatorEpoch != -1)) {
+        if (keyKind != KeyKind.CONTROL && (controlKind != ControlKind.NONE || coordinatorEpoch != -1)) {
             throw new IllegalArgumentException("data record cannot carry control-marker facts");
         }
         boolean hasProducer = producerId >= 0;
-        boolean validSequence =
-                keyKind == KeyKind.CONTROL ? sequence == -1 : sequence >= 0;
+        boolean validSequence = keyKind == KeyKind.CONTROL ? sequence == -1 : sequence >= 0;
         if (hasProducer != (producerEpoch >= 0 && validSequence)
                 || (!hasProducer && (producerId != -1 || producerEpoch != -1 || sequence != -1))
                 || (transactional && !hasProducer)

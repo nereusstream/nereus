@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendAuthority;
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.ErrorCode;
@@ -70,8 +70,8 @@ class KafkaLeaderAuthorityPropertyTest {
     @Test
     void mismatchedAuthorityIdentityIsInvariantViolation() {
         StreamHeadRecord head = head(session("writer-a", 4, 8, "owner-a", 9));
-        AppendAuthority wrong = new AppendAuthority(
-                "kafka-partition-leader-v1", "cluster/other-topic/3", 9, "owner-a", 10);
+        AppendAuthority wrong =
+                new AppendAuthority("kafka-partition-leader-v1", "cluster/other-topic/3", 9, "owner-a", 10);
 
         assertNereusCode(
                 () -> AppendAuthoritySessionTransitions.acquire(
@@ -82,27 +82,46 @@ class KafkaLeaderAuthorityPropertyTest {
     private static AppendSessionSnapshotRecord session(
             String writerId, long sessionEpoch, long authorityEpoch, String ownerId, long ownerEpoch) {
         return new AppendSessionSnapshotRecord(
-                writerId, sessionEpoch, "token", 3, 10_000,
-                "kafka-partition-leader-v1", "cluster/topic/3", authorityEpoch, ownerId, ownerEpoch);
+                writerId,
+                sessionEpoch,
+                "token",
+                3,
+                10_000,
+                "kafka-partition-leader-v1",
+                "cluster/topic/3",
+                authorityEpoch,
+                ownerId,
+                ownerEpoch);
     }
 
     private static AppendAuthority authority(long leaderEpoch, String ownerId, long ownerEpoch) {
-        return new AppendAuthority(
-                "kafka-partition-leader-v1", "cluster/topic/3", leaderEpoch, ownerId, ownerEpoch);
+        return new AppendAuthority("kafka-partition-leader-v1", "cluster/topic/3", leaderEpoch, ownerId, ownerEpoch);
     }
 
     private static StreamHeadRecord head(AppendSessionSnapshotRecord session) {
         return new StreamHeadRecord(
-                "stream", "kafka/cluster/topic/3/incarnation-1", "hash", "ACTIVE",
+                "stream",
+                "kafka/cluster/topic/3/incarnation-1",
+                "hash",
+                "ACTIVE",
                 "OBJECT_WAL_SYNC_OBJECT",
-                Map.of(AppendAuthoritySessionTransitions.AUTHORITY_MODE_ATTRIBUTE,
+                Map.of(
+                        AppendAuthoritySessionTransitions.AUTHORITY_MODE_ATTRIBUTE,
                         AppendAuthoritySessionTransitions.EXTERNAL_MONOTONIC_TERM_V1),
-                1_000, 1, 0, 0, 0, 0, "", session, 1);
+                1_000,
+                1,
+                0,
+                0,
+                0,
+                0,
+                "",
+                session,
+                1);
     }
 
     private static void assertNereusCode(Runnable action, ErrorCode code) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(NereusException.class,
-                        failure -> assertThat(failure.code()).isEqualTo(code));
+                .isInstanceOfSatisfying(NereusException.class, failure -> assertThat(failure.code())
+                        .isEqualTo(code));
     }
 }

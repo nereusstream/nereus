@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.kafka.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -7,7 +8,9 @@ import com.nereusstream.api.StreamId;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** Canonical NKC1 source snapshot facts. */
+/**
+ * Canonical NKC1 source snapshot facts.
+ */
 public record KafkaCheckpointHeader(
         int flags,
         String kafkaClusterId,
@@ -35,9 +38,15 @@ public record KafkaCheckpointHeader(
         if (sourceHeadSha256.type() != ChecksumType.SHA256) {
             throw new IllegalArgumentException("sourceHeadSha256 must use SHA256");
         }
-        if (partitionId < 0 || incarnation <= 0 || payloadMappingId != 1 || leaderEpoch < 0
-                || checkpointOffset < 0 || logStartOffset < 0 || stableEndOffset < checkpointOffset
-                || checkpointOffset < logStartOffset || sourceCommitVersion <= 0) {
+        if (partitionId < 0
+                || incarnation <= 0
+                || payloadMappingId != 1
+                || leaderEpoch < 0
+                || checkpointOffset < 0
+                || logStartOffset < 0
+                || stableEndOffset < checkpointOffset
+                || checkpointOffset < logStartOffset
+                || sourceCommitVersion <= 0) {
             throw new IllegalArgumentException("invalid Kafka checkpoint header numeric fields");
         }
     }

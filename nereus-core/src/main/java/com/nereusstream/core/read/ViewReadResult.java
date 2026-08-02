@@ -1,16 +1,16 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ReadView;
 import java.util.Objects;
 
-/** Read result plus the exclusive dense source coverage consumed by a semantic view. */
+/**
+ * Read result plus the exclusive dense source coverage consumed by a semantic view.
+ */
 @Deprecated(forRemoval = true)
-public record ViewReadResult(
-        ReadView view,
-        ReadResult result,
-        long sourceCoverageEndOffset) {
+public record ViewReadResult(ReadView view, ReadResult result, long sourceCoverageEndOffset) {
     public ViewReadResult {
         Objects.requireNonNull(view, "view");
         Objects.requireNonNull(result, "result");

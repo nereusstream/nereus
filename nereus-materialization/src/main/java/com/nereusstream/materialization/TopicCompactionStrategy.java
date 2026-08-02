@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
-/** Versioned deterministic tombstone policy for the isolated TOPIC_COMPACTED view. */
+/**
+ * Versioned deterministic tombstone policy for the isolated TOPIC_COMPACTED view.
+ */
 public interface TopicCompactionStrategy {
     String id();
 

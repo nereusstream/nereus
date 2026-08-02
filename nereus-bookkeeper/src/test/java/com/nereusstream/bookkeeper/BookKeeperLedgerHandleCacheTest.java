@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import java.lang.reflect.Proxy;
@@ -22,20 +22,18 @@ class BookKeeperLedgerHandleCacheTest {
         ReadHandle first = readHandle(1, firstClosed);
         ReadHandle second = readHandle(2, secondClosed);
         ReadHandle third = readHandle(3, thirdClosed);
-        try (BookKeeperLedgerHandleCache cache =
-                new BookKeeperLedgerHandleCache(
-                        2,
-                        2,
-                        1,
-                        Duration.ofHours(1))) {
-            BookKeeperLedgerHandleCache.Lease firstLease =
-                    cache.borrow(key(1), () -> CompletableFuture.completedFuture(first)).join();
+        try (BookKeeperLedgerHandleCache cache = new BookKeeperLedgerHandleCache(2, 2, 1, Duration.ofHours(1))) {
+            BookKeeperLedgerHandleCache.Lease firstLease = cache.borrow(
+                            key(1), () -> CompletableFuture.completedFuture(first))
+                    .join();
             firstLease.close();
-            BookKeeperLedgerHandleCache.Lease secondLease =
-                    cache.borrow(key(2), () -> CompletableFuture.completedFuture(second)).join();
+            BookKeeperLedgerHandleCache.Lease secondLease = cache.borrow(
+                            key(2), () -> CompletableFuture.completedFuture(second))
+                    .join();
 
-            BookKeeperLedgerHandleCache.Lease thirdLease =
-                    cache.borrow(key(3), () -> CompletableFuture.completedFuture(third)).join();
+            BookKeeperLedgerHandleCache.Lease thirdLease = cache.borrow(
+                            key(3), () -> CompletableFuture.completedFuture(third))
+                    .join();
 
             assertThat(firstClosed).isTrue();
             assertThat(secondClosed).isFalse();
@@ -50,36 +48,17 @@ class BookKeeperLedgerHandleCacheTest {
     @Test
     void referencedHandleStillEnforcesTheCapacityBound() {
         AtomicBoolean firstClosed = new AtomicBoolean();
-        try (BookKeeperLedgerHandleCache cache =
-                new BookKeeperLedgerHandleCache(
-                        1,
-                        1,
-                        1,
-                        Duration.ofHours(1))) {
-            BookKeeperLedgerHandleCache.Lease firstLease =
-                    cache.borrow(
-                                    key(1),
-                                    () -> CompletableFuture.completedFuture(
-                                            readHandle(1, firstClosed)))
-                            .join();
+        try (BookKeeperLedgerHandleCache cache = new BookKeeperLedgerHandleCache(1, 1, 1, Duration.ofHours(1))) {
+            BookKeeperLedgerHandleCache.Lease firstLease = cache.borrow(
+                            key(1), () -> CompletableFuture.completedFuture(readHandle(1, firstClosed)))
+                    .join();
 
-            assertThatThrownBy(
-                            () ->
-                                    cache.borrow(
-                                                    key(2),
-                                                    () -> CompletableFuture.completedFuture(
-                                                            readHandle(
-                                                                    2,
-                                                                    new AtomicBoolean())))
-                                            .join())
+            assertThatThrownBy(() -> cache.borrow(
+                                    key(2), () -> CompletableFuture.completedFuture(readHandle(2, new AtomicBoolean())))
+                            .join())
                     .hasCauseInstanceOf(NereusException.class)
-                    .satisfies(
-                            failure ->
-                                    assertThat(
-                                                    ((NereusException) failure.getCause())
-                                                            .code())
-                                            .isEqualTo(
-                                                    ErrorCode.BACKPRESSURE_REJECTED));
+                    .satisfies(failure -> assertThat(((NereusException) failure.getCause()).code())
+                            .isEqualTo(ErrorCode.BACKPRESSURE_REJECTED));
             assertThat(firstClosed).isFalse();
             firstLease.close();
         }
@@ -90,25 +69,20 @@ class BookKeeperLedgerHandleCacheTest {
         return new BookKeeperLedgerHandleCache.Key("cluster", ledgerId, 1);
     }
 
-    private static ReadHandle readHandle(
-            long ledgerId,
-            AtomicBoolean closed
-    ) {
-        return (ReadHandle)
-                Proxy.newProxyInstance(
-                        ReadHandle.class.getClassLoader(),
-                        new Class<?>[] {ReadHandle.class},
-                        (proxy, method, arguments) ->
-                                switch (method.getName()) {
-                                    case "getId" -> ledgerId;
-                                    case "closeAsync" -> {
-                                        closed.set(true);
-                                        yield CompletableFuture.completedFuture(null);
-                                    }
-                                    case "isClosed" -> closed.get();
-                                    case "toString" -> "cache-read-handle-" + ledgerId;
-                                    default -> defaultValue(method.getReturnType());
-                                });
+    private static ReadHandle readHandle(long ledgerId, AtomicBoolean closed) {
+        return (ReadHandle) Proxy.newProxyInstance(
+                ReadHandle.class.getClassLoader(),
+                new Class<?>[] {ReadHandle.class},
+                (proxy, method, arguments) -> switch (method.getName()) {
+                    case "getId" -> ledgerId;
+                    case "closeAsync" -> {
+                        closed.set(true);
+                        yield CompletableFuture.completedFuture(null);
+                    }
+                    case "isClosed" -> closed.get();
+                    case "toString" -> "cache-read-handle-" + ledgerId;
+                    default -> defaultValue(method.getReturnType());
+                });
     }
 
     private static Object defaultValue(Class<?> type) {

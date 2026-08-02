@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.managedledger.cursor.TestCursorStorage;
@@ -40,13 +40,11 @@ class NereusManagedLedgerCursorHydrationTest {
     Path root;
 
     @Test
-    void writableOpenPublishesOnlyACompleteHydratedRegistryAndFailsClosedOnCorruption()
-            throws Exception {
+    void writableOpenPublishesOnlyACompleteHydratedRegistryAndFailsClosedOnCorruption() throws Exception {
         Clock clock = Clock.systemUTC();
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         DefaultStreamStorage streamStorage = new DefaultStreamStorage(
                 StreamStorageConfig.defaults("cluster/a", "cursor-hydration-test"),
                 metadata,
@@ -55,14 +53,10 @@ class NereusManagedLedgerCursorHydrationTest {
                 clock,
                 Runnable::run);
         TestCursorStorage cursorStorage = new TestCursorStorage();
-        try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(
-                streamStorage, projections, cursorStorage)) {
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections, cursorStorage)) {
             NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
-                    runtime,
-                    fixedGuard(1),
-                    config(),
-                    new ManagedLedgerFactoryConfig(),
-                    false);
+                    runtime, fixedGuard(1), config(), new ManagedLedgerFactoryConfig(), false);
             NereusManagedLedger first = (NereusManagedLedger) factory.open(NAME, config());
             Position firstEntry = first.addEntry(new byte[] {0});
             Position secondEntry = first.addEntry(new byte[] {1});
@@ -75,14 +69,13 @@ class NereusManagedLedgerCursorHydrationTest {
 
             CompletableFuture<Void> hydrationGate = new CompletableFuture<>();
             cursorStorage.delayNextClaimCompletionUntil(hydrationGate);
-            CompletableFuture<ManagedLedger> reopening = open(
-                    factory, NAME, () -> CompletableFuture.completedFuture(true));
+            CompletableFuture<ManagedLedger> reopening =
+                    open(factory, NAME, () -> CompletableFuture.completedFuture(true));
             assertThat(reopening).isNotDone();
             hydrationGate.complete(null);
             NereusManagedLedger hydrated = (NereusManagedLedger) reopening.join();
             assertThat(cursorNames(hydrated.getCursors())).containsExactlyInAnyOrder("alpha", "beta");
-            assertThat(cursorNames(hydrated.getActiveCursors()))
-                    .containsExactlyInAnyOrder("alpha", "beta");
+            assertThat(cursorNames(hydrated.getActiveCursors())).containsExactlyInAnyOrder("alpha", "beta");
             ManagedCursor hydratedAlpha = StreamSupport.stream(
                             hydrated.getCursors().spliterator(), false)
                     .filter(cursor -> cursor.getName().equals("alpha"))
@@ -96,18 +89,18 @@ class NereusManagedLedgerCursorHydrationTest {
             hydrated.close();
 
             cursorStorage.failNextClaim(new IllegalArgumentException("corrupt cursor root"));
-            CompletableFuture<ManagedLedger> corruptOpen = open(
-                    factory, NAME, () -> CompletableFuture.completedFuture(true));
+            CompletableFuture<ManagedLedger> corruptOpen =
+                    open(factory, NAME, () -> CompletableFuture.completedFuture(true));
             assertThatThrownBy(corruptOpen::join)
                     .isInstanceOf(CompletionException.class)
                     .hasRootCauseMessage("corrupt cursor root");
             assertThat(factory.getManagedLedgers()).isEmpty();
             assertThat(cursorStorage.claimInvocationCount()).isEqualTo(3);
 
-            NereusManagedLedger recovered = (NereusManagedLedger) open(
-                    factory, NAME, () -> CompletableFuture.completedFuture(true)).join();
-            assertThat(cursorNames(recovered.getCursors()))
-                    .containsExactlyInAnyOrder("alpha", "beta");
+            NereusManagedLedger recovered =
+                    (NereusManagedLedger) open(factory, NAME, () -> CompletableFuture.completedFuture(true))
+                            .join();
+            assertThat(cursorNames(recovered.getCursors())).containsExactlyInAnyOrder("alpha", "beta");
             assertThat(cursorStorage.claimInvocationCount()).isEqualTo(4);
 
             recovered.close();
@@ -125,9 +118,7 @@ class NereusManagedLedgerCursorHydrationTest {
     }
 
     private static CompletableFuture<ManagedLedger> open(
-            NereusManagedLedgerFactory factory,
-            String name,
-            Supplier<CompletableFuture<Boolean>> ownershipChecker) {
+            NereusManagedLedgerFactory factory, String name, Supplier<CompletableFuture<Boolean>> ownershipChecker) {
         CompletableFuture<ManagedLedger> result = new CompletableFuture<>();
         factory.asyncOpen(
                 name,

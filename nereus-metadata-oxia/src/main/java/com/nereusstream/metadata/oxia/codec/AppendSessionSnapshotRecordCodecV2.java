@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-/** Dual V1/V2 codec that preserves the frozen five-field legacy session payload. */
+/**
+ * Dual V1/V2 codec that preserves the frozen five-field legacy session payload.
+ */
 public final class AppendSessionSnapshotRecordCodecV2
         implements MetadataRecordCodec<com.nereusstream.metadata.oxia.records.AppendSessionSnapshotRecord> {
     private static final int LEGACY_VERSION = 1;
@@ -48,8 +51,11 @@ public final class AppendSessionSnapshotRecordCodecV2
         Objects.requireNonNull(value, "value");
         if (!value.hasAuthority()) {
             return legacy.encode(new AppendSessionSnapshotRecord(
-                    value.writerId(), value.epoch(), value.fencingToken(),
-                    value.leaseVersion(), value.expiresAtMillis()));
+                    value.writerId(),
+                    value.epoch(),
+                    value.fencingToken(),
+                    value.leaseVersion(),
+                    value.expiresAtMillis()));
         }
         F4Binary.Writer writer = new F4Binary.Writer();
         writer.writeUnsignedShort(VERSION);
@@ -73,13 +79,11 @@ public final class AppendSessionSnapshotRecordCodecV2
         }
         AppendSessionSnapshotRecord value = legacy.decode(bytes);
         return new com.nereusstream.metadata.oxia.records.AppendSessionSnapshotRecord(
-                value.writerId(), value.epoch(), value.fencingToken(),
-                value.leaseVersion(), value.expiresAtMillis());
+                value.writerId(), value.epoch(), value.fencingToken(), value.leaseVersion(), value.expiresAtMillis());
     }
 
     static void writeV2(
-            F4Binary.Writer writer,
-            com.nereusstream.metadata.oxia.records.AppendSessionSnapshotRecord value) {
+            F4Binary.Writer writer, com.nereusstream.metadata.oxia.records.AppendSessionSnapshotRecord value) {
         writer.writeString(value.writerId());
         writer.writeLong(value.epoch());
         writer.writeString(value.fencingToken());
@@ -92,8 +96,7 @@ public final class AppendSessionSnapshotRecordCodecV2
         writer.writeLong(value.authorityOwnerEpoch());
     }
 
-    static com.nereusstream.metadata.oxia.records.AppendSessionSnapshotRecord readV2(
-            F4Binary.Reader reader) {
+    static com.nereusstream.metadata.oxia.records.AppendSessionSnapshotRecord readV2(F4Binary.Reader reader) {
         return new com.nereusstream.metadata.oxia.records.AppendSessionSnapshotRecord(
                 reader.readString("writerId"),
                 reader.readLong("epoch"),
@@ -108,10 +111,5 @@ public final class AppendSessionSnapshotRecordCodecV2
     }
 
     record AppendSessionSnapshotRecord(
-            String writerId,
-            long epoch,
-            String fencingToken,
-            long leaseVersion,
-            long expiresAtMillis) {
-    }
+            String writerId, long epoch, String fencingToken, long leaseVersion, long expiresAtMillis) {}
 }

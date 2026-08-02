@@ -14,9 +14,9 @@
 
 package com.nereusstream.core.read;
 
-import com.nereusstream.api.StreamId;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import java.time.Clock;
 import java.time.Duration;
@@ -29,10 +29,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Positive-only offset-index cache. Empty scans and EOF are never stored. */
+/**
+ * Positive-only offset-index cache. Empty scans and EOF are never stored.
+ */
 final class OffsetIndexCache {
-    private static final Comparator<OffsetIndexEntry> ORDER = Comparator
-            .comparingLong((OffsetIndexEntry record) -> record.range().endOffset())
+    private static final Comparator<OffsetIndexEntry> ORDER = Comparator.comparingLong(
+                    (OffsetIndexEntry record) -> record.range().endOffset())
             .thenComparingLong(OffsetIndexEntry::generation);
 
     private final boolean enabled;
@@ -46,12 +48,7 @@ final class OffsetIndexCache {
         this(enabled, ttl, clock, Integer.MAX_VALUE, Integer.MAX_VALUE);
     }
 
-    OffsetIndexCache(
-            boolean enabled,
-            Duration ttl,
-            Clock clock,
-            int maxStreams,
-            int maxRecordsPerStream) {
+    OffsetIndexCache(boolean enabled, Duration ttl, Clock clock, int maxStreams, int maxRecordsPerStream) {
         this.enabled = enabled;
         this.ttlMillis = durationMillis(Objects.requireNonNull(ttl, "ttl"));
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -62,10 +59,7 @@ final class OffsetIndexCache {
         this.maxRecordsPerStream = maxRecordsPerStream;
     }
 
-    Optional<List<OffsetIndexEntry>> lookup(
-            StreamId streamId,
-            long targetOffset,
-            long currentTrimOffset) {
+    Optional<List<OffsetIndexEntry>> lookup(StreamId streamId, long targetOffset, long currentTrimOffset) {
         if (!enabled) {
             return Optional.empty();
         }
@@ -74,22 +68,18 @@ final class OffsetIndexCache {
             return Optional.empty();
         }
         long age = clock.millis() - entry.createdAtMillis();
-        if (age < 0 || age >= ttlMillis || targetOffset < entry.trimOffset()
-                || targetOffset < currentTrimOffset) {
+        if (age < 0 || age >= ttlMillis || targetOffset < entry.trimOffset() || targetOffset < currentTrimOffset) {
             entries.remove(streamId, entry);
             return Optional.empty();
         }
-        boolean covers = entry.records().stream().anyMatch(record ->
-                !record.tombstoned()
+        boolean covers = entry.records().stream()
+                .anyMatch(record -> !record.tombstoned()
                         && record.range().startOffset() <= targetOffset
                         && targetOffset < record.range().endOffset());
         return covers ? Optional.of(entry.records()) : Optional.empty();
     }
 
-    void putPositive(
-            StreamId streamId,
-            List<OffsetIndexEntry> records,
-            long trimOffset) {
+    void putPositive(StreamId streamId, List<OffsetIndexEntry> records, long trimOffset) {
         if (!enabled || records.isEmpty()) {
             return;
         }
@@ -126,9 +116,8 @@ final class OffsetIndexCache {
                     merged.putIfAbsent(identity, record);
                 });
             }
-            List<OffsetIndexEntry> selected = merged.values().stream()
-                    .limit(maxRecordsPerStream)
-                    .toList();
+            List<OffsetIndexEntry> selected =
+                    merged.values().stream().limit(maxRecordsPerStream).toList();
             List<OffsetIndexEntry> ordered = new ArrayList<>(selected);
             ordered.sort(ORDER);
             long metadataVersion = ordered.stream()
@@ -158,8 +147,8 @@ final class OffsetIndexCache {
     }
 
     void invalidateFromWatch(StreamId streamId, long metadataVersion) {
-        entries.computeIfPresent(streamId, (ignored, entry) ->
-                metadataVersion >= entry.metadataVersion() ? null : entry);
+        entries.computeIfPresent(
+                streamId, (ignored, entry) -> metadataVersion >= entry.metadataVersion() ? null : entry);
     }
 
     void clear() {
@@ -175,11 +164,7 @@ final class OffsetIndexCache {
     }
 
     private record CacheEntry(
-            List<OffsetIndexEntry> records,
-            long trimOffset,
-            long createdAtMillis,
-            long metadataVersion) {
-    }
+            List<OffsetIndexEntry> records, long trimOffset, long createdAtMillis, long metadataVersion) {}
 
     private record IndexIdentity(long offsetEnd, long generation) {
         private static IndexIdentity of(OffsetIndexEntry record) {

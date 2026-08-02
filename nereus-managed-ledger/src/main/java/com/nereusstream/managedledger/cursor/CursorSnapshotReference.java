@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.api.Checksum;
@@ -8,7 +9,9 @@ import com.nereusstream.metadata.oxia.CursorIds;
 import com.nereusstream.metadata.oxia.records.CursorSnapshotReferenceRecord;
 import java.util.Objects;
 
-/** Strict immutable reference to one full cursor ack-state snapshot object. */
+/**
+ * Strict immutable reference to one full cursor ack-state snapshot object.
+ */
 public record CursorSnapshotReference(
         ObjectKey objectKey,
         String snapshotId,

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -22,7 +23,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Strictly verified immutable worker output, independent of the generation later assigned to it. */
+/**
+ * Strictly verified immutable worker output, independent of the generation later assigned to it.
+ */
 public record MaterializationOutput(
         String taskId,
         StreamId streamId,
@@ -90,15 +93,17 @@ public record MaterializationOutput(
                 || !target.entryIndexRef().equals(entryIndexRef)) {
             throw new IllegalArgumentException("output read target does not match immutable object fields");
         }
-        String targetIdentity = ReadTargetCodecRegistry.phase15()
-                .encode(readTarget)
-                .identityChecksumValue();
+        String targetIdentity =
+                ReadTargetCodecRegistry.phase15().encode(readTarget).identityChecksumValue();
         if (!targetIdentitySha256.value().equals(targetIdentity)) {
             throw new IllegalArgumentException("target identity does not match canonical read-target bytes");
         }
-        if (sourceRecordCount <= 0 || sourceRecordCount != coverage.recordCount()
-                || outputRecordCount < 0 || outputRecordCount > sourceRecordCount
-                || entryCount < 0 || logicalBytes < 0
+        if (sourceRecordCount <= 0
+                || sourceRecordCount != coverage.recordCount()
+                || outputRecordCount < 0
+                || outputRecordCount > sourceRecordCount
+                || entryCount < 0
+                || logicalBytes < 0
                 || cumulativeSizeAtStart < 0
                 || cumulativeSizeAtEnd < cumulativeSizeAtStart) {
             throw new IllegalArgumentException("output accounting is invalid");
@@ -110,10 +115,8 @@ public record MaterializationOutput(
             throw new IllegalArgumentException("committed output must be dense and byte-accounting exact");
         }
         if (view == ReadView.TOPIC_COMPACTED
-                && ((entryCount == 0) != (outputRecordCount == 0)
-                        || (entryCount == 0 && logicalBytes != 0))) {
-            throw new IllegalArgumentException(
-                    "topic-compacted output row/record/byte accounting is inconsistent");
+                && ((entryCount == 0) != (outputRecordCount == 0) || (entryCount == 0 && logicalBytes != 0))) {
+            throw new IllegalArgumentException("topic-compacted output row/record/byte accounting is inconsistent");
         }
         schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         requireChecksum(sourceSetSha256, ChecksumType.SHA256, "sourceSetSha256");
@@ -130,10 +133,7 @@ public record MaterializationOutput(
                 : PayloadFormat.valueOf(logicalFormat);
     }
 
-    private static void requireChecksum(
-            Checksum checksum,
-            ChecksumType expected,
-            String field) {
+    private static void requireChecksum(Checksum checksum, ChecksumType expected, String field) {
         Objects.requireNonNull(checksum, field);
         if (checksum.type() != expected) {
             throw new IllegalArgumentException(field + " must use " + expected);
@@ -147,8 +147,7 @@ public record MaterializationOutput(
         }
         for (int index = 0; index < value.length(); index++) {
             char character = value.charAt(index);
-            if (!((character >= 'a' && character <= 'z')
-                    || (character >= '2' && character <= '7'))) {
+            if (!((character >= 'a' && character <= 'z') || (character >= '2' && character <= '7'))) {
                 throw new IllegalArgumentException(field + " must be lowercase base32 without padding");
             }
         }

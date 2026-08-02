@@ -32,78 +32,74 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface KafkaPartitionMaintenance {
 
-  CompletableFuture<KafkaRetentionCoordinator.RunResult> runRetention(Hooks hooks);
+    CompletableFuture<KafkaRetentionCoordinator.RunResult> runRetention(Hooks hooks);
 
-  CompletableFuture<KafkaDeleteRecordsCoordinator.Result> deleteRecords(
-      Hooks hooks, long normalizedRequestedOffset);
+    CompletableFuture<KafkaDeleteRecordsCoordinator.Result> deleteRecords(Hooks hooks, long normalizedRequestedOffset);
 
-  /**
-   * Freezes one compaction pass from the same recovered leader and durable authority domain.
-   *
-   * <p>The product loads and validates the binding/source head. The fork supplies the
-   * partition-lock-owned canonical state and performs the stock transaction-marker pre-scan only
-   * after the product has selected the exact decision horizon.
-   */
-  default CompletableFuture<KafkaCompactionPartitionPass.Capture> captureCompaction(
-      CompactionHooks hooks) {
-    Objects.requireNonNull(hooks, "hooks");
-    return CompletableFuture.failedFuture(
-        new UnsupportedOperationException(
-            "Kafka partition maintenance does not provide compaction capture"));
-  }
-
-  interface Hooks {
-
-    CompletableFuture<Capture> capture(KafkaCheckpointSourceState currentSource);
-
-    CompletableFuture<Void> advanceLogStart(
-        KafkaTrimBarrier.Snapshot revalidated,
-        long durableTrimOffset,
-        VersionedKafkaPartitionBinding publishedBinding);
-  }
-
-  record Capture(
-      KafkaCanonicalCheckpointState canonicalState,
-      long highWatermark,
-      long lastStableOffset) {
-    public Capture {
-      Objects.requireNonNull(canonicalState, "canonicalState");
-      if (lastStableOffset < canonicalState.logStartOffset()
-          || highWatermark < lastStableOffset
-          || highWatermark > canonicalState.stableEndOffset()) {
-        throw new IllegalArgumentException(
-            "Kafka maintenance visibility offsets are outside the canonical state");
-      }
+    /**
+     * Freezes one compaction pass from the same recovered leader and durable authority domain.
+     *
+     * <p>The product loads and validates the binding/source head. The fork supplies the
+     * partition-lock-owned canonical state and performs the stock transaction-marker pre-scan only
+     * after the product has selected the exact decision horizon.
+     */
+    default CompletableFuture<KafkaCompactionPartitionPass.Capture> captureCompaction(CompactionHooks hooks) {
+        Objects.requireNonNull(hooks, "hooks");
+        return CompletableFuture.failedFuture(
+                new UnsupportedOperationException("Kafka partition maintenance does not provide compaction capture"));
     }
-  }
 
-  interface CompactionHooks {
+    interface Hooks {
 
-    CompletableFuture<CompactionState> capture(KafkaCheckpointSourceState currentSource);
+        CompletableFuture<Capture> capture(KafkaCheckpointSourceState currentSource);
 
-    CompletableFuture<KafkaCompactionPartitionPass.PassOneInputs> capturePassOne(
-        KafkaCheckpointSourceState currentSource,
-        KafkaCompactionPlanner.Candidate candidate,
-        CompactionState state);
-  }
-
-  /** Fork-owned immutable facts that do not require reading the selected decision horizon. */
-  record CompactionState(
-      KafkaCanonicalCheckpointState canonicalState,
-      long highWatermark,
-      long lastStableOffset,
-      MaterializationPolicy outputPolicy,
-      KafkaCompactionPartitionPass.WriteSettings writeSettings) {
-    public CompactionState {
-      Objects.requireNonNull(canonicalState, "canonicalState");
-      Objects.requireNonNull(outputPolicy, "outputPolicy");
-      Objects.requireNonNull(writeSettings, "writeSettings");
-      if (lastStableOffset < canonicalState.logStartOffset()
-          || highWatermark < lastStableOffset
-          || highWatermark > canonicalState.stableEndOffset()) {
-        throw new IllegalArgumentException(
-            "Kafka compaction visibility offsets are outside the canonical state");
-      }
+        CompletableFuture<Void> advanceLogStart(
+                KafkaTrimBarrier.Snapshot revalidated,
+                long durableTrimOffset,
+                VersionedKafkaPartitionBinding publishedBinding);
     }
-  }
+
+    record Capture(KafkaCanonicalCheckpointState canonicalState, long highWatermark, long lastStableOffset) {
+        public Capture {
+            Objects.requireNonNull(canonicalState, "canonicalState");
+            if (lastStableOffset < canonicalState.logStartOffset()
+                    || highWatermark < lastStableOffset
+                    || highWatermark > canonicalState.stableEndOffset()) {
+                throw new IllegalArgumentException(
+                        "Kafka maintenance visibility offsets are outside the canonical state");
+            }
+        }
+    }
+
+    interface CompactionHooks {
+
+        CompletableFuture<CompactionState> capture(KafkaCheckpointSourceState currentSource);
+
+        CompletableFuture<KafkaCompactionPartitionPass.PassOneInputs> capturePassOne(
+                KafkaCheckpointSourceState currentSource,
+                KafkaCompactionPlanner.Candidate candidate,
+                CompactionState state);
+    }
+
+    /**
+     * Fork-owned immutable facts that do not require reading the selected decision horizon.
+     */
+    record CompactionState(
+            KafkaCanonicalCheckpointState canonicalState,
+            long highWatermark,
+            long lastStableOffset,
+            MaterializationPolicy outputPolicy,
+            KafkaCompactionPartitionPass.WriteSettings writeSettings) {
+        public CompactionState {
+            Objects.requireNonNull(canonicalState, "canonicalState");
+            Objects.requireNonNull(outputPolicy, "outputPolicy");
+            Objects.requireNonNull(writeSettings, "writeSettings");
+            if (lastStableOffset < canonicalState.logStartOffset()
+                    || highWatermark < lastStableOffset
+                    || highWatermark > canonicalState.stableEndOffset()) {
+                throw new IllegalArgumentException(
+                        "Kafka compaction visibility offsets are outside the canonical state");
+            }
+        }
+    }
 }

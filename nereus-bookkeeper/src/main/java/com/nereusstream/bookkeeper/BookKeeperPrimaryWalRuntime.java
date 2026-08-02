@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.materialization.CommittedGenerationRetirementAuthority;
@@ -67,10 +68,7 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
                 configuration,
                 oxia,
                 sharedOxia,
-                new DefaultBookKeeperClientOperations(
-                        Objects.requireNonNull(
-                                borrowedClient,
-                                "borrowedClient")),
+                new DefaultBookKeeperClientOperations(Objects.requireNonNull(borrowedClient, "borrowedClient")),
                 namespaceReservations,
                 activationStore,
                 brokerReadiness,
@@ -108,15 +106,13 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
                 wal.protectionSlotsPerRange(),
                 wal.maxReaderLeasesPerLedger(),
                 wal.maxUncertainAllocations());
-        OxiaJavaBookKeeperMetadataStore metadata =
-                OxiaJavaBookKeeperMetadataStore.usingSharedRuntime(
-                        Objects.requireNonNull(oxia, "oxia"),
-                        Objects.requireNonNull(sharedOxia, "sharedOxia"),
-                        exactClock,
-                        metadataConfiguration);
+        OxiaJavaBookKeeperMetadataStore metadata = OxiaJavaBookKeeperMetadataStore.usingSharedRuntime(
+                Objects.requireNonNull(oxia, "oxia"),
+                Objects.requireNonNull(sharedOxia, "sharedOxia"),
+                exactClock,
+                metadataConfiguration);
         try {
-            BookKeeperPasswordProvider exactPasswords = Objects.requireNonNull(
-                    passwords, "passwords");
+            BookKeeperPasswordProvider exactPasswords = Objects.requireNonNull(passwords, "passwords");
             byte[] passwordProbe = exactPasswords.resolve(wal.passwordRef());
             if (passwordProbe == null) {
                 throw new IllegalArgumentException("BookKeeper password provider returned null");
@@ -125,11 +121,9 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
             BookKeeperLedgerIdNamespaceReservationAdminStore exactReservations =
                     Objects.requireNonNull(namespaceReservations, "namespaceReservations");
             BookKeeperLedgerIdNamespaceReservationVerifier namespaceVerifier =
-                    new BookKeeperLedgerIdNamespaceReservationVerifier(
-                            exactReservations, exactDeploymentId);
-            BookKeeperLedgerIdNamespaceReservation namespace = namespaceVerifier
-                    .requireActive(wal, wal.operationTimeout())
-                    .join();
+                    new BookKeeperLedgerIdNamespaceReservationVerifier(exactReservations, exactDeploymentId);
+            BookKeeperLedgerIdNamespaceReservation namespace =
+                    namespaceVerifier.requireActive(wal, wal.operationTimeout()).join();
             BookKeeperProtocolActivationStore exactActivationStore =
                     Objects.requireNonNull(activationStore, "activationStore");
             Optional<BookKeeperProtocolActivation> activation = exactActivationStore
@@ -140,16 +134,9 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
             DefaultBookKeeperProtocolActivationVerifier activationVerifier =
                     new DefaultBookKeeperProtocolActivationVerifier(
                             exactActivationStore, wal, namespace, exactReadiness);
-            BookKeeperClientOperations operations =
-                    Objects.requireNonNull(
-                            borrowedOperations,
-                            "borrowedOperations");
-            BookKeeperWriterStateMachine writer = new BookKeeperWriterStateMachine(
-                    exactCluster,
-                    wal,
-                    metadata,
-                    exactClock,
-                    exactProcessRunId);
+            BookKeeperClientOperations operations = Objects.requireNonNull(borrowedOperations, "borrowedOperations");
+            BookKeeperWriterStateMachine writer =
+                    new BookKeeperWriterStateMachine(exactCluster, wal, metadata, exactClock, exactProcessRunId);
             BookKeeperLedgerAllocator allocator = new BookKeeperLedgerAllocator(
                     exactCluster,
                     wal,
@@ -171,15 +158,7 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
                     writer,
                     exactClock);
             BookKeeperPrimaryWalAppender appender = new BookKeeperPrimaryWalAppender(
-                    exactCluster,
-                    wal,
-                    metadata,
-                    metadata,
-                    allocator,
-                    recovery,
-                    writer,
-                    operations,
-                    exactClock);
+                    exactCluster, wal, metadata, metadata, allocator, recovery, writer, operations, exactClock);
             BookKeeperPrimaryWalReader reader = new BookKeeperPrimaryWalReader(
                     exactCluster,
                     wal,
@@ -187,19 +166,9 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
                     operations,
                     exactPasswords,
                     handleCache(wal),
-                    new BookKeeperReaderLeaseManager(
-                            exactCluster,
-                            wal,
-                            metadata,
-                            exactClock,
-                            exactProcessRunId));
+                    new BookKeeperReaderLeaseManager(exactCluster, wal, metadata, exactClock, exactProcessRunId));
             BookKeeperPrimaryPhysicalReferenceAdapter references =
-                    new BookKeeperPrimaryPhysicalReferenceAdapter(
-                            exactCluster,
-                            wal,
-                            metadata,
-                            metadata,
-                            exactClock);
+                    new BookKeeperPrimaryPhysicalReferenceAdapter(exactCluster, wal, metadata, metadata, exactClock);
             return new BookKeeperPrimaryWalRuntime(
                     metadata,
                     exactDeploymentId,
@@ -216,12 +185,9 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
                     exactClock,
                     new BookKeeperWalRuntime(appender, reader, references),
                     references,
-                    new BookKeeperMaterializationSourceProtectionAdapter(
-                            exactCluster,
-                            wal,
-                            metadata,
-                            exactClock),
-                    activation.filter(BookKeeperProtocolActivation::supportsAllPublications)
+                    new BookKeeperMaterializationSourceProtectionAdapter(exactCluster, wal, metadata, exactClock),
+                    activation
+                            .filter(BookKeeperProtocolActivation::supportsAllPublications)
                             .map(active -> new BookKeeperPrimaryWalRuntimeCapabilityBinding(
                                     1,
                                     wal.configurationBindingSha256(),
@@ -240,8 +206,7 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
             if (failure instanceof Error error) {
                 throw error;
             }
-            throw new IllegalStateException(
-                    "failed to create BookKeeper primary-WAL runtime", failure);
+            throw new IllegalStateException("failed to create BookKeeper primary-WAL runtime", failure);
         }
     }
 
@@ -367,11 +332,9 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
      * authority proof.
      */
     public BookKeeperDeletionActivationCoordinator createDeletionActivationCoordinator(
-            BookKeeperLedgerGcConfiguration gcConfiguration,
-            BookKeeperStreamCoverageProofProvider streamCoverage) {
+            BookKeeperLedgerGcConfiguration gcConfiguration, BookKeeperStreamCoverageProofProvider streamCoverage) {
         ensureOpen();
-        BookKeeperLedgerGcConfiguration exactGc =
-                Objects.requireNonNull(gcConfiguration, "gcConfiguration");
+        BookKeeperLedgerGcConfiguration exactGc = Objects.requireNonNull(gcConfiguration, "gcConfiguration");
         exactGc.validateAgainst(configuration);
         return new BookKeeperDeletionActivationCoordinator(
                 configuration,
@@ -380,26 +343,15 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
                 namespaceVerifier,
                 brokerReadiness,
                 activationStore,
-                new BookKeeperProtocolActivationCoordinator(
-                        activationStore,
-                        clock),
+                new BookKeeperProtocolActivationCoordinator(activationStore, clock),
                 new BookKeeperRootCoverageProofProducer(
                         cluster,
                         configuration,
                         namespace.ledgerIdNamespaceSha256().value(),
                         metadata),
-                Objects.requireNonNull(
-                        streamCoverage,
-                        "streamCoverage"),
+                Objects.requireNonNull(streamCoverage, "streamCoverage"),
                 new BookKeeperScopeCapabilityProbe(
-                        cluster,
-                        configuration,
-                        namespace,
-                        namespaceVerifier,
-                        metadata,
-                        operations,
-                        passwords,
-                        clock));
+                        cluster, configuration, namespace, namespaceVerifier, metadata, operations, passwords, clock));
     }
 
     /**
@@ -418,89 +370,65 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
             ScheduledExecutorService scheduler,
             Executor callbackExecutor) {
         ensureOpen();
-        BookKeeperLedgerGcConfiguration exactGc =
-                Objects.requireNonNull(gcConfiguration, "gcConfiguration");
+        BookKeeperLedgerGcConfiguration exactGc = Objects.requireNonNull(gcConfiguration, "gcConfiguration");
         exactGc.validateAgainst(configuration);
         if (!exactGc.enabled() || exactGc.dryRun()) {
             return Optional.empty();
         }
         BookKeeperWalOnlyRetirementAuthority commonAuthority =
-                new BookKeeperWalOnlyRetirementAuthority(
-                        cluster,
-                        Objects.requireNonNull(l0, "l0"),
-                        metadata);
-        BookKeeperAsyncObjectRetirementAuthority retirementAuthority =
-                new BookKeeperAsyncObjectRetirementAuthority(
-                        cluster,
-                        configuration,
-                        commonAuthority,
-                        Objects.requireNonNull(
-                                committedGenerations,
-                                "committedGenerations"),
-                        metadata);
+                new BookKeeperWalOnlyRetirementAuthority(cluster, Objects.requireNonNull(l0, "l0"), metadata);
+        BookKeeperAsyncObjectRetirementAuthority retirementAuthority = new BookKeeperAsyncObjectRetirementAuthority(
+                cluster,
+                configuration,
+                commonAuthority,
+                Objects.requireNonNull(committedGenerations, "committedGenerations"),
+                metadata);
         BookKeeperWalReferenceManager referenceManager =
-                new BookKeeperWalReferenceManager(
-                        cluster,
-                        configuration,
-                        metadata,
-                        retirementAuthority);
+                new BookKeeperWalReferenceManager(cluster, configuration, metadata, retirementAuthority);
         BookKeeperWalOnlyReferenceRetirementCoordinator referenceRetirement =
                 new BookKeeperWalOnlyReferenceRetirementCoordinator(
-                        cluster,
-                        configuration,
-                        metadata,
-                        retirementAuthority,
-                        referenceManager);
-        BookKeeperSealedLedgerMaterializationTrigger sealedTrigger =
-                new BookKeeperSealedLedgerMaterializationTrigger(
-                        cluster,
-                        configuration,
-                        metadata,
-                        Objects.requireNonNull(
-                                materializationTrigger,
-                                "materializationTrigger"));
-        BookKeeperWalRetentionGate gate =
-                new BookKeeperWalRetentionGate(
-                        cluster,
-                        configuration,
-                        exactGc,
-                        metadata,
-                        metadata,
-                        namespaceVerifier,
-                        activationVerifier,
-                        operations,
-                        clock);
-        BookKeeperLedgerRetentionManager manager =
-                new BookKeeperLedgerRetentionManager(
-                        cluster,
-                        configuration,
-                        exactGc,
-                        metadata,
-                        namespaceVerifier,
-                        activationVerifier,
-                        operations,
-                        gate,
-                        clock);
-        BookKeeperLedgerRetentionScanner scanner =
-                new BookKeeperLedgerRetentionScanner(
-                        cluster,
-                        configuration,
-                        exactGc,
-                        namespace.ledgerIdNamespaceSha256().value(),
-                        metadata,
-                        sealedTrigger,
-                        referenceRetirement,
-                        gate,
-                        manager);
-        return Optional.of(
-                new BookKeeperLedgerRetentionService(
-                        scanner,
-                        configuration.retentionScanInterval(),
-                        configuration.operationTimeout(),
-                        Objects.requireNonNull(scheduler, "scheduler"),
-                        Objects.requireNonNull(
-                                callbackExecutor,
-                                "callbackExecutor")));
+                        cluster, configuration, metadata, retirementAuthority, referenceManager);
+        BookKeeperSealedLedgerMaterializationTrigger sealedTrigger = new BookKeeperSealedLedgerMaterializationTrigger(
+                cluster,
+                configuration,
+                metadata,
+                Objects.requireNonNull(materializationTrigger, "materializationTrigger"));
+        BookKeeperWalRetentionGate gate = new BookKeeperWalRetentionGate(
+                cluster,
+                configuration,
+                exactGc,
+                metadata,
+                metadata,
+                namespaceVerifier,
+                activationVerifier,
+                operations,
+                clock);
+        BookKeeperLedgerRetentionManager manager = new BookKeeperLedgerRetentionManager(
+                cluster,
+                configuration,
+                exactGc,
+                metadata,
+                namespaceVerifier,
+                activationVerifier,
+                operations,
+                gate,
+                clock);
+        BookKeeperLedgerRetentionScanner scanner = new BookKeeperLedgerRetentionScanner(
+                cluster,
+                configuration,
+                exactGc,
+                namespace.ledgerIdNamespaceSha256().value(),
+                metadata,
+                sealedTrigger,
+                referenceRetirement,
+                gate,
+                manager);
+        return Optional.of(new BookKeeperLedgerRetentionService(
+                scanner,
+                configuration.retentionScanInterval(),
+                configuration.operationTimeout(),
+                Objects.requireNonNull(scheduler, "scheduler"),
+                Objects.requireNonNull(callbackExecutor, "callbackExecutor")));
     }
 
     public Optional<BookKeeperPrimaryWalRuntimeCapabilityBinding> capabilityBinding() {
@@ -532,8 +460,7 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
             if (failure instanceof RuntimeException runtime) {
                 throw runtime;
             }
-            throw new IllegalStateException(
-                    "failed to close BookKeeper primary-WAL runtime", failure);
+            throw new IllegalStateException("failed to close BookKeeper primary-WAL runtime", failure);
         }
     }
 
@@ -543,22 +470,13 @@ public final class BookKeeperPrimaryWalRuntime implements AutoCloseable {
         }
     }
 
-    private static BookKeeperLedgerHandleCache handleCache(
-            BookKeeperWalConfiguration configuration) {
-        long estimatedBytes = Math.min(
-                ESTIMATED_READ_HANDLE_BYTES,
-                configuration.maxReadBytesInFlight());
-        int byteBoundHandles = Math.toIntExact(Math.min(
-                Integer.MAX_VALUE,
-                configuration.maxReadBytesInFlight() / estimatedBytes));
-        int maxHandles = Math.max(
-                1,
-                Math.min(configuration.maxReadsInFlight(), byteBoundHandles));
+    private static BookKeeperLedgerHandleCache handleCache(BookKeeperWalConfiguration configuration) {
+        long estimatedBytes = Math.min(ESTIMATED_READ_HANDLE_BYTES, configuration.maxReadBytesInFlight());
+        int byteBoundHandles =
+                Math.toIntExact(Math.min(Integer.MAX_VALUE, configuration.maxReadBytesInFlight() / estimatedBytes));
+        int maxHandles = Math.max(1, Math.min(configuration.maxReadsInFlight(), byteBoundHandles));
         return new BookKeeperLedgerHandleCache(
-                maxHandles,
-                configuration.maxReadBytesInFlight(),
-                estimatedBytes,
-                configuration.readerLeaseTtl());
+                maxHandles, configuration.maxReadBytesInFlight(), estimatedBytes, configuration.readerLeaseTtl());
     }
 
     private static String text(String value, String name) {

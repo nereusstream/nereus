@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.kafka.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -14,7 +15,9 @@ import java.util.Base64;
 import java.util.Locale;
 import java.util.Objects;
 
-/** Closed NKC1 constants, limits, and deterministic identity rules. */
+/**
+ * Closed NKC1 constants, limits, and deterministic identity rules.
+ */
 public final class KafkaCheckpointFormatV1 {
     public static final int FORMAT_VERSION = 1;
     public static final int MIN_READER_VERSION = 1;
@@ -26,18 +29,18 @@ public final class KafkaCheckpointFormatV1 {
     public static final long MAX_OBJECT_BYTES = 1L << 30;
     public static final int MAX_STRING_BYTES = 64 << 10;
     public static final int TRAILER_BYTES = Long.BYTES + 32 + Integer.BYTES;
-    public static final int SECTION_HEADER_BYTES = Short.BYTES * 2 + Integer.BYTES
-            + Long.BYTES + Integer.BYTES + 32;
+    public static final int SECTION_HEADER_BYTES = Short.BYTES * 2 + Integer.BYTES + Long.BYTES + Integer.BYTES + 32;
     public static final String CONTENT_TYPE = "application/vnd.nereus.kafka-checkpoint-v1";
     public static final String OBJECT_SUFFIX = ".nkc";
     static final byte[] MAGIC = "NKC1".getBytes(StandardCharsets.US_ASCII);
     private static final String ZERO_TOPIC_ID = "AAAAAAAAAAAAAAAAAAAAAA";
 
-    private KafkaCheckpointFormatV1() { }
+    private KafkaCheckpointFormatV1() {}
 
-    public static ObjectKeyPrefix prefix(
-            String nereusCluster, String kafkaClusterId, String topicId, int partitionId) {
-        if (partitionId < 0) throw new IllegalArgumentException("partitionId must be non-negative");
+    public static ObjectKeyPrefix prefix(String nereusCluster, String kafkaClusterId, String topicId, int partitionId) {
+        if (partitionId < 0) {
+            throw new IllegalArgumentException("partitionId must be non-negative");
+        }
         return new ObjectKeyPrefix(KeyComponentCodec.encodeComponent(text(nereusCluster, "nereusCluster"))
                 + "/kafka/checkpoints/v1/"
                 + KeyComponentCodec.encodeComponent(text(kafkaClusterId, "kafkaClusterId")) + "/"
@@ -56,15 +59,16 @@ public final class KafkaCheckpointFormatV1 {
     public static ObjectKey objectKey(
             String nereusCluster, KafkaCheckpointHeader header, Checksum contentPolicySha256) {
         String attempt = attemptId(header, contentPolicySha256);
-        return new ObjectKey(prefix(
-                        nereusCluster, header.kafkaClusterId(), header.topicId(), header.partitionId()).value()
+        return new ObjectKey(prefix(nereusCluster, header.kafkaClusterId(), header.topicId(), header.partitionId())
+                        .value()
                 + KeyComponentCodec.encodeNonNegativeLong(header.checkpointOffset()) + "/"
                 + attempt + OBJECT_SUFFIX);
     }
 
     public static ObjectId objectId(ObjectKey key) {
-        return new ObjectId("kc1-" + DeterministicIds.stableHashComponent(
-                Objects.requireNonNull(key, "key").value()));
+        return new ObjectId("kc1-"
+                + DeterministicIds.stableHashComponent(
+                        Objects.requireNonNull(key, "key").value()));
     }
 
     public static ObjectKeyHash objectKeyHash(ObjectKey key) {
@@ -79,7 +83,10 @@ public final class KafkaCheckpointFormatV1 {
         try {
             byte[] decoded = Base64.getUrlDecoder().decode(exact + "==");
             if (decoded.length != 16
-                    || !Base64.getUrlEncoder().withoutPadding().encodeToString(decoded).equals(exact)) {
+                    || !Base64.getUrlEncoder()
+                            .withoutPadding()
+                            .encodeToString(decoded)
+                            .equals(exact)) {
                 throw new IllegalArgumentException("topicId must be a canonical Kafka UUID");
             }
         } catch (IllegalArgumentException failure) {
@@ -93,7 +100,9 @@ public final class KafkaCheckpointFormatV1 {
     }
 
     static String topicId(byte[] value) {
-        if (value.length != 16) throw new IllegalArgumentException("topic UUID must contain 16 bytes");
+        if (value.length != 16) {
+            throw new IllegalArgumentException("topic UUID must contain 16 bytes");
+        }
         return canonicalTopicId(Base64.getUrlEncoder().withoutPadding().encodeToString(value));
     }
 

@@ -1,14 +1,16 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.keys.KeyComponentCodec;
 import java.util.Objects;
 
-/** The only durable key/partition-key constructor for F2 projection metadata. */
+/**
+ * The only durable key/partition-key constructor for F2 projection metadata.
+ */
 public final class ManagedLedgerProjectionKeyspace {
-    private static final PartitionKey ALLOCATOR_PARTITION_KEY =
-            new PartitionKey("managed-ledger-ledger-id-allocator");
+    private static final PartitionKey ALLOCATOR_PARTITION_KEY = new PartitionKey("managed-ledger-ledger-id-allocator");
 
     private final OxiaKeyspace l0;
     private final String projectionPrefix;

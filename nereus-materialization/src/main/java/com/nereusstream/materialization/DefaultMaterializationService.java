@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -13,7 +14,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-/** Non-overlapping full-pass loop that owns no injected store or executor. */
+/**
+ * Non-overlapping full-pass loop that owns no injected store or executor.
+ */
 public final class DefaultMaterializationService implements MaterializationService {
     private enum State {
         NEW,
@@ -77,8 +80,8 @@ public final class DefaultMaterializationService implements MaterializationServi
                 return CompletableFuture.completedFuture(null);
             }
             if (state != State.NEW) {
-                return CompletableFuture.failedFuture(closedFailure(
-                        "materialization service cannot start after close begins", null));
+                return CompletableFuture.failedFuture(
+                        closedFailure("materialization service cannot start after close begins", null));
             }
             state = State.RUNNING;
             try {
@@ -97,12 +100,13 @@ public final class DefaultMaterializationService implements MaterializationServi
         boolean launch = false;
         synchronized (monitor) {
             if (state != State.RUNNING) {
-                return CompletableFuture.failedFuture(state == State.NEW
-                        ? new NereusException(
-                                ErrorCode.METADATA_CONDITION_FAILED,
-                                true,
-                                "materialization service has not started")
-                        : closedFailure("materialization service is closing", null));
+                return CompletableFuture.failedFuture(
+                        state == State.NEW
+                                ? new NereusException(
+                                        ErrorCode.METADATA_CONDITION_FAILED,
+                                        true,
+                                        "materialization service has not started")
+                                : closedFailure("materialization service is closing", null));
             }
             if (activeScan != null) {
                 rescanRequested = true;
@@ -143,19 +147,14 @@ public final class DefaultMaterializationService implements MaterializationServi
         CompletableFuture<Void> dispatcherClose;
         try {
             dispatcherClose = Objects.requireNonNull(
-                    dispatcher.closeAsync(config.closeTimeout(), scheduler),
-                    "dispatcher close future");
+                    dispatcher.closeAsync(config.closeTimeout(), scheduler), "dispatcher close future");
         } catch (Throwable failure) {
             dispatcherClose = CompletableFuture.failedFuture(failure);
         }
-        CompletableFuture<Void> scanClose = scan == null
-                ? CompletableFuture.completedFuture(null)
-                : scan.handle((ignored, failure) -> null);
-        CompletableFuture.allOf(
-                        dispatcherClose.handle((ignored, failure) -> null),
-                        scanClose)
-                .whenComplete((ignored, failure) -> executeCallback(
-                        () -> completeClose(false)));
+        CompletableFuture<Void> scanClose =
+                scan == null ? CompletableFuture.completedFuture(null) : scan.handle((ignored, failure) -> null);
+        CompletableFuture.allOf(dispatcherClose.handle((ignored, failure) -> null), scanClose)
+                .whenComplete((ignored, failure) -> executeCallback(() -> completeClose(false)));
         try {
             long timeoutNanos = config.closeTimeout().toNanos();
             ScheduledFuture<?> deadline = scheduler.schedule(
@@ -225,8 +224,8 @@ public final class DefaultMaterializationService implements MaterializationServi
                 activeScanSource = admittedSource;
             }
         }
-        admittedSource.whenComplete((value, failure) -> executeCallback(
-                () -> finishScan(target, value, failure, started)));
+        admittedSource.whenComplete(
+                (value, failure) -> executeCallback(() -> finishScan(target, value, failure, started)));
         target.whenComplete((ignored, failure) -> {
             if (target.isCancelled()) {
                 admittedSource.cancel(true);
@@ -257,9 +256,7 @@ public final class DefaultMaterializationService implements MaterializationServi
                 activeScanSource = null;
             }
             if (state == State.RUNNING) {
-                Duration delay = rescanRequested
-                        ? Duration.ZERO
-                        : config.registryScanInterval();
+                Duration delay = rescanRequested ? Duration.ZERO : config.registryScanInterval();
                 rescanRequested = false;
                 try {
                     scheduleLocked(delay);
@@ -281,14 +278,9 @@ public final class DefaultMaterializationService implements MaterializationServi
             nanos = Long.MAX_VALUE;
         }
         try {
-            scheduledScan = scheduler.schedule(
-                    this::scheduledTrigger,
-                    nanos,
-                    TimeUnit.NANOSECONDS);
+            scheduledScan = scheduler.schedule(this::scheduledTrigger, nanos, TimeUnit.NANOSECONDS);
         } catch (RejectedExecutionException failure) {
-            throw closedFailure(
-                    "materialization scheduler rejected a registry scan",
-                    failure);
+            throw closedFailure("materialization scheduler rejected a registry scan", failure);
         }
     }
 
@@ -322,8 +314,7 @@ public final class DefaultMaterializationService implements MaterializationServi
         result.complete(null);
     }
 
-    private void cancelActiveScan(
-            CompletableFuture<RegisteredMaterializationScanResult> scan) {
+    private void cancelActiveScan(CompletableFuture<RegisteredMaterializationScanResult> scan) {
         if (scan == null) {
             return;
         }

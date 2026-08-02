@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.StreamId;
@@ -25,7 +25,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
-/** BK-M6 high-cardinality boundaries over the real BK metadata codecs, keyspace, and scanners. */
+/**
+ * BK-M6 high-cardinality boundaries over the real BK metadata codecs, keyspace, and scanners.
+ */
 final class BookKeeperPrimaryWalScaleTest {
     private static final String CLUSTER = "cluster-a";
     private static final String DEPLOYMENT = "deployment-a";
@@ -46,16 +48,13 @@ final class BookKeeperPrimaryWalScaleTest {
             int created = 0;
             while (created < expectedRoots) {
                 long ledgerId = ledgerId(configuration, suffix++);
-                int shard = keys.ledgerShard(keys.ledgerIdentitySha256(
-                        configuration.providerScopeSha256(), ledgerId));
+                int shard = keys.ledgerShard(keys.ledgerIdentitySha256(configuration.providerScopeSha256(), ledgerId));
                 if (remaining[shard] == 0) {
                     continue;
                 }
-                seed.createRoot(CLUSTER, root(
-                                configuration,
-                                namespace,
-                                ledgerId,
-                                BookKeeperLedgerLifecycle.QUARANTINED))
+                seed.createRoot(
+                                CLUSTER,
+                                root(configuration, namespace, ledgerId, BookKeeperLedgerLifecycle.QUARANTINED))
                         .join();
                 remaining[shard]--;
                 created++;
@@ -86,28 +85,23 @@ final class BookKeeperPrimaryWalScaleTest {
         BookKeeperWalConfiguration configuration = configuration(256, 64, 64, 32, 127);
         BookKeeperLedgerIdNamespaceReservation namespace = namespace(configuration);
         long ledgerId = ledgerId(configuration, 1);
-        int expected = Math.multiplyExact(
-                configuration.maxAppendRangesPerLedger(),
-                configuration.protectionSlotsPerRange());
+        int expected =
+                Math.multiplyExact(configuration.maxAppendRangesPerLedger(), configuration.protectionSlotsPerRange());
         ResponseLossPartitionedOxiaBackend backend = new ResponseLossPartitionedOxiaBackend();
         try (FakeBookKeeperMetadataStore seed = metadata(configuration, backend)) {
-            BookKeeperLedgerRootRecord root = root(
-                    configuration, namespace, ledgerId, BookKeeperLedgerLifecycle.ACTIVE);
+            BookKeeperLedgerRootRecord root =
+                    root(configuration, namespace, ledgerId, BookKeeperLedgerLifecycle.ACTIVE);
             seed.createRoot(CLUSTER, root).join();
             for (int range = 0; range < configuration.maxAppendRangesPerLedger(); range++) {
                 for (int slot = 0; slot < configuration.protectionSlotsPerRange(); slot++) {
-                    seed.createProtection(
-                                    CLUSTER,
-                                    configuration.providerScopeSha256(),
-                                    protection(root, range, slot))
+                    seed.createProtection(CLUSTER, configuration.providerScopeSha256(), protection(root, range, slot))
                             .join();
                 }
             }
         }
 
         try (FakeBookKeeperMetadataStore restarted = metadata(configuration, backend)) {
-            BookKeeperRootCoverageProof proof = proofProducer(
-                            configuration, namespace, restarted)
+            BookKeeperRootCoverageProof proof = proofProducer(configuration, namespace, restarted)
                     .produce(readiness(), Duration.ofSeconds(30))
                     .join();
             assertThat(proof.shardsScanned()).isEqualTo(BookKeeperKeyspace.LEDGER_SHARDS);
@@ -124,41 +118,32 @@ final class BookKeeperPrimaryWalScaleTest {
         long ledgerId = ledgerId(configuration, 2);
         ResponseLossPartitionedOxiaBackend backend = new ResponseLossPartitionedOxiaBackend();
         try (FakeBookKeeperMetadataStore seed = metadata(configuration, backend)) {
-            BookKeeperLedgerRootRecord root = root(
-                    configuration, namespace, ledgerId, BookKeeperLedgerLifecycle.ACTIVE);
+            BookKeeperLedgerRootRecord root =
+                    root(configuration, namespace, ledgerId, BookKeeperLedgerLifecycle.ACTIVE);
             seed.createRoot(CLUSTER, root).join();
             for (int range = 0; range < configuration.maxAppendRangesPerLedger(); range++) {
                 for (int slot = 0; slot < configuration.protectionSlotsPerRange(); slot++) {
-                    seed.createProtection(
-                                    CLUSTER,
-                                    configuration.providerScopeSha256(),
-                                    protection(root, range, slot))
+                    seed.createProtection(CLUSTER, configuration.providerScopeSha256(), protection(root, range, slot))
                             .join();
                 }
             }
             for (int slot = 0; slot < configuration.maxReaderLeasesPerLedger(); slot++) {
-                seed.createReaderLease(
-                                CLUSTER,
-                                configuration.providerScopeSha256(),
-                                reader(root, slot))
+                seed.createReaderLease(CLUSTER, configuration.providerScopeSha256(), reader(root, slot))
                         .join();
             }
         }
 
         try (FakeBookKeeperMetadataStore restarted = metadata(configuration, backend)) {
-            BookKeeperRootCoverageProof first = proofProducer(
-                            configuration, namespace, restarted)
+            BookKeeperRootCoverageProof first = proofProducer(configuration, namespace, restarted)
                     .produce(readiness(), Duration.ofSeconds(30))
                     .join();
-            BookKeeperRootCoverageProof second = proofProducer(
-                            configuration, namespace, restarted)
+            BookKeeperRootCoverageProof second = proofProducer(configuration, namespace, restarted)
                     .produce(readiness(), Duration.ofSeconds(30))
                     .join();
-            assertThat(first.protectionsScanned()).isEqualTo(Math.multiplyExact(
-                    configuration.maxAppendRangesPerLedger(),
-                    configuration.protectionSlotsPerRange()));
-            assertThat(first.readerLeasesScanned())
-                    .isEqualTo(configuration.maxReaderLeasesPerLedger());
+            assertThat(first.protectionsScanned())
+                    .isEqualTo(Math.multiplyExact(
+                            configuration.maxAppendRangesPerLedger(), configuration.protectionSlotsPerRange()));
+            assertThat(first.readerLeasesScanned()).isEqualTo(configuration.maxReaderLeasesPerLedger());
             assertThat(second).isEqualTo(first);
         }
     }
@@ -193,9 +178,8 @@ final class BookKeeperPrimaryWalScaleTest {
                                 return CompletableFuture.completedFuture(
                                         new BookKeeperWalReferenceRetirementResult(0, 0, 0));
                             },
-                            (root, timeout) -> CompletableFuture.completedFuture(
-                                    BookKeeperRetentionEvaluation.blocked(
-                                            Set.of(BookKeeperRetentionBlocker.PROTECTION_PRESENT))))
+                            (root, timeout) -> CompletableFuture.completedFuture(BookKeeperRetentionEvaluation.blocked(
+                                    Set.of(BookKeeperRetentionBlocker.PROTECTION_PRESENT))))
                     .scanOnce()
                     .join();
             assertThat(result.rootsScanned()).isEqualTo(10_000);
@@ -229,12 +213,7 @@ final class BookKeeperPrimaryWalScaleTest {
                 CLUSTER,
                 configuration,
                 new BookKeeperLedgerGcConfiguration(
-                        1,
-                        Duration.ZERO,
-                        configuration.readerLeaseTtl(),
-                        Duration.ofDays(1),
-                        true,
-                        false),
+                        1, Duration.ZERO, configuration.readerLeaseTtl(), Duration.ofDays(1), true, false),
                 namespace.ledgerIdNamespaceSha256().value(),
                 metadata,
                 materialization,
@@ -273,14 +252,10 @@ final class BookKeeperPrimaryWalScaleTest {
             BookKeeperLedgerIdNamespaceReservation namespace,
             FakeBookKeeperMetadataStore metadata) {
         return new BookKeeperRootCoverageProofProducer(
-                CLUSTER,
-                configuration,
-                namespace.ledgerIdNamespaceSha256().value(),
-                metadata);
+                CLUSTER, configuration, namespace.ledgerIdNamespaceSha256().value(), metadata);
     }
 
-    private static BookKeeperLedgerProtectionRecord protection(
-            BookKeeperLedgerRootRecord root, int range, int slot) {
+    private static BookKeeperLedgerProtectionRecord protection(BookKeeperLedgerRootRecord root, int range, int slot) {
         return new BookKeeperLedgerProtectionRecord(
                 1,
                 root.ledgerIdentitySha256(),
@@ -307,8 +282,7 @@ final class BookKeeperPrimaryWalScaleTest {
                 0);
     }
 
-    private static BookKeeperLedgerReaderLeaseRecord reader(
-            BookKeeperLedgerRootRecord root, int slot) {
+    private static BookKeeperLedgerReaderLeaseRecord reader(BookKeeperLedgerRootRecord root, int slot) {
         return new BookKeeperLedgerReaderLeaseRecord(
                 1,
                 root.ledgerIdentitySha256(),
@@ -330,18 +304,12 @@ final class BookKeeperPrimaryWalScaleTest {
         String stream = "scale-stream-" + ledgerId;
         String allocation = "scale-allocation-" + ledgerId;
         BookKeeperLedgerCustomMetadata custom = BookKeeperLedgerCustomMetadata.create(
-                CLUSTER,
-                configuration,
-                namespace,
-                new StreamId(stream),
-                0,
-                allocation);
+                CLUSTER, configuration, namespace, new StreamId(stream), 0, allocation);
         boolean sealed = lifecycle == BookKeeperLedgerLifecycle.SEALED;
         boolean quarantined = lifecycle == BookKeeperLedgerLifecycle.QUARANTINED;
         return new BookKeeperLedgerRootRecord(
                 1,
-                keys(configuration).ledgerIdentitySha256(
-                        configuration.providerScopeSha256(), ledgerId),
+                keys(configuration).ledgerIdentitySha256(configuration.providerScopeSha256(), ledgerId),
                 configuration.clusterAlias(),
                 configuration.providerScopeSha256(),
                 ledgerId,
@@ -382,14 +350,10 @@ final class BookKeeperPrimaryWalScaleTest {
     }
 
     private static BookKeeperBrokerReadiness readiness() {
-        return new BookKeeperBrokerReadiness(
-                9,
-                new Checksum(ChecksumType.SHA256, "88".repeat(32)),
-                2);
+        return new BookKeeperBrokerReadiness(9, new Checksum(ChecksumType.SHA256, "88".repeat(32)), 2);
     }
 
-    private static BookKeeperLedgerIdNamespaceReservation namespace(
-            BookKeeperWalConfiguration configuration) {
+    private static BookKeeperLedgerIdNamespaceReservation namespace(BookKeeperWalConfiguration configuration) {
         return new BookKeeperLedgerIdNamespaceReservation(
                 1,
                 configuration.ledgerIdNamespaceReservationId(),
@@ -422,13 +386,11 @@ final class BookKeeperPrimaryWalScaleTest {
     }
 
     private static FakeBookKeeperMetadataStore metadata(
-            BookKeeperWalConfiguration configuration,
-            ResponseLossPartitionedOxiaBackend backend) {
+            BookKeeperWalConfiguration configuration, ResponseLossPartitionedOxiaBackend backend) {
         return new FakeBookKeeperMetadataStore(metadataConfig(configuration), CLOCK, backend);
     }
 
-    private static BookKeeperMetadataStoreConfig metadataConfig(
-            BookKeeperWalConfiguration configuration) {
+    private static BookKeeperMetadataStoreConfig metadataConfig(BookKeeperWalConfiguration configuration) {
         return new BookKeeperMetadataStoreConfig(
                 configuration.maxAppendRangesPerLedger(),
                 configuration.protectionSlotsPerRange(),
@@ -437,11 +399,7 @@ final class BookKeeperPrimaryWalScaleTest {
     }
 
     private static BookKeeperWalConfiguration configuration(
-            int maxRanges,
-            int protectionSlots,
-            int readerSlots,
-            int uncertainSlots,
-            int pageSize) {
+            int maxRanges, int protectionSlots, int readerSlots, int uncertainSlots, int pageSize) {
         BookKeeperWalConfiguration value = BookKeeperTestConfigurations.valid();
         return new BookKeeperWalConfiguration(
                 value.clusterAlias(),

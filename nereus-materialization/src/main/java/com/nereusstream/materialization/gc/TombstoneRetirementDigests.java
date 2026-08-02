@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -15,10 +16,11 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 
-/** Canonical digests for the restart-safe separated tombstone-absence window. */
+/**
+ * Canonical digests for the restart-safe separated tombstone-absence window.
+ */
 final class TombstoneRetirementDigests {
-    private TombstoneRetirementDigests() {
-    }
+    private TombstoneRetirementDigests() {}
 
     static Checksum candidateEvidence(VersionedPhysicalObjectRoot root) {
         Objects.requireNonNull(root, "root");
@@ -40,9 +42,7 @@ final class TombstoneRetirementDigests {
     }
 
     static Checksum proof(
-            VersionedPhysicalObjectRoot root,
-            Checksum queryIdentitySha256,
-            List<GcReferenceSnapshot> snapshots) {
+            VersionedPhysicalObjectRoot root, Checksum queryIdentitySha256, List<GcReferenceSnapshot> snapshots) {
         List<GcReferenceSnapshot> exact = GcPlanValidation.canonical(
                 snapshots,
                 GcPlanValidation.DOMAIN_ORDER,
@@ -59,8 +59,7 @@ final class TombstoneRetirementDigests {
                     || snapshot.veto()
                     || snapshot.referenceCount() != 0
                     || !snapshot.queryIdentitySha256().equals(queryIdentitySha256)) {
-                throw new IllegalArgumentException(
-                        "tombstone proof requires complete clear query-bound domains");
+                throw new IllegalArgumentException("tombstone proof requires complete clear query-bound domains");
             }
             writer.text(snapshot.domainId());
             writer.int32(snapshot.protocolVersion());
@@ -90,8 +89,7 @@ final class TombstoneRetirementDigests {
         }
 
         private void text(String value) {
-            byte[] bytes = Objects.requireNonNull(value, "value")
-                    .getBytes(StandardCharsets.UTF_8);
+            byte[] bytes = Objects.requireNonNull(value, "value").getBytes(StandardCharsets.UTF_8);
             int32(bytes.length);
             digest.update(bytes);
         }
@@ -103,9 +101,7 @@ final class TombstoneRetirementDigests {
         }
 
         private Checksum finish() {
-            return new Checksum(
-                    ChecksumType.SHA256,
-                    HexFormat.of().formatHex(digest.digest()));
+            return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest()));
         }
     }
 }

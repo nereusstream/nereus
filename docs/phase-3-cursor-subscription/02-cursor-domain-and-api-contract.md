@@ -322,7 +322,8 @@ public DefaultCursorSnapshotStore(
         Clock clock);
 ```
 
-The store captures one `cursorSnapshotOperationTimeout` deadline per `prepareWrite`/`read`。Each PUT/HEAD/range-read receives
+The store captures one `cursorSnapshotOperationTimeout` deadline per `prepareWrite`/`read`。Each PUT/HEAD/range-read
+receives
 `min(remaining snapshot deadline, objectStoreRequestTimeout)`；timeout is recomputed before every subcall and a
 nonpositive remainder fails without issuing IO。Production random IDs use `SecureRandom` internally；package-private
 tests inject the deterministic ID source。`cluster` is canonicalized exactly as the owning runtime cluster and the
@@ -401,7 +402,8 @@ IDs。
 
 `NereusManagedLedgerOpenCoordinator.openWritable` creates a fresh cryptographically random `CursorOwnerSession` for
 every writable ledger instance and never reuses it across close/reopen。The existing base `open` path remains
-projection/L0-only for get-only/read-only inspection and never claims cursor roots。`claimAndLoadActiveCursors(owner)` first claims the retention root，
+projection/L0-only for get-only/read-only inspection and never claims cursor roots。`claimAndLoadActiveCursors(owner)`
+first claims the retention root，
 then bounded-parallel CAS-claims every ACTIVE cursor root to that same session，stabilizes/rescans，strictly hydrates
 snapshots and only then returns handles。A claim preserves ack state、generation、`ackStateEpoch`、properties、snapshot
 ref and protection proof；it checked-increments only root mutation sequence and updated time。DELETED tombstones need
@@ -613,10 +615,10 @@ maps to empty maps before constructing this internal record。The internal recor
 
 Creation computes first-unacked offset：
 
-| Initial value | `markDeleteOffset` |
-| --- | --- |
-| Earliest | `observedTrimOffset` |
-| Latest / null default | `observedCommittedEndOffset` |
+| Initial value                  | `markDeleteOffset`                                      |
+|--------------------------------|---------------------------------------------------------|
+| Earliest                       | `observedTrimOffset`                                    |
+| Latest / null default          | `observedCommittedEndOffset`                            |
 | explicit durable cursor target | `clamp(nextReadOffset, trimOffset, committedEndOffset)` |
 
 The F2 `newNonDurableCursor(Position startCursorPosition)` contract remains different: an explicit position is
@@ -680,14 +682,14 @@ survive；mark-delete position properties become empty, matching non-compaction 
 
 Facade ingress normalizes the public Position before constructing this request：
 
-| Public reset input | `force=false` | `force=true` before F4 |
-| --- | --- | --- |
-| `PositionFactory.EARLIEST` | current L0 `trimOffset` | current L0 `trimOffset` |
-| `PositionFactory.LATEST` | current `committedEndOffset` | current `committedEndOffset` |
-| current-ledger offset in `[trim,end]` | exact direct next-read offset | exact direct next-read offset |
-| current-ledger offset `< trim` | advance to `trimOffset` | fail `InvalidCursorPositionException` |
-| current-ledger offset `> end` | normalize to `committedEndOffset` | fail `InvalidCursorPositionException` |
-| foreign ledger/projection | fail | fail |
+| Public reset input                    | `force=false`                     | `force=true` before F4                |
+|---------------------------------------|-----------------------------------|---------------------------------------|
+| `PositionFactory.EARLIEST`            | current L0 `trimOffset`           | current L0 `trimOffset`               |
+| `PositionFactory.LATEST`              | current `committedEndOffset`      | current `committedEndOffset`          |
+| current-ledger offset in `[trim,end]` | exact direct next-read offset     | exact direct next-read offset         |
+| current-ledger offset `< trim`        | advance to `trimOffset`           | fail `InvalidCursorPositionException` |
+| current-ledger offset `> end`         | normalize to `committedEndOffset` | fail `InvalidCursorPositionException` |
+| foreign ledger/projection             | fail                              | fail                                  |
 
 An ack-set extension is admitted only on a retained Entry target `< committedEndOffset` and is decoded/validated as
 in section 4.2；EARLIEST/LATEST or one-past-tail cannot carry it。The normalized Position returned as reset callback
@@ -785,16 +787,16 @@ expiry maps to a storage/timeout failure without callback success。
 
 ### 7.1 Identity and lifecycle
 
-| Method | Durable cursor behavior |
-| --- | --- |
-| `getName()` | exact encoded name passed by ManagedLedger；never decode/normalize |
-| `getManagedLedger()` | owning `NereusManagedLedger` |
-| `isDurable()` | true |
-| `getLastActive/updateLastActive` | broker-local epoch-millis wall-clock field；update uses current time and performs no metadata write |
-| `setActive/setInactive/setAlwaysInactive/isActive` | local dispatcher/cache hint |
-| `isClosed()` | local lifecycle |
-| `close/asyncClose` | enter terminal CLOSING, reject new work, drain accepted lane, flush staged position properties, close waiter/lane, keep durable state |
-| `duplicateNonDurableCursor` | create an F2 non-durable cursor at the durable mark-delete boundary and copy effective whole ranges + partial-batch state；never copy dispatch-ahead local read offset |
+| Method                                             | Durable cursor behavior                                                                                                                                               |
+|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `getName()`                                        | exact encoded name passed by ManagedLedger；never decode/normalize                                                                                                     |
+| `getManagedLedger()`                               | owning `NereusManagedLedger`                                                                                                                                          |
+| `isDurable()`                                      | true                                                                                                                                                                  |
+| `getLastActive/updateLastActive`                   | broker-local epoch-millis wall-clock field；update uses current time and performs no metadata write                                                                    |
+| `setActive/setInactive/setAlwaysInactive/isActive` | local dispatcher/cache hint                                                                                                                                           |
+| `isClosed()`                                       | local lifecycle                                                                                                                                                       |
+| `close/asyncClose`                                 | enter terminal CLOSING, reject new work, drain accepted lane, flush staged position properties, close waiter/lane, keep durable state                                 |
+| `duplicateNonDurableCursor`                        | create an F2 non-durable cursor at the durable mark-delete boundary and copy effective whole ranges + partial-batch state；never copy dispatch-ahead local read offset |
 
 ### 7.2 Reads
 
@@ -834,16 +836,16 @@ For a durable cursor，`getPersistentMarkDeletedPosition()` never returns `null`
 `getMarkDeletedPosition()` because every published state is already backed by the cursor root。Entry ID `-1` is the
 legal before-origin coordinate when trim/mark-delete is zero；it is never passed to an Entry read。
 
-| Method | Contract |
-| --- | --- |
-| sync/async `readEntries` | bounded by entry count, byte size and `maxPosition`; filter whole ack ranges |
-| `readEntriesOrWait` variants | same read, then F2 coalesced tail waiter when no dispatchable committed Entry |
-| `asyncReadEntriesWithSkip*` | combine caller predicate with cursor whole-delete predicate; release skipped Entry |
-| `cancelPendingReadRequest` | local waiter cancellation only |
-| `hasMoreEntries` | committed dispatchable Entry exists at/after local read offset |
-| `getNthEntry` | resolve Nth from first unacked; Include/Exclude controls whole individual ranges |
-| find/scan | F1 bounded resolver; SearchActive starts at durable first-unacked, SearchAll at retained trim |
-| replay | foreign/trimmed/whole-deleted positions returned in skipped set; partial Entry is returned |
+| Method                       | Contract                                                                                      |
+|------------------------------|-----------------------------------------------------------------------------------------------|
+| sync/async `readEntries`     | bounded by entry count, byte size and `maxPosition`; filter whole ack ranges                  |
+| `readEntriesOrWait` variants | same read, then F2 coalesced tail waiter when no dispatchable committed Entry                 |
+| `asyncReadEntriesWithSkip*`  | combine caller predicate with cursor whole-delete predicate; release skipped Entry            |
+| `cancelPendingReadRequest`   | local waiter cancellation only                                                                |
+| `hasMoreEntries`             | committed dispatchable Entry exists at/after local read offset                                |
+| `getNthEntry`                | resolve Nth from first unacked; Include/Exclude controls whole individual ranges              |
+| find/scan                    | F1 bounded resolver; SearchActive starts at durable first-unacked, SearchAll at retained trim |
+| replay                       | foreign/trimmed/whole-deleted positions returned in skipped set; partial Entry is returned    |
 
 Every sync read/find/replay wrapper waits on the same async core and adds no second mutation path。The explicit
 start/end `asyncFindNewestMatching` overload validates both bounds in the same projection and searches only that
@@ -986,24 +988,24 @@ ranges；a mutation that cannot fit root + snapshot limits fails before CAS。
 
 The less visible `ManagedCursor` methods are still part of the locked API and are not left to implementation guesswork：
 
-| Method | Exact F3 behavior |
-| --- | --- |
-| `getNumberOfEntries()` | count offsets in `[localReadOffset, committedEndOffset)` excluding whole-ack ranges；partial Entry counts as one |
-| `hasBacklog()` / `hasBacklog(precise)` | `getNumberOfEntriesInBacklog(precise) > 0`；both are exact at F3 scale |
-| `getNumberOfEntriesSinceFirstNotAckedMessage()` | `max(0, min(localReadOffset,end)-firstUnacked)` in the dense one-Entry/one-offset coordinate |
-| `getTotalNonContiguousDeletedMessagesRange()` | effective normalized whole-ack range count；partials are not reported as whole ranges |
-| `getNonContiguousDeletedMessagesRangeSerializedSize()` | exact `16 * wholeRangeCount` V1 range-payload bytes，checked before narrowing to `int` |
-| `getEstimatedSizeSinceMarkDeletePosition()` | nonnegative stream-average estimate `round(cumulativeSize * exactBacklogEntries / max(1,committedEndOffset))`，saturated on overflow |
-| `getLastIndividualDeletedRange()` | `null` when no whole range；otherwise project the last `[s,e)` as `Range.openClosed(Position(s-1),Position(e-1))` |
-| `getThrottleMarkDelete/setThrottleMarkDelete` | broker-local finite nonnegative rate；setter rejects NaN/negative and never changes durable bytes or callback boundary |
-| `skipNonRecoverableLedger(long)` | no-op plus unsupported-operation metric；F3 admission rejects auto-skip, and missing committed bytes remain corruption |
-| `periodicRollover()` | `false`；F3 has no cursor BookKeeper ledger to roll |
-| `getManagedLedger()` | exact owning `NereusManagedLedger` |
-| `getStats()/getCursorStats()` | immutable/local snapshot with projected durable mark-delete, local read position, ack-range counts and `cursorLedger=-1` |
-| `checkAndUpdateReadPositionChanged()` | atomically compares local read position with the prior stats sample and returns true when changed or currently at tail |
-| `getManagedCursorAttributes()` | memoized stock `ManagedCursorAttributes(this)`；attributes are not durable cursor state |
-| `applyMaxSizeCap(maxEntries,maxBytes)` | rejects negative arguments except the locked `NO_MAX_SIZE_LIMIT` sentinel；returns zero for a zero bound，otherwise min of caller count, configured read cap and local observed-size estimate；the sentinel omits only the byte cap |
-| `updateReadStats(count,size)` | validates nonnegative inputs and updates only local counters/entry-size estimate |
+| Method                                                 | Exact F3 behavior                                                                                                                                                                                                                |
+|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `getNumberOfEntries()`                                 | count offsets in `[localReadOffset, committedEndOffset)` excluding whole-ack ranges；partial Entry counts as one                                                                                                                  |
+| `hasBacklog()` / `hasBacklog(precise)`                 | `getNumberOfEntriesInBacklog(precise) > 0`；both are exact at F3 scale                                                                                                                                                            |
+| `getNumberOfEntriesSinceFirstNotAckedMessage()`        | `max(0, min(localReadOffset,end)-firstUnacked)` in the dense one-Entry/one-offset coordinate                                                                                                                                     |
+| `getTotalNonContiguousDeletedMessagesRange()`          | effective normalized whole-ack range count；partials are not reported as whole ranges                                                                                                                                             |
+| `getNonContiguousDeletedMessagesRangeSerializedSize()` | exact `16 * wholeRangeCount` V1 range-payload bytes，checked before narrowing to `int`                                                                                                                                            |
+| `getEstimatedSizeSinceMarkDeletePosition()`            | nonnegative stream-average estimate `round(cumulativeSize * exactBacklogEntries / max(1,committedEndOffset))`，saturated on overflow                                                                                              |
+| `getLastIndividualDeletedRange()`                      | `null` when no whole range；otherwise project the last `[s,e)` as `Range.openClosed(Position(s-1),Position(e-1))`                                                                                                                 |
+| `getThrottleMarkDelete/setThrottleMarkDelete`          | broker-local finite nonnegative rate；setter rejects NaN/negative and never changes durable bytes or callback boundary                                                                                                            |
+| `skipNonRecoverableLedger(long)`                       | no-op plus unsupported-operation metric；F3 admission rejects auto-skip, and missing committed bytes remain corruption                                                                                                            |
+| `periodicRollover()`                                   | `false`；F3 has no cursor BookKeeper ledger to roll                                                                                                                                                                               |
+| `getManagedLedger()`                                   | exact owning `NereusManagedLedger`                                                                                                                                                                                               |
+| `getStats()/getCursorStats()`                          | immutable/local snapshot with projected durable mark-delete, local read position, ack-range counts and `cursorLedger=-1`                                                                                                         |
+| `checkAndUpdateReadPositionChanged()`                  | atomically compares local read position with the prior stats sample and returns true when changed or currently at tail                                                                                                           |
+| `getManagedCursorAttributes()`                         | memoized stock `ManagedCursorAttributes(this)`；attributes are not durable cursor state                                                                                                                                           |
+| `applyMaxSizeCap(maxEntries,maxBytes)`                 | rejects negative arguments except the locked `NO_MAX_SIZE_LIMIT` sentinel；returns zero for a zero bound，otherwise min of caller count, configured read cap and local observed-size estimate；the sentinel omits only the byte cap |
+| `updateReadStats(count,size)`                          | validates nonnegative inputs and updates only local counters/entry-size estimate                                                                                                                                                 |
 
 `getCursorStats()` renders `individuallyDeletedMessages` from canonical effective whole ranges，never from root-delta
 bytes alone。Snapshot-backed and inline-equivalent states therefore expose identical stats。Throttle/read counters、
@@ -1071,20 +1073,20 @@ CAS。
 
 ## 9. Error Mapping
 
-| Domain/storage failure | ManagedLedger-facing error |
-| --- | --- |
-| foreign virtual ledger/incarnation, future offset, malformed ack set | `InvalidCursorPositionException` |
-| force-reset target outside retained/tail range without F4 compacted bytes | `InvalidCursorPositionException` |
-| reset/property destructive CAS conflict | `ConcurrentFindCursorPositionException` / `BadVersionException` as method requires |
-| another protection/trim intent owns the required stream transition | `ConcurrentFindCursorPositionException` / subscription-busy |
-| cursor/retention owner session differs from the writable ledger instance | `ManagedLedgerFencedException` |
-| cursor-record or mutation-queue admission cap | `TooManyRequestsException` |
-| deleted generation used by stale handle | `CursorAlreadyClosedException` |
-| missing/corrupt referenced snapshot or invalid record | `ManagedLedgerException` with corruption cause; topic open fails |
-| metadata/object timeout or transient object read failure | `ManagedLedgerException` with the original retriable error and stable operation context |
-| mutation queue full | `ManagedLedgerException.TooManyRequestsException` |
-| cursor close | `CursorAlreadyClosedException` |
-| delete missing cursor | success |
+| Domain/storage failure                                                    | ManagedLedger-facing error                                                              |
+|---------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| foreign virtual ledger/incarnation, future offset, malformed ack set      | `InvalidCursorPositionException`                                                        |
+| force-reset target outside retained/tail range without F4 compacted bytes | `InvalidCursorPositionException`                                                        |
+| reset/property destructive CAS conflict                                   | `ConcurrentFindCursorPositionException` / `BadVersionException` as method requires      |
+| another protection/trim intent owns the required stream transition        | `ConcurrentFindCursorPositionException` / subscription-busy                             |
+| cursor/retention owner session differs from the writable ledger instance  | `ManagedLedgerFencedException`                                                          |
+| cursor-record or mutation-queue admission cap                             | `TooManyRequestsException`                                                              |
+| deleted generation used by stale handle                                   | `CursorAlreadyClosedException`                                                          |
+| missing/corrupt referenced snapshot or invalid record                     | `ManagedLedgerException` with corruption cause; topic open fails                        |
+| metadata/object timeout or transient object read failure                  | `ManagedLedgerException` with the original retriable error and stable operation context |
+| mutation queue full                                                       | `ManagedLedgerException.TooManyRequestsException`                                       |
+| cursor close                                                              | `CursorAlreadyClosedException`                                                          |
+| delete missing cursor                                                     | success                                                                                 |
 
 Error messages include operation, stream ID, cursor-name hash and generation；they do not log raw cursor properties,
 object credentials or snapshot bytes。
@@ -1125,29 +1127,29 @@ The canonical constructor enforces every cross-field relation stated below and `
 listed values。Configuration objects are immutable and one operation captures one reference before admission；it does
 not reread mutable broker configuration midway through a CAS/snapshot chain。
 
-| Key | Default | Validation / purpose |
-| --- | ---: | --- |
-| `cursorMetadataValueMaxBytes` | 65,536 | hard maximum encoded Oxia value |
-| `cursorMetadataSafetyMarginBytes` | 4,096 | root planner reserves space below hard maximum |
-| `cursorInlineAckMaxBytes` | 8,192 | hard encoded budget for inline range/partial fields before snapshot |
-| `cursorInlineDeltaMaxCount` | 256 | replacement snapshot when total inline range + partial records exceeds this count |
-| `cursorNameMaxUtf8Bytes` | 16,384 | exact name retained in record |
-| `cursorPositionPropertiesMaxBytes` | 8,192 | canonical encoded key/value budget |
-| `cursorPropertiesMaxBytes` | 16,384 | canonical encoded key/value budget |
-| `cursorSnapshotMaxBytes` | 67,108,864 | strict head/read/decode cap, 64 MiB |
-| `cursorAckPositionsPerRequestMax` | 1,000 | individual ack list admission |
-| `cursorBatchIndexesMax` | 131,072 | allocation/bitset bound for one persisted batch Entry；keeps worst-case reset intent within cap |
-| `cursorProtectionIntentMaxBytes` | 49,152 | hard encoded cap for one recoverable create/backward-reset intent |
-| `cursorTrimReasonMaxUtf8Bytes` | 1,024 | hard cap for the complete internal prefix + attempt ID + caller reason sent to L0 trim |
-| `cursorScanPageSize` | 256 | bounded Oxia cursor enumeration |
-| `cursorRecordsPerStreamMax` | 10,000 | active + retained tombstones admission |
-| `cursorOwnerClaimConcurrency` | 32 | bounded ACTIVE-root CAS claims before writable topic open |
-| `cursorMutationQueueMax` | 1,024 | per local durable cursor |
-| `cursorMaxCasAttempts` | 32 | additionally bounded by operation deadline |
-| `cursorHydrationMaxAttempts` | 8 | full scan/root-ref stabilization retry cap |
-| `cursorSnapshotIdMaxAttempts` | 8 | fresh random-ID retries after immutable-key collision |
-| `cursorMetadataOperationTimeout` | 30 s | CAS/get/scan total deadline |
-| `cursorSnapshotOperationTimeout` | 60 s | put/head/read total deadline |
+| Key                                |    Default | Validation / purpose                                                                           |
+|------------------------------------|-----------:|------------------------------------------------------------------------------------------------|
+| `cursorMetadataValueMaxBytes`      |     65,536 | hard maximum encoded Oxia value                                                                |
+| `cursorMetadataSafetyMarginBytes`  |      4,096 | root planner reserves space below hard maximum                                                 |
+| `cursorInlineAckMaxBytes`          |      8,192 | hard encoded budget for inline range/partial fields before snapshot                            |
+| `cursorInlineDeltaMaxCount`        |        256 | replacement snapshot when total inline range + partial records exceeds this count              |
+| `cursorNameMaxUtf8Bytes`           |     16,384 | exact name retained in record                                                                  |
+| `cursorPositionPropertiesMaxBytes` |      8,192 | canonical encoded key/value budget                                                             |
+| `cursorPropertiesMaxBytes`         |     16,384 | canonical encoded key/value budget                                                             |
+| `cursorSnapshotMaxBytes`           | 67,108,864 | strict head/read/decode cap, 64 MiB                                                            |
+| `cursorAckPositionsPerRequestMax`  |      1,000 | individual ack list admission                                                                  |
+| `cursorBatchIndexesMax`            |    131,072 | allocation/bitset bound for one persisted batch Entry；keeps worst-case reset intent within cap |
+| `cursorProtectionIntentMaxBytes`   |     49,152 | hard encoded cap for one recoverable create/backward-reset intent                              |
+| `cursorTrimReasonMaxUtf8Bytes`     |      1,024 | hard cap for the complete internal prefix + attempt ID + caller reason sent to L0 trim         |
+| `cursorScanPageSize`               |        256 | bounded Oxia cursor enumeration                                                                |
+| `cursorRecordsPerStreamMax`        |     10,000 | active + retained tombstones admission                                                         |
+| `cursorOwnerClaimConcurrency`      |         32 | bounded ACTIVE-root CAS claims before writable topic open                                      |
+| `cursorMutationQueueMax`           |      1,024 | per local durable cursor                                                                       |
+| `cursorMaxCasAttempts`             |         32 | additionally bounded by operation deadline                                                     |
+| `cursorHydrationMaxAttempts`       |          8 | full scan/root-ref stabilization retry cap                                                     |
+| `cursorSnapshotIdMaxAttempts`      |          8 | fresh random-ID retries after immutable-key collision                                          |
+| `cursorMetadataOperationTimeout`   |       30 s | CAS/get/scan total deadline                                                                    |
+| `cursorSnapshotOperationTimeout`   |       60 s | put/head/read total deadline                                                                   |
 
 The safety margin must be `< hard max`；inline budget must fit below the margin-adjusted root cap；batch-index cap plus
 the maximum cursor name must fit the protection-intent cap and snapshot cap after fixed overhead。Every mutation also

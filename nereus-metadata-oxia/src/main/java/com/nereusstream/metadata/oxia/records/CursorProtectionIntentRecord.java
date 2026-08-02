@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.metadata.oxia.CursorIds;
@@ -7,7 +8,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Complete immutable input needed to recover one create, recreate, or backward reset. */
+/**
+ * Complete immutable input needed to recover one create, recreate, or backward reset.
+ */
 public record CursorProtectionIntentRecord(
         String attemptId,
         CursorProtectionKind kind,
@@ -37,17 +40,16 @@ public record CursorProtectionIntentRecord(
                 throw new IllegalArgumentException("target partial offset must equal targetMarkDeleteOffset");
             }
         });
-        initialPositionProperties = CursorRecordValidation.canonicalLongMap(
-                initialPositionProperties, "initialPositionProperties");
-        initialCursorProperties = CursorRecordValidation.canonicalStringMap(
-                initialCursorProperties, "initialCursorProperties");
+        initialPositionProperties =
+                CursorRecordValidation.canonicalLongMap(initialPositionProperties, "initialPositionProperties");
+        initialCursorProperties =
+                CursorRecordValidation.canonicalStringMap(initialCursorProperties, "initialCursorProperties");
         if (createdAtMillis < 0) {
             throw new IllegalArgumentException("intent createdAtMillis must be non-negative");
         }
         switch (kind) {
             case CREATE -> {
-                if (expectedCursorGeneration != 0 || targetCursorGeneration != 1
-                        || targetPartialBatch.isPresent()) {
+                if (expectedCursorGeneration != 0 || targetCursorGeneration != 1 || targetPartialBatch.isPresent()) {
                     throw new IllegalArgumentException("CREATE protection has invalid generation or partial state");
                 }
             }
@@ -63,7 +65,8 @@ public record CursorProtectionIntentRecord(
                         || targetCursorGeneration != expectedCursorGeneration
                         || !initialPositionProperties.isEmpty()
                         || !initialCursorProperties.isEmpty()) {
-                    throw new IllegalArgumentException("BACKWARD_RESET protection has invalid generation or properties");
+                    throw new IllegalArgumentException(
+                            "BACKWARD_RESET protection has invalid generation or properties");
                 }
             }
         }

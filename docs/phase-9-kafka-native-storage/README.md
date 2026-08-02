@@ -84,23 +84,108 @@
 > 128-source/1,048,576-record two-pass NTC2 task with bounded winner memory、positive spill and complete cleanup。These
 > rows are `IMPLEMENTED_NOT_RUN` until the final clean aggregate；SCL006–010 remain open
 
-> 当前状态：Implemented/final-gated for the exact source locks recorded above；all F9-M1–M7 gates and all 146 scenario rows pass the clean final aggregate。The detailed milestone notes below remain the implementation and failure-history audit trail。
-> 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：真实 two-release-process Object-WAL/KRaft singleton reassignment、旧 owner resignation、committed recovery 与 new leader continuation 已通过；三 release JVM + Toxiproxy + `jcmd` + `SIGSTOP/SIGCONT` gate 又闭合了 Object-WAL already-dispatched old append 的 P/C 切点，并证明 stale append 在 guarded upload 前被新 session fence、WAL key 集与 durable LEO 不变；stock ZooKeeper + two-bookie + two Kafka release-process gate 闭合 `BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_SYNC_OBJECT` 的 post-handoff recovery/continuation 与 profile object invariants；test-only Byte Buddy agent gate further holds one real Bookie-acked write before `WRITING -> DURABLE`，proves exact physical-entry presence、new-leader `ABANDONED`/`SEALED` recovery、stale completion fencing and final LEO `2`；three combined broker/controller release JVMs with three static voters now prove ACTIVE-state controller kill/failover、per-epoch Nereus activation reconciliation and native IO continuity；a second three-dedicated-controller/one-broker gate now covers before-provider and after-provider cuts for readiness create、PREPARED create and ACTIVE CAS，kills the exact controller and proves higher-epoch recovery plus native IO；a third gate on the same role-separated topology closes both sides of the initial snapshot proof and capability aggregation；the Oxia-proxied dedicated-controller/broker gate proves actual transport reset normalization and same-controller-epoch recovery；native DeleteRecords now also publishes NKC1 before trim、survives forced process death、hydrates the pre-trim checkpoint window、applies the current durable trim and rebuilds virtual segments before continuing native IO；a second Object-WAL process gate loses the successful provider completion before binding/local publication，forces broker death，then proves fresh-process convergence and a same-target no-op without another trim CAS/checkpoint object；remaining open items are transaction/internal-topic coordinator migration and broader BookKeeper/all-profile chaos
-> 2026-07-29 trim matrix 增量（覆盖上两行的 response-loss open wording）：Object sync/async 与 BookKeeper WAL-only/async/sync 五档均已通过 provider-applied/caller-unobserved trim、forced restart、same-target no-repeat 与 continued IO；仍 open 的是 transaction/internal-topic coordinator migration、batch middle/end/HW、stock oracle 与 broader chaos
-> 2026-07-29 coordinator migration 增量（覆盖上两行的 coordinator open wording）：product `7c25d2e` 在 fork `1cbe8b65a8` 上以两个真实 release JVM 原子迁移 user、`__consumer_offsets-0`、`__transaction_state-0` 到 broker 2，旧 broker 保持存活；group offset 和 completed transactional-ID state 在 recovered-storage-ready 后恢复并继续提交。Ongoing/aborted coordinator takeover、mandatory internal-topic NTC2 failure、batch middle/end/HW、stock oracle 与 broader chaos 仍 open
-> 2026-07-29 ongoing transaction migration 增量（覆盖上一行的 ongoing/aborted open wording）：product `efe782d` 新增 `f9OngoingTransactionMigrationProcessIntegrationTest`，在两个 live Object-WAL release brokers 间来回迁移 user 与 `__transaction_state-0`；两个 OPEN transaction 分别跨 handoff COMMIT/ABORT，LSO 收敛、same-ID continuation 与 READ_COMMITTED aborted filtering 均通过。Injected abort-resolution failure、mandatory NTC2、BookKeeper/profile expansion、batch middle/end/HW、stock oracle 与 final aggregate 仍 open
-> 2026-07-29 mandatory internal-topic NTC2 deterministic 增量：product `b6b02f4` + fork `89b66ab03b` 在 coordinator election 前加入 binding-rooted、generation-constrained `TOPIC_COMPACTED` availability gate；每个未 trim 的 activated generation 都执行一个有界 probe，任一 `OBJECT_NOT_FOUND`/corruption/metadata failure 都阻止 `openLeader` 完成、撤销 exact pending lookup 并 resign recovered storage，且不存在 COMMITTED fallback。`KafkaInternalTopicNoResurrectionTest`、fork lifecycle tests、完整 `phase9M3KafkaForkBridgeCheck` 均通过；physical repair evidence is recorded in the next increment
-> 2026-07-29 mandatory NTC2 真实故障/修复增量（覆盖上一行末尾的 process-cut open wording）：product `0ae8ca9` + fork `768924da60` 的 `f9MandatoryInternalTopicNtc2ProcessIntegrationTest` 在真实 Oxia、LocalStack 与两个 live release Kafka JVM 上激活 `__consumer_offsets-0` NTC2，依次执行物理删除与原 key/metadata 下的 byte corruption；两次迁移都在 coordinator election 前 quarantine exact physical root/index 并保持 group service unavailable，且没有 COMMITTED fallback。恢复原 bytes、user metadata、content type 与 provider CRC 后，product 校验 HEAD length/CRC/ETag、full-read CRC/SHA，CAS 恢复同一 root/index，并以 `REPLACE` 发布新 generation-set digest/activation epoch；两次 ordinary reassignment 都恢复 committed group offset `1`。该行当时只覆盖 Object sync；Object async/BookKeeper expansion 由后续 `4676c12` 增量闭合
-> 2026-07-29 retention/DeleteRecords 增量（覆盖上一行末尾的 batch/oracle open wording）：product `77480cb` + fork `bd9963c980` 新增独立 `phase9M5KafkaRetentionOracleCheck` 和 `f9DeleteRecordsBoundaryProcessIntegrationTest`。前者用四个真实 stock `UnifiedLog` closed/active segments 对比 Nereus planner 与 `deleteOldSegments()` 的 selected count/logStart，覆盖 time、size、combined、HW cap、strict equality、compact-only；后者在真实 Oxia/LocalStack/release Kafka 上用三个三-record batches 依次执行 target `3/4/6/-1`，要求 low watermark `3/4/6/9`、latest 恒为 `9`、每次 Fetch 首条 offset/value 与新 logStart 一致，并验证首个 trim 的 rooted NKC1。KF-RET-001/002/003/006 现为 `PASSED_CURRENT_SOURCE`；stock `LogCleaner` compaction differential、injected transaction-resolution 与 final aggregate 仍 open
-> 2026-07-29 stock compaction oracle 增量（覆盖上一行的 `LogCleaner` open wording）：product `666bab1`/`08fe686` + fork `c4a0a2d1fa`/`bf8a2946e5` 新增独立 `phase9M5KafkaCompactionOracleCheck`。四个真实 stock `Cleaner` 场景与 Nereus 两遍 executor 比较 survivor offset、key/value、timestamp、compression、delete horizon、transaction/control、producer id/epoch/sequence 和 leader epoch，覆盖 keyed/tail winner、stock null-key drop、tombstone first/later horizon、committed/aborted data、required/empty marker 与 idempotent sparse batch。Oracle 暴露并修复了 null-key 误保留和 `RETAIN_REQUIRED` marker 过早 horizon 两处偏差；fork development dependencies 现在只对隔离 Nereus 坐标标记 changing/zero-cache。KF-CMP-001/002/003/004 现为 `PASSED_CURRENT_SOURCE`；OPEN crossing 仍由产品事务门禁证明，不冒充 stock cleaner 可清理前缀证据，full compression/header matrix、injected transaction-resolution 与 final aggregate 仍 open
-> 2026-07-29 transaction-resolution cut 增量（覆盖前文的 injected-resolution open wording）：product `04e661e` + fork `1e3783458b` 新增 test-only Byte Buddy append-boundary agent 与 `f9TransactionResolutionCutProcessIntegrationTest`。真实 Object-WAL 双 broker 先迁移一个 OPEN transaction 的 user partition，再分别在 abort marker 进入 provider 前和 provider 已 durable 完成但 caller completion 丢失后杀死目标 broker；fresh process 从同一 binding 恢复，READ_COMMITTED/LSO 跳过 aborted data，同一 `transactional.id` 继续提交。该门禁同时修复并锁定 stock `TransactionMarkerChannelManager`：metadata 中仍存在但暂时 `leader=-1` 的 partition 必须进入 unknown-broker retry queue，只有 metadata 已不存在才可跳过。强制 fresh rerun 66/66 tasks、1m30s 通过；KF-TXN-008 为 `PASSED_CURRENT_SOURCE`，non-Object profile 与 final aggregate 仍 open
-> 2026-07-29 transaction-resolution 五 profile 增量（覆盖上一行的 profile open wording）：product `2d7091d` 新增 `f9TransactionResolutionProfileMatrixProcessIntegrationTest`，把同一 before/after-provider 进程切点扩展到 `OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT` 与 `BOOKKEEPER_WAL_SYNC_OBJECT`；与原 Object-sync gate 合计十个真实切点场景。每个 BookKeeper cut 使用独立、确定的 ledger-id namespace；WAL-only 要求 bucket 恒空，async/sync 要求 materialized object 可见。首轮真实矩阵暴露 `BookKeeperLedgerHandleCache` 在容量已满时只清理超时 idle handle、不会淘汰已 release 的 LRU handle，第三个 ledger 因而错误返回 `BACKPRESSURE_REJECTED`；生产修复现会先淘汰 released LRU，所有 handle 仍被 lease 时继续 fail closed。矩阵 fresh rerun 66/66 tasks、6m28s 通过；BookKeeper 全量单测、Object-sync 原门禁与 146/146 manifest 联合回归 78/78 tasks、1m40s 通过。KF-TXN-008 五 profile P/C/K 当前源码证据闭合；final aggregate 仍 open
-> 2026-07-29 mandatory NTC2 五 profile 增量：product `4676c12` 新增 `f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest`，将真实 `__consumer_offsets` NTC2 的 delete/corrupt/fail-closed/exact-repair/re-election 扩展到 Object async 与 BookKeeper WAL-only/async/sync；连同 fresh Object-sync gate 共五 profile、十个场景。WAL-only 使用没有 F4 registration 的 projection-free L0 compaction authority；extended KCP1 decision set 只压缩持久化载荷，保留旧 logical planId/raw bytes，并受 60 KiB stored、1 MiB decoded、4096 sources 硬上限约束。矩阵 64/64 tasks、5m34s，Object-sync 73/73 tasks、1m29s。KF-TXN-016 五 profile P/C/K 当前源码证据闭合；final aggregate 仍 open
-> 2026-07-30 M6 final-process aggregate 增量（覆盖上两行的 M6 final-aggregate open wording）：fork `76f62f3b83` makes leader-state publication and `leaderEpochAwareOffsetLookupPending` installation atomic under `Partition`'s state write lock；product `14fb643` source-locks the resulting 53 commits/126 files。Harness commits `3293d76`、`c76a466` and `4a0ec22` close timed readiness Admin clients with `Duration.ZERO`、hold activation listener ports until launch and use the existing 30-second Admin profile for long topic/reassignment calls。The exact fencing、offset、orphan、activation and BookKeeper physical-entry assertions are unchanged。Fresh `phase9M6KafkaProcessCheck --rerun-tasks` passes 94/94 tasks in 34m21s at product `4a0ec22`；F9-M6 process evidence is closed，while M7/`phase9FinalCheck` remains open
+> 当前状态：Implemented/final-gated for the exact source locks recorded above；all F9-M1–M7 gates and all 146 scenario
+> rows pass the clean final aggregate。The detailed milestone notes below remain the implementation and failure-history
+> audit trail。
+> 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：真实 two-release-process Object-WAL/KRaft singleton
+> reassignment、旧 owner resignation、committed recovery 与 new leader continuation 已通过；三 release JVM + Toxiproxy +
+`jcmd` + `SIGSTOP/SIGCONT` gate 又闭合了 Object-WAL already-dispatched old append 的 P/C 切点，并证明 stale append 在
+> guarded upload 前被新 session fence、WAL key 集与 durable LEO 不变；stock ZooKeeper + two-bookie + two Kafka
+> release-process gate 闭合 `BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_SYNC_OBJECT` 的
+> post-handoff recovery/continuation 与 profile object invariants；test-only Byte Buddy agent gate further holds one real
+> Bookie-acked write before `WRITING -> DURABLE`，proves exact physical-entry presence、new-leader `ABANDONED`/`SEALED`
+> recovery、stale completion fencing and final LEO `2`；three combined broker/controller release JVMs with three static
+> voters now prove ACTIVE-state controller kill/failover、per-epoch Nereus activation reconciliation and native IO
+> continuity；a second three-dedicated-controller/one-broker gate now covers before-provider and after-provider cuts for
+> readiness create、PREPARED create and ACTIVE CAS，kills the exact controller and proves higher-epoch recovery plus native
+> IO；a third gate on the same role-separated topology closes both sides of the initial snapshot proof and capability
+> aggregation；the Oxia-proxied dedicated-controller/broker gate proves actual transport reset normalization and
+> same-controller-epoch recovery；native DeleteRecords now also publishes NKC1 before trim、survives forced process
+> death、hydrates the pre-trim checkpoint window、applies the current durable trim and rebuilds virtual segments before
+> continuing native IO；a second Object-WAL process gate loses the successful provider completion before binding/local
+> publication，forces broker death，then proves fresh-process convergence and a same-target no-op without another trim
+> CAS/checkpoint object；remaining open items are transaction/internal-topic coordinator migration and broader
+> BookKeeper/all-profile chaos
+> 2026-07-29 trim matrix 增量（覆盖上两行的 response-loss open wording）：Object sync/async 与 BookKeeper
+> WAL-only/async/sync 五档均已通过 provider-applied/caller-unobserved trim、forced restart、same-target no-repeat 与
+> continued IO；仍 open 的是 transaction/internal-topic coordinator migration、batch middle/end/HW、stock oracle 与 broader
+> chaos
+> 2026-07-29 coordinator migration 增量（覆盖上两行的 coordinator open wording）：product `7c25d2e` 在 fork `1cbe8b65a8`
+> 上以两个真实 release JVM 原子迁移 user、`__consumer_offsets-0`、`__transaction_state-0` 到 broker 2，旧 broker 保持存活；group
+> offset 和 completed transactional-ID state 在 recovered-storage-ready 后恢复并继续提交。Ongoing/aborted coordinator
+> takeover、mandatory internal-topic NTC2 failure、batch middle/end/HW、stock oracle 与 broader chaos 仍 open
+> 2026-07-29 ongoing transaction migration 增量（覆盖上一行的 ongoing/aborted open wording）：product `efe782d` 新增
+`f9OngoingTransactionMigrationProcessIntegrationTest`，在两个 live Object-WAL release brokers 间来回迁移 user 与
+`__transaction_state-0`；两个 OPEN transaction 分别跨 handoff COMMIT/ABORT，LSO 收敛、same-ID continuation 与
+> READ_COMMITTED aborted filtering 均通过。Injected abort-resolution failure、mandatory NTC2、BookKeeper/profile
+> expansion、batch middle/end/HW、stock oracle 与 final aggregate 仍 open
+> 2026-07-29 mandatory internal-topic NTC2 deterministic 增量：product `b6b02f4` + fork `89b66ab03b` 在 coordinator
+> election 前加入 binding-rooted、generation-constrained `TOPIC_COMPACTED` availability gate；每个未 trim 的 activated
+> generation 都执行一个有界 probe，任一 `OBJECT_NOT_FOUND`/corruption/metadata failure 都阻止 `openLeader` 完成、撤销 exact
+> pending lookup 并 resign recovered storage，且不存在 COMMITTED fallback。`KafkaInternalTopicNoResurrectionTest`、fork
+> lifecycle tests、完整 `phase9M3KafkaForkBridgeCheck` 均通过；physical repair evidence is recorded in the next increment
+> 2026-07-29 mandatory NTC2 真实故障/修复增量（覆盖上一行末尾的 process-cut open wording）：product `0ae8ca9` + fork
+`768924da60` 的 `f9MandatoryInternalTopicNtc2ProcessIntegrationTest` 在真实 Oxia、LocalStack 与两个 live release Kafka
+> JVM 上激活 `__consumer_offsets-0` NTC2，依次执行物理删除与原 key/metadata 下的 byte corruption；两次迁移都在 coordinator
+> election 前 quarantine exact physical root/index 并保持 group service unavailable，且没有 COMMITTED fallback。恢复原
+> bytes、user metadata、content type 与 provider CRC 后，product 校验 HEAD length/CRC/ETag、full-read CRC/SHA，CAS 恢复同一
+> root/index，并以 `REPLACE` 发布新 generation-set digest/activation epoch；两次 ordinary reassignment 都恢复 committed
+> group offset `1`。该行当时只覆盖 Object sync；Object async/BookKeeper expansion 由后续 `4676c12` 增量闭合
+> 2026-07-29 retention/DeleteRecords 增量（覆盖上一行末尾的 batch/oracle open wording）：product `77480cb` + fork
+`bd9963c980` 新增独立 `phase9M5KafkaRetentionOracleCheck` 和 `f9DeleteRecordsBoundaryProcessIntegrationTest`。前者用四个真实
+> stock `UnifiedLog` closed/active segments 对比 Nereus planner 与 `deleteOldSegments()` 的 selected count/logStart，覆盖
+> time、size、combined、HW cap、strict equality、compact-only；后者在真实 Oxia/LocalStack/release Kafka 上用三个三-record
+> batches 依次执行 target `3/4/6/-1`，要求 low watermark `3/4/6/9`、latest 恒为 `9`、每次 Fetch 首条 offset/value 与新
+> logStart 一致，并验证首个 trim 的 rooted NKC1。KF-RET-001/002/003/006 现为 `PASSED_CURRENT_SOURCE`；stock `LogCleaner`
+> compaction differential、injected transaction-resolution 与 final aggregate 仍 open
+> 2026-07-29 stock compaction oracle 增量（覆盖上一行的 `LogCleaner` open wording）：product `666bab1`/`08fe686` + fork
+`c4a0a2d1fa`/`bf8a2946e5` 新增独立 `phase9M5KafkaCompactionOracleCheck`。四个真实 stock `Cleaner` 场景与 Nereus 两遍
+> executor 比较 survivor offset、key/value、timestamp、compression、delete horizon、transaction/control、producer
+> id/epoch/sequence 和 leader epoch，覆盖 keyed/tail winner、stock null-key drop、tombstone first/later
+> horizon、committed/aborted data、required/empty marker 与 idempotent sparse batch。Oracle 暴露并修复了 null-key 误保留和
+`RETAIN_REQUIRED` marker 过早 horizon 两处偏差；fork development dependencies 现在只对隔离 Nereus 坐标标记
+> changing/zero-cache。KF-CMP-001/002/003/004 现为 `PASSED_CURRENT_SOURCE`；OPEN crossing 仍由产品事务门禁证明，不冒充 stock
+> cleaner 可清理前缀证据，full compression/header matrix、injected transaction-resolution 与 final aggregate 仍 open
+> 2026-07-29 transaction-resolution cut 增量（覆盖前文的 injected-resolution open wording）：product `04e661e` + fork
+`1e3783458b` 新增 test-only Byte Buddy append-boundary agent 与 `f9TransactionResolutionCutProcessIntegrationTest`。真实
+> Object-WAL 双 broker 先迁移一个 OPEN transaction 的 user partition，再分别在 abort marker 进入 provider 前和 provider 已
+> durable 完成但 caller completion 丢失后杀死目标 broker；fresh process 从同一 binding 恢复，READ_COMMITTED/LSO 跳过 aborted
+> data，同一 `transactional.id` 继续提交。该门禁同时修复并锁定 stock `TransactionMarkerChannelManager`：metadata 中仍存在但暂时
+`leader=-1` 的 partition 必须进入 unknown-broker retry queue，只有 metadata 已不存在才可跳过。强制 fresh rerun 66/66
+> tasks、1m30s 通过；KF-TXN-008 为 `PASSED_CURRENT_SOURCE`，non-Object profile 与 final aggregate 仍 open
+> 2026-07-29 transaction-resolution 五 profile 增量（覆盖上一行的 profile open wording）：product `2d7091d` 新增
+`f9TransactionResolutionProfileMatrixProcessIntegrationTest`，把同一 before/after-provider 进程切点扩展到
+`OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT` 与 `BOOKKEEPER_WAL_SYNC_OBJECT`；与原
+> Object-sync gate 合计十个真实切点场景。每个 BookKeeper cut 使用独立、确定的 ledger-id namespace；WAL-only 要求 bucket
+> 恒空，async/sync 要求 materialized object 可见。首轮真实矩阵暴露 `BookKeeperLedgerHandleCache` 在容量已满时只清理超时 idle
+> handle、不会淘汰已 release 的 LRU handle，第三个 ledger 因而错误返回 `BACKPRESSURE_REJECTED`；生产修复现会先淘汰 released
+> LRU，所有 handle 仍被 lease 时继续 fail closed。矩阵 fresh rerun 66/66 tasks、6m28s 通过；BookKeeper 全量单测、Object-sync
+> 原门禁与 146/146 manifest 联合回归 78/78 tasks、1m40s 通过。KF-TXN-008 五 profile P/C/K 当前源码证据闭合；final aggregate 仍
+> open
+> 2026-07-29 mandatory NTC2 五 profile 增量：product `4676c12` 新增
+`f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest`，将真实 `__consumer_offsets` NTC2 的
+> delete/corrupt/fail-closed/exact-repair/re-election 扩展到 Object async 与 BookKeeper WAL-only/async/sync；连同 fresh
+> Object-sync gate 共五 profile、十个场景。WAL-only 使用没有 F4 registration 的 projection-free L0 compaction
+> authority；extended KCP1 decision set 只压缩持久化载荷，保留旧 logical planId/raw bytes，并受 60 KiB stored、1 MiB
+> decoded、4096 sources 硬上限约束。矩阵 64/64 tasks、5m34s，Object-sync 73/73 tasks、1m29s。KF-TXN-016 五 profile P/C/K
+> 当前源码证据闭合；final aggregate 仍 open
+> 2026-07-30 M6 final-process aggregate 增量（覆盖上两行的 M6 final-aggregate open wording）：fork `76f62f3b83` makes
+> leader-state publication and `leaderEpochAwareOffsetLookupPending` installation atomic under `Partition`'s state write
+> lock；product `14fb643` source-locks the resulting 53 commits/126 files。Harness commits `3293d76`、`c76a466` and `4a0ec22`
+> close timed readiness Admin clients with `Duration.ZERO`、hold activation listener ports until launch and use the
+> existing 30-second Admin profile for long topic/reassignment calls。The exact fencing、offset、orphan、activation and
+> BookKeeper physical-entry assertions are unchanged。Fresh `phase9M6KafkaProcessCheck --rerun-tasks` passes 94/94 tasks in
+> 34m21s at product `4a0ec22`；F9-M6 process evidence is closed，while M7/`phase9FinalCheck` remains open
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Kafka fork development head：`nereusstream/kafka:nereus/future9-native-kafka-storage@76f62f3b83e882105219b6c7687dbde594a8b8a2`（53 commits / 126 files from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；第 49 个 `bd9963c980` 增加 stock retention oracle，第 50 个 `c4a0a2d1fa` 增加 stock `LogCleaner` compaction oracle，第 51 个 `bf8a2946e5` 刷新隔离 development coordinates，第 52 个 `1e3783458b` 修复 leaderless transaction-marker retry，第 53 个 `76f62f3b83` 在 `Partition.makeLeader` state lock 内原子安装 new-leader offset-lookup fence）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；SSH push is configured and the remote head is verified
+> Kafka fork development head：
+`nereusstream/kafka:nereus/future9-native-kafka-storage@76f62f3b83e882105219b6c7687dbde594a8b8a2`（53 commits / 126 files
+> from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；第 49 个 `bd9963c980` 增加 stock retention oracle，第 50 个
+`c4a0a2d1fa` 增加 stock `LogCleaner` compaction oracle，第 51 个 `bf8a2946e5` 刷新隔离 development coordinates，第 52 个
+`1e3783458b` 修复 leaderless transaction-marker retry，第 53 个 `76f62f3b83` 在 `Partition.makeLeader` state lock 内原子安装
+> new-leader offset-lookup fence）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；SSH push is
+> configured and the remote head is verified
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
@@ -109,7 +194,8 @@ NCP2/NTC2、exact format dispatch/capability 和真实 S3 round trip；F9-M2 已
 authority-bound head CAS、V1/V2 dual codec、Kafka partition binding 的显式 codec、真实 Oxia store、
 deterministic create/delete、64-shard hint scanner、NKC1、受保护 publication/fallback 和 fresh-state replay
 状态机；F9-M3 已开始落地 raw magic-v2 RecordBatch 严格校验、exact per-batch append encoding、serialized stable
-partition append、bounded containing-entry Fetch assembly、owned Produce byte budget/bounded executor 和 fail-closed append
+partition append、bounded containing-entry Fetch assembly、owned Produce byte budget/bounded executor 和 fail-closed
+append
 outcome classifier，以及 actual-byte minBytes/maxWait/event-coalescing 的 multi-partition async Fetch operation。
 process-local leader manager 也已按 KRaft leader/broker term 拒绝 stale/conflicting/late open。Nereus-side ListOffsets
 resolver 已以单一 stable snapshot 支持 exact earliest/latest 和由 fork record iterator 驱动的有界 timestamp/max
@@ -126,7 +212,8 @@ follower/delete callback 等待 manager lifecycle 完成，delete→同名 recre
 `NereusUnifiedLog` shell，lifecycle 再把同一个 manager-returned recovered storage 发布到该 shell，最后才安装
 ListOffsets lookup；任一步失败都按 epoch/instance 撤销。fork 已注册完整 100-key
 `nereus.kafka.storage.*` `ConfigDef`，构建无副作用
-immutable Object/BookKeeper typed snapshot，并在 enabled-only pure validator 中拒绝非 broker、RF/minISR、remote log、stock cleaner、
+immutable Object/BookKeeper typed snapshot，并在 enabled-only pure validator 中拒绝非 broker、RF/minISR、remote log、stock
+cleaner、
 AutoMQ mode、request hard limit 与 authoritative log-directory conflicts；disabled default 不创建资源。Kafka fork
 现有 stock-compatible `BrokerStorageRuntimeFactory` 显式注入 seam：runtime 在 LogManager IO 前创建，start future 在
 unfence/request processing 前等待，optional metadata lifecycle 传给 publisher，shutdown 在 request handlers 前关闭
@@ -148,15 +235,18 @@ server 类型；runtime configuration 同时冻结 executable profile set，mana
 `createActivated` 进一步在同一 shared Oxia 上组装 activation store/runtime：先发布 broker capability，
 在双重（wall deadline + 最大尝试数）有界轮询内等待 ACTIVE/readiness，严格校验后才执行原 startup action；续租失败会撤销
 admission，关闭顺序保证先取消续租/轮询再关 activation store，借入 scheduler 不关闭。未激活 creator 已降为 package-private
-failure-cut test seam。real-Oxia + local-file provider gate 已升级为 activation-backed startup、leader open、authority recovery、
+failure-cut test seam。real-Oxia + local-file provider gate 已升级为 activation-backed startup、leader open、authority
+recovery、
 stable Produce/Fetch 与 close。production creator 还会把 fork 的 KRaft/local-log snapshot 与全部 64 个 binding-registry
 shard 的首键 existence proof 合并；任一历史 binding hint 都会阻止 first activation，只有全分片为空才保留
 `bindingsPresent=false`。
-activation control plane 已新增 V1 protocol activation、epoch-scoped broker capability、exact broker-set readiness records 与
+activation control plane 已新增 V1 protocol activation、epoch-scoped broker capability、exact broker-set readiness records
+与
 closed codecs；同一 deterministic Oxia partition 上的 create/exact-version CAS 会校验 key/value identity、不可变 tuple、
 one-way ACTIVE、heartbeat/readiness monotonicity，并恢复 applied-but-response-lost。broker 侧 capability publisher 已按固定周期
 续租并在首次失败后停止，ACTIVE verifier 会把当前 KRaft cluster/feature/broker epoch set 与 activation、readiness、逐 broker
-capability、profile 和 provider scope 一次性交叉校验后才允许启动继续；兼容能力摘要已冻结为 domain-separated canonical bytes。
+capability、profile 和 provider scope 一次性交叉校验后才允许启动继续；兼容能力摘要已冻结为 domain-separated canonical
+bytes。
 `KafkaStorageFirstActivationCoordinator` 已实现 controller 侧的 empty-cluster 双重快照证明、全 broker capability 聚合、
 readiness create/CAS、PREPARED create/resume、ACTIVE one-way CAS 与并发 controller 胜者恢复；ACTIVE 幂等重试不再错误要求
 集群持续为空。deterministic 与 real-Oxia reconnect gates 已通过。fork `9773c8f817` 已把 controller seam
@@ -168,7 +258,8 @@ in-flight attempt；只对 `NereusException.retriable()==true` 按 typed retry i
 一次；这不是 durable checkpoint quarantine。`start()` 只创建 minimal shared-Oxia、
 partition/activation store 和 binding-aware snapshot/coordinator graph，不等待 first activation，从而允许 combined
 controller 先启动、broker 随后注册 capability，再由 retry 完成 PREPARED→ACTIVE。in-flight CAS 不在本切片增加 durable
-controller-epoch fencing；它继续依赖 coordinator 的 idempotent CAS/winner recovery，新的 attempt/retry 才受 local-controller
+controller-epoch fencing；它继续依赖 coordinator 的 idempotent CAS/winner recovery，新的 attempt/retry 才受
+local-controller
 检查约束。Object-WAL runtime 现另外拥有 `KafkaCheckpointFailureMetadataStore` 和
 `DurableKafkaCheckpointFailureQuarantine`：recovery/retention 在读取对象前按 exact reference 查询，确认永久失败后必须先
 完成 immutable first-failure audit 的 create/reconcile 才能尝试旧 root；raw failure message 不进入 durable bytes，
@@ -180,7 +271,8 @@ controller create/config/ISR/reassignment/directory mutation 同时执行 single
 现已组合 BookKeeper async/sync creator 并通过完整五档 real-service provider matrix；checkpoint time-index candidate、
 完整五档 fresh-process profile matrix仍未实现；ACTIVE 稳态三 voter controller kill/reconciliation，以及
 all six before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS controller failover gates and actual
-Oxia transport reset/same-controller-epoch retry 已通过；the four initial empty-cluster snapshot-proof/capability-aggregation
+Oxia transport reset/same-controller-epoch retry 已通过；the four initial empty-cluster
+snapshot-proof/capability-aggregation
 process cuts also pass。
 `NereusUnifiedLog` 已有首条同步
 correctness bridge：stock validation/offset assignment 后把 exact bytes 交给 adapter stable append，成功后才推进 shell
@@ -188,7 +280,8 @@ LEO；Fetch 把 bounded adapter assembly 转回 `MemoryRecords`，synthetic segm
 `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
 stock Kafka 4.3 `MemoryRecords` 实现；bridge/lifecycle tests、18 个 mapper/context/runtime-focused tests、完整 stock
 `KafkaConfigTest` 以及 server/core/storage checkstyle/SpotBugs/Spotless 已通过；`7739351b7c` 对应的
-`phase9M3KafkaForkCheck --rerun-tasks` 通过 80/80 outer tasks，nested stock/artifact-enabled Kafka builds 通过 92/92 与 95/95 actionable
+`phase9M3KafkaForkCheck --rerun-tasks` 通过 80/80 outer tasks，nested stock/artifact-enabled Kafka builds 通过 92/92 与
+95/95 actionable
 tasks；`dc8c66388a` 在加入 stable append/read、required-acks 与 failure-fence 覆盖后再次通过相同
 80/80、92/92、95/95 exact-head aggregate。`ee608625e4` 进一步接入 stock-owned optional
 `BrokerStorageAppendExecutor`：请求线程先做整请求字节校验并复制每分区 exact `MemoryRecords`，product executor
@@ -203,7 +296,8 @@ storage profile policy 已冻结五个 canonical profile，并禁止 request ack
 M4 的首个产品侧切片新增 Kafka-artifact-neutral `KafkaProducerTransactionState` 和
 `KafkaProducerTransactionStateCodecV1`：section 1/2/7 按文档规定的 big-endian canonical layout 编码，严格校验
 排序、producer/current-open-transaction 等价、五批 duplicate window、sequence wrap、checkpoint offset、aborted
-transaction marker offset 单调性及允许 LSO 低于 marker 的 stock 语义、required/version/flags/count/truncation/EOF，并以 frozen digest 和 200 轮固定种子随机状态证明
+transaction marker offset 单调性及允许 LSO 低于 marker 的 stock 语义、required/version/flags/count/truncation/EOF，并以
+frozen digest 和 200 轮固定种子随机状态证明
 decode/re-encode byte exact。当前只允许 normal checkpoint barrier；completed-but-not-finalized open transaction
 在没有显式 section flag 前 fail closed。产品侧 `KafkaAppendBatchEncoder` 已解除 M3 数据类型闸门，接受 codec
 严格校验后的 idempotent、transactional 与 control magic-v2 batch，并继续逐 batch 保存 exact bytes 与 logical
@@ -331,7 +425,8 @@ virtual segments，并冻结到 stable-end decision horizon；codec 严格解码
 logical record 生成 KCK2 key/null/control 身份与 source SHA/base/index，并把选中的普通、transactional 或
 commit/abort record 重写为原 offset 上的单记录 valid batch；compression、timestamp、headers、producer/sequence 与
 control meaning 经 decode round trip 验证。`KafkaCompactionStrategyV1` 又以 pass-1 collector facts 确定
-latest/superseded key、stock-compatible null-key drop、committed/aborted/open transaction，以及 full-scan-proven tombstone/control
+latest/superseded key、stock-compatible null-key drop、committed/aborted/open transaction，以及 full-scan-proven
+tombstone/control
 delete horizon（含 first-pass assignment 和 later `now == horizon`）。Bounded
 `KafkaCompactionPassOneCollector`/`KafkaCompactionTwoPassExecutor` 已扫描 full horizon、reprove output prefix，并将
 survivors 重写/映射为 ordered、non-empty、fetchable NTC2 rows；`ExactSourceSetVerifier` 同时拒绝 target/source-set
@@ -450,7 +545,8 @@ revalidation 失败会撤销该 epoch 的 provisional state。该 M3 head 对 id
 NKC1 派生 section 使用 `UNSUPPORTED_FORMAT` fail closed；后续 `ec7f0db991` 已替换为 M4 stock-state
 hydration/replay。fork `cfcdd55fbc` 新增 per-broker `UnifiedLogFactory` seam、
 cache-root-only `NereusUnifiedLogFactory` 和 `NereusUnifiedLog`/`NereusLocalLog` ephemeral state-machine shell；
-`LogManager` 在 Nereus mode 不扫描旧 local logs，也不运行 cleaner/retention/flusher/checkpoint/clean-shutdown local truth。
+`LogManager` 在 Nereus mode 不扫描旧 local logs，也不运行 cleaner/retention/flusher/checkpoint/clean-shutdown local
+truth。
 `BrokerServer` 从 exact runtime 注入 factory；恢复 state、storage、ListOffsets lookup 按顺序发布，shell 只有前两者匹配
 exact identity/epoch/stable snapshot 后才报告 writable。`7739351b7c` 补齐所有 stock-file 成对 inject marker。当前
 `dc8c66388a` 再增加 stock-only `RequiredAcksAwareAppend` seam、`Partition` 的 exact `-1/0/1` 传递与同步
@@ -701,7 +797,8 @@ artifact/config。它为 `createReadiness`、`createActivation` 和 `compareAndS
 
 每个 controller 有独立的 arm/captured/blocked/applied/installed marker；harness 先通过
 `bootstrap.controllers` 直接读取 exact voter set、leader ID/epoch，只 arm 当前 leader，再从 Oxia 分别冻结
-activation/readiness both absent、activation absent + readiness、`PREPARED`、或 `ACTIVE`。旧 leader 在看到 reconciliation-success 日志前被
+activation/readiness both absent、activation absent + readiness、`PREPARED`、或 `ACTIVE`。旧 leader 在看到
+reconciliation-success 日志前被
 `destroyForcibly()`；survivors 必须选出不同 controller ID 和更高 epoch，并为该 exact epoch 输出
 `Nereus Kafka storage activation reconciled ...`。Empty-control-plane 场景必须重新完成 proof 并创建 readiness；
 readiness-only 场景必须复用原 readiness epoch 和 `kraftMetadataOffset` 创建 PREPARED；durable PREPARED 必须把原
@@ -712,7 +809,8 @@ Produce/Fetch、earliest/latest `0/1` 与正数 Object count。
 该 fresh `--rerun-tasks` gate 的最新回归以 75/75 actionable tasks、2m40s 通过，已进入
 `phase9M6KafkaProcessCheck`；失败时会保留四份
 config/format/server log 和全部 agent marker。它闭合 readiness-create、PREPARED-create 与 ACTIVE-CAS 各自的
-before-provider / after-provider P/C 进程矩阵。首个 before-PREPARED 执行还暴露并锁定 production fix：replacement controller
+before-provider / after-provider P/C 进程矩阵。首个 before-PREPARED 执行还暴露并锁定 production fix：replacement
+controller
 必须用 durable readiness 的 metadata offset 构造 PREPARED，不能使用自身更高的当前 snapshot offset。Agent
 不是产品 fault API；下面的独立 gate 负责 initial snapshot/capability proof cuts，而 M7
 aggregate/priority/chaos 仍需独立进程证据。因此 `KF-OPS-005` 继续保持 `PLANNED`。
@@ -763,17 +861,17 @@ reload 语义保持不变。完整 store contract 与真实 process gate 均通�
 
 ## 1. 设计文档
 
-| 文档 | 权威范围 |
-| --- | --- |
-| `01-current-contract-and-automq-source-audit.md` | 本地 Nereus/AutoMQ 源码事实、可复用边界、gap inventory |
-| `02-ranged-entry-api-and-object-format.md` | protocol-neutral API、ranged entry、read boundary、NCP2/NTC2 bytes |
-| `03-kafka-fork-log-and-broker-integration.md` | Kafka fork classes/methods、Produce/Fetch、LEO/HW/LSO、error mapping |
-| `04-oxia-binding-session-checkpoint-and-lifecycle.md` | keyspace、records/codecs、leader authority、partition lifecycle、recovery |
+| 文档                                                           | 权威范围                                                                         |
+|--------------------------------------------------------------|------------------------------------------------------------------------------|
+| `01-current-contract-and-automq-source-audit.md`             | 本地 Nereus/AutoMQ 源码事实、可复用边界、gap inventory                                    |
+| `02-ranged-entry-api-and-object-format.md`                   | protocol-neutral API、ranged entry、read boundary、NCP2/NTC2 bytes              |
+| `03-kafka-fork-log-and-broker-integration.md`                | Kafka fork classes/methods、Produce/Fetch、LEO/HW/LSO、error mapping            |
+| `04-oxia-binding-session-checkpoint-and-lifecycle.md`        | keyspace、records/codecs、leader authority、partition lifecycle、recovery        |
 | `05-producer-state-transactions-compaction-and-retention.md` | producer state、transaction、internal topics、virtual segment、retention/cleaner |
-| `06-runtime-configuration-rollout-and-observability.md` | config、runtime ownership、activation、upgrade、metrics/alerts/runbook |
-| `07-implementation-plan-and-gates.md` | package/file ownership、milestone DAG、build/test gates、definition of done |
-| `08-scenario-evidence-matrix.md` | requirement-to-test traceability、failure cuts、scale/compatibility aggregate |
-| `09-f9-m0-design-review-2026-07-23.md` | dated M0 coverage/status/scope audit；非新的运行时合同 |
+| `06-runtime-configuration-rollout-and-observability.md`      | config、runtime ownership、activation、upgrade、metrics/alerts/runbook           |
+| `07-implementation-plan-and-gates.md`                        | package/file ownership、milestone DAG、build/test gates、definition of done     |
+| `08-scenario-evidence-matrix.md`                             | requirement-to-test traceability、failure cuts、scale/compatibility aggregate  |
+| `09-f9-m0-design-review-2026-07-23.md`                       | dated M0 coverage/status/scope audit；非新的运行时合同                                |
 
 North-star 摘要见 `../design/nereus-future9-kafka-native-storage.md`。发生冲突时：已实现代码/测试优先于
 代码级合同；代码级合同优先于 Future 摘要；本地锁定源码优先于对 AutoMQ 或 Kafka 的记忆。
@@ -814,17 +912,17 @@ Kafka `TopicPartition`、`MemoryRecords`、`RecordBatch`、`Errors` 等类型只
 
 计划 package：
 
-| Package | Owner |
-| --- | --- |
-| `com.nereusstream.kafka.config` | typed Kafka/Nereus config and validation |
-| `com.nereusstream.kafka.runtime` | process runtime、owned/borrowed resources、activation |
-| `com.nereusstream.kafka.partition` | partition identity、binding、storage facade、state machine |
-| `com.nereusstream.kafka.codec` | Kafka batch validation/append/fetch mapping |
-| `com.nereusstream.kafka.metadata` | Oxia keyspace、records、codecs、store、scanner |
-| `com.nereusstream.kafka.checkpoint` | immutable checkpoint format/store/publication |
-| `com.nereusstream.kafka.recovery` | open/replay/unknown-outcome recovery |
-| `com.nereusstream.kafka.retention` | log-start、segment retention、DeleteRecords |
-| `com.nereusstream.kafka.compaction` | F4 topic codec/strategy and NTC2 rewrite |
+| Package                             | Owner                                                   |
+|-------------------------------------|---------------------------------------------------------|
+| `com.nereusstream.kafka.config`     | typed Kafka/Nereus config and validation                |
+| `com.nereusstream.kafka.runtime`    | process runtime、owned/borrowed resources、activation     |
+| `com.nereusstream.kafka.partition`  | partition identity、binding、storage facade、state machine |
+| `com.nereusstream.kafka.codec`      | Kafka batch validation/append/fetch mapping             |
+| `com.nereusstream.kafka.metadata`   | Oxia keyspace、records、codecs、store、scanner              |
+| `com.nereusstream.kafka.checkpoint` | immutable checkpoint format/store/publication           |
+| `com.nereusstream.kafka.recovery`   | open/replay/unknown-outcome recovery                    |
+| `com.nereusstream.kafka.retention`  | log-start、segment retention、DeleteRecords               |
+| `com.nereusstream.kafka.compaction` | F4 topic codec/strategy and NTC2 rewrite                |
 
 ## 4. Target call paths
 
@@ -897,16 +995,16 @@ KRaft topic delete or DeleteRecords/retention
 
 ## 5. Correctness owners
 
-| Concern | Single owner | Forbidden alternate owner |
-| --- | --- | --- |
-| data commit | Nereus stream head + reachable commit | local LEO、object list、Kafka checkpoint file |
-| offset allocation | Kafka validation under partition append lock + Nereus expected-start CAS | adapter-side retry with new offset |
-| leader fencing | KRaft leader epoch bound into durable append authority | broker routing/cache only |
-| stream identity | Oxia binding keyed by cluster/topicId/partition | topic name / log directory name |
-| recovery state | committed bytes replayed from verified checkpoint | local disk snapshot alone |
-| group/txn coordinator | native Kafka internal topics | F9-specific Oxia coordinator tree |
-| compacted visibility | F4 committed generation | cleaner local swap or task output existence |
-| logical retention | Kafka policy -> Nereus trim | consumer group offset floor |
+| Concern               | Single owner                                                             | Forbidden alternate owner                   |
+|-----------------------|--------------------------------------------------------------------------|---------------------------------------------|
+| data commit           | Nereus stream head + reachable commit                                    | local LEO、object list、Kafka checkpoint file |
+| offset allocation     | Kafka validation under partition append lock + Nereus expected-start CAS | adapter-side retry with new offset          |
+| leader fencing        | KRaft leader epoch bound into durable append authority                   | broker routing/cache only                   |
+| stream identity       | Oxia binding keyed by cluster/topicId/partition                          | topic name / log directory name             |
+| recovery state        | committed bytes replayed from verified checkpoint                        | local disk snapshot alone                   |
+| group/txn coordinator | native Kafka internal topics                                             | F9-specific Oxia coordinator tree           |
+| compacted visibility  | F4 committed generation                                                  | cleaner local swap or task output existence |
+| logical retention     | Kafka policy -> Nereus trim                                              | consumer group offset floor                 |
 
 ## 6. Code-level invariants
 
@@ -916,7 +1014,8 @@ KRaft topic delete or DeleteRecords/retention
 - `AppendBatch.recordCount == sum(AppendEntry.recordCount)`；
 - `expectedStartOffset == first RecordBatch.baseOffset == current committedEndOffset`；
 - success result start/end/count exactly equals request；
-- payload bytes are exact owned snapshots before async handoff；worker alone may mutate the budgeted copy for stock offset
+- payload bytes are exact owned snapshots before async handoff；worker alone may mutate the budgeted copy for stock
+  offset
   assignment，then storage receives an exact read-only duplicate；
 - no retry creates a new physical attempt while previous completion is unknown；
 - partition append lane remains closed until exact recovery converges。
@@ -949,20 +1048,20 @@ KRaft topic delete or DeleteRecords/retention
 
 ## 7. Initial compatibility envelope
 
-| Dimension | Initial target |
-| --- | --- |
-| Kafka mode | KRaft only |
-| Kafka fork baseline | version aligned with locked integration branch；initial audit uses AutoMQ 3.9 fork |
-| Kafka replication factor | exactly 1 in Nereus mode |
-| Nereus storage profile | immutable per stream；all activated executable profiles；default BK async object |
-| topic cleanup policy | `delete`、`compact`、`compact,delete` after F9-M5 |
-| compression | exact batch bytes；all Kafka-supported codecs present in locked fork |
-| message formats | magic versions explicitly allowed by locked fork/config；no implicit downgrade |
-| transactions | required for compatibility claim after F9-M4 |
-| tiered storage | stock Kafka remote log disabled for Nereus partitions |
-| local log migration | unsupported |
-| mixed F9/non-F9 broker | forbidden after activation |
-| mixed storage topics | unsupported in first release |
+| Dimension                | Initial target                                                                    |
+|--------------------------|-----------------------------------------------------------------------------------|
+| Kafka mode               | KRaft only                                                                        |
+| Kafka fork baseline      | version aligned with locked integration branch；initial audit uses AutoMQ 3.9 fork |
+| Kafka replication factor | exactly 1 in Nereus mode                                                          |
+| Nereus storage profile   | immutable per stream；all activated executable profiles；default BK async object    |
+| topic cleanup policy     | `delete`、`compact`、`compact,delete` after F9-M5                                   |
+| compression              | exact batch bytes；all Kafka-supported codecs present in locked fork               |
+| message formats          | magic versions explicitly allowed by locked fork/config；no implicit downgrade     |
+| transactions             | required for compatibility claim after F9-M4                                      |
+| tiered storage           | stock Kafka remote log disabled for Nereus partitions                             |
+| local log migration      | unsupported                                                                       |
+| mixed F9/non-F9 broker   | forbidden after activation                                                        |
+| mixed storage topics     | unsupported in first release                                                      |
 
 ## 8. F9 milestone DAG
 

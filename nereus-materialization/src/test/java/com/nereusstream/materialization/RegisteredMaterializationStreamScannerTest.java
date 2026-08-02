@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.CLUSTER;
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.ProjectionType;
 import com.nereusstream.api.StorageProfile;
@@ -12,14 +12,14 @@ import com.nereusstream.api.StreamState;
 import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationOperation;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
-import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.F4Keyspace;
+import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStoreTestFactory;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
-import com.nereusstream.metadata.oxia.StreamRegistrationScanPage;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
+import com.nereusstream.metadata.oxia.StreamRegistrationScanPage;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
@@ -43,8 +43,7 @@ import org.junit.jupiter.api.Test;
 class RegisteredMaterializationStreamScannerTest {
     private static final int SCALE_STREAMS_PER_SHARD = 257;
     private static final int SCALE_REGISTRY_PAGE_SIZE = 256;
-    private static final int SCALE_STREAM_COUNT =
-            F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS * SCALE_STREAMS_PER_SHARD;
+    private static final int SCALE_STREAM_COUNT = F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS * SCALE_STREAMS_PER_SHARD;
 
     @Test
     void scansAllShardsAndConvergesAnUnownedStreamIntoOneDurableTask() {
@@ -53,14 +52,13 @@ class RegisteredMaterializationStreamScannerTest {
                 MaterializationPlannerTestSupport.zero("/index/z-4", 2, 4, 100, 100, 4));
         Clock clock = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
         GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(clock);
-        GenerationMetadataStore generations = MaterializationPlannerTestSupport.generationStore(
-                candidates, List.of(), durable);
+        GenerationMetadataStore generations =
+                MaterializationPlannerTestSupport.generationStore(candidates, List.of(), durable);
         MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
         MaterializationTaskStore taskStore = new MaterializationTaskStore(CLUSTER, generations, clock);
         DefaultMaterializationPlanner planner = new DefaultMaterializationPlanner(
                 CLUSTER,
-                MaterializationPlannerTestSupport.l0Store(
-                        MaterializationPlannerTestSupport.snapshot(0, 4)),
+                MaterializationPlannerTestSupport.l0Store(MaterializationPlannerTestSupport.snapshot(0, 4)),
                 generations,
                 2);
         AtomicInteger dispatches = new AtomicInteger();
@@ -68,10 +66,9 @@ class RegisteredMaterializationStreamScannerTest {
         MaterializationTaskRecovery recovery = new MaterializationTaskRecovery(
                 taskStore,
                 durableTask -> CompletableFuture.completedFuture(
-                        new MaterializationTaskProtections(
-                                durableTask, List.of(), Optional.empty())),
-                new GenerationPublicationReconciler((ignoredTask, ignoredOutput) ->
-                        CompletableFuture.completedFuture(null)),
+                        new MaterializationTaskProtections(durableTask, List.of(), Optional.empty())),
+                new GenerationPublicationReconciler(
+                        (ignoredTask, ignoredOutput) -> CompletableFuture.completedFuture(null)),
                 (ignoredDurable, task) -> {
                     dispatches.incrementAndGet();
                     dispatched.add(task);
@@ -87,8 +84,7 @@ class RegisteredMaterializationStreamScannerTest {
         GenerationProtocolActivationGuard guard = countingGuard(readinessChecks, revalidations);
         RegisteredMaterializationStreamScanner scanner = new RegisteredMaterializationStreamScanner(
                 CLUSTER,
-                MaterializationPlannerTestSupport.l0Store(
-                        MaterializationPlannerTestSupport.snapshot(0, 4)),
+                MaterializationPlannerTestSupport.l0Store(MaterializationPlannerTestSupport.snapshot(0, 4)),
                 generations,
                 guard,
                 streamId -> {
@@ -97,20 +93,16 @@ class RegisteredMaterializationStreamScannerTest {
                 },
                 (streamId, range, exactPolicy, maxTasks) -> {
                     assertThat(sourceRepairs.get()).isPositive();
-                    return planner.plan(
-                            streamId,
-                            range,
-                            exactPolicy,
-                            maxTasks);
+                    return planner.plan(streamId, range, exactPolicy, maxTasks);
                 },
                 taskStore,
                 recovery,
                 recoveryScanner,
                 streamId -> CompletableFuture.completedFuture(
                         com.nereusstream.materialization.recovery.RecoveryCheckpointRunResult.skipped(
-                                com.nereusstream.materialization.recovery.RecoveryCheckpointBuildStatus
-                                        .NO_LIVE_TAIL)),
-                (streamId, exactPolicy, mutationGuard) -> mutationGuard.revalidate()
+                                com.nereusstream.materialization.recovery.RecoveryCheckpointBuildStatus.NO_LIVE_TAIL)),
+                (streamId, exactPolicy, mutationGuard) -> mutationGuard
+                        .revalidate()
                         .thenCompose(ignored -> durable.getOrCreateMaterializationCheckpoint(
                                 CLUSTER,
                                 streamId,
@@ -118,8 +110,7 @@ class RegisteredMaterializationStreamScannerTest {
                                 exactPolicy.policyVersion(),
                                 exactPolicy.digestSha256())),
                 (streamId, exactPolicy, trim, mutationGuard) ->
-                        CompletableFuture.completedFuture(
-                                TerminalWorkflowMetadataRetirementResult.empty()),
+                        CompletableFuture.completedFuture(TerminalWorkflowMetadataRetirementResult.empty()),
                 policy,
                 1,
                 10);
@@ -163,25 +154,21 @@ class RegisteredMaterializationStreamScannerTest {
                                 0))
                 .join();
         List<VersionedGenerationCandidate> candidates = List.of(
-                MaterializationPlannerTestSupport.zero(
-                        "/index/restarted-2", 0, 2, 0, 100, 2),
-                MaterializationPlannerTestSupport.zero(
-                        "/index/restarted-4", 2, 4, 100, 100, 4));
+                MaterializationPlannerTestSupport.zero("/index/restarted-2", 0, 2, 0, 100, 2),
+                MaterializationPlannerTestSupport.zero("/index/restarted-4", 2, 4, 100, 100, 4));
         MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
         AtomicInteger dispatches = new AtomicInteger();
 
         // Every object below is reconstructed. Only durable registry/L0/index metadata is shared.
         RegisteredMaterializationStreamScanner restarted = liveStreamScanner(
                 durableGenerationStore(durable, candidates),
-                MaterializationPlannerTestSupport.l0Store(
-                        MaterializationPlannerTestSupport.snapshot(0, 4)),
+                MaterializationPlannerTestSupport.l0Store(MaterializationPlannerTestSupport.snapshot(0, 4)),
                 policy,
                 clock,
                 dispatches);
         RegisteredMaterializationScanResult recovered = restarted.scanOnce().join();
 
-        assertThat(recovered.shardsScanned())
-                .isEqualTo(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
+        assertThat(recovered.shardsScanned()).isEqualTo(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
         assertThat(recovered.registrationsScanned()).isOne();
         assertThat(recovered.registrationsAdmitted()).isOne();
         assertThat(recovered.existingTasksRecovered()).isZero();
@@ -189,8 +176,7 @@ class RegisteredMaterializationStreamScannerTest {
 
         RegisteredMaterializationStreamScanner secondFreshProcess = liveStreamScanner(
                 durableGenerationStore(durable, candidates),
-                MaterializationPlannerTestSupport.l0Store(
-                        MaterializationPlannerTestSupport.snapshot(0, 4)),
+                MaterializationPlannerTestSupport.l0Store(MaterializationPlannerTestSupport.snapshot(0, 4)),
                 policy,
                 clock,
                 dispatches);
@@ -212,8 +198,7 @@ class RegisteredMaterializationStreamScannerTest {
         streamsByShard.values().stream()
                 .flatMap(List::stream)
                 .map(RegisteredMaterializationStreamScannerTest::registration)
-                .forEach(registration -> durable.createOrVerifyStreamRegistration(
-                                CLUSTER, registration)
+                .forEach(registration -> durable.createOrVerifyStreamRegistration(CLUSTER, registration)
                         .join());
 
         OxiaMetadataStore l0Metadata = emptyL0Store();
@@ -223,26 +208,12 @@ class RegisteredMaterializationStreamScannerTest {
         AtomicInteger plannerCalls = new AtomicInteger();
 
         RegisteredMaterializationScanResult first = emptyStreamScanner(
-                        durable,
-                        l0Metadata,
-                        policy,
-                        readinessChecks,
-                        revalidations,
-                        plannerCalls,
-                        clock,
-                        1)
+                        durable, l0Metadata, policy, readinessChecks, revalidations, plannerCalls, clock, 1)
                 .scanOnce()
                 .join();
         // A new scanner has no watch state, queue contents, or process-local stream hints to reuse.
         RegisteredMaterializationScanResult afterWatchLossAndRestart = emptyStreamScanner(
-                        durable,
-                        l0Metadata,
-                        policy,
-                        readinessChecks,
-                        revalidations,
-                        plannerCalls,
-                        clock,
-                        1)
+                        durable, l0Metadata, policy, readinessChecks, revalidations, plannerCalls, clock, 1)
                 .scanOnce()
                 .join();
 
@@ -258,14 +229,12 @@ class RegisteredMaterializationStreamScannerTest {
         Clock clock = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
         try (GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(clock)) {
             F4Keyspace keyspace = new F4Keyspace(CLUSTER);
-            Map<Integer, List<StreamId>> streamsByShard = streamsPerShard(
-                    keyspace, SCALE_STREAMS_PER_SHARD);
+            Map<Integer, List<StreamId>> streamsByShard = streamsPerShard(keyspace, SCALE_STREAMS_PER_SHARD);
             Map<Integer, List<String>> expectedKeysByShard = new LinkedHashMap<>();
             streamsByShard.forEach((shard, streams) -> {
                 List<String> keys = streams.stream()
                         .map(RegisteredMaterializationStreamScannerTest::registration)
-                        .map(registration -> durable.createOrVerifyStreamRegistration(
-                                        CLUSTER, registration)
+                        .map(registration -> durable.createOrVerifyStreamRegistration(CLUSTER, registration)
                                 .join()
                                 .key())
                         .sorted()
@@ -274,8 +243,7 @@ class RegisteredMaterializationStreamScannerTest {
             });
 
             RegistryScanTrace firstTrace = new RegistryScanTrace();
-            RegisteredMaterializationScanResult first = skippedStreamScanner(
-                            tracingStore(durable, firstTrace), clock)
+            RegisteredMaterializationScanResult first = skippedStreamScanner(tracingStore(durable, firstTrace), clock)
                     .scanOnce()
                     .join();
 
@@ -307,10 +275,9 @@ class RegisteredMaterializationStreamScannerTest {
         MaterializationTaskRecovery recovery = new MaterializationTaskRecovery(
                 taskStore,
                 durableTask -> CompletableFuture.completedFuture(
-                        new MaterializationTaskProtections(
-                                durableTask, List.of(), Optional.empty())),
-                new GenerationPublicationReconciler((ignoredTask, ignoredOutput) ->
-                        CompletableFuture.completedFuture(null)),
+                        new MaterializationTaskProtections(durableTask, List.of(), Optional.empty())),
+                new GenerationPublicationReconciler(
+                        (ignoredTask, ignoredOutput) -> CompletableFuture.completedFuture(null)),
                 (ignoredDurable, ignoredTask) -> CompletableFuture.completedFuture(null),
                 clock,
                 Duration.ZERO,
@@ -331,9 +298,9 @@ class RegisteredMaterializationStreamScannerTest {
                 new TaskRecoveryScanner(taskStore, recovery, 1),
                 streamId -> CompletableFuture.completedFuture(
                         com.nereusstream.materialization.recovery.RecoveryCheckpointRunResult.skipped(
-                                com.nereusstream.materialization.recovery.RecoveryCheckpointBuildStatus
-                                        .NO_LIVE_TAIL)),
-                (streamId, exactPolicy, mutationGuard) -> mutationGuard.revalidate()
+                                com.nereusstream.materialization.recovery.RecoveryCheckpointBuildStatus.NO_LIVE_TAIL)),
+                (streamId, exactPolicy, mutationGuard) -> mutationGuard
+                        .revalidate()
                         .thenCompose(ignored -> durable.getOrCreateMaterializationCheckpoint(
                                 CLUSTER,
                                 streamId,
@@ -341,8 +308,7 @@ class RegisteredMaterializationStreamScannerTest {
                                 exactPolicy.policyVersion(),
                                 exactPolicy.digestSha256())),
                 (streamId, exactPolicy, trim, mutationGuard) ->
-                        CompletableFuture.completedFuture(
-                                TerminalWorkflowMetadataRetirementResult.empty()),
+                        CompletableFuture.completedFuture(TerminalWorkflowMetadataRetirementResult.empty()),
                 policy,
                 registryPageSize,
                 1);
@@ -354,15 +320,13 @@ class RegisteredMaterializationStreamScannerTest {
             MaterializationPolicy policy,
             Clock clock,
             AtomicInteger dispatches) {
-        MaterializationTaskStore taskStore = new MaterializationTaskStore(
-                CLUSTER, generations, clock);
+        MaterializationTaskStore taskStore = new MaterializationTaskStore(CLUSTER, generations, clock);
         MaterializationTaskRecovery recovery = new MaterializationTaskRecovery(
                 taskStore,
                 durableTask -> CompletableFuture.completedFuture(
-                        new MaterializationTaskProtections(
-                                durableTask, List.of(), Optional.empty())),
-                new GenerationPublicationReconciler((ignoredTask, ignoredOutput) ->
-                        CompletableFuture.completedFuture(null)),
+                        new MaterializationTaskProtections(durableTask, List.of(), Optional.empty())),
+                new GenerationPublicationReconciler(
+                        (ignoredTask, ignoredOutput) -> CompletableFuture.completedFuture(null)),
                 (ignoredDurable, ignoredTask) -> {
                     dispatches.incrementAndGet();
                     return CompletableFuture.completedFuture(null);
@@ -370,8 +334,7 @@ class RegisteredMaterializationStreamScannerTest {
                 clock,
                 Duration.ZERO,
                 Duration.ofSeconds(1));
-        DefaultMaterializationPlanner planner = new DefaultMaterializationPlanner(
-                CLUSTER, l0Metadata, generations, 2);
+        DefaultMaterializationPlanner planner = new DefaultMaterializationPlanner(CLUSTER, l0Metadata, generations, 2);
         return new RegisteredMaterializationStreamScanner(
                 CLUSTER,
                 l0Metadata,
@@ -384,9 +347,9 @@ class RegisteredMaterializationStreamScannerTest {
                 new TaskRecoveryScanner(taskStore, recovery, 1),
                 streamId -> CompletableFuture.completedFuture(
                         com.nereusstream.materialization.recovery.RecoveryCheckpointRunResult.skipped(
-                                com.nereusstream.materialization.recovery.RecoveryCheckpointBuildStatus
-                                        .NO_LIVE_TAIL)),
-                (streamId, exactPolicy, mutationGuard) -> mutationGuard.revalidate()
+                                com.nereusstream.materialization.recovery.RecoveryCheckpointBuildStatus.NO_LIVE_TAIL)),
+                (streamId, exactPolicy, mutationGuard) -> mutationGuard
+                        .revalidate()
                         .thenCompose(ignored -> generations.getOrCreateMaterializationCheckpoint(
                                 CLUSTER,
                                 streamId,
@@ -394,16 +357,14 @@ class RegisteredMaterializationStreamScannerTest {
                                 exactPolicy.policyVersion(),
                                 exactPolicy.digestSha256())),
                 (streamId, exactPolicy, trim, mutationGuard) ->
-                        CompletableFuture.completedFuture(
-                                TerminalWorkflowMetadataRetirementResult.empty()),
+                        CompletableFuture.completedFuture(TerminalWorkflowMetadataRetirementResult.empty()),
                 policy,
                 1,
                 10);
     }
 
     private static GenerationMetadataStore durableGenerationStore(
-            GenerationMetadataStore delegate,
-            List<VersionedGenerationCandidate> candidates) {
+            GenerationMetadataStore delegate, List<VersionedGenerationCandidate> candidates) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -418,26 +379,25 @@ class RegisteredMaterializationStreamScannerTest {
                     }
                     if (method.getName().equals("scanIndex")) {
                         StreamId stream = (StreamId) args[1];
-                        com.nereusstream.api.ReadView view =
-                                (com.nereusstream.api.ReadView) args[2];
+                        com.nereusstream.api.ReadView view = (com.nereusstream.api.ReadView) args[2];
                         List<VersionedGenerationCandidate> page = candidates.stream()
-                                .filter(candidate -> candidate instanceof
-                                        com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex zero
+                                .filter(candidate -> candidate
+                                                instanceof
+                                                com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex zero
                                         && zero.value().streamId().equals(stream)
                                         && view == com.nereusstream.api.ReadView.COMMITTED)
                                 .toList();
-                        return CompletableFuture.completedFuture(
-                                new GenerationScanPage(page, Optional.empty()));
+                        return CompletableFuture.completedFuture(new GenerationScanPage(page, Optional.empty()));
                     }
                     if (method.getName().equals("getCandidate")) {
                         StreamId stream = (StreamId) args[1];
-                        com.nereusstream.api.ReadView view =
-                                (com.nereusstream.api.ReadView) args[2];
+                        com.nereusstream.api.ReadView view = (com.nereusstream.api.ReadView) args[2];
                         long offsetEnd = (long) args[3];
                         long generation = (long) args[4];
                         return CompletableFuture.completedFuture(candidates.stream()
-                                .filter(candidate -> candidate instanceof
-                                        com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex zero
+                                .filter(candidate -> candidate
+                                                instanceof
+                                                com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex zero
                                         && zero.value().streamId().equals(stream)
                                         && view == com.nereusstream.api.ReadView.COMMITTED
                                         && zero.value().offsetEnd() == offsetEnd
@@ -456,8 +416,7 @@ class RegisteredMaterializationStreamScannerTest {
     }
 
     private static RegisteredMaterializationStreamScanner skippedStreamScanner(
-            GenerationMetadataStore generations,
-            Clock clock) {
+            GenerationMetadataStore generations, Clock clock) {
         return emptyStreamScanner(
                 generations,
                 skippedL0Store(),
@@ -473,16 +432,13 @@ class RegisteredMaterializationStreamScannerTest {
         return streamsPerShard(keyspace, 2);
     }
 
-    private static Map<Integer, List<StreamId>> streamsPerShard(
-            F4Keyspace keyspace,
-            int streamsPerShard) {
+    private static Map<Integer, List<StreamId>> streamsPerShard(F4Keyspace keyspace, int streamsPerShard) {
         Map<Integer, List<StreamId>> result = new LinkedHashMap<>();
         for (int shard = 0; shard < F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS; shard++) {
             result.put(shard, new ArrayList<>(streamsPerShard));
         }
         int discovered = 0;
-        int target = Math.multiplyExact(
-                F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS, streamsPerShard);
+        int target = Math.multiplyExact(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS, streamsPerShard);
         for (int candidate = 0; candidate < 2_000_000 && discovered < target; candidate++) {
             StreamId streamId = new StreamId("paged-registry-stream-" + candidate);
             int shard = keyspace.materializationRegistryShard(streamId);
@@ -493,15 +449,13 @@ class RegisteredMaterializationStreamScannerTest {
             }
         }
         assertThat(result).hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
-        assertThat(result.values())
-                .allSatisfy(streams -> assertThat(streams).hasSize(streamsPerShard));
+        assertThat(result.values()).allSatisfy(streams -> assertThat(streams).hasSize(streamsPerShard));
         assertThat(discovered).isEqualTo(target);
         return result;
     }
 
     private static MaterializationStreamRegistrationRecord registration(StreamId streamId) {
-        ProjectionRef projection = new ProjectionRef(
-                ProjectionType.VIRTUAL_LEDGER, "projection-" + streamId.value());
+        ProjectionRef projection = new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "projection-" + streamId.value());
         return new MaterializationStreamRegistrationRecord(
                 1,
                 streamId.value(),
@@ -536,8 +490,8 @@ class RegisteredMaterializationStreamScannerTest {
                         };
                     }
                     return switch (method.getName()) {
-                        case "getStreamSnapshot" -> CompletableFuture.completedFuture(
-                                emptySnapshot((StreamId) args[1], state));
+                        case "getStreamSnapshot" ->
+                            CompletableFuture.completedFuture(emptySnapshot((StreamId) args[1], state));
                         case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
                     };
@@ -581,9 +535,7 @@ class RegisteredMaterializationStreamScannerTest {
         assertThat(result.workflowMetadataRetired()).isZero();
     }
 
-    private static GenerationMetadataStore tracingStore(
-            GenerationMetadataStore delegate,
-            RegistryScanTrace trace) {
+    private static GenerationMetadataStore tracingStore(GenerationMetadataStore delegate, RegistryScanTrace trace) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -623,10 +575,7 @@ class RegisteredMaterializationStreamScannerTest {
         private final Map<Integer, List<Boolean>> nextContinuationByShard = new LinkedHashMap<>();
         private final Map<Integer, List<String>> returnedKeysByShard = new LinkedHashMap<>();
 
-        private void record(
-                int shard,
-                Optional<F4ScanToken> continuation,
-                StreamRegistrationScanPage page) {
+        private void record(int shard, Optional<F4ScanToken> continuation, StreamRegistrationScanPage page) {
             emptyContinuationByShard
                     .computeIfAbsent(shard, ignored -> new ArrayList<>())
                     .add(continuation.isEmpty());
@@ -638,24 +587,17 @@ class RegisteredMaterializationStreamScannerTest {
                     .add(page.continuation().isPresent());
             returnedKeysByShard
                     .computeIfAbsent(shard, ignored -> new ArrayList<>())
-                    .addAll(page.values().stream()
-                            .map(value -> value.key())
-                            .toList());
+                    .addAll(page.values().stream().map(value -> value.key()).toList());
         }
 
         private void assertExact(Map<Integer, List<String>> expectedKeysByShard) {
-            assertThat(emptyContinuationByShard)
-                    .hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
-            assertThat(pageSizesByShard)
-                    .hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
-            assertThat(nextContinuationByShard)
-                    .hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
-            assertThat(returnedKeysByShard)
-                    .hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
+            assertThat(emptyContinuationByShard).hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
+            assertThat(pageSizesByShard).hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
+            assertThat(nextContinuationByShard).hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
+            assertThat(returnedKeysByShard).hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
             expectedKeysByShard.forEach((shard, expectedKeys) -> {
                 assertThat(emptyContinuationByShard.get(shard)).containsExactly(true, false);
-                assertThat(pageSizesByShard.get(shard))
-                        .containsExactly(SCALE_REGISTRY_PAGE_SIZE, 1);
+                assertThat(pageSizesByShard.get(shard)).containsExactly(SCALE_REGISTRY_PAGE_SIZE, 1);
                 assertThat(nextContinuationByShard.get(shard)).containsExactly(true, false);
                 assertThat(returnedKeysByShard.get(shard))
                         .hasSize(SCALE_STREAMS_PER_SHARD)
@@ -666,8 +608,7 @@ class RegisteredMaterializationStreamScannerTest {
     }
 
     private static GenerationProtocolActivationGuard countingGuard(
-            AtomicInteger readinessChecks,
-            AtomicInteger revalidations) {
+            AtomicInteger readinessChecks, AtomicInteger revalidations) {
         GenerationProtocolActivationGuard delegate = GenerationPublicationTestSupport.successfulGuard();
         return new GenerationProtocolActivationGuard() {
             @Override

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -11,7 +12,9 @@ import java.time.Duration;
 import java.util.HexFormat;
 import java.util.Objects;
 
-/** Immutable, secret-free semantic and resource binding for one BookKeeper primary-WAL runtime. */
+/**
+ * Immutable, secret-free semantic and resource binding for one BookKeeper primary-WAL runtime.
+ */
 public record BookKeeperWalConfiguration(
         String clusterAlias,
         String providerScopeSha256,
@@ -44,18 +47,24 @@ public record BookKeeperWalConfiguration(
     public BookKeeperWalConfiguration {
         clusterAlias = text(clusterAlias, "clusterAlias");
         providerScopeSha256 = sha256(providerScopeSha256, "providerScopeSha256");
-        ledgerIdNamespaceReservationId = text(
-                ledgerIdNamespaceReservationId, "ledgerIdNamespaceReservationId");
+        ledgerIdNamespaceReservationId = text(ledgerIdNamespaceReservationId, "ledgerIdNamespaceReservationId");
         Objects.requireNonNull(digestType, "digestType");
         Objects.requireNonNull(passwordRef, "passwordRef");
         requireNamespace(ledgerIdPrefixBits, ledgerIdPrefixValue);
-        if (ensembleSize <= 0 || writeQuorumSize <= 0 || ackQuorumSize <= 0
-                || ensembleSize < writeQuorumSize || writeQuorumSize < ackQuorumSize) {
+        if (ensembleSize <= 0
+                || writeQuorumSize <= 0
+                || ackQuorumSize <= 0
+                || ensembleSize < writeQuorumSize
+                || writeQuorumSize < ackQuorumSize) {
             throw new IllegalArgumentException("BookKeeper quorums require ensemble >= write >= ack > 0");
         }
-        if (maxEntriesPerLedger <= 0 || maxBytesPerLedger <= 0
-                || maxAppendRangesPerLedger <= 0 || maxReaderLeasesPerLedger <= 0
-                || maxWritesInFlight <= 0 || maxReadsInFlight <= 0 || maxReadBytesInFlight <= 0
+        if (maxEntriesPerLedger <= 0
+                || maxBytesPerLedger <= 0
+                || maxAppendRangesPerLedger <= 0
+                || maxReaderLeasesPerLedger <= 0
+                || maxWritesInFlight <= 0
+                || maxReadsInFlight <= 0
+                || maxReadBytesInFlight <= 0
                 || retentionPageSize <= 0) {
             throw new IllegalArgumentException("BookKeeper capacity bounds must be positive");
         }
@@ -124,7 +133,9 @@ public record BookKeeperWalConfiguration(
     }
 
     private static void requireNamespace(int bits, long value) {
-        if (bits < 8 || bits > 24) throw new IllegalArgumentException("ledger-id prefix bits must be in [8,24]");
+        if (bits < 8 || bits > 24) {
+            throw new IllegalArgumentException("ledger-id prefix bits must be in [8,24]");
+        }
         long limit = 1L << bits;
         if (value < (limit >>> 1) || value >= limit) {
             throw new IllegalArgumentException("ledger-id prefix must set its highest bit and fit its width");
@@ -145,13 +156,18 @@ public record BookKeeperWalConfiguration(
 
     private static void positive(Duration value, String field) {
         Objects.requireNonNull(value, field);
-        if (value.isZero() || value.isNegative()) throw new IllegalArgumentException(field + " must be positive");
+        if (value.isZero() || value.isNegative()) {
+            throw new IllegalArgumentException(field + " must be positive");
+        }
         value.toNanos();
     }
 
     private static MessageDigest digest() {
-        try { return MessageDigest.getInstance("SHA-256"); }
-        catch (NoSuchAlgorithmException e) { throw new IllegalStateException("SHA-256 is required", e); }
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is required", e);
+        }
     }
 
     private static void frame(MessageDigest digest, String value) {

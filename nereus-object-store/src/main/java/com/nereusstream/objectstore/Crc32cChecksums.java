@@ -22,10 +22,11 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.zip.CRC32C;
 
-/** CRC32C helper shared by local object IO and WAL format checksums. */
+/**
+ * CRC32C helper shared by local object IO and WAL format checksums.
+ */
 public final class Crc32cChecksums {
-    private Crc32cChecksums() {
-    }
+    private Crc32cChecksums() {}
 
     public static Checksum checksum(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");

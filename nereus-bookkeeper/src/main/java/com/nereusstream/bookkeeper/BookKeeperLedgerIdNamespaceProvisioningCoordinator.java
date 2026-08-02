@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.ErrorCode;
@@ -8,7 +9,9 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** Explicit, fail-closed provision/revoke state machine for one advanced-ledger-id prefix. */
+/**
+ * Explicit, fail-closed provision/revoke state machine for one advanced-ledger-id prefix.
+ */
 public final class BookKeeperLedgerIdNamespaceProvisioningCoordinator {
     private final BookKeeperLedgerIdNamespaceReservationAdminStore store;
     private final Clock clock;
@@ -26,8 +29,7 @@ public final class BookKeeperLedgerIdNamespaceProvisioningCoordinator {
             Duration timeout) {
         BookKeeperWalConfiguration exact = Objects.requireNonNull(configuration, "configuration");
         String deployment = text(nereusDeploymentId, "nereusDeploymentId");
-        String evidence = BookKeeperWalConfiguration.sha256(
-                operatorEvidenceSha256, "operatorEvidenceSha256");
+        String evidence = BookKeeperWalConfiguration.sha256(operatorEvidenceSha256, "operatorEvidenceSha256");
         BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(timeout);
         return store.read(
                         exact.providerScopeSha256(),
@@ -37,28 +39,26 @@ public final class BookKeeperLedgerIdNamespaceProvisioningCoordinator {
                 .thenCompose(existing -> {
                     if (existing.isPresent()) {
                         BookKeeperLedgerIdNamespaceReservation reservation = existing.orElseThrow();
-                        if (sameProvisioningIdentity(
-                                reservation, exact, deployment, evidence)) {
+                        if (sameProvisioningIdentity(reservation, exact, deployment, evidence)) {
                             return CompletableFuture.completedFuture(reservation);
                         }
-                        return CompletableFuture.failedFuture(condition(
-                                "BookKeeper ledger-id namespace is already reserved or revoked"));
+                        return CompletableFuture.failedFuture(
+                                condition("BookKeeper ledger-id namespace is already reserved or revoked"));
                     }
                     long now = clock.millis();
-                    BookKeeperLedgerIdNamespaceReservationValue value =
-                            new BookKeeperLedgerIdNamespaceReservationValue(
-                                    1,
-                                    exact.ledgerIdNamespaceReservationId(),
-                                    deployment,
-                                    exact.clusterAlias(),
-                                    exact.providerScopeSha256(),
-                                    exact.ledgerIdPrefixBits(),
-                                    exact.ledgerIdPrefixValue(),
-                                    BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE,
-                                    1,
-                                    now,
-                                    0,
-                                    evidence);
+                    BookKeeperLedgerIdNamespaceReservationValue value = new BookKeeperLedgerIdNamespaceReservationValue(
+                            1,
+                            exact.ledgerIdNamespaceReservationId(),
+                            deployment,
+                            exact.clusterAlias(),
+                            exact.providerScopeSha256(),
+                            exact.ledgerIdPrefixBits(),
+                            exact.ledgerIdPrefixValue(),
+                            BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE,
+                            1,
+                            now,
+                            0,
+                            evidence);
                     return store.create(value, deadline.remaining());
                 });
     }
@@ -71,8 +71,7 @@ public final class BookKeeperLedgerIdNamespaceProvisioningCoordinator {
             Duration timeout) {
         BookKeeperWalConfiguration exact = Objects.requireNonNull(configuration, "configuration");
         String deployment = text(nereusDeploymentId, "nereusDeploymentId");
-        String evidence = BookKeeperWalConfiguration.sha256(
-                revocationEvidenceSha256, "revocationEvidenceSha256");
+        String evidence = BookKeeperWalConfiguration.sha256(revocationEvidenceSha256, "revocationEvidenceSha256");
         if (expectedMetadataVersion < 0) {
             throw new IllegalArgumentException("expectedMetadataVersion must be non-negative");
         }
@@ -83,8 +82,8 @@ public final class BookKeeperLedgerIdNamespaceProvisioningCoordinator {
                         exact.ledgerIdPrefixValue(),
                         deadline.remaining())
                 .thenCompose(existing -> {
-                    BookKeeperLedgerIdNamespaceReservation reservation = existing.orElseThrow(() ->
-                            condition("BookKeeper ledger-id namespace reservation is absent"));
+                    BookKeeperLedgerIdNamespaceReservation reservation = existing.orElseThrow(
+                            () -> condition("BookKeeper ledger-id namespace reservation is absent"));
                     requireExactActive(reservation, exact, deployment, expectedMetadataVersion);
                     BookKeeperLedgerIdNamespaceReservationValue replacement =
                             new BookKeeperLedgerIdNamespaceReservationValue(
@@ -100,10 +99,7 @@ public final class BookKeeperLedgerIdNamespaceProvisioningCoordinator {
                                     reservation.createdAtMillis(),
                                     Math.max(clock.millis(), reservation.createdAtMillis()),
                                     evidence);
-                    return store.compareAndSet(
-                            replacement,
-                            expectedMetadataVersion,
-                            deadline.remaining());
+                    return store.compareAndSet(replacement, expectedMetadataVersion, deadline.remaining());
                 });
     }
 
@@ -114,12 +110,10 @@ public final class BookKeeperLedgerIdNamespaceProvisioningCoordinator {
             String evidence) {
         return reservation.lifecycle() == BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE
                 && reservation.reservationEpoch() == 1
-                && reservation.reservationId().equals(
-                        configuration.ledgerIdNamespaceReservationId())
+                && reservation.reservationId().equals(configuration.ledgerIdNamespaceReservationId())
                 && reservation.nereusDeploymentId().equals(deployment)
                 && reservation.clusterAlias().equals(configuration.clusterAlias())
-                && reservation.bookKeeperProviderScopeSha256().equals(
-                        configuration.providerScopeSha256())
+                && reservation.bookKeeperProviderScopeSha256().equals(configuration.providerScopeSha256())
                 && reservation.ledgerIdPrefixBits() == configuration.ledgerIdPrefixBits()
                 && reservation.ledgerIdPrefixValue() == configuration.ledgerIdPrefixValue()
                 && reservation.operatorEvidenceSha256().equals(evidence);
@@ -132,12 +126,10 @@ public final class BookKeeperLedgerIdNamespaceProvisioningCoordinator {
             long expectedMetadataVersion) {
         if (reservation.lifecycle() != BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE
                 || reservation.metadataVersion() != expectedMetadataVersion
-                || !reservation.reservationId().equals(
-                        configuration.ledgerIdNamespaceReservationId())
+                || !reservation.reservationId().equals(configuration.ledgerIdNamespaceReservationId())
                 || !reservation.nereusDeploymentId().equals(deployment)
                 || !reservation.clusterAlias().equals(configuration.clusterAlias())
-                || !reservation.bookKeeperProviderScopeSha256().equals(
-                        configuration.providerScopeSha256())
+                || !reservation.bookKeeperProviderScopeSha256().equals(configuration.providerScopeSha256())
                 || reservation.ledgerIdPrefixBits() != configuration.ledgerIdPrefixBits()
                 || reservation.ledgerIdPrefixValue() != configuration.ledgerIdPrefixValue()) {
             throw condition("BookKeeper ledger-id namespace revoke precondition failed");

@@ -50,8 +50,7 @@ public final class KafkaFetchOperation implements AutoCloseable {
     private final ScheduledExecutorService deadlineScheduler;
     private final List<PartitionSlot> slots;
     private final Map<KafkaPartitionIdentity, PartitionSlot> slotsByIdentity;
-    private final CopyOnWriteArrayList<KafkaPartitionEventSubscription> subscriptions =
-            new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<KafkaPartitionEventSubscription> subscriptions = new CopyOnWriteArrayList<>();
     private final OperationFuture<KafkaFetchOperationResult> completion = new OperationFuture<>();
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean terminal = new AtomicBoolean();
@@ -86,12 +85,18 @@ public final class KafkaFetchOperation implements AutoCloseable {
         this.slotsByIdentity = Map.copyOf(indexed);
     }
 
-    /** Starts listener registration, the initial read wave and the max-wait timer exactly once. */
+    /**
+     * Starts listener registration, the initial read wave and the max-wait timer exactly once.
+     */
     public CompletableFuture<KafkaFetchOperationResult> start() {
-        if (!started.compareAndSet(false, true)) return completion;
+        if (!started.compareAndSet(false, true)) {
+            return completion;
+        }
         try {
             registerListeners();
-            if (terminal.get()) return completion;
+            if (terminal.get()) {
+                return completion;
+            }
             state = KafkaFetchOperationState.READING;
             if (!request.maxWait().isZero()) {
                 deadlineTask = deadlineScheduler.schedule(
@@ -114,7 +119,9 @@ public final class KafkaFetchOperation implements AutoCloseable {
         return pendingReads;
     }
 
-    /** Only runtime shutdown/leadership teardown calls this; client future cancellation is deliberately disabled. */
+    /**
+     * Only runtime shutdown/leadership teardown calls this; client future cancellation is deliberately disabled.
+     */
     public void cancel() {
         completeFailure(
                 new NereusException(ErrorCode.CANCELLED, false, "Kafka Fetch operation was cancelled"),
@@ -128,17 +135,23 @@ public final class KafkaFetchOperation implements AutoCloseable {
 
     private void registerListeners() {
         for (PartitionSlot slot : slots) {
-            KafkaPartitionEventSubscription subscription = slot.request.storage().subscribe(
-                    event -> dispatchControl(() -> handleEvent(event)));
+            KafkaPartitionEventSubscription subscription =
+                    slot.request.storage().subscribe(event -> dispatchControl(() -> handleEvent(event)));
             subscriptions.add(subscription);
-            if (terminal.get() && subscriptions.remove(subscription)) subscription.close();
+            if (terminal.get() && subscriptions.remove(subscription)) {
+                subscription.close();
+            }
         }
     }
 
     private void handleEvent(KafkaPartitionEvent event) {
-        if (terminal.get()) return;
+        if (terminal.get()) {
+            return;
+        }
         PartitionSlot slot = slotsByIdentity.get(event.identity());
-        if (slot == null) return;
+        if (slot == null) {
+            return;
+        }
         if (event.type() == KafkaPartitionEventType.LEADERSHIP_LOST) {
             completeFailure(
                     new NereusException(
@@ -157,7 +170,9 @@ public final class KafkaFetchOperation implements AutoCloseable {
                     KafkaFetchOperationState.COMPLETE);
             return;
         }
-        if (deadlineExpired) return;
+        if (deadlineExpired) {
+            return;
+        }
         slot.dirty = true;
         if (state == KafkaFetchOperationState.WAITING) {
             beginReadWave(dirtySlots(), true);
@@ -165,7 +180,9 @@ public final class KafkaFetchOperation implements AutoCloseable {
     }
 
     private void handleDeadline() {
-        if (terminal.get()) return;
+        if (terminal.get()) {
+            return;
+        }
         deadlineExpired = true;
         state = KafkaFetchOperationState.TIMED_READING;
         if (pendingReads == 0) {
@@ -175,22 +192,31 @@ public final class KafkaFetchOperation implements AutoCloseable {
         }
     }
 
-    /** Returns false only when the reread safety budget is exhausted. */
+    /**
+     * Returns false only when the reread safety budget is exhausted.
+     */
     private boolean beginReadWave(Collection<PartitionSlot> requestedSlots, boolean reread) {
-        if (terminal.get()) return false;
-        if (reread && rereadRounds >= request.maxRereads()) {
-            if (!deadlineExpired) state = KafkaFetchOperationState.WAITING;
+        if (terminal.get()) {
             return false;
         }
-        List<PartitionSlot> eligible = requestedSlots.stream()
-                .filter(slot -> !slot.inFlight)
-                .toList();
-        if (eligible.isEmpty()) return true;
-        if (reread) rereadRounds++;
-        state = deadlineExpired
-                ? KafkaFetchOperationState.TIMED_READING
-                : KafkaFetchOperationState.READING;
-        for (PartitionSlot slot : eligible) beginRead(slot);
+        if (reread && rereadRounds >= request.maxRereads()) {
+            if (!deadlineExpired) {
+                state = KafkaFetchOperationState.WAITING;
+            }
+            return false;
+        }
+        List<PartitionSlot> eligible =
+                requestedSlots.stream().filter(slot -> !slot.inFlight).toList();
+        if (eligible.isEmpty()) {
+            return true;
+        }
+        if (reread) {
+            rereadRounds++;
+        }
+        state = deadlineExpired ? KafkaFetchOperationState.TIMED_READING : KafkaFetchOperationState.READING;
+        for (PartitionSlot slot : eligible) {
+            beginRead(slot);
+        }
         return true;
     }
 
@@ -202,21 +228,18 @@ public final class KafkaFetchOperation implements AutoCloseable {
         CompletableFuture<KafkaStorageReadResult> read;
         try {
             read = Objects.requireNonNull(
-                    slot.request.storage().read(slot.request.readRequest()),
-                    "Kafka partition read future");
+                    slot.request.storage().read(slot.request.readRequest()), "Kafka partition read future");
         } catch (Throwable failure) {
             read = CompletableFuture.failedFuture(failure);
         }
         slot.inFlightFuture = read;
-        read.whenComplete((result, failure) ->
-                dispatchControl(() -> finishRead(slot, result, failure)));
+        read.whenComplete((result, failure) -> dispatchControl(() -> finishRead(slot, result, failure)));
     }
 
-    private void finishRead(
-            PartitionSlot slot,
-            KafkaStorageReadResult result,
-            Throwable failure) {
-        if (terminal.get() || !slot.inFlight) return;
+    private void finishRead(PartitionSlot slot, KafkaStorageReadResult result, Throwable failure) {
+        if (terminal.get() || !slot.inFlight) {
+            return;
+        }
         slot.inFlight = false;
         slot.inFlightFuture = null;
         pendingReads--;
@@ -225,7 +248,9 @@ public final class KafkaFetchOperation implements AutoCloseable {
             return;
         }
         slot.latest = Objects.requireNonNull(result, "Kafka partition read result");
-        if (pendingReads != 0) return;
+        if (pendingReads != 0) {
+            return;
+        }
 
         KafkaFetchOperationResult assembled = buildResult(deadlineExpired);
         if (deadlineExpired
@@ -253,23 +278,22 @@ public final class KafkaFetchOperation implements AutoCloseable {
             KafkaStorageReadResult latest = Objects.requireNonNull(
                     slot.latest, "Fetch result requested before every partition completed an initial read");
             int bytes = latest.fetchAssembly().sizeInBytes();
-            if ((exhausted && bytes > 0)
-                    || bytes > request.maxResponseBytes() - responseBytes) {
+            if ((exhausted && bytes > 0) || bytes > request.maxResponseBytes() - responseBytes) {
                 exhausted = true;
-                partitionResults.add(new KafkaFetchPartitionResult(
-                        slot.request.identity(), Optional.empty(), true));
+                partitionResults.add(new KafkaFetchPartitionResult(slot.request.identity(), Optional.empty(), true));
             } else {
                 responseBytes = Math.addExact(responseBytes, bytes);
-                partitionResults.add(new KafkaFetchPartitionResult(
-                        slot.request.identity(), Optional.of(latest), false));
+                partitionResults.add(
+                        new KafkaFetchPartitionResult(slot.request.identity(), Optional.of(latest), false));
             }
         }
-        return new KafkaFetchOperationResult(
-                partitionResults, responseBytes, exhausted, timedOut, readAttempts);
+        return new KafkaFetchOperationResult(partitionResults, responseBytes, exhausted, timedOut, readAttempts);
     }
 
     private void completeSuccess(KafkaFetchOperationResult result) {
-        if (!terminal.compareAndSet(false, true)) return;
+        if (!terminal.compareAndSet(false, true)) {
+            return;
+        }
         state = KafkaFetchOperationState.COMPLETE;
         cleanup();
         dispatchCompletion(() -> completion.completeFromOperation(result));
@@ -277,7 +301,9 @@ public final class KafkaFetchOperation implements AutoCloseable {
 
     private void completeFailure(Throwable failure, KafkaFetchOperationState terminalState) {
         Objects.requireNonNull(failure, "failure");
-        if (!terminal.compareAndSet(false, true)) return;
+        if (!terminal.compareAndSet(false, true)) {
+            return;
+        }
         state = terminalState;
         cleanup();
         dispatchCompletion(() -> completion.failFromOperation(failure));
@@ -285,7 +311,9 @@ public final class KafkaFetchOperation implements AutoCloseable {
 
     private void cleanup() {
         ScheduledFuture<?> deadline = deadlineTask;
-        if (deadline != null) deadline.cancel(false);
+        if (deadline != null) {
+            deadline.cancel(false);
+        }
         for (KafkaPartitionEventSubscription subscription : subscriptions) {
             try {
                 subscription.close();
@@ -296,7 +324,9 @@ public final class KafkaFetchOperation implements AutoCloseable {
         subscriptions.clear();
         for (PartitionSlot slot : slots) {
             CompletableFuture<KafkaStorageReadResult> read = slot.inFlightFuture;
-            if (read != null) read.cancel(true);
+            if (read != null) {
+                read.cancel(true);
+            }
             slot.inFlightFuture = null;
             slot.inFlight = false;
         }
@@ -309,7 +339,9 @@ public final class KafkaFetchOperation implements AutoCloseable {
     private void dispatchCompletion(Runnable action) {
         AtomicBoolean invoked = new AtomicBoolean();
         Runnable exactlyOnce = () -> {
-            if (invoked.compareAndSet(false, true)) action.run();
+            if (invoked.compareAndSet(false, true)) {
+                action.run();
+            }
         };
         try {
             callbackExecutor.execute(exactlyOnce);
@@ -319,15 +351,23 @@ public final class KafkaFetchOperation implements AutoCloseable {
     }
 
     private void dispatchControl(Runnable task) {
-        if (terminal.get()) return;
+        if (terminal.get()) {
+            return;
+        }
         boolean submit;
         synchronized (controlGuard) {
-            if (terminal.get()) return;
+            if (terminal.get()) {
+                return;
+            }
             controlTasks.addLast(task);
             submit = !controlScheduled;
-            if (submit) controlScheduled = true;
+            if (submit) {
+                controlScheduled = true;
+            }
         }
-        if (!submit) return;
+        if (!submit) {
+            return;
+        }
         try {
             readExecutor.execute(this::drainControlTasks);
         } catch (RejectedExecutionException rejected) {
@@ -385,7 +425,9 @@ public final class KafkaFetchOperation implements AutoCloseable {
         }
     }
 
-    /** Prevents a network/client future cancellation from bypassing operation terminal cleanup. */
+    /**
+     * Prevents a network/client future cancellation from bypassing operation terminal cleanup.
+     */
     private static final class OperationFuture<T> extends CompletableFuture<T> {
         private boolean completeFromOperation(T value) {
             return super.complete(value);

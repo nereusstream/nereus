@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
@@ -11,8 +11,8 @@ import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.SemanticReadResult;
-import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StorageProfile;
+import com.nereusstream.api.StreamId;
 import com.nereusstream.kafka.codec.KafkaFetchAssembler;
 import com.nereusstream.kafka.codec.KafkaRecordBatchCodec;
 import com.nereusstream.kafka.fetch.KafkaFetchOperation;
@@ -30,11 +30,11 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Delayed;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,17 +47,21 @@ class KafkaFetchOperationTest {
         ManualScheduler scheduler = new ManualScheduler();
         try {
             FakePartitionStorage storage = new FakePartitionStorage(identity(1));
-            byte[] batch = KafkaPartitionStorageTestSupport.batch(
-                    0, CompressionType.GZIP, 1_000, "a", "b");
+            byte[] batch = KafkaPartitionStorageTestSupport.batch(0, CompressionType.GZIP, 1_000, "a", "b");
             storage.enqueue(completed(emptyResult(0)));
             storage.enqueue(completed(dataResult(batch, 2)));
             AtomicInteger callbackDispatches = new AtomicInteger();
             KafkaFetchOperation operation = operation(
-                    List.of(storage), 1, 1024 * 1024, Duration.ofSeconds(5), 8,
+                    List.of(storage),
+                    1,
+                    1024 * 1024,
+                    Duration.ofSeconds(5),
+                    8,
                     command -> {
                         callbackDispatches.incrementAndGet();
                         command.run();
-                    }, scheduler);
+                    },
+                    scheduler);
 
             CompletableFuture<KafkaFetchOperationResult> completion = operation.start();
 
@@ -86,9 +90,8 @@ class KafkaFetchOperationTest {
             FakePartitionStorage storage = new FakePartitionStorage(identity(2));
             KafkaStorageReadResult empty = emptyResult(0);
             storage.enqueue(completed(empty));
-            KafkaFetchOperation operation = operation(
-                    List.of(storage), 1, 1024 * 1024, Duration.ofSeconds(5), 8,
-                    Runnable::run, scheduler);
+            KafkaFetchOperation operation =
+                    operation(List.of(storage), 1, 1024 * 1024, Duration.ofSeconds(5), 8, Runnable::run, scheduler);
             CompletableFuture<KafkaFetchOperationResult> completion = operation.start();
             CompletableFuture<KafkaStorageReadResult> pending = new CompletableFuture<>();
             storage.enqueue(pending);
@@ -123,15 +126,19 @@ class KafkaFetchOperationTest {
     void appliesRequestWideBudgetInPartitionOrderWithoutLeakingOmittedBuffers() {
         ManualScheduler scheduler = new ManualScheduler();
         try {
-            byte[] batch = KafkaPartitionStorageTestSupport.batch(
-                    0, CompressionType.NONE, 1_000, "value");
+            byte[] batch = KafkaPartitionStorageTestSupport.batch(0, CompressionType.NONE, 1_000, "value");
             FakePartitionStorage first = new FakePartitionStorage(identity(3));
             FakePartitionStorage second = new FakePartitionStorage(identity(4));
             first.enqueue(completed(dataResult(batch, 1)));
             second.enqueue(completed(dataResult(batch, 1)));
             KafkaFetchOperation operation = operation(
-                    List.of(first, second), batch.length, batch.length, Duration.ofSeconds(5), 8,
-                    Runnable::run, scheduler);
+                    List.of(first, second),
+                    batch.length,
+                    batch.length,
+                    Duration.ofSeconds(5),
+                    8,
+                    Runnable::run,
+                    scheduler);
 
             KafkaFetchOperationResult result = operation.start().join();
 
@@ -155,11 +162,16 @@ class KafkaFetchOperationTest {
             CompletableFuture<KafkaStorageReadResult> fencedRead = new CompletableFuture<>();
             fenced.enqueue(fencedRead);
             KafkaFetchOperation fencedOperation = operation(
-                    List.of(fenced), 1, 1024 * 1024, Duration.ofSeconds(5), 8,
+                    List.of(fenced),
+                    1,
+                    1024 * 1024,
+                    Duration.ofSeconds(5),
+                    8,
                     command -> {
                         callbackDispatches.incrementAndGet();
                         command.run();
-                    }, scheduler);
+                    },
+                    scheduler);
             CompletableFuture<KafkaFetchOperationResult> fencedCompletion = fencedOperation.start();
 
             fenced.emit(KafkaPartitionEventType.LEADERSHIP_LOST);
@@ -174,11 +186,16 @@ class KafkaFetchOperationTest {
             CompletableFuture<KafkaStorageReadResult> cancelledRead = new CompletableFuture<>();
             cancelled.enqueue(cancelledRead);
             KafkaFetchOperation cancelledOperation = operation(
-                    List.of(cancelled), 1, 1024 * 1024, Duration.ofSeconds(5), 8,
+                    List.of(cancelled),
+                    1,
+                    1024 * 1024,
+                    Duration.ofSeconds(5),
+                    8,
                     command -> {
                         callbackDispatches.incrementAndGet();
                         command.run();
-                    }, scheduler);
+                    },
+                    scheduler);
             CompletableFuture<KafkaFetchOperationResult> cancelledCompletion = cancelledOperation.start();
 
             cancelledOperation.cancel();
@@ -201,8 +218,7 @@ class KafkaFetchOperationTest {
             FakePartitionStorage storage = new FakePartitionStorage(identity(7));
             KafkaFetchOperation operation = new KafkaFetchOperation(
                     new KafkaFetchOperationRequest(
-                            List.of(new KafkaFetchPartitionRequest(
-                                    storage, readRequest(1024 * 1024))),
+                            List.of(new KafkaFetchPartitionRequest(storage, readRequest(1024 * 1024))),
                             1,
                             1024 * 1024,
                             Duration.ofSeconds(5),
@@ -233,12 +249,10 @@ class KafkaFetchOperationTest {
             java.util.concurrent.Executor callbackExecutor,
             ScheduledExecutorService scheduler) {
         List<KafkaFetchPartitionRequest> partitions = storages.stream()
-                .map(storage -> new KafkaFetchPartitionRequest(
-                        storage, readRequest(maxResponseBytes)))
+                .map(storage -> new KafkaFetchPartitionRequest(storage, readRequest(maxResponseBytes)))
                 .toList();
         return new KafkaFetchOperation(
-                new KafkaFetchOperationRequest(
-                        partitions, minBytes, maxResponseBytes, maxWait, maxRereads),
+                new KafkaFetchOperationRequest(partitions, minBytes, maxResponseBytes, maxWait, maxRereads),
                 Runnable::run,
                 callbackExecutor,
                 scheduler);
@@ -250,16 +264,10 @@ class KafkaFetchOperationTest {
     }
 
     private static KafkaStorageReadResult emptyResult(long stableEnd) {
-        ReadResult result = new ReadResult(
-                STREAM_ID, 0, 0, List.of(), stableEnd == 0);
+        ReadResult result = new ReadResult(STREAM_ID, 0, 0, List.of(), stableEnd == 0);
         return new KafkaStorageReadResult(
                 ASSEMBLER.assemble(
-                        new SemanticReadResult(ReadView.COMMITTED, result, 0),
-                        1024 * 1024,
-                        false,
-                        0,
-                        0,
-                        List.of()),
+                        new SemanticReadResult(ReadView.COMMITTED, result, 0), 1024 * 1024, false, 0, 0, List.of()),
                 KafkaStableSnapshot.nonTransactional(0, stableEnd, 1));
     }
 
@@ -268,8 +276,7 @@ class KafkaFetchOperationTest {
                 STREAM_ID,
                 0,
                 endOffset,
-                List.of(KafkaPartitionStorageTestSupport.readBatch(
-                        new OffsetRange(0, endOffset), batch, 1)),
+                List.of(KafkaPartitionStorageTestSupport.readBatch(new OffsetRange(0, endOffset), batch, 1)),
                 true);
         return new KafkaStorageReadResult(
                 ASSEMBLER.assemble(
@@ -288,12 +295,10 @@ class KafkaFetchOperationTest {
 
     private static KafkaPartitionIdentity identity(int partition) {
         KafkaPartitionIdentity base = KafkaPartitionStorageTestSupport.identity();
-        return new KafkaPartitionIdentity(
-                base.kafkaClusterId(), base.topicId(), partition, base.observedTopicName());
+        return new KafkaPartitionIdentity(base.kafkaClusterId(), base.topicId(), partition, base.observedTopicName());
     }
 
-    private static void assertFailureCode(
-            CompletableFuture<?> completion, ErrorCode expected) {
+    private static void assertFailureCode(CompletableFuture<?> completion, ErrorCode expected) {
         assertThatThrownBy(completion::join)
                 .isInstanceOf(CompletionException.class)
                 .satisfies(failure -> {
@@ -303,8 +308,7 @@ class KafkaFetchOperationTest {
     }
 
     private static final StreamId STREAM_ID = new StreamId("fetch-operation-test");
-    private static final KafkaFetchAssembler ASSEMBLER =
-            new KafkaFetchAssembler(new KafkaRecordBatchCodec());
+    private static final KafkaFetchAssembler ASSEMBLER = new KafkaFetchAssembler(new KafkaRecordBatchCodec());
 
     private static final class FakePartitionStorage implements KafkaPartitionStorage {
         private final KafkaPartitionIdentity identity;
@@ -327,8 +331,8 @@ class KafkaFetchOperationTest {
             synchronized (this) {
                 snapshot = new ArrayList<>(listeners);
             }
-            KafkaPartitionEvent event = new KafkaPartitionEvent(
-                    identity, type, KafkaStableSnapshot.nonTransactional(0, 0, 1));
+            KafkaPartitionEvent event =
+                    new KafkaPartitionEvent(identity, type, KafkaStableSnapshot.nonTransactional(0, 0, 1));
             snapshot.forEach(listener -> listener.onPartitionEvent(event));
         }
 
@@ -380,9 +384,10 @@ class KafkaFetchOperationTest {
         }
 
         @Override
-        public synchronized CompletableFuture<KafkaStorageReadResult> read(
-                KafkaStorageReadRequest request) {
-            if (reads.isEmpty()) throw new AssertionError("no scripted Kafka Fetch read result");
+        public synchronized CompletableFuture<KafkaStorageReadResult> read(KafkaStorageReadRequest request) {
+            if (reads.isEmpty()) {
+                throw new AssertionError("no scripted Kafka Fetch read result");
+            }
             if (previousRead != null && !previousRead.isDone()) {
                 throw new AssertionError("a second read started while the previous partition read was in flight");
             }
@@ -394,8 +399,7 @@ class KafkaFetchOperationTest {
         }
 
         @Override
-        public synchronized KafkaPartitionEventSubscription subscribe(
-                KafkaPartitionEventListener listener) {
+        public synchronized KafkaPartitionEventSubscription subscribe(KafkaPartitionEventListener listener) {
             listeners.add(listener);
             AtomicBoolean removed = new AtomicBoolean();
             return () -> {
@@ -424,8 +428,7 @@ class KafkaFetchOperationTest {
         }
 
         @Override
-        public synchronized ScheduledFuture<?> schedule(
-                Runnable command, long delay, TimeUnit unit) {
+        public synchronized ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
             if (deadline != null && !deadline.isDone()) {
                 throw new AssertionError("only one active Fetch deadline may be scheduled");
             }
@@ -434,13 +437,14 @@ class KafkaFetchOperationTest {
         }
 
         private synchronized void fireDeadline() {
-            if (deadline == null) throw new AssertionError("Fetch deadline was not scheduled");
+            if (deadline == null) {
+                throw new AssertionError("Fetch deadline was not scheduled");
+            }
             deadline.run();
         }
     }
 
-    private static final class ManualScheduledFuture
-            extends FutureTask<Void> implements ScheduledFuture<Void> {
+    private static final class ManualScheduledFuture extends FutureTask<Void> implements ScheduledFuture<Void> {
         private ManualScheduledFuture(Runnable command) {
             super(command, null);
         }

@@ -17,7 +17,6 @@ package com.nereusstream.metadata.oxia.spike;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import io.oxia.client.api.AsyncOxiaClient;
 import io.oxia.client.api.GetResult;
 import io.oxia.client.api.OxiaClientBuilder;
@@ -25,7 +24,6 @@ import io.oxia.client.api.PutResult;
 import io.oxia.client.api.SyncOxiaClient;
 import io.oxia.client.api.exceptions.UnexpectedVersionIdException;
 import io.oxia.client.api.options.GetOption;
-import io.oxia.client.api.options.GetSequenceUpdatesOption;
 import io.oxia.client.api.options.ListOption;
 import io.oxia.client.api.options.PutOption;
 import io.oxia.client.api.options.RangeScanOption;
@@ -56,15 +54,13 @@ import org.testcontainers.utility.DockerImageName;
 @Testcontainers
 final class OxiaCapabilitySpikeTest {
     private static final String OXIA_CLIENT_COORDINATES = "io.github.oxia-db:oxia-client:0.9.0";
-    private static final String OXIA_TESTCONTAINERS_COORDINATES =
-            "io.github.oxia-db:oxia-testcontainers:0.7.4";
+    private static final String OXIA_TESTCONTAINERS_COORDINATES = "io.github.oxia-db:oxia-testcontainers:0.7.4";
     private static final String TESTCONTAINERS_COORDINATES = "org.testcontainers:junit-jupiter:1.20.4";
     private static final String OXIA_IMAGE = "oxia/oxia:0.16.3";
     private static final String MULTI_KEY_CAPABILITY = "NOT_SUPPORTED_BY_PUBLIC_JAVA_API";
 
     @Container
-    private static final OxiaContainer OXIA =
-            new OxiaContainer(DockerImageName.parse(OXIA_IMAGE)).withShards(10);
+    private static final OxiaContainer OXIA = new OxiaContainer(DockerImageName.parse(OXIA_IMAGE)).withShards(10);
 
     private static final ConcurrentSkipListMap<String, String> EVIDENCE = new ConcurrentSkipListMap<>();
 
@@ -73,7 +69,8 @@ final class OxiaCapabilitySpikeTest {
         String prefix = keyPrefix("partition");
         String partitionKey = partitionKey(prefix);
 
-        try (SyncOxiaClient client = OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
+        try (SyncOxiaClient client =
+                OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
             client.put(prefix + "/a", bytes("a"), Set.of(PutOption.PartitionKey(partitionKey)));
             client.put(prefix + "/b", bytes("b"), Set.of(PutOption.PartitionKey(partitionKey)));
             client.put(prefix + "/c", bytes("c"), Set.of(PutOption.PartitionKey(partitionKey)));
@@ -84,8 +81,7 @@ final class OxiaCapabilitySpikeTest {
 
             String wrongPartitionKey = IntStream.range(0, 100)
                     .mapToObj(index -> "wrong-" + index)
-                    .filter(candidate -> client.get(
-                            prefix + "/a", Set.of(GetOption.PartitionKey(candidate))) == null)
+                    .filter(candidate -> client.get(prefix + "/a", Set.of(GetOption.PartitionKey(candidate))) == null)
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("could not find a partition key routed to another shard"));
 
@@ -95,14 +91,13 @@ final class OxiaCapabilitySpikeTest {
 
             List<String> keys =
                     client.list(prefix + "/a", prefix + "/e", Set.of(ListOption.PartitionKey(partitionKey)));
-            assertThat(keys)
-                    .containsExactly(prefix + "/a", prefix + "/b", prefix + "/c", prefix + "/d");
+            assertThat(keys).containsExactly(prefix + "/a", prefix + "/b", prefix + "/c", prefix + "/d");
 
             Iterable<GetResult> scan =
-                    client.rangeScan(
-                            prefix + "/a", prefix + "/d", Set.of(RangeScanOption.PartitionKey(partitionKey)));
-            List<String> scannedKeys =
-                    StreamSupport.stream(scan.spliterator(), false).map(GetResult::key).toList();
+                    client.rangeScan(prefix + "/a", prefix + "/d", Set.of(RangeScanOption.PartitionKey(partitionKey)));
+            List<String> scannedKeys = StreamSupport.stream(scan.spliterator(), false)
+                    .map(GetResult::key)
+                    .toList();
             assertThat(scannedKeys).containsExactly(prefix + "/a", prefix + "/b", prefix + "/c");
         }
 
@@ -115,24 +110,22 @@ final class OxiaCapabilitySpikeTest {
         String partitionKey = partitionKey(prefix);
         String key = prefix + "/committed-end-offset";
 
-        try (SyncOxiaClient client = OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
+        try (SyncOxiaClient client =
+                OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
             client.put(key, bytes("v1"), Set.of(PutOption.PartitionKey(partitionKey)));
-            long versionId =
-                    client.get(key, Set.of(GetOption.PartitionKey(partitionKey))).version().versionId();
+            long versionId = client.get(key, Set.of(GetOption.PartitionKey(partitionKey)))
+                    .version()
+                    .versionId();
 
             client.put(
                     key,
                     bytes("v2"),
                     Set.of(PutOption.PartitionKey(partitionKey), PutOption.IfVersionIdEquals(versionId)));
 
-            assertThatThrownBy(
-                            () ->
-                                    client.put(
-                                            key,
-                                            bytes("v3"),
-                                            Set.of(
-                                                    PutOption.PartitionKey(partitionKey),
-                                                    PutOption.IfVersionIdEquals(versionId))))
+            assertThatThrownBy(() -> client.put(
+                            key,
+                            bytes("v3"),
+                            Set.of(PutOption.PartitionKey(partitionKey), PutOption.IfVersionIdEquals(versionId))))
                     .isInstanceOf(UnexpectedVersionIdException.class);
         }
 
@@ -145,16 +138,16 @@ final class OxiaCapabilitySpikeTest {
         String partitionKey = partitionKey(prefix);
         String indexPrefix = prefix + "/offset-index";
 
-        try (SyncOxiaClient client = OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
+        try (SyncOxiaClient client =
+                OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
             client.put(offsetIndexKey(indexPrefix, 100, 0), bytes("100"), Set.of(PutOption.PartitionKey(partitionKey)));
             client.put(offsetIndexKey(indexPrefix, 9, 0), bytes("9"), Set.of(PutOption.PartitionKey(partitionKey)));
             client.put(offsetIndexKey(indexPrefix, 10, 0), bytes("10"), Set.of(PutOption.PartitionKey(partitionKey)));
 
-            List<String> keys =
-                    client.list(
-                            offsetIndexKey(indexPrefix, 0, 0),
-                            offsetIndexKey(indexPrefix, Long.MAX_VALUE, Long.MAX_VALUE),
-                            Set.of(ListOption.PartitionKey(partitionKey)));
+            List<String> keys = client.list(
+                    offsetIndexKey(indexPrefix, 0, 0),
+                    offsetIndexKey(indexPrefix, Long.MAX_VALUE, Long.MAX_VALUE),
+                    Set.of(ListOption.PartitionKey(partitionKey)));
             assertThat(keys)
                     .containsExactly(
                             offsetIndexKey(indexPrefix, 9, 0),
@@ -171,26 +164,27 @@ final class OxiaCapabilitySpikeTest {
         String partitionKey = partitionKey(prefix);
         String sequenceRoot = prefix + "/seq";
 
-        try (SyncOxiaClient client = OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
+        try (SyncOxiaClient client =
+                OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
             assertThatThrownBy(() -> client.getSequenceUpdates(sequenceRoot, ignored -> {}, Set.of()))
                     .isInstanceOf(IllegalArgumentException.class);
 
-            PutResult first =
-                    client.put(
-                            sequenceRoot,
-                            bytes("first"),
-                            Set.of(PutOption.PartitionKey(partitionKey), PutOption.SequenceKeysDeltas(List.of(1L))));
-            PutResult second =
-                    client.put(
-                            sequenceRoot,
-                            bytes("second"),
-                            Set.of(PutOption.PartitionKey(partitionKey), PutOption.SequenceKeysDeltas(List.of(1L))));
+            PutResult first = client.put(
+                    sequenceRoot,
+                    bytes("first"),
+                    Set.of(PutOption.PartitionKey(partitionKey), PutOption.SequenceKeysDeltas(List.of(1L))));
+            PutResult second = client.put(
+                    sequenceRoot,
+                    bytes("second"),
+                    Set.of(PutOption.PartitionKey(partitionKey), PutOption.SequenceKeysDeltas(List.of(1L))));
 
             assertThat(first.key()).isEqualTo(sequenceRoot + "-00000000000000000001");
             assertThat(second.key()).isEqualTo(sequenceRoot + "-00000000000000000002");
-            assertThat(client.get(first.key(), Set.of(GetOption.PartitionKey(partitionKey))).value())
+            assertThat(client.get(first.key(), Set.of(GetOption.PartitionKey(partitionKey)))
+                            .value())
                     .isEqualTo(bytes("first"));
-            assertThat(client.get(second.key(), Set.of(GetOption.PartitionKey(partitionKey))).value())
+            assertThat(client.get(second.key(), Set.of(GetOption.PartitionKey(partitionKey)))
+                            .value())
                     .isEqualTo(bytes("second"));
         }
 
@@ -199,16 +193,15 @@ final class OxiaCapabilitySpikeTest {
 
     @Test
     void publicJavaApiDoesNotExposeMultiKeyConditionalWrite() {
-        List<String> candidates =
-                Stream.of(AsyncOxiaClient.class, SyncOxiaClient.class)
-                        .flatMap(type -> Arrays.stream(type.getMethods()))
-                        .filter(method -> Modifier.isPublic(method.getModifiers()))
-                        .filter(method -> !method.isSynthetic())
-                        .filter(OxiaCapabilitySpikeTest::looksLikeMultiKeyConditionalWrite)
-                        .map(Method::toGenericString)
-                        .distinct()
-                        .sorted()
-                        .toList();
+        List<String> candidates = Stream.of(AsyncOxiaClient.class, SyncOxiaClient.class)
+                .flatMap(type -> Arrays.stream(type.getMethods()))
+                .filter(method -> Modifier.isPublic(method.getModifiers()))
+                .filter(method -> !method.isSynthetic())
+                .filter(OxiaCapabilitySpikeTest::looksLikeMultiKeyConditionalWrite)
+                .map(Method::toGenericString)
+                .distinct()
+                .sorted()
+                .toList();
 
         assertThat(candidates)
                 .as("The selected public Oxia Java API must not silently grow a multi-key write primitive without "
@@ -220,11 +213,8 @@ final class OxiaCapabilitySpikeTest {
 
     @AfterAll
     static void writeReport() throws IOException {
-        Path reportDir =
-                Path.of(
-                        System.getProperty(
-                                "nereus.oxiaCapabilitySpike.reportDir",
-                                "build/reports/oxia-capability-spike"));
+        Path reportDir = Path.of(
+                System.getProperty("nereus.oxiaCapabilitySpike.reportDir", "build/reports/oxia-capability-spike"));
         Files.createDirectories(reportDir);
         Files.writeString(reportDir.resolve("summary.md"), markdownReport(), UTF_8);
         Files.writeString(reportDir.resolve("summary.json"), jsonReport(), UTF_8);
@@ -242,13 +232,10 @@ final class OxiaCapabilitySpikeTest {
         if (name.contains("range")) {
             return false;
         }
-        boolean hasMultiKeyPayload =
-                Arrays.stream(method.getParameterTypes())
-                        .anyMatch(
-                                parameterType ->
-                                        Map.class.isAssignableFrom(parameterType)
-                                                || (Collection.class.isAssignableFrom(parameterType)
-                                                        && !Set.class.isAssignableFrom(parameterType)));
+        boolean hasMultiKeyPayload = Arrays.stream(method.getParameterTypes())
+                .anyMatch(parameterType -> Map.class.isAssignableFrom(parameterType)
+                        || (Collection.class.isAssignableFrom(parameterType)
+                                && !Set.class.isAssignableFrom(parameterType)));
         return hasMultiKeyPayload && (name.contains("put") || name.contains("delete"));
     }
 
@@ -289,11 +276,15 @@ final class OxiaCapabilitySpikeTest {
     private static String jsonReport() {
         StringBuilder json = new StringBuilder();
         json.append("{\n");
-        json.append("  \"oxiaClient\": \"").append(jsonEscape(OXIA_CLIENT_COORDINATES)).append("\",\n");
+        json.append("  \"oxiaClient\": \"")
+                .append(jsonEscape(OXIA_CLIENT_COORDINATES))
+                .append("\",\n");
         json.append("  \"oxiaTestcontainers\": \"")
                 .append(jsonEscape(OXIA_TESTCONTAINERS_COORDINATES))
                 .append("\",\n");
-        json.append("  \"testcontainers\": \"").append(jsonEscape(TESTCONTAINERS_COORDINATES)).append("\",\n");
+        json.append("  \"testcontainers\": \"")
+                .append(jsonEscape(TESTCONTAINERS_COORDINATES))
+                .append("\",\n");
         json.append("  \"oxiaImage\": \"").append(jsonEscape(OXIA_IMAGE)).append("\",\n");
         json.append("  \"evidence\": {\n");
         int index = 0;

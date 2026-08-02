@@ -16,7 +16,6 @@ package com.nereusstream.managedledger.projection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendCompletionPolicy;
 import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ReadIsolation;
@@ -34,9 +33,10 @@ class F2L0RequestFactoryTest {
         Duration timeout = Duration.ofSeconds(7);
 
         assertThat(requests.createOptions().profile()).isEqualTo(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
-        assertThat(requests.createOptions().attributes()).isEqualTo(Map.of(
-                ManagedLedgerProjectionNames.PAYLOAD_MAPPING_ATTRIBUTE,
-                ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1));
+        assertThat(requests.createOptions().attributes())
+                .isEqualTo(Map.of(
+                        ManagedLedgerProjectionNames.PAYLOAD_MAPPING_ATTRIBUTE,
+                        ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1));
 
         assertThat(requests.appendOptions(timeout).appendSession()).isEmpty();
         assertThat(requests.appendOptions(timeout).durabilityLevel())
@@ -56,55 +56,39 @@ class F2L0RequestFactoryTest {
 
     @Test
     void delegatesInvalidBudgetRejectionToL0ValueContracts() {
-        assertThatThrownBy(() -> requests.appendOptions(Duration.ZERO))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> requests.recoveryOptions(Duration.ZERO))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> requests.appendOptions(Duration.ZERO)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> requests.recoveryOptions(Duration.ZERO)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> requests.singleEntryReadOptions(0, Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void mapsEveryBookKeeperProfileToItsExactCompletionPredicate() {
-        F2L0RequestFactory bookKeeper = new F2L0RequestFactory(
-                StorageProfile.BOOKKEEPER_WAL_ONLY);
-        assertThat(bookKeeper.createOptions().profile())
-                .isEqualTo(StorageProfile.BOOKKEEPER_WAL_ONLY);
-        assertThat(bookKeeper.appendOptions(
-                        StorageProfile.BOOKKEEPER_WAL_ONLY,
-                        Duration.ofSeconds(7))
-                .durabilityLevel())
+        F2L0RequestFactory bookKeeper = new F2L0RequestFactory(StorageProfile.BOOKKEEPER_WAL_ONLY);
+        assertThat(bookKeeper.createOptions().profile()).isEqualTo(StorageProfile.BOOKKEEPER_WAL_ONLY);
+        assertThat(bookKeeper
+                        .appendOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Duration.ofSeconds(7))
+                        .durabilityLevel())
                 .isEqualTo(DurabilityLevel.WAL_DURABLE);
-        assertThat(bookKeeper.appendOptions(
-                        StorageProfile.BOOKKEEPER_WAL_ONLY,
-                        Duration.ofSeconds(7))
-                .completionPolicy())
+        assertThat(bookKeeper
+                        .appendOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Duration.ofSeconds(7))
+                        .completionPolicy())
                 .isEqualTo(AppendCompletionPolicy.PROFILE_DEFAULT);
 
-        F2L0RequestFactory async = new F2L0RequestFactory(
-                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT);
-        assertThat(async.appendOptions(
-                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
-                        Duration.ofSeconds(7))
-                .durabilityLevel())
+        F2L0RequestFactory async = new F2L0RequestFactory(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT);
+        assertThat(async.appendOptions(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT, Duration.ofSeconds(7))
+                        .durabilityLevel())
                 .isEqualTo(DurabilityLevel.WAL_DURABLE);
-        assertThat(async.appendOptions(
-                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
-                        Duration.ofSeconds(7))
-                .completionPolicy())
+        assertThat(async.appendOptions(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT, Duration.ofSeconds(7))
+                        .completionPolicy())
                 .isEqualTo(AppendCompletionPolicy.PROFILE_DEFAULT);
 
-        F2L0RequestFactory sync = new F2L0RequestFactory(
-                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT);
-        assertThat(sync.appendOptions(
-                        StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
-                        Duration.ofSeconds(7))
-                .durabilityLevel())
+        F2L0RequestFactory sync = new F2L0RequestFactory(StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT);
+        assertThat(sync.appendOptions(StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT, Duration.ofSeconds(7))
+                        .durabilityLevel())
                 .isEqualTo(DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED);
-        assertThat(sync.appendOptions(
-                        StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
-                        Duration.ofSeconds(7))
-                .completionPolicy())
+        assertThat(sync.appendOptions(StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT, Duration.ofSeconds(7))
+                        .completionPolicy())
                 .isEqualTo(AppendCompletionPolicy.REQUIRED_OBJECT_GENERATION);
     }
 }

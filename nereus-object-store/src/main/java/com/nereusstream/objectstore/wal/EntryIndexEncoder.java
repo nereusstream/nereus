@@ -17,8 +17,7 @@ package com.nereusstream.objectstore.wal;
 import java.util.Objects;
 
 public final class EntryIndexEncoder {
-    private EntryIndexEncoder() {
-    }
+    private EntryIndexEncoder() {}
 
     public static byte[] encode(EntryIndex index) {
         Objects.requireNonNull(index, "index");

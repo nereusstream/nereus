@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.callbacks;
 
 import java.util.Objects;
@@ -10,8 +11,7 @@ import java.util.concurrent.RejectedExecutionException;
  * strand the callback or its associated resources.
  */
 public final class CallbackDispatcher {
-    private CallbackDispatcher() {
-    }
+    private CallbackDispatcher() {}
 
     public static void execute(Executor executor, Runnable callback) {
         Objects.requireNonNull(executor, "executor");

@@ -67,7 +67,10 @@ public record CommitSliceRequest(
         Objects.requireNonNull(sliceChecksum, "sliceChecksum");
         Objects.requireNonNull(payloadFormat, "payloadFormat");
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
-        if (epoch < 0 || expectedStartOffset < 0 || logicalBytes < 0 || minEventTimeMillis < 0
+        if (epoch < 0
+                || expectedStartOffset < 0
+                || logicalBytes < 0
+                || minEventTimeMillis < 0
                 || maxEventTimeMillis < minEventTimeMillis) {
             throw new IllegalArgumentException("commit request numeric fields are invalid");
         }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import java.util.List;
@@ -6,7 +7,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-/** Durable workflow root; visibility remains owned only by GenerationIndexRecord. */
+/**
+ * Durable workflow root; visibility remains owned only by GenerationIndexRecord.
+ */
 public record MaterializationTaskRecord(
         int schemaVersion,
         String taskId,
@@ -38,8 +41,7 @@ public record MaterializationTaskRecord(
 
     public MaterializationTaskRecord {
         if (schemaVersion != 1 && schemaVersion != CURRENT_SCHEMA_VERSION) {
-            throw new IllegalArgumentException(
-                    "materialization task schemaVersion must be 1 or 2");
+            throw new IllegalArgumentException("materialization task schemaVersion must be 1 or 2");
         }
         taskId = F4RecordValidation.requireText(taskId, "taskId", 256, false);
         F4RecordValidation.requirePositive(taskSequence, "taskSequence");
@@ -51,8 +53,7 @@ public record MaterializationTaskRecord(
             throw new IllegalArgumentException("taskKindId is unknown");
         }
         F4RecordValidation.requireRange(offsetStart, offsetEnd, "task coverage");
-        sources = F4RecordValidation.immutableBoundedList(
-                sources, F4RecordValidation.MAX_TASK_SOURCES, "sources");
+        sources = F4RecordValidation.immutableBoundedList(sources, F4RecordValidation.MAX_TASK_SOURCES, "sources");
         if (sources.isEmpty()) {
             throw new IllegalArgumentException("task must contain at least one source");
         }
@@ -60,8 +61,7 @@ public record MaterializationTaskRecord(
         int expectedSourceViewId = taskKindId == 2 ? 1 : readViewId;
         for (SourceGenerationRecord source : sources) {
             if (source.readViewId() != expectedSourceViewId || source.offsetStart() != cursor) {
-                throw new IllegalArgumentException(
-                        "task sources must use the task-kind source view and be gap-free");
+                throw new IllegalArgumentException("task sources must use the task-kind source view and be gap-free");
             }
             cursor = source.offsetEnd();
         }
@@ -106,8 +106,7 @@ public record MaterializationTaskRecord(
                 throw new IllegalArgumentException("task output source identity does not match task");
             }
         }
-        boolean publicationLifecycle = lifecycle == TaskLifecycle.PUBLISHING
-                || lifecycle == TaskLifecycle.PUBLISHED;
+        boolean publicationLifecycle = lifecycle == TaskLifecycle.PUBLISHING || lifecycle == TaskLifecycle.PUBLISHED;
         if (publicationLifecycle != !publicationId.isEmpty()) {
             throw new IllegalArgumentException("publication id does not match task lifecycle");
         }
@@ -160,9 +159,31 @@ public record MaterializationTaskRecord(
 
     public MaterializationTaskRecord withMetadataVersion(long version) {
         return new MaterializationTaskRecord(
-                schemaVersion, taskId, taskSequence, streamId, readViewId, taskKindId,
-                offsetStart, offsetEnd, sources, sourceSetSha256, policyId, policyVersion, policySha256,
-                policy, lifecycle, attempt, workerClaim, output, allocatedGeneration, publicationId,
-                failureClassId, failureMessage, retryNotBeforeMillis, createdAtMillis, updatedAtMillis, version);
+                schemaVersion,
+                taskId,
+                taskSequence,
+                streamId,
+                readViewId,
+                taskKindId,
+                offsetStart,
+                offsetEnd,
+                sources,
+                sourceSetSha256,
+                policyId,
+                policyVersion,
+                policySha256,
+                policy,
+                lifecycle,
+                attempt,
+                workerClaim,
+                output,
+                allocatedGeneration,
+                publicationId,
+                failureClassId,
+                failureMessage,
+                retryNotBeforeMillis,
+                createdAtMillis,
+                updatedAtMillis,
+                version);
     }
 }

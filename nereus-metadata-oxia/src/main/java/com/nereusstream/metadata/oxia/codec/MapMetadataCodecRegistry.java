@@ -19,7 +19,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Immutable metadata codec registry used by fake and future real adapters. */
+/**
+ * Immutable metadata codec registry used by fake and future real adapters.
+ */
 public final class MapMetadataCodecRegistry implements MetadataCodecRegistry {
     private final Map<String, MetadataRecordCodec<?>> byType;
     private final Map<Class<?>, MetadataRecordCodec<?>> byClass;
@@ -61,9 +63,7 @@ public final class MapMetadataCodecRegistry implements MetadataCodecRegistry {
         return (MetadataRecordCodec<T>) codec;
     }
 
-    public record RegisteredCodec<T>(
-            Class<T> recordClass,
-            MetadataRecordCodec<T> codec) {
+    public record RegisteredCodec<T>(Class<T> recordClass, MetadataRecordCodec<T> codec) {
         public RegisteredCodec {
             Objects.requireNonNull(recordClass, "recordClass");
             Objects.requireNonNull(codec, "codec");

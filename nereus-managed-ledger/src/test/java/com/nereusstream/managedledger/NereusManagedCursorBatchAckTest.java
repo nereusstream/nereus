@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.managedledger.cursor.TestCursorStorage;
@@ -48,8 +48,7 @@ class NereusManagedCursorBatchAckTest {
         Clock clock = Clock.systemUTC();
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         DefaultStreamStorage streamStorage = new DefaultStreamStorage(
                 StreamStorageConfig.defaults("cluster/a", "cursor-batch-ack-test"),
                 metadata,
@@ -57,14 +56,10 @@ class NereusManagedCursorBatchAckTest {
                 new DefaultWalObjectReader(objectStore),
                 clock,
                 Runnable::run);
-        try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(
-                streamStorage, projections, new TestCursorStorage())) {
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections, new TestCursorStorage())) {
             NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
-                    runtime,
-                    fixedGuard(1),
-                    config(),
-                    new ManagedLedgerFactoryConfig(),
-                    false);
+                    runtime, fixedGuard(1), config(), new ManagedLedgerFactoryConfig(), false);
             NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME, config());
             Position batch = ledger.addEntry(batchEntry(4), 4);
             Position ordinary = ledger.addEntry(new byte[] {9});
@@ -75,8 +70,7 @@ class NereusManagedCursorBatchAckTest {
             long[] exposed = individual.getBatchPositionAckSet(batch);
             assertThat(exposed).containsExactly(0b1110L);
             exposed[0] = 0;
-            assertThat(individual.getDeletedBatchIndexesAsLongArray(batch))
-                    .containsExactly(0b1110L);
+            assertThat(individual.getDeletedBatchIndexesAsLongArray(batch)).containsExactly(0b1110L);
 
             individual.close();
             individual = ledger.openCursor("individual");
@@ -85,22 +79,21 @@ class NereusManagedCursorBatchAckTest {
             assertThat(individual.getBatchPositionAckSet(batch)).containsExactly(0b1100L);
 
             List<Entry> liveRead = individual.readEntries(1);
-            assertThat(liveRead).singleElement()
-                    .satisfies(entry -> assertThat(entry.getPosition()).isEqualTo(batch));
+            assertThat(liveRead).singleElement().satisfies(entry -> assertThat(entry.getPosition())
+                    .isEqualTo(batch));
             liveRead.forEach(Entry::release);
             List<Entry> replayed = individual.replayEntries(Set.of(batch));
-            assertThat(replayed).singleElement()
-                    .satisfies(entry -> assertThat(entry.getPosition()).isEqualTo(batch));
+            assertThat(replayed).singleElement().satisfies(entry -> assertThat(entry.getPosition())
+                    .isEqualTo(batch));
             replayed.forEach(Entry::release);
 
             individual.delete(batchPosition(batch, 0));
             assertThat(individual.isMessageDeleted(batch)).isTrue();
             assertThat(individual.getBatchPositionAckSet(batch)).isNull();
-            assertThat(individual.readEntries(1)).singleElement()
-                    .satisfies(entry -> {
-                        assertThat(entry.getPosition()).isEqualTo(ordinary);
-                        entry.release();
-                    });
+            assertThat(individual.readEntries(1)).singleElement().satisfies(entry -> {
+                assertThat(entry.getPosition()).isEqualTo(ordinary);
+                entry.release();
+            });
             assertWholeEntryReplayIsSkipped(individual, batch);
 
             Entry direct = read(ledger, batch).join();
@@ -128,9 +121,7 @@ class NereusManagedCursorBatchAckTest {
         }
     }
 
-    private static void assertWholeEntryReplayIsSkipped(
-            ManagedCursor cursor,
-            Position position) {
+    private static void assertWholeEntryReplayIsSkipped(ManagedCursor cursor, Position position) {
         CompletableFuture<List<Entry>> callback = new CompletableFuture<>();
         Set<? extends Position> skipped = cursor.asyncReplayEntries(
                 Set.of(position),
@@ -152,17 +143,20 @@ class NereusManagedCursorBatchAckTest {
 
     private static CompletableFuture<Entry> read(ManagedLedger ledger, Position position) {
         CompletableFuture<Entry> result = new CompletableFuture<>();
-        ledger.asyncReadEntry(position, new AsyncCallbacks.ReadEntryCallback() {
-            @Override
-            public void readEntryComplete(Entry entry, Object ctx) {
-                result.complete(entry);
-            }
+        ledger.asyncReadEntry(
+                position,
+                new AsyncCallbacks.ReadEntryCallback() {
+                    @Override
+                    public void readEntryComplete(Entry entry, Object ctx) {
+                        result.complete(entry);
+                    }
 
-            @Override
-            public void readEntryFailed(ManagedLedgerException exception, Object ctx) {
-                result.completeExceptionally(exception);
-            }
-        }, null);
+                    @Override
+                    public void readEntryFailed(ManagedLedgerException exception, Object ctx) {
+                        result.completeExceptionally(exception);
+                    }
+                },
+                null);
         return result;
     }
 
@@ -178,8 +172,7 @@ class NereusManagedCursorBatchAckTest {
                 .setPublishTime(1)
                 .setNumMessagesInBatch(batchSize);
         ByteBuf payload = Unpooled.wrappedBuffer(new byte[] {1, 2, 3, 4});
-        ByteBuf serialized = Commands.serializeMetadataAndPayload(
-                Commands.ChecksumType.Crc32c, metadata, payload);
+        ByteBuf serialized = Commands.serializeMetadataAndPayload(Commands.ChecksumType.Crc32c, metadata, payload);
         try {
             byte[] bytes = new byte[serialized.readableBytes()];
             serialized.getBytes(serialized.readerIndex(), bytes);

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -15,7 +16,6 @@ import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HexFormat;
@@ -25,7 +25,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Deterministic in-memory physical store used by unchanged M1 store/core contracts. */
+/**
+ * Deterministic in-memory physical store used by unchanged M1 store/core contracts.
+ */
 public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataStore {
     private final Map<String, VersionedPhysicalObjectRoot> roots = new HashMap<>();
     private final Map<String, VersionedReaderLease> leases = new HashMap<>();
@@ -59,8 +61,8 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         }
         long version = nextVersion++;
         PhysicalObjectRootRecord value = root.withMetadataVersion(version);
-        VersionedPhysicalObjectRoot created = new VersionedPhysicalObjectRoot(
-                key, value, version, durable(value, PhysicalObjectRootRecord.class));
+        VersionedPhysicalObjectRoot created =
+                new VersionedPhysicalObjectRoot(key, value, version, durable(value, PhysicalObjectRootRecord.class));
         roots.put(key, created);
         return completed(created);
     }
@@ -83,8 +85,8 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         }
         long version = nextVersion++;
         PhysicalObjectRootRecord value = root.withMetadataVersion(version);
-        VersionedPhysicalObjectRoot updated = new VersionedPhysicalObjectRoot(
-                key, value, version, durable(value, PhysicalObjectRootRecord.class));
+        VersionedPhysicalObjectRoot updated =
+                new VersionedPhysicalObjectRoot(key, value, version, durable(value, PhysicalObjectRootRecord.class));
         roots.put(key, updated);
         return completed(updated);
     }
@@ -126,8 +128,14 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
                 limit);
         return completed(new PhysicalObjectRootScanPage(
                 values,
-                continuation(values, VersionedPhysicalObjectRoot::key, cluster,
-                        F4ScanKind.PHYSICAL_ROOT, scope, prefix, limit)));
+                continuation(
+                        values,
+                        VersionedPhysicalObjectRoot::key,
+                        cluster,
+                        F4ScanKind.PHYSICAL_ROOT,
+                        scope,
+                        prefix,
+                        limit)));
     }
 
     @Override
@@ -146,8 +154,8 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         }
         long version = nextVersion++;
         ObjectReaderLeaseRecord value = lease.withMetadataVersion(version);
-        VersionedReaderLease created = new VersionedReaderLease(
-                key, value, version, durable(value, ObjectReaderLeaseRecord.class));
+        VersionedReaderLease created =
+                new VersionedReaderLease(key, value, version, durable(value, ObjectReaderLeaseRecord.class));
         leases.put(key, created);
         return completed(created);
     }
@@ -165,8 +173,8 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         }
         long version = nextVersion++;
         ObjectReaderLeaseRecord value = lease.withMetadataVersion(version);
-        VersionedReaderLease updated = new VersionedReaderLease(
-                key, value, version, durable(value, ObjectReaderLeaseRecord.class));
+        VersionedReaderLease updated =
+                new VersionedReaderLease(key, value, version, durable(value, ObjectReaderLeaseRecord.class));
         leases.put(key, updated);
         return completed(updated);
     }
@@ -191,15 +199,21 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         F4MetadataStoreSupport.requirePageLimit(limit);
         F4Keyspace keys = new F4Keyspace(cluster);
         String prefix = F4MetadataStoreSupport.prefixStart(keys.readerPrefix(object));
-        String scope = sha256(
-                F4ScanKind.READER_LEASE.name() + "\0" + object.value() + "\0" + keys.readerPrefix(object));
+        String scope =
+                sha256(F4ScanKind.READER_LEASE.name() + "\0" + object.value() + "\0" + keys.readerPrefix(object));
         List<VersionedReaderLease> values = page(
-                leases.values(), VersionedReaderLease::key, prefix, continuation,
-                cluster, F4ScanKind.READER_LEASE, scope, limit);
+                leases.values(),
+                VersionedReaderLease::key,
+                prefix,
+                continuation,
+                cluster,
+                F4ScanKind.READER_LEASE,
+                scope,
+                limit);
         return completed(new ReaderLeaseScanPage(
                 values,
-                continuation(values, VersionedReaderLease::key, cluster,
-                        F4ScanKind.READER_LEASE, scope, prefix, limit)));
+                continuation(
+                        values, VersionedReaderLease::key, cluster, F4ScanKind.READER_LEASE, scope, prefix, limit)));
     }
 
     @Override
@@ -219,8 +233,8 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         }
         long version = nextVersion++;
         ObjectProtectionRecord value = protection.withMetadataVersion(version);
-        VersionedObjectProtection created = new VersionedObjectProtection(
-                key, value, version, durable(value, ObjectProtectionRecord.class));
+        VersionedObjectProtection created =
+                new VersionedObjectProtection(key, value, version, durable(value, ObjectProtectionRecord.class));
         protections.put(key, created);
         return completed(created);
     }
@@ -239,8 +253,8 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         }
         long version = nextVersion++;
         ObjectProtectionRecord value = protection.withMetadataVersion(version);
-        VersionedObjectProtection updated = new VersionedObjectProtection(
-                key, value, version, durable(value, ObjectProtectionRecord.class));
+        VersionedObjectProtection updated =
+                new VersionedObjectProtection(key, value, version, durable(value, ObjectProtectionRecord.class));
         protections.put(key, updated);
         return completed(updated);
     }
@@ -266,18 +280,27 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         F4MetadataStoreSupport.requirePageLimit(limit);
         F4Keyspace keys = new F4Keyspace(cluster);
         String prefix = F4MetadataStoreSupport.prefixStart(keys.protectionPrefix(object));
-        String scope = sha256(F4ScanKind.OBJECT_PROTECTION.name()
-                + "\0"
-                + object.value()
-                + "\0"
-                + keys.protectionPrefix(object));
+        String scope = sha256(
+                F4ScanKind.OBJECT_PROTECTION.name() + "\0" + object.value() + "\0" + keys.protectionPrefix(object));
         List<VersionedObjectProtection> values = page(
-                protections.values(), VersionedObjectProtection::key, prefix, continuation,
-                cluster, F4ScanKind.OBJECT_PROTECTION, scope, limit);
+                protections.values(),
+                VersionedObjectProtection::key,
+                prefix,
+                continuation,
+                cluster,
+                F4ScanKind.OBJECT_PROTECTION,
+                scope,
+                limit);
         return completed(new ObjectProtectionScanPage(
                 values,
-                continuation(values, VersionedObjectProtection::key, cluster,
-                        F4ScanKind.OBJECT_PROTECTION, scope, prefix, limit)));
+                continuation(
+                        values,
+                        VersionedObjectProtection::key,
+                        cluster,
+                        F4ScanKind.OBJECT_PROTECTION,
+                        scope,
+                        prefix,
+                        limit)));
     }
 
     @Override
@@ -298,8 +321,7 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         VersionedGcRetirementManifest existing = retirementManifests.get(key);
         if (existing != null) {
             if (!existing.value().withMetadataVersion(0).equals(manifest)) {
-                return failed(F4MetadataStoreSupport.invariant(
-                        "GC retirement manifest identity conflict"));
+                return failed(F4MetadataStoreSupport.invariant("GC retirement manifest identity conflict"));
             }
             return completed(existing);
         }
@@ -317,13 +339,11 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         ensureOpen();
         F4Keyspace keys = new F4Keyspace(cluster);
         ObjectKeyHash object = new ObjectKeyHash(protection.objectKeyHash());
-        String key = keys.gcRetirementProtectionKey(
-                object, protection.gcAttemptId(), protection.protectionKey());
+        String key = keys.gcRetirementProtectionKey(object, protection.gcAttemptId(), protection.protectionKey());
         VersionedGcRetirementProtection existing = retirementProtections.get(key);
         if (existing != null) {
             if (!existing.value().withMetadataVersion(0).equals(protection)) {
-                return failed(F4MetadataStoreSupport.invariant(
-                        "GC retirement protection identity conflict"));
+                return failed(F4MetadataStoreSupport.invariant("GC retirement protection identity conflict"));
             }
             return completed(existing);
         }
@@ -341,41 +361,31 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         ensureOpen();
         F4Keyspace keys = new F4Keyspace(cluster);
         ObjectKeyHash object = new ObjectKeyHash(removal.objectKeyHash());
-        String key = keys.gcRetirementRemovalKey(
-                object, removal.gcAttemptId(), removal.removalKey());
+        String key = keys.gcRetirementRemovalKey(object, removal.gcAttemptId(), removal.removalKey());
         VersionedGcRetirementRemoval existing = retirementRemovals.get(key);
         if (existing != null) {
             if (!existing.value().withMetadataVersion(0).equals(removal)) {
-                return failed(F4MetadataStoreSupport.invariant(
-                        "GC retirement removal identity conflict"));
+                return failed(F4MetadataStoreSupport.invariant("GC retirement removal identity conflict"));
             }
             return completed(existing);
         }
         long version = nextVersion++;
         GcRetirementRemovalRecord value = removal.withMetadataVersion(version);
-        VersionedGcRetirementRemoval created = new VersionedGcRetirementRemoval(
-                key, value, version, durable(value, GcRetirementRemovalRecord.class));
+        VersionedGcRetirementRemoval created =
+                new VersionedGcRetirementRemoval(key, value, version, durable(value, GcRetirementRemovalRecord.class));
         retirementRemovals.put(key, created);
         return completed(created);
     }
 
     @Override
     public synchronized CompletableFuture<GcRetirementProtectionScanPage> scanRetirementProtections(
-            String cluster,
-            ObjectKeyHash object,
-            String gcAttemptId,
-            Optional<F4ScanToken> continuation,
-            int limit) {
+            String cluster, ObjectKeyHash object, String gcAttemptId, Optional<F4ScanToken> continuation, int limit) {
         ensureOpen();
         F4MetadataStoreSupport.requirePageLimit(limit);
         F4Keyspace keys = new F4Keyspace(cluster);
         String base = keys.gcRetirementProtectionPrefix(object, gcAttemptId);
         String prefix = F4MetadataStoreSupport.prefixStart(base);
-        String scope = sha256(F4ScanKind.GC_RETIREMENT_PROTECTION.name()
-                + "\0"
-                + object.value()
-                + "\0"
-                + base);
+        String scope = sha256(F4ScanKind.GC_RETIREMENT_PROTECTION.name() + "\0" + object.value() + "\0" + base);
         List<VersionedGcRetirementProtection> values = page(
                 retirementProtections.values(),
                 VersionedGcRetirementProtection::key,
@@ -399,21 +409,13 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
 
     @Override
     public synchronized CompletableFuture<GcRetirementRemovalScanPage> scanRetirementRemovals(
-            String cluster,
-            ObjectKeyHash object,
-            String gcAttemptId,
-            Optional<F4ScanToken> continuation,
-            int limit) {
+            String cluster, ObjectKeyHash object, String gcAttemptId, Optional<F4ScanToken> continuation, int limit) {
         ensureOpen();
         F4MetadataStoreSupport.requirePageLimit(limit);
         F4Keyspace keys = new F4Keyspace(cluster);
         String base = keys.gcRetirementRemovalPrefix(object, gcAttemptId);
         String prefix = F4MetadataStoreSupport.prefixStart(base);
-        String scope = sha256(F4ScanKind.GC_RETIREMENT_REMOVAL.name()
-                + "\0"
-                + object.value()
-                + "\0"
-                + base);
+        String scope = sha256(F4ScanKind.GC_RETIREMENT_REMOVAL.name() + "\0" + object.value() + "\0" + base);
         List<VersionedGcRetirementRemoval> values = page(
                 retirementRemovals.values(),
                 VersionedGcRetirementRemoval::key,
@@ -443,8 +445,8 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
     public synchronized Optional<VersionedObjectProtection> protection(
             String cluster, ObjectProtectionIdentity identity) {
         F4Keyspace keys = new F4Keyspace(cluster);
-        return Optional.ofNullable(protections.get(
-                keys.protectionKey(identity.object(), identity.type(), identity.referenceId())));
+        return Optional.ofNullable(
+                protections.get(keys.protectionKey(identity.object(), identity.type(), identity.referenceId())));
     }
 
     @Override
@@ -487,17 +489,12 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
             String prefix,
             int limit) {
         return values.size() == limit
-                ? Optional.of(new F4ScanToken(
-                        cluster, kind, scope, prefix, key.apply(values.get(values.size() - 1))))
+                ? Optional.of(new F4ScanToken(cluster, kind, scope, prefix, key.apply(values.get(values.size() - 1))))
                 : Optional.empty();
     }
 
     private static Optional<F4ScanToken> validateToken(
-            Optional<F4ScanToken> supplied,
-            String cluster,
-            F4ScanKind kind,
-            String scope,
-            String prefix) {
+            Optional<F4ScanToken> supplied, String cluster, F4ScanKind kind, String scope, String prefix) {
         Objects.requireNonNull(supplied, "continuation");
         supplied.ifPresent(token -> {
             if (!cluster.equals(token.cluster())
@@ -522,8 +519,9 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
 
     private static String sha256(String value) {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            return HexFormat.of()
+                    .formatHex(MessageDigest.getInstance("SHA-256")
+                            .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }

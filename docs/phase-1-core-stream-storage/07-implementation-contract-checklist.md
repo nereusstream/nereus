@@ -5,33 +5,33 @@
 
 ## 1. Supported Surface For Phase 1
 
-| Area | Phase 1 supports | Phase 1 rejects or defers |
-| --- | --- | --- |
-| Stream lifecycle | exact opaque `StreamName`, deterministic full-hash `StreamId`, create-or-get as `ACTIVE`, read/trim `SEALED` | public seal/delete API, parsing Pulsar topic syntax in L0 |
-| Durable key helpers | `nereus-api` shared key/hash helpers used by metadata and object modules; `.`/`..` are encoded; writer run id has at least 128 bits entropy | duplicate local key encoders, raw cluster in paths, truncated hashes without migration plan |
-| Storage profile | metadata/API reserve all names；execution accepts only canonical `OBJECT_WAL_SYNC_OBJECT` (`OBJECT_WAL` alias) | BK/async/local execution；fail with `UNSUPPORTED_STORAGE_PROFILE` before WAL IO |
-| Durability | `WAL_DURABLE_AND_INDEX_COMMITTED` only；success includes WAL durable、head commit、generation-0 index/marker confirmation | `WAL_DURABLE` execution；fail with `UNSUPPORTED_DURABILITY_LEVEL` before WAL IO |
-| Payload | `OPAQUE_RECORD_BATCH`, one record per entry, one read batch per opaque entry | non-opaque public append, opaque entry with `recordCount > 1`, concatenating opaque entries |
-| Zero-byte records | empty payload consumes one offset and can be returned after byte budget is exactly consumed | read loops that advance only by payload bytes or stop solely on `remainingBytes == 0` |
-| Projection | public append returns empty `ProjectionRef` | non-empty public `projectionHints` without a durable mapping |
-| WAL object shape | `WalObjectWriter` supports multi-slice; core planner may initially flush one append work item per object | implicit request splitting inside writer |
-| WAL object identity | per-writer-run object sequence is monotonic and never reused; same physical retry reuses same object id | sequence rewind after timeout/failure, caller-level retry reusing object id |
-| WAL object limits | sizing pass computes final encoded length; `maxObjectBytes` is hard, `targetObjectSizeBytes` is advisory | checking only payload bytes or treating target as the hard limit |
-| Object upload deadline | `WalWriteOptions.uploadTimeout` reaches `PutObjectOptions.timeout` and concrete client calls | caller-only timeout wrapper with unbounded object-store upload |
-| Read memory boundary | full-slice reads guarded by `maxConcurrentObjectReads` and `maxReadBufferBytes` | unbounded full-slice allocation for clipped reads |
-| WAL format metadata | common header length, major/minor version, section envelopes, writer version in manifest | ad hoc raw section concatenation without version/checksum headers |
-| WAL compression | `CompressionType.NONE` | `ZSTD` with `UNSUPPORTED_FORMAT` |
-| Entry index location | writer emits and reader supports `OBJECT_FOOTER` | `INLINE` and `INDEX_OBJECT` with `UNSUPPORTED_FORMAT` |
-| Checksum domains | caller payload checksum, WAL canonical object checksum, storage checksum, slice checksum, entry-index/footer checksums | treating distinct checksum domains as interchangeable |
-| Metadata truth | stream head + reachable commit log are append truth；offset index/marker are repairable read/replay materializations | treating derived index, manifest, watch, or list as the append linearization truth |
-| Object metadata | manifest/reference as repairable audit/GC inputs | cross-stream/object atomic producer ack |
-| Read path | offset-index-driven resolve, full-slice checksum before clipping | object list, manifest-only reads, negative cache |
-| Read amplification | explicit metrics for full-slice bytes, entry-index bytes, returned bytes, amplification, and read backpressure | hiding 16 MiB-to-100 byte reads as ordinary object read volume |
-| Offset-index cache | positive scan results only; watch events invalidate but never populate cache | EOF caching, watch-created positive records |
-| Trim | monotonic stream-head low-watermark CAS，deadline/cancel response，explicit cache invalidation | offset-index/object deletion，treating timeout as rollback proof |
-| Orphan diagnostics | caller-supplied object id，manifest + repaired reachable references，diagnostic-only classification | object listing in correctness path，any Phase 1 deletion authorization |
-| Local object cleanup | test-only cleanup under injected `LocalFileObjectStore` root | production object delete in Phase 1 |
-| Protocol integration | protocol-neutral API and metadata labels | Pulsar, KoP, ManagedLedger classes |
+| Area                   | Phase 1 supports                                                                                                                            | Phase 1 rejects or defers                                                                   |
+|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| Stream lifecycle       | exact opaque `StreamName`, deterministic full-hash `StreamId`, create-or-get as `ACTIVE`, read/trim `SEALED`                                | public seal/delete API, parsing Pulsar topic syntax in L0                                   |
+| Durable key helpers    | `nereus-api` shared key/hash helpers used by metadata and object modules; `.`/`..` are encoded; writer run id has at least 128 bits entropy | duplicate local key encoders, raw cluster in paths, truncated hashes without migration plan |
+| Storage profile        | metadata/API reserve all names；execution accepts only canonical `OBJECT_WAL_SYNC_OBJECT` (`OBJECT_WAL` alias)                               | BK/async/local execution；fail with `UNSUPPORTED_STORAGE_PROFILE` before WAL IO              |
+| Durability             | `WAL_DURABLE_AND_INDEX_COMMITTED` only；success includes WAL durable、head commit、generation-0 index/marker confirmation                      | `WAL_DURABLE` execution；fail with `UNSUPPORTED_DURABILITY_LEVEL` before WAL IO              |
+| Payload                | `OPAQUE_RECORD_BATCH`, one record per entry, one read batch per opaque entry                                                                | non-opaque public append, opaque entry with `recordCount > 1`, concatenating opaque entries |
+| Zero-byte records      | empty payload consumes one offset and can be returned after byte budget is exactly consumed                                                 | read loops that advance only by payload bytes or stop solely on `remainingBytes == 0`       |
+| Projection             | public append returns empty `ProjectionRef`                                                                                                 | non-empty public `projectionHints` without a durable mapping                                |
+| WAL object shape       | `WalObjectWriter` supports multi-slice; core planner may initially flush one append work item per object                                    | implicit request splitting inside writer                                                    |
+| WAL object identity    | per-writer-run object sequence is monotonic and never reused; same physical retry reuses same object id                                     | sequence rewind after timeout/failure, caller-level retry reusing object id                 |
+| WAL object limits      | sizing pass computes final encoded length; `maxObjectBytes` is hard, `targetObjectSizeBytes` is advisory                                    | checking only payload bytes or treating target as the hard limit                            |
+| Object upload deadline | `WalWriteOptions.uploadTimeout` reaches `PutObjectOptions.timeout` and concrete client calls                                                | caller-only timeout wrapper with unbounded object-store upload                              |
+| Read memory boundary   | full-slice reads guarded by `maxConcurrentObjectReads` and `maxReadBufferBytes`                                                             | unbounded full-slice allocation for clipped reads                                           |
+| WAL format metadata    | common header length, major/minor version, section envelopes, writer version in manifest                                                    | ad hoc raw section concatenation without version/checksum headers                           |
+| WAL compression        | `CompressionType.NONE`                                                                                                                      | `ZSTD` with `UNSUPPORTED_FORMAT`                                                            |
+| Entry index location   | writer emits and reader supports `OBJECT_FOOTER`                                                                                            | `INLINE` and `INDEX_OBJECT` with `UNSUPPORTED_FORMAT`                                       |
+| Checksum domains       | caller payload checksum, WAL canonical object checksum, storage checksum, slice checksum, entry-index/footer checksums                      | treating distinct checksum domains as interchangeable                                       |
+| Metadata truth         | stream head + reachable commit log are append truth；offset index/marker are repairable read/replay materializations                         | treating derived index, manifest, watch, or list as the append linearization truth          |
+| Object metadata        | manifest/reference as repairable audit/GC inputs                                                                                            | cross-stream/object atomic producer ack                                                     |
+| Read path              | offset-index-driven resolve, full-slice checksum before clipping                                                                            | object list, manifest-only reads, negative cache                                            |
+| Read amplification     | explicit metrics for full-slice bytes, entry-index bytes, returned bytes, amplification, and read backpressure                              | hiding 16 MiB-to-100 byte reads as ordinary object read volume                              |
+| Offset-index cache     | positive scan results only; watch events invalidate but never populate cache                                                                | EOF caching, watch-created positive records                                                 |
+| Trim                   | monotonic stream-head low-watermark CAS，deadline/cancel response，explicit cache invalidation                                                | offset-index/object deletion，treating timeout as rollback proof                             |
+| Orphan diagnostics     | caller-supplied object id，manifest + repaired reachable references，diagnostic-only classification                                           | object listing in correctness path，any Phase 1 deletion authorization                       |
+| Local object cleanup   | test-only cleanup under injected `LocalFileObjectStore` root                                                                                | production object delete in Phase 1                                                         |
+| Protocol integration   | protocol-neutral API and metadata labels                                                                                                    | Pulsar, KoP, ManagedLedger classes                                                          |
 
 ## 2. Must-Have Before Real Adapter Work
 
@@ -226,27 +226,28 @@ Producer ack is allowed only after:
 1. WAL object bytes are durable.
 2. Object manifest is written or idempotently confirmed.
 3. `commitStreamSlice` succeeds through the stream-head CAS protocol:
-   - stream state is `ACTIVE`;
-   - append epoch/token match;
-   - head committed end equals `expectedStartOffset`;
-   - immutable `StreamCommitRecord` is written or idempotently confirmed;
-   - stream head CAS advances committed end, cumulative size, commitVersion, and lastCommitId;
-   - compatible head CAS conflicts caused only by same-writer renew, trim, or other non-append head
-     updates are retried with the latest head instead of fencing or reporting a condition failure;
-   - for same-slice replay, the existing marker or reachable head-chain commit is validated and the
-     original result is returned;
-   - after marker-missing condition failure, the head chain is searched before classifying the error;
-   - object manifest object id, writer id, writer run id, writer epoch, object key/type/format, aggregate
-     visibility state, and slice fields match the commit request;
-   - an existing commit intent matches both the canonical request and the current head-derived predecessor,
-     offset range, cumulative size, and next commitVersion before CAS reuse;
-   - every reachable-chain scan validates dense offset, cumulative-size, and commitVersion progression;
-   - offset index and committed-slice marker for the committed record are materialized or idempotently
-     confirmed before success is returned;
-   - durable `commitVersion` is the same in stream head, commit-log, offset-index, and committed-slice
-     records.
+    - stream state is `ACTIVE`;
+    - append epoch/token match;
+    - head committed end equals `expectedStartOffset`;
+    - immutable `StreamCommitRecord` is written or idempotently confirmed;
+    - stream head CAS advances committed end, cumulative size, commitVersion, and lastCommitId;
+    - compatible head CAS conflicts caused only by same-writer renew, trim, or other non-append head
+      updates are retried with the latest head instead of fencing or reporting a condition failure;
+    - for same-slice replay, the existing marker or reachable head-chain commit is validated and the
+      original result is returned;
+    - after marker-missing condition failure, the head chain is searched before classifying the error;
+    - object manifest object id, writer id, writer run id, writer epoch, object key/type/format, aggregate
+      visibility state, and slice fields match the commit request;
+    - an existing commit intent matches both the canonical request and the current head-derived predecessor,
+      offset range, cumulative size, and next commitVersion before CAS reuse;
+    - every reachable-chain scan validates dense offset, cumulative-size, and commitVersion progression;
+    - offset index and committed-slice marker for the committed record are materialized or idempotently
+      confirmed before success is returned;
+    - durable `commitVersion` is the same in stream head, commit-log, offset-index, and committed-slice
+      records.
 
-Every exceptional append carries `AppendOutcome`，including missing-stream/closed-store rejection。Before head send is `KNOWN_NOT_COMMITTED`；unconfirmed head
+Every exceptional append carries `AppendOutcome`，including missing-stream/closed-store rejection。Before head send is
+`KNOWN_NOT_COMMITTED`；unconfirmed head
 response or replay-proof budget exhaustion is `MAY_HAVE_COMMITTED`；confirmed head success followed by
 index/result failure is `KNOWN_COMMITTED`。The implementation must not report either latter state as an
 ordinary retryable conflict；same physical slice replay/repair must finish from the reachable commit record。

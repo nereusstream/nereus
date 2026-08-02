@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -15,16 +16,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
-/** One monotonic deadline shared by every asynchronous cut in a materialization operation. */
+/**
+ * One monotonic deadline shared by every asynchronous cut in a materialization operation.
+ */
 public final class MaterializationDeadline implements AutoCloseable {
     private final long deadlineNanos;
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean closed = new AtomicBoolean();
     private final Set<BoundState<?>> active = ConcurrentHashMap.newKeySet();
 
-    public MaterializationDeadline(
-            Duration timeout,
-            ScheduledExecutorService scheduler) {
+    public MaterializationDeadline(Duration timeout, ScheduledExecutorService scheduler) {
         Objects.requireNonNull(timeout, "timeout");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         if (timeout.isZero() || timeout.isNegative()) {
@@ -37,24 +38,18 @@ public final class MaterializationDeadline implements AutoCloseable {
         } catch (ArithmeticException overflow) {
             timeoutNanos = Long.MAX_VALUE;
         }
-        this.deadlineNanos = timeoutNanos >= Long.MAX_VALUE - now
-                ? Long.MAX_VALUE
-                : now + timeoutNanos;
+        this.deadlineNanos = timeoutNanos >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + timeoutNanos;
     }
 
     public Duration remaining() {
-        long nanos = deadlineNanos == Long.MAX_VALUE
-                ? Long.MAX_VALUE
-                : deadlineNanos - System.nanoTime();
+        long nanos = deadlineNanos == Long.MAX_VALUE ? Long.MAX_VALUE : deadlineNanos - System.nanoTime();
         if (nanos <= 0) {
             throw timeout("materialization operation deadline expired");
         }
         return Duration.ofNanos(nanos);
     }
 
-    public <T> CompletableFuture<T> bound(
-            Supplier<CompletableFuture<T>> operation,
-            String stage) {
+    public <T> CompletableFuture<T> bound(Supplier<CompletableFuture<T>> operation, String stage) {
         if (closed.get()) {
             return CompletableFuture.failedFuture(closed(stage + " rejected after close"));
         }
@@ -78,16 +73,11 @@ public final class MaterializationDeadline implements AutoCloseable {
             return result;
         }
         try {
-            state.timeout = scheduler.schedule(
-                    () -> state.fail(timeout(stage + " timed out")),
-                    nanos,
-                    TimeUnit.NANOSECONDS);
+            state.timeout =
+                    scheduler.schedule(() -> state.fail(timeout(stage + " timed out")), nanos, TimeUnit.NANOSECONDS);
         } catch (RejectedExecutionException failure) {
             state.fail(new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    stage + " timeout scheduler rejected admitted work",
-                    failure));
+                    ErrorCode.STORAGE_CLOSED, false, stage + " timeout scheduler rejected admitted work", failure));
             return result;
         }
         source.whenComplete(state::completeFromSource);
@@ -116,10 +106,7 @@ public final class MaterializationDeadline implements AutoCloseable {
         private final AtomicBoolean terminal = new AtomicBoolean();
         private volatile ScheduledFuture<?> timeout;
 
-        private BoundState(
-                CompletableFuture<T> source,
-                CompletableFuture<T> result,
-                String stage) {
+        private BoundState(CompletableFuture<T> source, CompletableFuture<T> result, String stage) {
             this.source = source;
             this.result = result;
             this.stage = stage;

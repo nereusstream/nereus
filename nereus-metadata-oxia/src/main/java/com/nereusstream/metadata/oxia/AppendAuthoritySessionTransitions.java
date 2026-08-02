@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.AppendAuthority;
@@ -10,13 +11,14 @@ import com.nereusstream.metadata.oxia.records.StreamHeadRecord;
 import java.util.Objects;
 import java.util.function.LongFunction;
 
-/** Pure external-authority comparison and session transition shared by real and fake stores. */
+/**
+ * Pure external-authority comparison and session transition shared by real and fake stores.
+ */
 public final class AppendAuthoritySessionTransitions {
     public static final String AUTHORITY_MODE_ATTRIBUTE = "nereus.append.authority.mode";
     public static final String EXTERNAL_MONOTONIC_TERM_V1 = "EXTERNAL_MONOTONIC_TERM_V1";
 
-    private AppendAuthoritySessionTransitions() {
-    }
+    private AppendAuthoritySessionTransitions() {}
 
     public static void requireLegacyMode(StreamHeadRecord head) {
         Objects.requireNonNull(head, "head");
@@ -66,8 +68,7 @@ public final class AppendAuthoritySessionTransitions {
         if (sameOwner && requested.ownerEpoch() > current.authorityOwnerEpoch()) {
             return replacement(current, options, requested, expiresAtMillis, tokenForEpoch);
         }
-        boolean exactAuthority = sameOwner
-                && requested.ownerEpoch() == current.authorityOwnerEpoch();
+        boolean exactAuthority = sameOwner && requested.ownerEpoch() == current.authorityOwnerEpoch();
         boolean live = current.expiresAtMillis() > nowMillis;
         if (exactAuthority && live && current.writerId().equals(options.writerId())) {
             return new AppendSessionSnapshotRecord(
@@ -89,14 +90,19 @@ public final class AppendAuthoritySessionTransitions {
     }
 
     public static AppendSessionSnapshotRecord preserveAuthorityOnRenewal(
-            AppendSessionSnapshotRecord current,
-            long expiresAtMillis) {
+            AppendSessionSnapshotRecord current, long expiresAtMillis) {
         Objects.requireNonNull(current, "current");
         return new AppendSessionSnapshotRecord(
-                current.writerId(), current.epoch(), current.fencingToken(),
-                Math.addExact(current.leaseVersion(), 1), expiresAtMillis,
-                current.authorityType(), current.authorityId(), current.authorityEpoch(),
-                current.authorityOwnerId(), current.authorityOwnerEpoch());
+                current.writerId(),
+                current.epoch(),
+                current.fencingToken(),
+                Math.addExact(current.leaseVersion(), 1),
+                expiresAtMillis,
+                current.authorityType(),
+                current.authorityId(),
+                current.authorityEpoch(),
+                current.authorityOwnerId(),
+                current.authorityOwnerEpoch());
     }
 
     private static AppendSessionSnapshotRecord replacement(

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -26,7 +27,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Production BK_ONLY bridge from monotonic L0 trim/abandoned-reservation facts to protection retirement. */
+/**
+ * Production BK_ONLY bridge from monotonic L0 trim/abandoned-reservation facts to protection retirement.
+ */
 public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperWalRetirementAuthority {
     private final String cluster;
     private final OxiaMetadataStore l0;
@@ -34,9 +37,7 @@ public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperWal
     private final OxiaKeyspace keys;
 
     public BookKeeperWalOnlyRetirementAuthority(
-            String cluster,
-            OxiaMetadataStore l0,
-            BookKeeperWriterMetadataStore writerMetadata) {
+            String cluster, OxiaMetadataStore l0, BookKeeperWriterMetadataStore writerMetadata) {
         this.cluster = text(cluster, "cluster");
         this.l0 = Objects.requireNonNull(l0, "l0");
         this.writerMetadata = Objects.requireNonNull(writerMetadata, "writerMetadata");
@@ -44,20 +45,21 @@ public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperWal
     }
 
     public CompletableFuture<Optional<BookKeeperProtectionRetirementProof>> proveLogicalTrim(
-            BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> protection,
-            Duration timeout) {
+            BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> protection, Duration timeout) {
         BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> exact =
                 Objects.requireNonNull(protection, "protection");
         if (exact.value().lifecycle() != ProtectionLifecycle.ACTIVE) {
-            return CompletableFuture.failedFuture(invariant(
-                    "logical trim can retire only an exact ACTIVE BookKeeper protection"));
+            return CompletableFuture.failedFuture(
+                    invariant("logical trim can retire only an exact ACTIVE BookKeeper protection"));
         }
-        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(
-                Objects.requireNonNull(timeout, "timeout"));
+        BookKeeperOperationDeadline deadline =
+                new BookKeeperOperationDeadline(Objects.requireNonNull(timeout, "timeout"));
         StreamId stream = new StreamId(exact.value().streamId());
         return deadline.bound(l0.getStreamSnapshot(cluster, stream)).thenApply(snapshot -> {
             requireBookKeeperStream(stream, snapshot);
-            if (snapshot.trim().trimOffset() < exact.value().offsetEnd()) return Optional.empty();
+            if (snapshot.trim().trimOffset() < exact.value().offsetEnd()) {
+                return Optional.empty();
+            }
             return Optional.of(new BookKeeperProtectionRetirementProof(
                     exact.key(),
                     exact.metadataVersion(),
@@ -73,25 +75,28 @@ public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperWal
     }
 
     public CompletableFuture<Optional<BookKeeperProtectionRetirementProof>> proveAbandonedAppend(
-            BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> protection,
-            Duration timeout) {
+            BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> protection, Duration timeout) {
         BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> exact =
                 Objects.requireNonNull(protection, "protection");
-        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(
-                Objects.requireNonNull(timeout, "timeout"));
+        BookKeeperOperationDeadline deadline =
+                new BookKeeperOperationDeadline(Objects.requireNonNull(timeout, "timeout"));
         StreamId stream = new StreamId(exact.value().streamId());
-        return deadline.bound(writerMetadata.getReservation(cluster, stream, exact.value().referenceId()))
+        return deadline.bound(writerMetadata.getReservation(
+                        cluster, stream, exact.value().referenceId()))
                 .thenApply(optional -> optional.flatMap(reservation -> {
                     if (reservation.value().lifecycle() != AppendReservationLifecycle.ABANDONED) {
                         return Optional.empty();
                     }
                     requireReservation(exact.value(), reservation.value());
                     String ownerKey = exact.value().lifecycle() == ProtectionLifecycle.RESERVED
-                            ? reservation.key() : exact.value().ownerKey();
+                            ? reservation.key()
+                            : exact.value().ownerKey();
                     long ownerVersion = exact.value().lifecycle() == ProtectionLifecycle.RESERVED
-                            ? reservation.metadataVersion() : exact.value().ownerMetadataVersion();
+                            ? reservation.metadataVersion()
+                            : exact.value().ownerMetadataVersion();
                     Checksum ownerIdentity = exact.value().lifecycle() == ProtectionLifecycle.RESERVED
-                            ? reservation.durableValueSha256() : sha(exact.value().ownerIdentitySha256());
+                            ? reservation.durableValueSha256()
+                            : sha(exact.value().ownerIdentitySha256());
                     return Optional.of(new BookKeeperProtectionRetirementProof(
                             exact.key(),
                             exact.metadataVersion(),
@@ -114,15 +119,16 @@ public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperWal
         BookKeeperProtectionRetirementProof expected = Objects.requireNonNull(proof, "proof");
         BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> current =
                 Objects.requireNonNull(protection, "protection");
-        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(
-                Objects.requireNonNull(timeout, "timeout"));
+        BookKeeperOperationDeadline deadline =
+                new BookKeeperOperationDeadline(Objects.requireNonNull(timeout, "timeout"));
         return switch (expected.reason()) {
             case LOGICAL_TRIM -> revalidateTrim(expected, current, deadline);
             case ABANDONED_APPEND -> revalidateAbandoned(expected, current, deadline);
-            case HEALTHY_HIGHER_GENERATION -> CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
-                    false,
-                    "BK_ONLY retirement authority cannot prove a higher Object generation"));
+            case HEALTHY_HIGHER_GENERATION ->
+                CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
+                        false,
+                        "BK_ONLY retirement authority cannot prove a higher Object generation"));
         };
     }
 
@@ -150,15 +156,18 @@ public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperWal
         return deadline.bound(writerMetadata.getReservation(
                         cluster, stream, protection.value().referenceId()))
                 .thenAccept(optional -> {
-                    var reservation = optional.orElseThrow(() -> condition(
-                            "abandoned BookKeeper reservation disappeared during protection retirement"));
+                    var reservation = optional.orElseThrow(() ->
+                            condition("abandoned BookKeeper reservation disappeared during protection retirement"));
                     requireReservation(protection.value(), reservation.value());
                     String expectedOwnerKey = protection.value().lifecycle() == ProtectionLifecycle.RESERVED
-                            ? reservation.key() : protection.value().ownerKey();
+                            ? reservation.key()
+                            : protection.value().ownerKey();
                     long expectedOwnerVersion = protection.value().lifecycle() == ProtectionLifecycle.RESERVED
-                            ? reservation.metadataVersion() : protection.value().ownerMetadataVersion();
+                            ? reservation.metadataVersion()
+                            : protection.value().ownerMetadataVersion();
                     Checksum expectedOwnerIdentity = protection.value().lifecycle() == ProtectionLifecycle.RESERVED
-                            ? reservation.durableValueSha256() : sha(protection.value().ownerIdentitySha256());
+                            ? reservation.durableValueSha256()
+                            : sha(protection.value().ownerIdentitySha256());
                     if (reservation.value().lifecycle() != AppendReservationLifecycle.ABANDONED
                             || !proof.authorityKey().equals(reservation.key())
                             || proof.authorityMetadataVersion() != reservation.metadataVersion()
@@ -189,8 +198,7 @@ public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperWal
     }
 
     private static void requireReservation(
-            BookKeeperLedgerProtectionRecord protection,
-            BookKeeperAppendReservationRecord reservation) {
+            BookKeeperLedgerProtectionRecord protection, BookKeeperAppendReservationRecord reservation) {
         if (!reservation.reservationId().equals(protection.referenceId())
                 || !reservation.streamId().equals(protection.streamId())
                 || reservation.ledgerId() != protection.ledgerId()
@@ -260,7 +268,9 @@ public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperWal
 
     private static String text(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 }

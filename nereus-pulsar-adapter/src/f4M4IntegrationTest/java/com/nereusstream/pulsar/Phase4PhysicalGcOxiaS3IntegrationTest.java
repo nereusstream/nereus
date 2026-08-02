@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -43,12 +43,12 @@ import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
+import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaGenerationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaPhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
-import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.ProjectionMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
@@ -139,23 +139,20 @@ import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 
 @Testcontainers
 class Phase4PhysicalGcOxiaS3IntegrationTest {
-    private static final DockerImageName OXIA_IMAGE =
-            DockerImageName.parse("oxia/oxia:0.16.3");
-    private static final DockerImageName LOCALSTACK_IMAGE =
-            DockerImageName.parse("localstack/localstack:4.14.0");
+    private static final DockerImageName OXIA_IMAGE = DockerImageName.parse("oxia/oxia:0.16.3");
+    private static final DockerImageName LOCALSTACK_IMAGE = DockerImageName.parse("localstack/localstack:4.14.0");
     private static final long READINESS_EPOCH = 7;
     private static final Duration ACTIVATION_TIMEOUT = Duration.ofSeconds(90);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final Duration DRAIN_GRACE = Duration.ofMinutes(6);
-    private static final F4Keyspace SHARD_KEYSPACE =
-            new F4Keyspace("f4-m4-integration-shards");
+    private static final F4Keyspace SHARD_KEYSPACE = new F4Keyspace("f4-m4-integration-shards");
 
     @Container
     private static final OxiaContainer OXIA = new OxiaContainer(OXIA_IMAGE).withShards(4);
 
     @Container
-    private static final LocalStackContainer LOCALSTACK = new LocalStackContainer(LOCALSTACK_IMAGE)
-            .withServices(LocalStackContainer.Service.S3);
+    private static final LocalStackContainer LOCALSTACK =
+            new LocalStackContainer(LOCALSTACK_IMAGE).withServices(LocalStackContainer.Service.S3);
 
     @TempDir
     Path temporaryDirectory;
@@ -169,8 +166,8 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         createBucket(bucket);
         ObjectStoreConfiguration correctScope = objectStoreConfiguration(bucket, "scope-a");
         ObjectStoreConfiguration wrongScope = objectStoreConfiguration(bucket, "scope-b");
-        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
-                READINESS_EPOCH, sha256("broker-set/" + suffix), 1);
+        GenerationCapabilityReadiness readiness =
+                new GenerationCapabilityReadiness(READINESS_EPOCH, sha256("broker-set/" + suffix), 1);
         PhysicalGcConfig gcConfig = physicalGcConfig();
         TargetObject target;
 
@@ -188,15 +185,12 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
 
             first.runtime.start();
             assertThat(first.runtime.lifecycleService().isRunning()).isFalse();
-            assertThat(first.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+            assertThat(first.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.ACTIVE);
 
             ManagedLedgerPhysicalDeletionActivationResult activation = first.runtime
-                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
-                            "b".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest("b".repeat(26), 4, ACTIVATION_TIMEOUT))
                     .join();
-            assertThat(activation.status())
-                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+            assertThat(activation.status()).isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
             assertThat(activation.objectStoreCapabilitySha256())
                     .isEqualTo(first.runtime.expectedObjectStoreCapabilitySha256());
             assertThat(first.runtime.lifecycleService().isRunning()).isTrue();
@@ -227,8 +221,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 assertThat(nereus.retriable()).isFalse();
             });
             assertThat(wrong.runtime.lifecycleService().isRunning()).isFalse();
-            assertThat(wrong.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            assertThat(wrong.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.MARKED);
         }
 
         AtomicBoolean deleteResponseLost = new AtomicBoolean();
@@ -249,33 +242,31 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
 
             recovered.runtime.lifecycleService().scanNow().join();
 
-            assertThat(recovered.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(recovered.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
             assertThat(deleteResponseLost).isTrue();
             assertThat(emptyListCalls).hasPositiveValue();
-            assertThatThrownBy(() -> recovered.objectStore
+            assertThatThrownBy(() -> recovered
+                            .objectStore
                             .headObject(target.key(), new HeadObjectOptions(REQUEST_TIMEOUT))
                             .join())
                     .satisfies(failure -> {
                         Throwable exact = unwrap(failure);
                         assertThat(exact).isInstanceOf(NereusException.class);
-                        assertThat(((NereusException) exact).code())
-                                .isEqualTo(ErrorCode.OBJECT_NOT_FOUND);
+                        assertThat(((NereusException) exact).code()).isEqualTo(ErrorCode.OBJECT_NOT_FOUND);
                     });
         }
     }
 
     @Test
-    void processRestartAfterDeleteBeforeDeletedRootCasRecoversDurableDeletingIntent()
-            throws Exception {
+    void processRestartAfterDeleteBeforeDeletedRootCasRecoversDurableDeletingIntent() throws Exception {
         MutableClock clock = new MutableClock(2_000_000);
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "f4-m4-post-delete-" + suffix;
         String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
         createBucket(bucket);
         ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "post-delete");
-        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
-                READINESS_EPOCH, sha256("broker-set/post-delete/" + suffix), 1);
+        GenerationCapabilityReadiness readiness =
+                new GenerationCapabilityReadiness(READINESS_EPOCH, sha256("broker-set/post-delete/" + suffix), 1);
         PhysicalGcConfig gcConfig = physicalGcConfig();
         TargetObject target;
 
@@ -292,14 +283,11 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             target = first.createOwnerlessCompactedObject();
 
             ManagedLedgerPhysicalDeletionActivationResult activation = first.runtime
-                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
-                            "g".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest("g".repeat(26), 4, ACTIVATION_TIMEOUT))
                     .join();
-            assertThat(activation.status())
-                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+            assertThat(activation.status()).isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
             first.runtime.lifecycleService().scanNow().join();
-            assertThat(first.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            assertThat(first.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.MARKED);
             first.assertObjectPresent(target);
         }
 
@@ -315,20 +303,15 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 gcConfig,
                 stagingDirectory("post-delete-interrupted"),
                 clock,
-                raw -> new TargetDeleteTrackingObjectStore(
-                        raw, target.key(), targetDeleteCompleted),
+                raw -> new TargetDeleteTrackingObjectStore(raw, target.key(), targetDeleteCompleted),
                 PhysicalStoreDecorator.failBeforeDeletedRootCas(
-                        target.hash(),
-                        targetDeleteCompleted,
-                        crashInjected,
-                        crashObserved))) {
+                        target.hash(), targetDeleteCompleted, crashInjected, crashObserved))) {
             interrupted.runtime.start();
             crashObserved.get(30, TimeUnit.SECONDS);
 
             assertThat(targetDeleteCompleted).isTrue();
             assertThat(crashInjected).isTrue();
-            assertThat(interrupted.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETING);
+            assertThat(interrupted.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETING);
             interrupted.assertObjectAbsent(target);
         }
 
@@ -344,23 +327,21 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             recovered.runtime.start();
             recovered.runtime.lifecycleService().scanNow().join();
 
-            assertThat(recovered.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(recovered.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
             recovered.assertObjectAbsent(target);
         }
     }
 
     @Test
-    void lostDeletedRootCasResponseReloadsExactDurableReplacementWithoutRepeatedDelete()
-            throws Exception {
+    void lostDeletedRootCasResponseReloadsExactDurableReplacementWithoutRepeatedDelete() throws Exception {
         MutableClock clock = new MutableClock(3_000_000);
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "f4-m4-lost-deleted-cas-" + suffix;
         String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
         createBucket(bucket);
         ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "lost-deleted-cas");
-        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
-                READINESS_EPOCH, sha256("broker-set/lost-deleted-cas/" + suffix), 1);
+        GenerationCapabilityReadiness readiness =
+                new GenerationCapabilityReadiness(READINESS_EPOCH, sha256("broker-set/lost-deleted-cas/" + suffix), 1);
         PhysicalGcConfig gcConfig = physicalGcConfig();
         TargetObject target;
 
@@ -377,14 +358,11 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             target = first.createOwnerlessCompactedObject();
 
             ManagedLedgerPhysicalDeletionActivationResult activation = first.runtime
-                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
-                            "k".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest("k".repeat(26), 4, ACTIVATION_TIMEOUT))
                     .join();
-            assertThat(activation.status())
-                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+            assertThat(activation.status()).isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
             first.runtime.lifecycleService().scanNow().join();
-            assertThat(first.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            assertThat(first.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.MARKED);
             first.assertObjectPresent(target);
         }
 
@@ -401,16 +379,9 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 gcConfig,
                 stagingDirectory("lost-deleted-cas-uncertain"),
                 clock,
-                raw -> new TargetDeleteTrackingObjectStore(
-                        raw,
-                        target.key(),
-                        targetDeleteCompleted,
-                        targetDeleteCalls),
+                raw -> new TargetDeleteTrackingObjectStore(raw, target.key(), targetDeleteCompleted, targetDeleteCalls),
                 PhysicalStoreDecorator.loseDeletedRootCasResponse(
-                        target.hash(),
-                        targetDeleteCompleted,
-                        deletedCasResponseLost,
-                        exactDeletedReloadObserved))) {
+                        target.hash(), targetDeleteCompleted, deletedCasResponseLost, exactDeletedReloadObserved))) {
             uncertain.runtime.start();
             uncertain.runtime.lifecycleService().scanNow().join();
 
@@ -418,8 +389,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             assertThat(deletedCasResponseLost).isTrue();
             assertThat(exactDeletedReloadObserved).isTrue();
             assertThat(targetDeleteCalls).hasValue(1);
-            assertThat(uncertain.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(uncertain.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
             uncertain.assertObjectAbsent(target);
         }
 
@@ -434,15 +404,11 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 stagingDirectory("lost-deleted-cas-restarted"),
                 clock,
                 raw -> new TargetDeleteTrackingObjectStore(
-                        raw,
-                        target.key(),
-                        restartedDeleteCompleted,
-                        restartedDeleteCalls))) {
+                        raw, target.key(), restartedDeleteCompleted, restartedDeleteCalls))) {
             restarted.runtime.start();
             restarted.runtime.lifecycleService().scanNow().join();
 
-            assertThat(restarted.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(restarted.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
             restarted.assertObjectAbsent(target);
             assertThat(restartedDeleteCompleted).isFalse();
             assertThat(restartedDeleteCalls).hasValue(0);
@@ -450,16 +416,15 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
     }
 
     @Test
-    void twoIndependentWorkersConvergeConcurrentDeletingIntentAndExactDeletes()
-            throws Exception {
+    void twoIndependentWorkersConvergeConcurrentDeletingIntentAndExactDeletes() throws Exception {
         MutableClock clock = new MutableClock(4_000_000);
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "f4-m4-two-workers-" + suffix;
         String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
         createBucket(bucket);
         ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "two-workers");
-        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
-                READINESS_EPOCH, sha256("broker-set/two-workers/" + suffix), 2);
+        GenerationCapabilityReadiness readiness =
+                new GenerationCapabilityReadiness(READINESS_EPOCH, sha256("broker-set/two-workers/" + suffix), 2);
         PhysicalGcConfig gcConfig = physicalGcConfig();
         TargetObject target;
 
@@ -476,14 +441,11 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             target = first.createOwnerlessCompactedObject();
 
             ManagedLedgerPhysicalDeletionActivationResult activation = first.runtime
-                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
-                            "o".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest("o".repeat(26), 4, ACTIVATION_TIMEOUT))
                     .join();
-            assertThat(activation.status())
-                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+            assertThat(activation.status()).isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
             first.runtime.lifecycleService().scanNow().join();
-            assertThat(first.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            assertThat(first.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.MARKED);
             first.assertObjectPresent(target);
         }
 
@@ -524,8 +486,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             assertThat(deletingRace.failures()).hasValue(1);
             assertThat(deleteRace.attempts()).hasValue(2);
             assertThat(deleteRace.completions()).hasValue(2);
-            assertThat(workerA.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(workerA.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
             assertThat(workerB.root(target)).isEqualTo(workerA.root(target));
             workerA.assertObjectAbsent(target);
             workerB.assertObjectAbsent(target);
@@ -533,16 +494,15 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
     }
 
     @Test
-    void freshProcessRecoversMarkedAndDeletingRootsFromEveryShardWithEmptyInventory()
-            throws Exception {
+    void freshProcessRecoversMarkedAndDeletingRootsFromEveryShardWithEmptyInventory() throws Exception {
         MutableClock clock = new MutableClock(5_000_000);
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "f4-m4-all-shards-" + suffix;
         String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
         createBucket(bucket);
         ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "all-shards");
-        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
-                READINESS_EPOCH, sha256("broker-set/all-shards/" + suffix), 2);
+        GenerationCapabilityReadiness readiness =
+                new GenerationCapabilityReadiness(READINESS_EPOCH, sha256("broker-set/all-shards/" + suffix), 2);
         PhysicalGcConfig gcConfig = physicalGcConfig();
         List<TargetObject> targets;
 
@@ -563,11 +523,9 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             }
 
             ManagedLedgerPhysicalDeletionActivationResult activation = first.runtime
-                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
-                            "s".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest("s".repeat(26), 4, ACTIVATION_TIMEOUT))
                     .join();
-            assertThat(activation.status())
-                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+            assertThat(activation.status()).isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
             first.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
             assertThat(targets)
                     .allSatisfy(target -> assertThat(first.root(target).value().lifecycle())
@@ -589,11 +547,9 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                         .isEqualTo(PhysicalObjectLifecycle.DELETING);
             }
             for (int shard = 0; shard < targets.size(); shard++) {
-                PhysicalObjectLifecycle expected = (shard & 1) == 0
-                        ? PhysicalObjectLifecycle.MARKED
-                        : PhysicalObjectLifecycle.DELETING;
-                assertThat(setup.root(targets.get(shard)).value().lifecycle())
-                        .isEqualTo(expected);
+                PhysicalObjectLifecycle expected =
+                        (shard & 1) == 0 ? PhysicalObjectLifecycle.MARKED : PhysicalObjectLifecycle.DELETING;
+                assertThat(setup.root(targets.get(shard)).value().lifecycle()).isEqualTo(expected);
             }
         }
 
@@ -608,33 +564,29 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 clock,
                 raw -> new EmptyInventoryObjectStore(raw, emptyListCalls))) {
             recovered.runtime.start();
-            var pass = recovered.runtime.lifecycleService()
-                    .scanNow()
-                    .get(180, TimeUnit.SECONDS);
+            var pass = recovered.runtime.lifecycleService().scanNow().get(180, TimeUnit.SECONDS);
 
             assertThat(pass.roots().markedRoots()).isEqualTo(128);
             assertThat(pass.roots().deletingRoots()).isEqualTo(128);
             assertThat(pass.roots().totalRoots()).isEqualTo(256);
             assertThat(emptyListCalls).hasPositiveValue();
             for (TargetObject target : targets) {
-                assertThat(recovered.root(target).value().lifecycle())
-                        .isEqualTo(PhysicalObjectLifecycle.DELETED);
+                assertThat(recovered.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
                 recovered.assertObjectAbsent(target);
             }
         }
     }
 
     @Test
-    void freshProcessPaginatesOneThousandOneRootsInOneShardAndEveryOtherShard()
-            throws Exception {
+    void freshProcessPaginatesOneThousandOneRootsInOneShardAndEveryOtherShard() throws Exception {
         MutableClock clock = new MutableClock(6_000_000);
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "f4-m4-root-scale-" + suffix;
         String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
         createBucket(bucket);
         ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "root-scale");
-        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
-                READINESS_EPOCH, sha256("broker-set/root-scale/" + suffix), 2);
+        GenerationCapabilityReadiness readiness =
+                new GenerationCapabilityReadiness(READINESS_EPOCH, sha256("broker-set/root-scale/" + suffix), 2);
         PhysicalGcConfig gcConfig = physicalGcConfig();
         List<TargetObject> expected;
 
@@ -653,26 +605,24 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     .hasSize(1_001);
             for (int shard = 1; shard < PhysicalObjectRootScanner.ROOT_SHARDS; shard++) {
                 int exactShard = shard;
-                assertThat(expected.stream()
-                                .filter(target -> rootShard(target.hash()) == exactShard))
+                assertThat(expected.stream().filter(target -> rootShard(target.hash()) == exactShard))
                         .hasSize(1);
             }
         }
 
-        AtomicIntegerArray pageCalls =
-                new AtomicIntegerArray(PhysicalObjectRootScanner.ROOT_SHARDS);
+        AtomicIntegerArray pageCalls = new AtomicIntegerArray(PhysicalObjectRootScanner.ROOT_SHARDS);
         try (Process recovered = Process.open(
-                cluster,
-                "x".repeat(26),
-                scope,
-                readiness,
-                gcConfig,
-                stagingDirectory("root-scale-recovered"),
-                clock,
-                StoreDecorator.identity(),
-                PhysicalStoreDecorator.auditRootScalePagination(pageCalls));
-                PhysicalObjectRootScanner scanner = new PhysicalObjectRootScanner(
-                        cluster, gcConfig, recovered.physical, recovered.scheduler)) {
+                        cluster,
+                        "x".repeat(26),
+                        scope,
+                        readiness,
+                        gcConfig,
+                        stagingDirectory("root-scale-recovered"),
+                        clock,
+                        StoreDecorator.identity(),
+                        PhysicalStoreDecorator.auditRootScalePagination(pageCalls));
+                PhysicalObjectRootScanner scanner =
+                        new PhysicalObjectRootScanner(cluster, gcConfig, recovered.physical, recovered.scheduler)) {
             Set<String> visited = new HashSet<>();
             var result = scanner.scan(root -> {
                         assertThat(visited.add(root.value().objectKeyHash())).isTrue();
@@ -698,16 +648,15 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
     }
 
     @Test
-    void freshProcessRecoversJournaledMetadataAndProtectionPostDeleteCuts()
-            throws Exception {
+    void freshProcessRecoversJournaledMetadataAndProtectionPostDeleteCuts() throws Exception {
         MutableClock clock = new MutableClock(7_000_000);
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "f4-m4-retirement-cuts-" + suffix;
         String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
         createBucket(bucket);
         ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "retirement-cuts");
-        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
-                READINESS_EPOCH, sha256("broker-set/retirement-cuts/" + suffix), 1);
+        GenerationCapabilityReadiness readiness =
+                new GenerationCapabilityReadiness(READINESS_EPOCH, sha256("broker-set/retirement-cuts/" + suffix), 1);
         PhysicalGcConfig gcConfig = physicalGcConfig();
         TargetObject metadataCut;
         TargetObject protectionCut;
@@ -725,11 +674,9 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 PhysicalStoreDecorator.failRootScansWhen(blockSetupRootScans))) {
             first.seedPublication();
             ManagedLedgerPhysicalDeletionActivationResult activation = first.runtime
-                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
-                            "z".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest("z".repeat(26), 4, ACTIVATION_TIMEOUT))
                     .join();
-            assertThat(activation.status())
-                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+            assertThat(activation.status()).isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
             blockSetupRootScans.set(true);
 
             metadataCut = first.createOwnerlessCompactedObject();
@@ -738,11 +685,9 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             first.seedDeletingPostRetirementCut(metadataCut, true, false);
             first.seedDeletingPostRetirementCut(protectionCut, false, true);
 
-            assertThat(first.root(metadataCut).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETING);
+            assertThat(first.root(metadataCut).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETING);
             assertThat(first.protections(metadataCut)).hasSize(1);
-            assertThat(first.root(protectionCut).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETING);
+            assertThat(first.root(protectionCut).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETING);
             assertThat(first.protections(protectionCut)).isEmpty();
             first.assertObjectPresent(metadataCut);
             first.assertObjectPresent(protectionCut);
@@ -760,24 +705,17 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 clock,
                 StoreDecorator.identity(),
                 PhysicalStoreDecorator.loseProtectionDeleteResponse(
-                        metadataCut.hash(),
-                        protectionDeleteResponseLost,
-                        protectionDeleteCalls))) {
+                        metadataCut.hash(), protectionDeleteResponseLost, protectionDeleteCalls))) {
             recovered.runtime.start();
-            var pass = recovered.runtime.lifecycleService()
-                    .scanNow()
-                    .get(120, TimeUnit.SECONDS);
+            var pass = recovered.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
 
             assertThat(pass.roots().totalRoots()).isEqualTo(2);
-            assertThat(Math.addExact(
-                            pass.roots().deletingRoots(), pass.roots().deletedRoots()))
+            assertThat(Math.addExact(pass.roots().deletingRoots(), pass.roots().deletedRoots()))
                     .isEqualTo(2);
             assertThat(protectionDeleteResponseLost).isTrue();
             assertThat(protectionDeleteCalls).hasValue(1);
-            assertThat(recovered.root(metadataCut).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
-            assertThat(recovered.root(protectionCut).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(recovered.root(metadataCut).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(recovered.root(protectionCut).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
             assertThat(recovered.protections(metadataCut)).isEmpty();
             assertThat(recovered.protections(protectionCut)).isEmpty();
             recovered.assertObjectAbsent(metadataCut);
@@ -786,19 +724,15 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
     }
 
     @Test
-    void externallyReappearingBytesAfterRootRetirementReenterOwnerlessInventoryAndGc()
-            throws Exception {
+    void externallyReappearingBytesAfterRootRetirementReenterOwnerlessInventoryAndGc() throws Exception {
         MutableClock clock = new MutableClock(System.currentTimeMillis());
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "f4-m4-external-reappearance-" + suffix;
         String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
         createBucket(bucket);
-        ObjectStoreConfiguration scope = objectStoreConfiguration(
-                bucket, "external-reappearance");
+        ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "external-reappearance");
         GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
-                READINESS_EPOCH,
-                sha256("broker-set/external-reappearance/" + suffix),
-                1);
+                READINESS_EPOCH, sha256("broker-set/external-reappearance/" + suffix), 1);
         PhysicalGcConfig gcConfig = physicalGcConfig();
 
         try (Process process = Process.open(
@@ -813,30 +747,24 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             process.seedPublication();
             TargetObject target = process.createOwnerlessCompactedObject();
             ManagedLedgerPhysicalDeletionActivationResult activation = process.runtime
-                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
-                            "c".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest("c".repeat(26), 4, ACTIVATION_TIMEOUT))
                     .join();
-            assertThat(activation.status())
-                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+            assertThat(activation.status()).isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
 
             process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
-            assertThat(process.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            assertThat(process.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.MARKED);
             process.assertObjectPresent(target);
 
             clock.advance(Duration.ofMinutes(7));
             process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
-            assertThat(process.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(process.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
             process.assertObjectAbsent(target);
 
             clock.advance(Duration.ofDays(8));
             process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
             VersionedPhysicalObjectRoot firstAbsence = process.root(target);
-            assertThat(firstAbsence.value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
-            assertThat(firstAbsence.value().tombstoneFirstAbsentAtMillis())
-                    .isEqualTo(clock.millis());
+            assertThat(firstAbsence.value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(firstAbsence.value().tombstoneFirstAbsentAtMillis()).isEqualTo(clock.millis());
 
             clock.advance(Duration.ofHours(26));
             process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
@@ -845,33 +773,26 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
 
             process.recreateExactOwnerlessObject(target);
             process.assertObjectPresent(target);
-            var registrationPass = process.runtime.lifecycleService()
-                    .scanNow()
-                    .get(120, TimeUnit.SECONDS);
+            var registrationPass = process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
             assertThat(registrationPass.inventory().rootsRegistered()).isEqualTo(1);
             VersionedPhysicalObjectRoot reentered = process.root(target);
-            assertThat(reentered.value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
-            assertThat(reentered.value().orphanNotBeforeMillis())
-                    .isGreaterThan(clock.millis());
+            assertThat(reentered.value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+            assertThat(reentered.value().orphanNotBeforeMillis()).isGreaterThan(clock.millis());
             process.assertObjectPresent(target);
 
             clock.advance(Duration.ofHours(24));
             process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
-            assertThat(process.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+            assertThat(process.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.ACTIVE);
             process.assertObjectPresent(target);
 
             clock.advance(Duration.ofHours(2));
             process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
-            assertThat(process.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            assertThat(process.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.MARKED);
             process.assertObjectPresent(target);
 
             clock.advance(Duration.ofMinutes(7));
             process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
-            assertThat(process.root(target).value().lifecycle())
-                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(process.root(target).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
             process.assertObjectAbsent(target);
         }
     }
@@ -906,16 +827,10 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
 
     private static OxiaClientConfiguration oxiaConfiguration() {
         return new OxiaClientConfiguration(
-                OXIA.getServiceAddress(),
-                "default",
-                Duration.ofSeconds(10),
-                Duration.ofSeconds(30),
-                10_000,
-                1_024);
+                OXIA.getServiceAddress(), "default", Duration.ofSeconds(10), Duration.ofSeconds(30), 10_000, 1_024);
     }
 
-    private static ObjectStoreConfiguration objectStoreConfiguration(
-            String bucket, String prefix) {
+    private static ObjectStoreConfiguration objectStoreConfiguration(String bucket, String prefix) {
         return new ObjectStoreConfiguration(
                 S3CompatibleObjectStoreProvider.class.getName(),
                 LOCALSTACK.getEndpointOverride(LocalStackContainer.Service.S3),
@@ -942,14 +857,13 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         try (S3AsyncClient admin = S3AsyncClient.builder()
                 .endpointOverride(LOCALSTACK.getEndpointOverride(LocalStackContainer.Service.S3))
                 .region(Region.of(LOCALSTACK.getRegion()))
-                .serviceConfiguration(S3Configuration.builder()
-                        .pathStyleAccessEnabled(true)
-                        .build())
+                .serviceConfiguration(
+                        S3Configuration.builder().pathStyleAccessEnabled(true).build())
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(
-                                LOCALSTACK.getAccessKey(), LOCALSTACK.getSecretKey())))
+                        AwsBasicCredentials.create(LOCALSTACK.getAccessKey(), LOCALSTACK.getSecretKey())))
                 .build()) {
-            admin.createBucket(CreateBucketRequest.builder().bucket(bucket).build()).join();
+            admin.createBucket(CreateBucketRequest.builder().bucket(bucket).build())
+                    .join();
         }
     }
 
@@ -961,8 +875,8 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(
-                            MessageDigest.getInstance("SHA-256").digest(value)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("SHA-256 is unavailable", impossible);
         }
@@ -970,8 +884,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
 
     private static Throwable unwrap(Throwable supplied) {
         Throwable failure = supplied;
-        while ((failure instanceof CompletionException
-                        || failure instanceof ExecutionException)
+        while ((failure instanceof CompletionException || failure instanceof ExecutionException)
                 && failure.getCause() != null) {
             failure = failure.getCause();
         }
@@ -996,8 +909,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 });
     }
 
-    private record TargetObject(ObjectKey key, ObjectKeyHash hash) {
-    }
+    private record TargetObject(ObjectKey key, ObjectKeyHash hash) {}
 
     private static final class Process implements AutoCloseable {
         private final String cluster;
@@ -1031,45 +943,31 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 Path stagingDirectory,
                 MutableClock clock,
                 StoreDecorator decorator,
-                PhysicalStoreDecorator physicalDecorator) throws Exception {
+                PhysicalStoreDecorator physicalDecorator)
+                throws Exception {
             this.cluster = cluster;
             this.processRunId = processRunId;
             this.clock = clock;
             this.gcConfig = gcConfig;
             this.objectStoreConfiguration = objectStoreConfiguration;
             objectStoreProvider = new S3CompatibleObjectStoreProvider();
-            rawObjectStore = objectStoreProvider.create(
-                    objectStoreConfiguration, secretResolver());
+            rawObjectStore = objectStoreProvider.create(objectStoreConfiguration, secretResolver());
             objectStore = decorator.decorate(rawObjectStore);
             OxiaClientConfiguration oxia = oxiaConfiguration();
             oxiaRuntime = SharedOxiaClientRuntime.connect(oxia, clock);
             l0 = OxiaJavaClientMetadataStore.usingSharedRuntime(oxia, oxiaRuntime, clock);
-            generations = OxiaJavaGenerationMetadataStore.usingSharedRuntime(
-                    oxia, oxiaRuntime, clock);
-            rawPhysical = OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
-                    oxia, oxiaRuntime, clock);
+            generations = OxiaJavaGenerationMetadataStore.usingSharedRuntime(oxia, oxiaRuntime, clock);
+            rawPhysical = OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(oxia, oxiaRuntime, clock);
             physical = physicalDecorator.decorate(rawPhysical);
             projections = ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
-                    oxia,
-                    oxiaRuntime,
-                    ProjectionMetadataStoreConfig.defaults(),
-                    clock);
-            cursors = CursorMetadataStore.usingSharedRuntime(
-                    oxia,
-                    oxiaRuntime,
-                    CursorMetadataStoreConfig.defaults());
+                    oxia, oxiaRuntime, ProjectionMetadataStoreConfig.defaults(), clock);
+            cursors = CursorMetadataStore.usingSharedRuntime(oxia, oxiaRuntime, CursorMetadataStoreConfig.defaults());
             activations = GenerationProtocolActivationStore.usingSharedRuntime(
-                    oxia,
-                    oxiaRuntime,
-                    clock,
-                    processRunId,
-                    NereusGenerationProtocolReferenceDomains.currentV1());
+                    oxia, oxiaRuntime, clock, processRunId, NereusGenerationProtocolReferenceDomains.currentV1());
             SourceRetirementMetadataStore sourceRetirement =
-                    OxiaJavaSourceRetirementMetadataStore.usingSharedRuntime(
-                            oxia, oxiaRuntime);
+                    OxiaJavaSourceRetirementMetadataStore.usingSharedRuntime(oxia, oxiaRuntime);
             ObjectAuditRetirementStore objectAudit =
-                    OxiaJavaObjectAuditRetirementStore.usingSharedRuntime(
-                            oxia, oxiaRuntime);
+                    OxiaJavaObjectAuditRetirementStore.usingSharedRuntime(oxia, oxiaRuntime);
             protections = new DefaultObjectProtectionManager(
                     cluster,
                     physical,
@@ -1078,12 +976,10 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     gcConfig.orphanGrace(),
                     clock);
             Phase4GcReferenceDomainAssembly referenceDomains =
-                    Phase4GcReferenceDomainAssembly.create(
-                            cluster, gcConfig, activations, generations, projections);
+                    Phase4GcReferenceDomainAssembly.create(cluster, gcConfig, activations, generations, projections);
             StaticReadinessProvider readinessProvider = new StaticReadinessProvider(readiness);
             ObjectStoreDeleteCapabilityProbe capabilityProbe =
-                    new DefaultObjectStoreDeleteCapabilityProbe(
-                            objectStore, objectStoreConfiguration, clock);
+                    new DefaultObjectStoreDeleteCapabilityProbe(objectStore, objectStoreConfiguration, clock);
             ManagedLedgerGenerationProtocolActivationGuard activationGuard =
                     new ManagedLedgerGenerationProtocolActivationGuard(
                             cluster,
@@ -1135,7 +1031,8 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 PhysicalGcConfig gcConfig,
                 Path stagingDirectory,
                 MutableClock clock,
-                StoreDecorator decorator) throws Exception {
+                StoreDecorator decorator)
+                throws Exception {
             return open(
                     cluster,
                     processRunId,
@@ -1157,7 +1054,8 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 Path stagingDirectory,
                 MutableClock clock,
                 StoreDecorator decorator,
-                PhysicalStoreDecorator physicalDecorator) throws Exception {
+                PhysicalStoreDecorator physicalDecorator)
+                throws Exception {
             return new Process(
                     cluster,
                     processRunId,
@@ -1198,12 +1096,13 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     now,
                     now,
                     0);
-            activations.compareAndSet(cluster, active, current.metadataVersion()).join();
+            activations
+                    .compareAndSet(cluster, active, current.metadataVersion())
+                    .join();
         }
 
         private TargetObject createOwnerlessCompactedObject() {
-            byte[] payload = ("phase4-m4-ownerless/" + cluster)
-                    .getBytes(StandardCharsets.UTF_8);
+            byte[] payload = ("phase4-m4-ownerless/" + cluster).getBytes(StandardCharsets.UTF_8);
             Checksum contentSha256 = sha256(payload);
             CompactedObjectWriteRequest request = new CompactedObjectWriteRequest(
                     cluster,
@@ -1228,7 +1127,8 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     "f4-m4-integration",
                     Optional.empty());
             ObjectKey key = CompactedObjectFormatV1.objectKey(request, contentSha256);
-            PutObjectResult stored = objectStore.putObject(
+            PutObjectResult stored = objectStore
+                    .putObject(
                             key,
                             ByteBuffer.wrap(payload),
                             new PutObjectOptions(
@@ -1269,9 +1169,9 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
 
         private void recreateExactOwnerlessObject(TargetObject target) {
-            byte[] payload = ("phase4-m4-ownerless/" + cluster)
-                    .getBytes(StandardCharsets.UTF_8);
-            PutObjectResult stored = objectStore.putObject(
+            byte[] payload = ("phase4-m4-ownerless/" + cluster).getBytes(StandardCharsets.UTF_8);
+            PutObjectResult stored = objectStore
+                    .putObject(
                             target.key(),
                             ByteBuffer.wrap(payload),
                             new PutObjectOptions(
@@ -1286,9 +1186,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
 
         private VersionedPhysicalObjectRoot seedDeletingPostRetirementCut(
-                TargetObject target,
-                boolean includeAlreadyRetiredMetadata,
-                boolean deleteProtectionBeforeRestart) {
+                TargetObject target, boolean includeAlreadyRetiredMetadata, boolean deleteProtectionBeforeRestart) {
             VersionedPhysicalObjectRoot active = root(target);
             if (active.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE) {
                 throw new AssertionError("retirement-cut fixture requires an ACTIVE root");
@@ -1305,21 +1203,14 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     clock.millis(),
                     0,
                     0);
-            VersionedObjectProtection protection = physical
-                    .createProtection(cluster, protectionRecord)
-                    .join();
-            GcPlannedProtectionRemoval plannedProtection =
-                    new GcPlannedProtectionRemoval(protection);
+            VersionedObjectProtection protection =
+                    physical.createProtection(cluster, protectionRecord).join();
+            GcPlannedProtectionRemoval plannedProtection = new GcPlannedProtectionRemoval(protection);
 
             PhysicalObjectIdentity object = PhysicalObjectIdentity.from(active.value());
             GcReferenceQuery query = GcReferenceQuery.create(
-                    GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
-                    object,
-                    List.of(),
-                    object.identitySha256());
-            String candidateId = includeAlreadyRetiredMetadata
-                    ? "b".repeat(52)
-                    : "c".repeat(52);
+                    GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE, object, List.of(), object.identitySha256());
+            String candidateId = includeAlreadyRetiredMetadata ? "b".repeat(52) : "c".repeat(52);
             GcCandidate candidate = GcCandidate.fromActiveRoot(
                     gcConfig,
                     candidateId,
@@ -1338,32 +1229,26 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     0,
                     List.of(),
                     List.of());
-            List<GcPlannedMetadataRemoval> metadataRemovals =
-                    includeAlreadyRetiredMetadata
-                            ? List.of(new GcPlannedMetadataRemoval(
-                                    "generation-zero-index",
-                                    new F4Keyspace(cluster).generationIndexKey(
+            List<GcPlannedMetadataRemoval> metadataRemovals = includeAlreadyRetiredMetadata
+                    ? List.of(new GcPlannedMetadataRemoval(
+                            "generation-zero-index",
+                            new F4Keyspace(cluster)
+                                    .generationIndexKey(
                                             new StreamId("retired-source-"
                                                     + target.hash().value().substring(0, 16)),
                                             ReadView.COMMITTED,
                                             1,
                                             0),
-                                    7,
-                                    sha256("retired-source/" + target.hash().value())))
-                            : List.of();
+                            7,
+                            sha256("retired-source/" + target.hash().value())))
+                    : List.of();
             List<GcReferenceSnapshot> snapshots = List.of(snapshot);
             List<GcPlannedProtectionRemoval> protections = List.of(plannedProtection);
-            Checksum referenceSet = GcPlan.computeReferenceSetSha256(
-                    gcConfig,
-                    candidate,
-                    snapshots,
-                    protections,
-                    metadataRemovals);
-            String attemptId = includeAlreadyRetiredMetadata
-                    ? "d".repeat(52)
-                    : "e".repeat(52);
-            try (MaterializationDeadline deadline = new MaterializationDeadline(
-                    gcConfig.operationTimeout(), scheduler)) {
+            Checksum referenceSet =
+                    GcPlan.computeReferenceSetSha256(gcConfig, candidate, snapshots, protections, metadataRemovals);
+            String attemptId = includeAlreadyRetiredMetadata ? "d".repeat(52) : "e".repeat(52);
+            try (MaterializationDeadline deadline =
+                    new MaterializationDeadline(gcConfig.operationTimeout(), scheduler)) {
                 new DefaultGcRetirementJournal(cluster, physical, gcConfig)
                         .prepare(
                                 attemptId,
@@ -1380,20 +1265,14 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             long now = clock.millis();
             VersionedPhysicalObjectRoot marked = physical.compareAndSetRoot(
                             cluster,
-                            markedForRecoveryFixture(
-                                    active.value(), attemptId, referenceSet.value(), now, now),
+                            markedForRecoveryFixture(active.value(), attemptId, referenceSet.value(), now, now),
                             active.metadataVersion())
                     .join();
             VersionedPhysicalObjectRoot deleting = physical.compareAndSetRoot(
-                            cluster,
-                            deletingForRecoveryFixture(marked.value(), now),
-                            marked.metadataVersion())
+                            cluster, deletingForRecoveryFixture(marked.value(), now), marked.metadataVersion())
                     .join();
             if (deleteProtectionBeforeRestart) {
-                physical.deleteProtection(
-                                cluster,
-                                plannedProtection.identity(),
-                                protection.metadataVersion())
+                physical.deleteProtection(cluster, plannedProtection.identity(), protection.metadataVersion())
                         .join();
             }
             return deleting;
@@ -1411,8 +1290,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             int[] rootsPerShard = new int[PhysicalObjectRootScanner.ROOT_SHARDS];
             ArrayList<TargetObject> targets = new ArrayList<>(1_256);
             for (long nonce = 0; targets.size() < 1_256; nonce++) {
-                ObjectKey key = new ObjectKey(
-                        "objects/f4/physical-root-scale/" + cluster + "/" + nonce);
+                ObjectKey key = new ObjectKey("objects/f4/physical-root-scale/" + cluster + "/" + nonce);
                 ObjectKeyHash hash = ObjectKeyHash.from(key);
                 int shard = rootShard(hash);
                 int required = shard == 0 ? 1_001 : 1;
@@ -1463,8 +1341,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
 
         private TargetObject createOwnerlessCompactedObjectForShard(int requiredShard) {
             for (int nonce = 0; ; nonce++) {
-                byte[] payload = ("phase4-m4-ownerless/" + cluster + "/"
-                                + requiredShard + "/" + nonce)
+                byte[] payload = ("phase4-m4-ownerless/" + cluster + "/" + requiredShard + "/" + nonce)
                         .getBytes(StandardCharsets.UTF_8);
                 Checksum contentSha256 = sha256(payload);
                 CompactedObjectWriteRequest request = new CompactedObjectWriteRequest(
@@ -1494,7 +1371,8 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 if (rootShard(hash) != requiredShard) {
                     continue;
                 }
-                PutObjectResult stored = objectStore.putObject(
+                PutObjectResult stored = objectStore
+                        .putObject(
                                 key,
                                 ByteBuffer.wrap(payload),
                                 new PutObjectOptions(
@@ -1552,8 +1430,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
 
         private List<VersionedObjectProtection> protections(TargetObject target) {
-            return physical.scanProtections(
-                            cluster, target.hash(), Optional.empty(), gcConfig.metadataScanPageSize())
+            return physical.scanProtections(cluster, target.hash(), Optional.empty(), gcConfig.metadataScanPageSize())
                     .join()
                     .values();
         }
@@ -1573,8 +1450,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     .satisfies(failure -> {
                         Throwable exact = unwrap(failure);
                         assertThat(exact).isInstanceOf(NereusException.class);
-                        assertThat(((NereusException) exact).code())
-                                .isEqualTo(ErrorCode.OBJECT_NOT_FOUND);
+                        assertThat(((NereusException) exact).code()).isEqualTo(ErrorCode.OBJECT_NOT_FOUND);
                     });
         }
 
@@ -1609,14 +1485,12 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
 
         @Override
-        public CompletableFuture<GenerationCapabilityReadiness>
-                requireGenerationCapabilityReadiness() {
+        public CompletableFuture<GenerationCapabilityReadiness> requireGenerationCapabilityReadiness() {
             return CompletableFuture.completedFuture(readiness);
         }
 
         @Override
-        public Optional<GenerationCapabilityReadiness>
-                currentGenerationCapabilityReadiness() {
+        public Optional<GenerationCapabilityReadiness> currentGenerationCapabilityReadiness() {
             return Optional.of(readiness);
         }
     }
@@ -1645,10 +1519,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     (proxy, method, arguments) -> {
                         if (method.getDeclaringClass() == Object.class) {
                             return proxyObjectMethod(
-                                    proxy,
-                                    method,
-                                    arguments,
-                                    "setup root-scan blocker physical metadata store");
+                                    proxy, method, arguments, "setup root-scan blocker physical metadata store");
                         }
                         if (method.getName().equals("close")) {
                             return null;
@@ -1673,11 +1544,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     new Class<?>[] {PhysicalObjectMetadataStore.class},
                     (proxy, method, arguments) -> {
                         if (method.getDeclaringClass() == Object.class) {
-                            return proxyObjectMethod(
-                                    proxy,
-                                    method,
-                                    arguments,
-                                    "post-DELETE physical metadata store");
+                            return proxyObjectMethod(proxy, method, arguments, "post-DELETE physical metadata store");
                         }
                         if (method.getName().equals("close")) {
                             return null;
@@ -1711,10 +1578,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     (proxy, method, arguments) -> {
                         if (method.getDeclaringClass() == Object.class) {
                             return proxyObjectMethod(
-                                    proxy,
-                                    method,
-                                    arguments,
-                                    "lost DELETED-root CAS response physical metadata store");
+                                    proxy, method, arguments, "lost DELETED-root CAS response physical metadata store");
                         }
                         if (method.getName().equals("close")) {
                             return null;
@@ -1734,8 +1598,8 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                                 && replacement.lifecycle() == PhysicalObjectLifecycle.DELETED
                                 && targetDeleteCompleted.get()
                                 && !deletedCasResponseLost.get()) {
-                            CompletableFuture<?> applied = (CompletableFuture<?>)
-                                    invokeDelegate(raw, method, arguments);
+                            CompletableFuture<?> applied =
+                                    (CompletableFuture<?>) invokeDelegate(raw, method, arguments);
                             return applied.thenCompose(ignored -> {
                                 deletedCasResponseLost.set(true);
                                 return CompletableFuture.failedFuture(new NereusException(
@@ -1749,9 +1613,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
 
         static PhysicalStoreDecorator loseProtectionDeleteResponse(
-                ObjectKeyHash target,
-                AtomicBoolean responseLost,
-                AtomicInteger deleteCalls) {
+                ObjectKeyHash target, AtomicBoolean responseLost, AtomicInteger deleteCalls) {
             return raw -> (PhysicalObjectMetadataStore) Proxy.newProxyInstance(
                     PhysicalObjectMetadataStore.class.getClassLoader(),
                     new Class<?>[] {PhysicalObjectMetadataStore.class},
@@ -1772,19 +1634,17 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                                 && arguments[1] instanceof ObjectProtectionIdentity identity
                                 && identity.object().equals(target)
                                 && !responseLost.get()) {
-                            return invokeDelegateFuture(raw, method, arguments)
-                                    .thenCompose(ignored -> {
-                                        if (!responseLost.compareAndSet(false, true)) {
-                                            return CompletableFuture.failedFuture(
-                                                    new AssertionError(
-                                                            "duplicate target protection delete"));
-                                        }
-                                        deleteCalls.incrementAndGet();
-                                        return CompletableFuture.failedFuture(new NereusException(
-                                                ErrorCode.TIMEOUT,
-                                                true,
-                                                "injected response loss after successful protection delete"));
-                                    });
+                            return invokeDelegateFuture(raw, method, arguments).thenCompose(ignored -> {
+                                if (!responseLost.compareAndSet(false, true)) {
+                                    return CompletableFuture.failedFuture(
+                                            new AssertionError("duplicate target protection delete"));
+                                }
+                                deleteCalls.incrementAndGet();
+                                return CompletableFuture.failedFuture(new NereusException(
+                                        ErrorCode.TIMEOUT,
+                                        true,
+                                        "injected response loss after successful protection delete"));
+                            });
                         }
                         return invokeDelegate(raw, method, arguments);
                     });
@@ -1797,10 +1657,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     (proxy, method, arguments) -> {
                         if (method.getDeclaringClass() == Object.class) {
                             return proxyObjectMethod(
-                                    proxy,
-                                    method,
-                                    arguments,
-                                    "two-worker DELETING-CAS physical metadata store");
+                                    proxy, method, arguments, "two-worker DELETING-CAS physical metadata store");
                         }
                         if (method.getName().equals("close")) {
                             return null;
@@ -1812,18 +1669,13 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     });
         }
 
-        static PhysicalStoreDecorator auditRootScalePagination(
-                AtomicIntegerArray pageCalls) {
+        static PhysicalStoreDecorator auditRootScalePagination(AtomicIntegerArray pageCalls) {
             return raw -> (PhysicalObjectMetadataStore) Proxy.newProxyInstance(
                     PhysicalObjectMetadataStore.class.getClassLoader(),
                     new Class<?>[] {PhysicalObjectMetadataStore.class},
                     (proxy, method, arguments) -> {
                         if (method.getDeclaringClass() == Object.class) {
-                            return proxyObjectMethod(
-                                    proxy,
-                                    method,
-                                    arguments,
-                                    "root-scale physical metadata store");
+                            return proxyObjectMethod(proxy, method, arguments, "root-scale physical metadata store");
                         }
                         if (method.getName().equals("close")) {
                             return null;
@@ -1864,8 +1716,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     && replacement.lifecycle() == PhysicalObjectLifecycle.DELETING;
         }
 
-        private CompletableFuture<?> execute(
-                PhysicalObjectMetadataStore raw, Method method, Object[] arguments) {
+        private CompletableFuture<?> execute(PhysicalObjectMetadataStore raw, Method method, Object[] arguments) {
             int arrived = attempts.incrementAndGet();
             if (arrived > 2) {
                 return CompletableFuture.failedFuture(
@@ -1911,9 +1762,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
 
         @Override
         public CompletableFuture<PutObjectResult> putObject(
-                ObjectKey key,
-                ReplayableObjectUpload source,
-                PutObjectOptions options) {
+                ObjectKey key, ReplayableObjectUpload source, PutObjectOptions options) {
             return delegate.putObject(key, source, options);
         }
 
@@ -1928,30 +1777,23 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
 
         @Override
         public CompletableFuture<RangeReadResult> readRange(
-                ObjectKey key,
-                long offset,
-                long length,
-                RangeReadOptions options) {
+                ObjectKey key, long offset, long length, RangeReadOptions options) {
             return delegate.readRange(key, offset, length, options);
         }
 
         @Override
-        public CompletableFuture<HeadObjectResult> headObject(
-                ObjectKey key, HeadObjectOptions options) {
+        public CompletableFuture<HeadObjectResult> headObject(ObjectKey key, HeadObjectOptions options) {
             return delegate.headObject(key, options);
         }
 
         @Override
         public CompletableFuture<ListObjectsResult> listObjects(
-                ObjectKeyPrefix prefix,
-                Optional<String> continuationToken,
-                ListObjectsOptions options) {
+                ObjectKeyPrefix prefix, Optional<String> continuationToken, ListObjectsOptions options) {
             return delegate.listObjects(prefix, continuationToken, options);
         }
 
         @Override
-        public CompletableFuture<DeleteObjectResult> deleteObject(
-                ObjectKey key, DeleteObjectOptions options) {
+        public CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
             return delegate.deleteObject(key, options);
         }
 
@@ -1961,16 +1803,13 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
-    private static final class TargetDeleteTrackingObjectStore
-            extends ForwardingObjectStore {
+    private static final class TargetDeleteTrackingObjectStore extends ForwardingObjectStore {
         private final ObjectKey target;
         private final AtomicBoolean targetDeleteCompleted;
         private final AtomicInteger targetDeleteCalls;
 
         private TargetDeleteTrackingObjectStore(
-                ObjectStore delegate,
-                ObjectKey target,
-                AtomicBoolean targetDeleteCompleted) {
+                ObjectStore delegate, ObjectKey target, AtomicBoolean targetDeleteCompleted) {
             this(delegate, target, targetDeleteCompleted, new AtomicInteger());
         }
 
@@ -1986,8 +1825,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
 
         @Override
-        public CompletableFuture<DeleteObjectResult> deleteObject(
-                ObjectKey key, DeleteObjectOptions options) {
+        public CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
             if (key.equals(target)) {
                 targetDeleteCalls.incrementAndGet();
             }
@@ -2000,19 +1838,16 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
-    private static final class ConcurrentTargetDeleteObjectStore
-            extends ForwardingObjectStore {
+    private static final class ConcurrentTargetDeleteObjectStore extends ForwardingObjectStore {
         private final TargetDeleteRace race;
 
-        private ConcurrentTargetDeleteObjectStore(
-                ObjectStore delegate, TargetDeleteRace race) {
+        private ConcurrentTargetDeleteObjectStore(ObjectStore delegate, TargetDeleteRace race) {
             super(delegate);
             this.race = race;
         }
 
         @Override
-        public CompletableFuture<DeleteObjectResult> deleteObject(
-                ObjectKey key, DeleteObjectOptions options) {
+        public CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
             if (!key.equals(race.target())) {
                 return delegate.deleteObject(key, options);
             }
@@ -2066,8 +1901,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
-    private static final class EmptyInventoryLostDeleteResponseObjectStore
-            extends ForwardingObjectStore {
+    private static final class EmptyInventoryLostDeleteResponseObjectStore extends ForwardingObjectStore {
         private final ObjectKey target;
         private final AtomicBoolean deleteResponseLost;
         private final AtomicInteger emptyListCalls;
@@ -2085,23 +1919,17 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
 
         @Override
         public CompletableFuture<ListObjectsResult> listObjects(
-                ObjectKeyPrefix prefix,
-                Optional<String> continuationToken,
-                ListObjectsOptions options) {
+                ObjectKeyPrefix prefix, Optional<String> continuationToken, ListObjectsOptions options) {
             emptyListCalls.incrementAndGet();
-            return CompletableFuture.completedFuture(
-                    new ListObjectsResult(prefix, List.of(), Optional.empty()));
+            return CompletableFuture.completedFuture(new ListObjectsResult(prefix, List.of(), Optional.empty()));
         }
 
         @Override
-        public CompletableFuture<DeleteObjectResult> deleteObject(
-                ObjectKey key, DeleteObjectOptions options) {
+        public CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
             return delegate.deleteObject(key, options).thenCompose(result -> {
                 if (key.equals(target) && deleteResponseLost.compareAndSet(false, true)) {
                     return CompletableFuture.failedFuture(new NereusException(
-                            ErrorCode.TIMEOUT,
-                            true,
-                            "injected response loss after successful target DELETE"));
+                            ErrorCode.TIMEOUT, true, "injected response loss after successful target DELETE"));
                 }
                 return CompletableFuture.completedFuture(result);
             });
@@ -2118,20 +1946,13 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
 
         @Override
         public CompletableFuture<ListObjectsResult> listObjects(
-                ObjectKeyPrefix prefix,
-                Optional<String> continuationToken,
-                ListObjectsOptions options) {
+                ObjectKeyPrefix prefix, Optional<String> continuationToken, ListObjectsOptions options) {
             emptyListCalls.incrementAndGet();
-            return CompletableFuture.completedFuture(
-                    new ListObjectsResult(prefix, List.of(), Optional.empty()));
+            return CompletableFuture.completedFuture(new ListObjectsResult(prefix, List.of(), Optional.empty()));
         }
     }
 
-    private static Object proxyObjectMethod(
-            Object proxy,
-            Method method,
-            Object[] arguments,
-            String description) {
+    private static Object proxyObjectMethod(Object proxy, Method method, Object[] arguments, String description) {
         return switch (method.getName()) {
             case "toString" -> description;
             case "hashCode" -> System.identityHashCode(proxy);
@@ -2140,8 +1961,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         };
     }
 
-    private static Object invokeDelegate(
-            Object delegate, Method method, Object[] arguments) throws Throwable {
+    private static Object invokeDelegate(Object delegate, Method method, Object[] arguments) throws Throwable {
         try {
             return method.invoke(delegate, arguments);
         } catch (InvocationTargetException failure) {
@@ -2149,8 +1969,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
-    private static CompletableFuture<?> invokeDelegateFuture(
-            Object delegate, Method method, Object[] arguments) {
+    private static CompletableFuture<?> invokeDelegateFuture(Object delegate, Method method, Object[] arguments) {
         try {
             Object result = invokeDelegate(delegate, method, arguments);
             if (result instanceof CompletableFuture<?> future) {

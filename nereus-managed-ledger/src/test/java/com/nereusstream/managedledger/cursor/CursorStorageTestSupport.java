@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.api.AppendAttemptId;
@@ -31,14 +32,14 @@ import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.ObjectProtectionOwner;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
+import com.nereusstream.metadata.oxia.CursorMetadataStore;
+import com.nereusstream.metadata.oxia.CursorScanPage;
+import com.nereusstream.metadata.oxia.CursorScanToken;
 import com.nereusstream.metadata.oxia.FakeCursorMetadataStore;
 import com.nereusstream.metadata.oxia.FakeManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
 import com.nereusstream.metadata.oxia.ProjectionCreateRequest;
-import com.nereusstream.metadata.oxia.CursorMetadataStore;
-import com.nereusstream.metadata.oxia.CursorScanPage;
-import com.nereusstream.metadata.oxia.CursorScanToken;
 import com.nereusstream.metadata.oxia.VersionedCursorRetention;
 import com.nereusstream.metadata.oxia.VersionedCursorState;
 import com.nereusstream.metadata.oxia.WatchRegistration;
@@ -52,7 +53,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -77,13 +77,11 @@ final class CursorStorageTestSupport {
     static final String OWNER_3 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
 
-    private CursorStorageTestSupport() {
-    }
+    private CursorStorageTestSupport() {}
 
     static final class Context implements AutoCloseable {
         final CursorStorageConfig config;
-        final FakeManagedLedgerProjectionMetadataStore projectionStore =
-                new FakeManagedLedgerProjectionMetadataStore();
+        final FakeManagedLedgerProjectionMetadataStore projectionStore = new FakeManagedLedgerProjectionMetadataStore();
         final FakeCursorMetadataStore metadataBackend;
         final ControllableCursorMetadataStore metadataStore;
         final TestStreamStorage streamStorage;
@@ -92,8 +90,7 @@ final class CursorStorageTestSupport {
         final AtomicInteger activationCalls = new AtomicInteger();
         final AtomicReference<CompletableFuture<Void>> activationGate =
                 new AtomicReference<>(CompletableFuture.completedFuture(null));
-        final AtomicReference<CountDownLatch> activationArrivals =
-                new AtomicReference<>(new CountDownLatch(0));
+        final AtomicReference<CountDownLatch> activationArrivals = new AtomicReference<>(new CountDownLatch(0));
         final AtomicInteger idSequence = new AtomicInteger();
         final TopicProjectionRecord projection;
         final CursorLedgerIdentity ledger;
@@ -104,15 +101,13 @@ final class CursorStorageTestSupport {
             this(trimOffset, committedEndOffset, CursorStorageConfig.defaults());
         }
 
-        Context(
-                long trimOffset,
-                long committedEndOffset,
-                CursorStorageConfig config) {
+        Context(long trimOffset, long committedEndOffset, CursorStorageConfig config) {
             this.config = config;
             StreamId streamId = ManagedLedgerProjectionNames.streamId(TOPIC, 1);
             StreamName streamName = ManagedLedgerProjectionNames.streamName(TOPIC, 1);
             StreamMetadata empty = metadata(streamId, streamName, 0, 0, 0);
-            projection = projectionStore.createFirstProjection(
+            projection = projectionStore
+                    .createFirstProjection(
                             CLUSTER,
                             new ProjectionCreateRequest(TOPIC, 1, 1, empty, Map.of()),
                             () -> CompletableFuture.completedFuture(null))
@@ -120,11 +115,9 @@ final class CursorStorageTestSupport {
             metadataBackend = new FakeCursorMetadataStore();
             metadataStore = new ControllableCursorMetadataStore(metadataBackend);
             ledger = new CursorLedgerIdentity(
-                    TOPIC,
-                    ManagedLedgerProjectionNames.managedLedgerNameHash(TOPIC),
-                    projection.projectionIdentity());
-            streamStorage = new TestStreamStorage(metadata(
-                    streamId, streamName, trimOffset, committedEndOffset, committedEndOffset * 100));
+                    TOPIC, ManagedLedgerProjectionNames.managedLedgerNameHash(TOPIC), projection.projectionIdentity());
+            streamStorage = new TestStreamStorage(
+                    metadata(streamId, streamName, trimOffset, committedEndOffset, committedEndOffset * 100));
             snapshotStore = new InMemorySnapshotStore(config);
             CursorProtocolActivationGuard guard = ignored -> {
                 activationCalls.incrementAndGet();
@@ -296,8 +289,7 @@ final class CursorStorageTestSupport {
         }
 
         @Override
-        public CompletableFuture<Void> trim(
-                StreamId streamId, long beforeOffset, TrimOptions options) {
+        public CompletableFuture<Void> trim(StreamId streamId, long beforeOffset, TrimOptions options) {
             StreamMetadata current = metadata.get();
             if (!current.streamId().equals(streamId)
                     || beforeOffset < current.trimOffset()
@@ -338,40 +330,33 @@ final class CursorStorageTestSupport {
         }
 
         @Override
-        public CompletableFuture<StreamMetadata> createOrGetStream(
-                StreamName streamName, StreamCreateOptions options) {
+        public CompletableFuture<StreamMetadata> createOrGetStream(StreamName streamName, StreamCreateOptions options) {
             return unsupported();
         }
 
         @Override
-        public CompletableFuture<AppendSession> acquireAppendSession(
-                StreamId streamId, AppendSessionOptions options) {
+        public CompletableFuture<AppendSession> acquireAppendSession(StreamId streamId, AppendSessionOptions options) {
             return unsupported();
         }
 
         @Override
-        public CompletableFuture<AppendResult> append(
-                StreamId streamId, AppendBatch batch, AppendOptions options) {
+        public CompletableFuture<AppendResult> append(StreamId streamId, AppendBatch batch, AppendOptions options) {
             return unsupported();
         }
 
         @Override
         public CompletableFuture<AppendResult> recoverAppend(
-                StreamId streamId,
-                AppendAttemptId attemptId,
-                AppendRecoveryOptions options) {
+                StreamId streamId, AppendAttemptId attemptId, AppendRecoveryOptions options) {
             return unsupported();
         }
 
         @Override
-        public CompletableFuture<ReadResult> read(
-                StreamId streamId, long startOffset, ReadOptions options) {
+        public CompletableFuture<ReadResult> read(StreamId streamId, long startOffset, ReadOptions options) {
             return unsupported();
         }
 
         @Override
-        public CompletableFuture<ResolveResult> resolve(
-                StreamId streamId, long startOffset, ResolveOptions options) {
+        public CompletableFuture<ResolveResult> resolve(StreamId streamId, long startOffset, ResolveOptions options) {
             return unsupported();
         }
 
@@ -386,16 +371,14 @@ final class CursorStorageTestSupport {
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
 
         private static <T> CompletableFuture<T> unsupported() {
             return CompletableFuture.failedFuture(new UnsupportedOperationException("not used by cursor tests"));
         }
     }
 
-    record TrimCall(long offset, String reason) {
-    }
+    record TrimCall(long offset, String reason) {}
 
     enum MetadataOperation {
         CREATE_CURSOR,
@@ -427,11 +410,7 @@ final class CursorStorageTestSupport {
             }
         }
 
-        void failNext(
-                MetadataOperation operation,
-                FaultCut cut,
-                Predicate<Object> predicate,
-                Throwable failure) {
+        void failNext(MetadataOperation operation, FaultCut cut, Predicate<Object> predicate, Throwable failure) {
             faults.add(new FaultRule(operation, cut, predicate, failure));
         }
 
@@ -446,12 +425,8 @@ final class CursorStorageTestSupport {
         }
 
         @Override
-        public CompletableFuture<VersionedCursorState> createCursor(
-                String cluster, CursorStateRecord value) {
-            return invoke(
-                    MetadataOperation.CREATE_CURSOR,
-                    value,
-                    () -> delegate.createCursor(cluster, value));
+        public CompletableFuture<VersionedCursorState> createCursor(String cluster, CursorStateRecord value) {
+            return invoke(MetadataOperation.CREATE_CURSOR, value, () -> delegate.createCursor(cluster, value));
         }
 
         @Override
@@ -465,49 +440,37 @@ final class CursorStorageTestSupport {
             return invoke(
                     MetadataOperation.CAS_CURSOR,
                     value,
-                    () -> delegate.compareAndSetCursor(
-                            cluster, value, expectedMetadataVersion));
+                    () -> delegate.compareAndSetCursor(cluster, value, expectedMetadataVersion));
         }
 
         @Override
         public CompletableFuture<CursorScanPage> scanCursors(
-                String cluster,
-                StreamId streamId,
-                Optional<CursorScanToken> continuation,
-                int pageSize) {
+                String cluster, StreamId streamId, Optional<CursorScanToken> continuation, int pageSize) {
             return delegate.scanCursors(cluster, streamId, continuation, pageSize);
         }
 
         @Override
-        public CompletableFuture<Optional<VersionedCursorRetention>> getRetention(
-                String cluster, StreamId streamId) {
+        public CompletableFuture<Optional<VersionedCursorRetention>> getRetention(String cluster, StreamId streamId) {
             return delegate.getRetention(cluster, streamId);
         }
 
         @Override
         public CompletableFuture<VersionedCursorRetention> createRetention(
                 String cluster, CursorRetentionRecord value) {
-            return invoke(
-                    MetadataOperation.CREATE_RETENTION,
-                    value,
-                    () -> delegate.createRetention(cluster, value));
+            return invoke(MetadataOperation.CREATE_RETENTION, value, () -> delegate.createRetention(cluster, value));
         }
 
         @Override
         public CompletableFuture<VersionedCursorRetention> compareAndSetRetention(
-                String cluster,
-                CursorRetentionRecord value,
-                long expectedMetadataVersion) {
+                String cluster, CursorRetentionRecord value, long expectedMetadataVersion) {
             return invoke(
                     MetadataOperation.CAS_RETENTION,
                     value,
-                    () -> delegate.compareAndSetRetention(
-                            cluster, value, expectedMetadataVersion));
+                    () -> delegate.compareAndSetRetention(cluster, value, expectedMetadataVersion));
         }
 
         @Override
-        public WatchRegistration watchStreamCursors(
-                String cluster, StreamId streamId, Runnable invalidation) {
+        public WatchRegistration watchStreamCursors(String cluster, StreamId streamId, Runnable invalidation) {
             return delegate.watchStreamCursors(cluster, streamId, invalidation);
         }
 
@@ -517,9 +480,7 @@ final class CursorStorageTestSupport {
         }
 
         private <T> CompletableFuture<T> invoke(
-                MetadataOperation operation,
-                Object value,
-                Supplier<CompletableFuture<T>> action) {
+                MetadataOperation operation, Object value, Supplier<CompletableFuture<T>> action) {
             FaultRule fault = takeFault(operation, value);
             if (fault != null && fault.cut() == FaultCut.BEFORE) {
                 return CompletableFuture.failedFuture(fault.failure());
@@ -550,8 +511,7 @@ final class CursorStorageTestSupport {
             return null;
         }
 
-        private void awaitCursorCasGate()
-                throws InterruptedException, BrokenBarrierException, TimeoutException {
+        private void awaitCursorCasGate() throws InterruptedException, BrokenBarrierException, TimeoutException {
             CursorCasGate gate = cursorCasGate.get();
             if (gate == null || !gate.tryEnter()) {
                 return;
@@ -567,11 +527,7 @@ final class CursorStorageTestSupport {
     }
 
     private record FaultRule(
-            MetadataOperation operation,
-            FaultCut cut,
-            Predicate<Object> predicate,
-            Throwable failure) {
-    }
+            MetadataOperation operation, FaultCut cut, Predicate<Object> predicate, Throwable failure) {}
 
     private record CursorCasGate(CyclicBarrier barrier, AtomicInteger remaining) {
         CursorCasGate(int parties) {
@@ -603,14 +559,11 @@ final class CursorStorageTestSupport {
 
         @Override
         public CompletableFuture<CursorSnapshotPublication> prepareWrite(
-                CursorSnapshotWriteRequest request,
-                CursorSnapshotWriteAuthority authority) {
+                CursorSnapshotWriteRequest request, CursorSnapshotWriteAuthority authority) {
             authority.requireMatches(request);
             String snapshotId = String.format("%032x", ids.incrementAndGet());
-            CursorSnapshotCodecV1.EncodedSnapshot encoded = CursorSnapshotCodecV1.encode(
-                    request, snapshotId, config);
-            ObjectKey key = CursorSnapshotKeys.objectKey(
-                    CLUSTER, request.identity(), snapshotId);
+            CursorSnapshotCodecV1.EncodedSnapshot encoded = CursorSnapshotCodecV1.encode(request, snapshotId, config);
+            ObjectKey key = CursorSnapshotKeys.objectKey(CLUSTER, request.identity(), snapshotId);
             byte[] bytes = new byte[encoded.payload().remaining()];
             encoded.payload().get(bytes);
             objects.put(key, bytes);
@@ -636,9 +589,7 @@ final class CursorStorageTestSupport {
             ObjectProtection pending = new ObjectProtection(
                     object,
                     new ObjectProtectionIdentity(
-                            object.objectKeyHash(),
-                            ObjectProtectionType.CURSOR_SNAPSHOT_PENDING,
-                            snapshotId),
+                            object.objectKeyHash(), ObjectProtectionType.CURSOR_SNAPSHOT_PENDING, snapshotId),
                     new ObjectProtectionOwner(
                             "/test/cursor-snapshot/" + request.identity().cursorNameHash(),
                             authority.currentRoot().metadataVersion(),
@@ -648,20 +599,21 @@ final class CursorStorageTestSupport {
                     Math.addExact(request.createdAtMillis(), 1),
                     1,
                     new Checksum(ChecksumType.SHA256, "b".repeat(64)));
-            return CompletableFuture.completedFuture(new CursorSnapshotPublication(
-                    request, authority, reference, object, pending));
+            return CompletableFuture.completedFuture(
+                    new CursorSnapshotPublication(request, authority, reference, object, pending));
         }
 
         @Override
         public CompletableFuture<Void> completeWrite(
-                CursorSnapshotPublication publication,
-                VersionedCursorState publishedRoot) {
+                CursorSnapshotPublication publication, VersionedCursorState publishedRoot) {
             if (publishedRoot.value().snapshotReference().isEmpty()
-                    || !publishedRoot.value().snapshotReference()
+                    || !publishedRoot
+                            .value()
+                            .snapshotReference()
                             .orElseThrow()
                             .equals(publication.reference().toMetadataRecord())) {
-                return CompletableFuture.failedFuture(new IllegalArgumentException(
-                        "published root does not contain the prepared snapshot"));
+                return CompletableFuture.failedFuture(
+                        new IllegalArgumentException("published root does not contain the prepared snapshot"));
             }
             return CompletableFuture.completedFuture(null);
         }
@@ -675,12 +627,12 @@ final class CursorStorageTestSupport {
             }
             byte[] bytes = objects.get(reference.objectKey());
             if (bytes == null) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.OBJECT_NOT_FOUND, true, "snapshot missing"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.OBJECT_NOT_FOUND, true, "snapshot missing"));
             }
             try {
-                return CompletableFuture.completedFuture(CursorSnapshotCodecV1.decode(
-                        ByteBuffer.wrap(bytes), reference, expectedIdentity, config));
+                return CompletableFuture.completedFuture(
+                        CursorSnapshotCodecV1.decode(ByteBuffer.wrap(bytes), reference, expectedIdentity, config));
             } catch (Throwable error) {
                 return CompletableFuture.failedFuture(error);
             }
@@ -716,7 +668,6 @@ final class CursorStorageTestSupport {
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 }

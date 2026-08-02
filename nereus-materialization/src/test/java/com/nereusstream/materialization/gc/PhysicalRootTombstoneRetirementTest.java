@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -56,8 +56,7 @@ class PhysicalRootTombstoneRetirementTest {
     private static final String REFERENCE_SHA = "b".repeat(64);
     private static final ObjectKey OBJECT_KEY = new ObjectKey("objects/wal-a");
     private static final ObjectKeyHash OBJECT = ObjectKeyHash.from(OBJECT_KEY);
-    private static final Checksum STORAGE_CHECKSUM =
-            new Checksum(ChecksumType.CRC32C, "01020304");
+    private static final Checksum STORAGE_CHECKSUM = new Checksum(ChecksumType.CRC32C, "01020304");
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
@@ -70,9 +69,8 @@ class PhysicalRootTombstoneRetirementTest {
     void durableFirstAbsenceAndSecondWindowRetireRootLast() {
         Fixture fixture = fixture(false);
 
-        TombstoneRetirementResult first = fixture.coordinator()
-                .retire(fixture.deletedRoot())
-                .join();
+        TombstoneRetirementResult first =
+                fixture.coordinator().retire(fixture.deletedRoot()).join();
 
         assertThat(first.status()).isEqualTo(TombstoneRetirementStatus.NOT_OLD_ENOUGH);
         VersionedPhysicalObjectRoot observed = fixture.currentRoot();
@@ -80,7 +78,8 @@ class PhysicalRootTombstoneRetirementTest {
         assertThat(observed.value().tombstoneProofSha256()).hasSize(64);
 
         fixture.clock().setMillis(7_000);
-        TombstoneRetirementResult retired = fixture.coordinator().retire(observed).join();
+        TombstoneRetirementResult retired =
+                fixture.coordinator().retire(observed).join();
 
         assertThat(retired.status()).isEqualTo(TombstoneRetirementStatus.RETIRED);
         assertThat(retired.rootRetired()).isTrue();
@@ -93,20 +92,25 @@ class PhysicalRootTombstoneRetirementTest {
         Fixture fixture = fixture(false);
         fixture.coordinator().retire(fixture.deletedRoot()).join();
         VersionedPhysicalObjectRoot observed = fixture.currentRoot();
-        fixture.store().createOrCompareReaderLease(CLUSTER, new ObjectReaderLeaseRecord(
-                1,
-                OBJECT.value(),
-                "c".repeat(26),
-                "d".repeat(26),
-                observed.value().lifecycleEpoch(),
-                5_100,
-                5_200,
-                5_150,
-                0,
-                0)).join();
+        fixture.store()
+                .createOrCompareReaderLease(
+                        CLUSTER,
+                        new ObjectReaderLeaseRecord(
+                                1,
+                                OBJECT.value(),
+                                "c".repeat(26),
+                                "d".repeat(26),
+                                observed.value().lifecycleEpoch(),
+                                5_100,
+                                5_200,
+                                5_150,
+                                0,
+                                0))
+                .join();
         fixture.clock().setMillis(7_000);
 
-        TombstoneRetirementResult result = fixture.coordinator().retire(observed).join();
+        TombstoneRetirementResult result =
+                fixture.coordinator().retire(observed).join();
 
         assertThat(result.status()).isEqualTo(TombstoneRetirementStatus.HANDLE_PRESENT);
         assertThat(fixture.currentRoot().value().tombstoneFirstAbsentAtMillis()).isZero();
@@ -121,7 +125,8 @@ class PhysicalRootTombstoneRetirementTest {
         fixture.domain().mode = DomainMode.OWNER;
         fixture.clock().setMillis(7_000);
 
-        TombstoneRetirementResult result = fixture.coordinator().retire(observed).join();
+        TombstoneRetirementResult result =
+                fixture.coordinator().retire(observed).join();
 
         assertThat(result.status()).isEqualTo(TombstoneRetirementStatus.OWNER_PRESENT);
         assertThat(fixture.currentRoot().value().tombstoneFirstAbsentAtMillis()).isZero();
@@ -153,7 +158,8 @@ class PhysicalRootTombstoneRetirementTest {
         fixture.objectStore().exists = true;
         fixture.clock().setMillis(7_000);
 
-        TombstoneRetirementResult result = fixture.coordinator().retire(observed).join();
+        TombstoneRetirementResult result =
+                fixture.coordinator().retire(observed).join();
 
         assertThat(result.status()).isEqualTo(TombstoneRetirementStatus.OBJECT_PRESENT);
         assertThat(fixture.objectStore().exists).isFalse();
@@ -170,7 +176,8 @@ class PhysicalRootTombstoneRetirementTest {
         fixture.objectStore().mismatched = true;
         fixture.clock().setMillis(7_000);
 
-        TombstoneRetirementResult result = fixture.coordinator().retire(observed).join();
+        TombstoneRetirementResult result =
+                fixture.coordinator().retire(observed).join();
 
         assertThat(result.status()).isEqualTo(TombstoneRetirementStatus.QUARANTINED);
         assertThat(fixture.objectStore().deleteCalls).hasValue(0);
@@ -188,14 +195,14 @@ class PhysicalRootTombstoneRetirementTest {
         fixture.store().loseRootDeleteResponse = true;
         fixture.clock().setMillis(7_000);
 
-        TombstoneRetirementResult result = fixture.coordinator().retire(observed).join();
+        TombstoneRetirementResult result =
+                fixture.coordinator().retire(observed).join();
 
         assertThat(result.status()).isEqualTo(TombstoneRetirementStatus.RETIRED);
         assertThat(result.referencesRetired()).isTrue();
         assertThat(result.manifestRetired()).isTrue();
         assertThat(result.rootRetired()).isTrue();
-        assertThat(fixture.mutationOrder())
-                .containsExactly("references", "manifest", "root");
+        assertThat(fixture.mutationOrder()).containsExactly("references", "manifest", "root");
         assertThat(fixture.store().getRoot(CLUSTER, OBJECT).join()).isEmpty();
         assertThat(fixture.auditStore().references).isEmpty();
         assertThat(fixture.auditStore().manifest).isEmpty();
@@ -204,99 +211,59 @@ class PhysicalRootTombstoneRetirementTest {
     Fixture fixture(boolean withAudits) {
         ArrayList<String> mutationOrder = new ArrayList<>();
         TrackingPhysicalStore store = new TrackingPhysicalStore(mutationOrder);
-        VersionedPhysicalObjectRoot deleted = deletedRoot(
-                store, withAudits ? "object-1" : "");
+        VersionedPhysicalObjectRoot deleted = deletedRoot(store, withAudits ? "object-1" : "");
         MutableDomain domain = new MutableDomain(config().referenceDomainConfig());
-        GcReferenceDomainRegistry registry = new GcReferenceDomainRegistry(
-                config(), scheduler, List.of(domain));
+        GcReferenceDomainRegistry registry = new GcReferenceDomainRegistry(config(), scheduler, List.of(domain));
         ExactObjectStore objectStore = new ExactObjectStore();
         FakeAuditStore auditStore = new FakeAuditStore(mutationOrder, withAudits);
         MutableClock clock = new MutableClock(5_000);
         var coordinator = new DefaultPhysicalRootTombstoneRetirementCoordinator(
-                CLUSTER,
-                config(),
-                store,
-                auditStore,
-                registry,
-                objectStore,
-                clock,
-                scheduler);
-        return new Fixture(
-                store,
-                domain,
-                objectStore,
-                auditStore,
-                clock,
-                coordinator,
-                deleted,
-                mutationOrder);
+                CLUSTER, config(), store, auditStore, registry, objectStore, clock, scheduler);
+        return new Fixture(store, domain, objectStore, auditStore, clock, coordinator, deleted, mutationOrder);
     }
 
-    private static VersionedPhysicalObjectRoot deletedRoot(
-            FakePhysicalObjectMetadataStore store,
-            String objectId) {
+    private static VersionedPhysicalObjectRoot deletedRoot(FakePhysicalObjectMetadataStore store, String objectId) {
         VersionedPhysicalObjectRoot active = store.createRoot(
-                CLUSTER,
-                new PhysicalObjectRootRecord(
-                        1,
-                        OBJECT.value(),
-                        OBJECT_KEY.value(),
-                        objectId,
-                        1,
-                        42,
-                        STORAGE_CHECKSUM.type().name(),
-                        STORAGE_CHECKSUM.value(),
-                        "",
-                        "",
-                        PhysicalObjectLifecycle.ACTIVE,
-                        1,
-                        100,
-                        200,
-                        "",
-                        "",
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        "",
-                        "",
-                        0))
+                        CLUSTER,
+                        new PhysicalObjectRootRecord(
+                                1,
+                                OBJECT.value(),
+                                OBJECT_KEY.value(),
+                                objectId,
+                                1,
+                                42,
+                                STORAGE_CHECKSUM.type().name(),
+                                STORAGE_CHECKSUM.value(),
+                                "",
+                                "",
+                                PhysicalObjectLifecycle.ACTIVE,
+                                1,
+                                100,
+                                200,
+                                "",
+                                "",
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                "",
+                                "",
+                                0))
                 .join();
         VersionedPhysicalObjectRoot marked = store.compareAndSetRoot(
-                CLUSTER,
-                lifecycle(
-                        active.value(),
-                        PhysicalObjectLifecycle.MARKED,
-                        2,
-                        300,
-                        400,
-                        0,
-                        0),
-                active.metadataVersion())
+                        CLUSTER,
+                        lifecycle(active.value(), PhysicalObjectLifecycle.MARKED, 2, 300, 400, 0, 0),
+                        active.metadataVersion())
                 .join();
         VersionedPhysicalObjectRoot deleting = store.compareAndSetRoot(
-                CLUSTER,
-                lifecycle(
-                        marked.value(),
-                        PhysicalObjectLifecycle.DELETING,
-                        3,
-                        300,
-                        400,
-                        500,
-                        0),
-                marked.metadataVersion())
+                        CLUSTER,
+                        lifecycle(marked.value(), PhysicalObjectLifecycle.DELETING, 3, 300, 400, 500, 0),
+                        marked.metadataVersion())
                 .join();
         return store.compareAndSetRoot(
                         CLUSTER,
-                        lifecycle(
-                                deleting.value(),
-                                PhysicalObjectLifecycle.DELETED,
-                                4,
-                                300,
-                                400,
-                                500,
-                                1_000),
+                        lifecycle(deleting.value(), PhysicalObjectLifecycle.DELETED, 4, 300, 400, 500, 1_000),
                         deleting.metadataVersion())
                 .join();
     }
@@ -416,19 +383,12 @@ class PhysicalRootTombstoneRetirementTest {
 
         @Override
         public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
-            GcReferenceSnapshotBuilder builder = new GcReferenceSnapshotBuilder(
-                    domainId(), protocolVersion(), query, config);
+            GcReferenceSnapshotBuilder builder =
+                    new GcReferenceSnapshotBuilder(domainId(), protocolVersion(), query, config);
             builder.addAuthority(new GcAuthorityToken(
-                    "/authority",
-                    authorityVersion,
-                    authorityVersion % 2 == 0 ? sha('e') : sha('d')));
+                    "/authority", authorityVersion, authorityVersion % 2 == 0 ? sha('e') : sha('d')));
             if (mode == DomainMode.OWNER) {
-                builder.addReference(new GcReference(
-                        "test-owner",
-                        "owner-1",
-                        "/owner",
-                        7,
-                        sha('f')));
+                builder.addReference(new GcReference("test-owner", "owner-1", "/owner", 7, sha('f')));
                 builder.veto();
             } else if (mode == DomainMode.VETO) {
                 builder.veto();
@@ -437,9 +397,7 @@ class PhysicalRootTombstoneRetirementTest {
         }
 
         @Override
-        public CompletableFuture<Boolean> stillMatches(
-                GcReferenceQuery query,
-                GcReferenceSnapshot snapshot) {
+        public CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot) {
             if (becomeOwnerBeforeRevalidation) {
                 becomeOwnerBeforeRevalidation = false;
                 mode = DomainMode.OWNER;
@@ -448,8 +406,7 @@ class PhysicalRootTombstoneRetirementTest {
         }
     }
 
-    private static final class TrackingPhysicalStore
-            extends FakePhysicalObjectMetadataStore {
+    private static final class TrackingPhysicalStore extends FakePhysicalObjectMetadataStore {
         private final List<String> mutationOrder;
         private volatile boolean loseRootDeleteResponse;
 
@@ -459,19 +416,14 @@ class PhysicalRootTombstoneRetirementTest {
 
         @Override
         public CompletableFuture<Void> deleteRoot(
-                String cluster,
-                ObjectKeyHash object,
-                long expectedVersion,
-                Checksum expectedRootSha256) {
-            return super.deleteRoot(
-                            cluster, object, expectedVersion, expectedRootSha256)
+                String cluster, ObjectKeyHash object, long expectedVersion, Checksum expectedRootSha256) {
+            return super.deleteRoot(cluster, object, expectedVersion, expectedRootSha256)
                     .thenCompose(ignored -> {
                         mutationOrder.add("root");
                         if (loseRootDeleteResponse) {
                             loseRootDeleteResponse = false;
                             return CompletableFuture.failedFuture(
-                                    new IllegalStateException(
-                                            "lost root delete response"));
+                                    new IllegalStateException("lost root delete response"));
                         }
                         return CompletableFuture.completedFuture(null);
                     });
@@ -486,75 +438,55 @@ class PhysicalRootTombstoneRetirementTest {
 
         @Override
         public CompletableFuture<RangeReadResult> readRange(
-                ObjectKey key,
-                long offset,
-                long length,
-                RangeReadOptions options) {
+                ObjectKey key, long offset, long length, RangeReadOptions options) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         }
 
         @Override
-        public CompletableFuture<HeadObjectResult> headObject(
-                ObjectKey key,
-                HeadObjectOptions options) {
+        public CompletableFuture<HeadObjectResult> headObject(ObjectKey key, HeadObjectOptions options) {
             if (!exists) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.OBJECT_NOT_FOUND, true, "object not found"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.OBJECT_NOT_FOUND, true, "object not found"));
             }
-            return CompletableFuture.completedFuture(new HeadObjectResult(
-                    key,
-                    mismatched ? 43 : 42,
-                    STORAGE_CHECKSUM,
-                    Optional.empty(),
-                    Map.of()));
+            return CompletableFuture.completedFuture(
+                    new HeadObjectResult(key, mismatched ? 43 : 42, STORAGE_CHECKSUM, Optional.empty(), Map.of()));
         }
 
         @Override
-        public CompletableFuture<DeleteObjectResult> deleteObject(
-                ObjectKey key,
-                DeleteObjectOptions options) {
+        public CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
             deleteCalls.incrementAndGet();
             assertThat(key).isEqualTo(OBJECT_KEY);
             assertThat(options.expectedLength()).isEqualTo(42);
             assertThat(options.expectedStorageChecksum()).isEqualTo(STORAGE_CHECKSUM);
-            DeleteObjectResult.Status status = exists
-                    ? DeleteObjectResult.Status.DELETED
-                    : DeleteObjectResult.Status.ALREADY_ABSENT;
+            DeleteObjectResult.Status status =
+                    exists ? DeleteObjectResult.Status.DELETED : DeleteObjectResult.Status.ALREADY_ABSENT;
             exists = false;
             if (loseDeleteResponse) {
                 loseDeleteResponse = false;
-                return CompletableFuture.failedFuture(
-                        new IllegalStateException("lost late object delete response"));
+                return CompletableFuture.failedFuture(new IllegalStateException("lost late object delete response"));
             }
-            return CompletableFuture.completedFuture(
-                    new DeleteObjectResult(key, status));
+            return CompletableFuture.completedFuture(new DeleteObjectResult(key, status));
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 
-    private static final class FakeAuditStore
-            implements ObjectAuditRetirementStore {
+    private static final class FakeAuditStore implements ObjectAuditRetirementStore {
         private final List<String> mutationOrder;
         private Optional<VersionedObjectReferencesAudit> references;
         private Optional<VersionedObjectManifestAudit> manifest;
         private volatile boolean loseReferenceDeleteResponse;
         private volatile boolean loseManifestDeleteResponse;
-        private volatile Runnable afterReferenceDelete = () -> { };
-        private volatile Runnable afterManifestDelete = () -> { };
+        private volatile Runnable afterReferenceDelete = () -> {};
+        private volatile Runnable afterManifestDelete = () -> {};
 
         private FakeAuditStore(List<String> mutationOrder, boolean populated) {
             this.mutationOrder = mutationOrder;
             if (populated) {
-                ObjectReferenceRecord referenceValue = new ObjectReferenceRecord(
-                        "object-1", List.of(), 900, 11);
-                references = Optional.of(new VersionedObjectReferencesAudit(
-                        "/references/object-1",
-                        referenceValue,
-                        11,
-                        sha('1')));
+                ObjectReferenceRecord referenceValue = new ObjectReferenceRecord("object-1", List.of(), 900, 11);
+                references = Optional.of(
+                        new VersionedObjectReferencesAudit("/references/object-1", referenceValue, 11, sha('1')));
                 ObjectManifestRecord manifestValue = new ObjectManifestRecord(
                         "object-1",
                         OBJECT_KEY.value(),
@@ -576,11 +508,8 @@ class PhysicalRootTombstoneRetirementTest {
                         List.of(),
                         300,
                         12);
-                manifest = Optional.of(new VersionedObjectManifestAudit(
-                        "/manifests/object-1",
-                        manifestValue,
-                        12,
-                        sha('2')));
+                manifest = Optional.of(
+                        new VersionedObjectManifestAudit("/manifests/object-1", manifestValue, 12, sha('2')));
             } else {
                 references = Optional.empty();
                 manifest = Optional.empty();
@@ -589,63 +518,50 @@ class PhysicalRootTombstoneRetirementTest {
 
         @Override
         public CompletableFuture<Optional<VersionedObjectManifestAudit>> getManifest(
-                String cluster,
-                ObjectId objectId) {
+                String cluster, ObjectId objectId) {
             return CompletableFuture.completedFuture(manifest);
         }
 
         @Override
         public CompletableFuture<Optional<VersionedObjectReferencesAudit>> getReferences(
-                String cluster,
-                ObjectId objectId) {
+                String cluster, ObjectId objectId) {
             return CompletableFuture.completedFuture(references);
         }
 
         @Override
         public CompletableFuture<Void> deleteReferences(
-                String cluster,
-                ObjectId objectId,
-                long expectedVersion,
-                Checksum expectedDurableValueSha256) {
+                String cluster, ObjectId objectId, long expectedVersion, Checksum expectedDurableValueSha256) {
             VersionedObjectReferencesAudit current = references.orElseThrow();
             assertThat(current.metadataVersion()).isEqualTo(expectedVersion);
-            assertThat(current.durableValueSha256())
-                    .isEqualTo(expectedDurableValueSha256);
+            assertThat(current.durableValueSha256()).isEqualTo(expectedDurableValueSha256);
             references = Optional.empty();
             mutationOrder.add("references");
             afterReferenceDelete.run();
             if (loseReferenceDeleteResponse) {
                 loseReferenceDeleteResponse = false;
-                return CompletableFuture.failedFuture(
-                        new IllegalStateException("lost reference delete response"));
+                return CompletableFuture.failedFuture(new IllegalStateException("lost reference delete response"));
             }
             return CompletableFuture.completedFuture(null);
         }
 
         @Override
         public CompletableFuture<Void> deleteManifest(
-                String cluster,
-                ObjectId objectId,
-                long expectedVersion,
-                Checksum expectedDurableValueSha256) {
+                String cluster, ObjectId objectId, long expectedVersion, Checksum expectedDurableValueSha256) {
             VersionedObjectManifestAudit current = manifest.orElseThrow();
             assertThat(current.metadataVersion()).isEqualTo(expectedVersion);
-            assertThat(current.durableValueSha256())
-                    .isEqualTo(expectedDurableValueSha256);
+            assertThat(current.durableValueSha256()).isEqualTo(expectedDurableValueSha256);
             manifest = Optional.empty();
             mutationOrder.add("manifest");
             afterManifestDelete.run();
             if (loseManifestDeleteResponse) {
                 loseManifestDeleteResponse = false;
-                return CompletableFuture.failedFuture(
-                        new IllegalStateException("lost manifest delete response"));
+                return CompletableFuture.failedFuture(new IllegalStateException("lost manifest delete response"));
             }
             return CompletableFuture.completedFuture(null);
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 
     static final class MutableClock extends Clock {

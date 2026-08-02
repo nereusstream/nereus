@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -87,17 +88,13 @@ public final class ObjectInventoryScanner implements AutoCloseable {
             return CompletableFuture.failedFuture(failure);
         }
         Counts counts = new Counts();
-        CompletableFuture<ObjectInventoryScanResult> result = scanFamily(
-                0, Optional.empty(), now, counts);
+        CompletableFuture<ObjectInventoryScanResult> result = scanFamily(0, Optional.empty(), now, counts);
         result.whenComplete((ignored, failure) -> scanning.set(false));
         return result;
     }
 
     private CompletableFuture<ObjectInventoryScanResult> scanFamily(
-            int familyIndex,
-            Optional<String> continuation,
-            long now,
-            Counts counts) {
+            int familyIndex, Optional<String> continuation, long now, Counts counts) {
         if (familyIndex == families.size()) {
             return CompletableFuture.completedFuture(counts.result());
         }
@@ -106,37 +103,23 @@ public final class ObjectInventoryScanner implements AutoCloseable {
                         deadline -> objectStore.listObjects(
                                 family.prefix(),
                                 continuation,
-                                new ListObjectsOptions(
-                                        config.objectListPageSize(), deadline.remaining())),
+                                new ListObjectsOptions(config.objectListPageSize(), deadline.remaining())),
                         "list object inventory family " + family.familyId())
                 .thenCompose(page -> {
                     requirePage(family, page, continuation);
                     counts.page();
-                    return inspectPage(family, page.objects(), 0, now, counts)
-                            .thenCompose(ignored -> {
-                                if (page.continuationToken().isPresent()) {
-                                    return scanFamily(
-                                            familyIndex,
-                                            page.continuationToken(),
-                                            now,
-                                            counts);
-                                }
-                                counts.family();
-                                return scanFamily(
-                                        familyIndex + 1,
-                                        Optional.empty(),
-                                        now,
-                                        counts);
-                            });
+                    return inspectPage(family, page.objects(), 0, now, counts).thenCompose(ignored -> {
+                        if (page.continuationToken().isPresent()) {
+                            return scanFamily(familyIndex, page.continuationToken(), now, counts);
+                        }
+                        counts.family();
+                        return scanFamily(familyIndex + 1, Optional.empty(), now, counts);
+                    });
                 });
     }
 
     private CompletableFuture<Void> inspectPage(
-            ObjectInventoryFamily family,
-            List<ListedObject> values,
-            int index,
-            long now,
-            Counts counts) {
+            ObjectInventoryFamily family, List<ListedObject> values, int index, long now, Counts counts) {
         if (index == values.size()) {
             return CompletableFuture.completedFuture(null);
         }
@@ -146,10 +129,7 @@ public final class ObjectInventoryScanner implements AutoCloseable {
                 .thenCompose(ignored -> inspectPage(family, values, index + 1, now, counts));
     }
 
-    private CompletableFuture<Outcome> inspect(
-            ObjectInventoryFamily family,
-            ListedObject listed,
-            long now) {
+    private CompletableFuture<Outcome> inspect(ObjectInventoryFamily family, ListedObject listed, long now) {
         final ObjectInventoryKey parsed;
         try {
             parsed = Objects.requireNonNull(family.parse(listed.key()), "parsed inventory key");
@@ -160,9 +140,7 @@ public final class ObjectInventoryScanner implements AutoCloseable {
             return CompletableFuture.completedFuture(Outcome.MALFORMED_KEY);
         }
         ObjectKeyHash object = ObjectKeyHash.from(listed.key());
-        return bound(
-                        ignored -> metadataStore.getRoot(cluster, object),
-                        "load physical root for listed object")
+        return bound(ignored -> metadataStore.getRoot(cluster, object), "load physical root for listed object")
                 .thenCompose(existing -> {
                     if (existing.isPresent()) {
                         return CompletableFuture.completedFuture(
@@ -193,10 +171,7 @@ public final class ObjectInventoryScanner implements AutoCloseable {
     }
 
     private CompletableFuture<Outcome> registerIfStillMissing(
-            ObjectInventoryKey parsed,
-            PhysicalObjectIdentity identity,
-            ListedObject listed,
-            long now) {
+            ObjectInventoryKey parsed, PhysicalObjectIdentity identity, ListedObject listed, long now) {
         return bound(
                         ignored -> metadataStore.getRoot(cluster, identity.objectKeyHash()),
                         "recheck physical root before inventory registration")
@@ -221,24 +196,18 @@ public final class ObjectInventoryScanner implements AutoCloseable {
                 });
     }
 
-    private CompletableFuture<Outcome> createOrRecover(
-            PhysicalObjectIdentity identity,
-            PhysicalObjectRootRecord root) {
-        return bound(
-                        ignored -> metadataStore.createRoot(cluster, root),
-                        "register inventory-discovered physical root")
+    private CompletableFuture<Outcome> createOrRecover(PhysicalObjectIdentity identity, PhysicalObjectRootRecord root) {
+        return bound(ignored -> metadataStore.createRoot(cluster, root), "register inventory-discovered physical root")
                 .handle((created, failure) -> {
                     if (failure == null) {
                         return CompletableFuture.completedFuture(
-                                exactIdentity(created, identity)
-                                                && exactDesiredRoot(created, root)
+                                exactIdentity(created, identity) && exactDesiredRoot(created, root)
                                         ? Outcome.ROOT_REGISTERED
                                         : Outcome.ROOT_CONFLICT);
                     }
                     Throwable original = unwrap(failure);
                     return bound(
-                                    ignored -> metadataStore.getRoot(
-                                            cluster, identity.objectKeyHash()),
+                                    ignored -> metadataStore.getRoot(cluster, identity.objectKeyHash()),
                                     "reload physical root after uncertain inventory registration")
                             .thenCompose(reloaded -> {
                                 if (reloaded.isEmpty()) {
@@ -246,7 +215,7 @@ public final class ObjectInventoryScanner implements AutoCloseable {
                                 }
                                 return CompletableFuture.completedFuture(
                                         exactIdentity(reloaded.orElseThrow(), identity)
-                                                && exactDesiredRoot(reloaded.orElseThrow(), root)
+                                                        && exactDesiredRoot(reloaded.orElseThrow(), root)
                                                 ? Outcome.ROOT_CONVERGED
                                                 : Outcome.ROOT_CONFLICT);
                             });
@@ -254,19 +223,16 @@ public final class ObjectInventoryScanner implements AutoCloseable {
                 .thenCompose(Function.identity());
     }
 
-    private CompletableFuture<Optional<HeadObjectResult>> head(
-            com.nereusstream.api.ObjectKey key) {
+    private CompletableFuture<Optional<HeadObjectResult>> head(com.nereusstream.api.ObjectKey key) {
         return bound(
-                        deadline -> objectStore.headObject(
-                                key, new HeadObjectOptions(deadline.remaining())),
+                        deadline -> objectStore.headObject(key, new HeadObjectOptions(deadline.remaining())),
                         "HEAD inventory-discovered object")
                 .handle((value, failure) -> {
                     if (failure == null) {
                         return Optional.of(value);
                     }
                     Throwable exact = unwrap(failure);
-                    if (exact instanceof NereusException nereus
-                            && nereus.code() == ErrorCode.OBJECT_NOT_FOUND) {
+                    if (exact instanceof NereusException nereus && nereus.code() == ErrorCode.OBJECT_NOT_FOUND) {
                         return Optional.empty();
                     }
                     throw propagate(exact);
@@ -299,12 +265,9 @@ public final class ObjectInventoryScanner implements AutoCloseable {
     }
 
     private <T> CompletableFuture<T> bound(
-            Function<MaterializationDeadline, CompletableFuture<T>> operation,
-            String stage) {
-        MaterializationDeadline deadline = new MaterializationDeadline(
-                config.operationTimeout(), scheduler);
-        CompletableFuture<T> result = deadline.bound(
-                () -> operation.apply(deadline), stage);
+            Function<MaterializationDeadline, CompletableFuture<T>> operation, String stage) {
+        MaterializationDeadline deadline = new MaterializationDeadline(config.operationTimeout(), scheduler);
+        CompletableFuture<T> result = deadline.bound(() -> operation.apply(deadline), stage);
         result.whenComplete((ignored, failure) -> deadline.close());
         return result;
     }
@@ -328,25 +291,20 @@ public final class ObjectInventoryScanner implements AutoCloseable {
                 && (listed.etag().isEmpty() || listed.etag().equals(head.etag()));
     }
 
-    private static boolean exactIdentity(
-            VersionedPhysicalObjectRoot root, PhysicalObjectIdentity identity) {
+    private static boolean exactIdentity(VersionedPhysicalObjectRoot root, PhysicalObjectIdentity identity) {
         return root.value().lifecycle() == PhysicalObjectLifecycle.ACTIVE
                 && com.nereusstream.core.physical.PhysicalObjectIdentity.from(root.value())
                         .equals(identity);
     }
 
-    private static boolean exactDesiredRoot(
-            VersionedPhysicalObjectRoot actual,
-            PhysicalObjectRootRecord desired) {
+    private static boolean exactDesiredRoot(VersionedPhysicalObjectRoot actual, PhysicalObjectRootRecord desired) {
         return actual.metadataVersion() > 0
                 && actual.value().metadataVersion() == actual.metadataVersion()
                 && actual.value().equals(desired.withMetadataVersion(actual.metadataVersion()));
     }
 
     private static PhysicalObjectRootRecord active(
-            PhysicalObjectIdentity identity,
-            long createdAtMillis,
-            long orphanNotBeforeMillis) {
+            PhysicalObjectIdentity identity, long createdAtMillis, long orphanNotBeforeMillis) {
         return new PhysicalObjectRootRecord(
                 1,
                 identity.objectKeyHash().value(),
@@ -375,21 +333,16 @@ public final class ObjectInventoryScanner implements AutoCloseable {
     }
 
     private static void requirePage(
-            ObjectInventoryFamily family,
-            ListObjectsResult page,
-            Optional<String> suppliedContinuation) {
+            ObjectInventoryFamily family, ListObjectsResult page, Optional<String> suppliedContinuation) {
         if (!page.prefix().equals(family.prefix())
                 || (page.continuationToken().isPresent()
                         && page.continuationToken().equals(suppliedContinuation))) {
-            throw invariant(
-                    "object inventory listing escaped its prefix or repeated the supplied opaque token");
+            throw invariant("object inventory listing escaped its prefix or repeated the supplied opaque token");
         }
     }
 
-    private static List<ObjectInventoryFamily> canonicalFamilies(
-            List<ObjectInventoryFamily> values) {
-        List<ObjectInventoryFamily> exact = new ArrayList<>(
-                List.copyOf(Objects.requireNonNull(values, "families")));
+    private static List<ObjectInventoryFamily> canonicalFamilies(List<ObjectInventoryFamily> values) {
+        List<ObjectInventoryFamily> exact = new ArrayList<>(List.copyOf(Objects.requireNonNull(values, "families")));
         if (exact.isEmpty() || exact.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException("object inventory requires at least one non-null family");
         }
@@ -399,7 +352,8 @@ public final class ObjectInventoryScanner implements AutoCloseable {
         String previousPrefix = null;
         for (ObjectInventoryFamily family : exact) {
             String id = requireText(family.familyId(), "familyId");
-            String prefix = Objects.requireNonNull(family.prefix(), "family prefix").value();
+            String prefix =
+                    Objects.requireNonNull(family.prefix(), "family prefix").value();
             if (!prefix.endsWith("/")
                     || !ids.add(id)
                     || !prefixes.add(prefix)
@@ -429,9 +383,7 @@ public final class ObjectInventoryScanner implements AutoCloseable {
     }
 
     private static RuntimeException propagate(Throwable failure) {
-        return failure instanceof RuntimeException runtime
-                ? runtime
-                : new CompletionException(failure);
+        return failure instanceof RuntimeException runtime ? runtime : new CompletionException(failure);
     }
 
     private static Throwable unwrap(Throwable failure) {

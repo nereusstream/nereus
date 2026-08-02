@@ -1,27 +1,44 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT migration、all-five-profile before/after-provider abort-marker process cuts、deterministic mandatory NTC2 admission and all-five-profile NTC2 delete/corrupt + exact repair/re-election pass；stock `LogCleaner` differential now covers stable-prefix keyed/null/tombstone/transaction/control/idempotent semantics，while full compression/OPEN-boundary oracle and real compaction restart remain in progress
-> 2026-07-29 mandatory NTC2 五 profile 增量：product `4676c12` adds Object async and BookKeeper WAL-only/async/sync delete/corrupt/repair process coverage；together with the fresh Object-sync gate, KF-TXN-016 now has five-profile P/C/K current-source evidence。WAL-only compaction is rooted in projection-free L0 authority without an F4 registration，and extended KCP1 decision sets use bounded compressed persistence without changing legacy logical plan IDs
-> 2026-07-30 M6 process aggregate 增量：fork `76f62f3b83` closes the new-leader/lookup-publication race under the partition state lock；fresh `phase9M6KafkaProcessCheck --rerun-tasks` at product `4a0ec22` passes 94/94 tasks in 34m21s，including five-profile transaction-resolution、mandatory NTC2、retention/DeleteRecords、Object/BookKeeper in-flight takeover and all profile cold-recovery tasks。M7 full-format/large-randomized/chaos work remains separate
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact
+> idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction
+> import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and
+> internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived
+> index、checkpoint-before-DeleteRecords、periodic retention runtime and compaction fork authority/marker capture
+> implemented；native DeleteRecords + rooted NKC1 + durable trim + forced-restart/current-trim recovery process slice
+> passes；completed group/transaction coordinator live migration、Object-WAL bidirectional OPEN transaction COMMIT/ABORT
+> migration、all-five-profile before/after-provider abort-marker process cuts、deterministic mandatory NTC2 admission and
+> all-five-profile NTC2 delete/corrupt + exact repair/re-election pass；stock `LogCleaner` differential now covers
+> stable-prefix keyed/null/tombstone/transaction/control/idempotent semantics，while full compression/OPEN-boundary oracle
+> and real compaction restart remain in progress
+> 2026-07-29 mandatory NTC2 五 profile 增量：product `4676c12` adds Object async and BookKeeper WAL-only/async/sync
+> delete/corrupt/repair process coverage；together with the fresh Object-sync gate, KF-TXN-016 now has five-profile P/C/K
+> current-source evidence。WAL-only compaction is rooted in projection-free L0 authority without an F4 registration，and
+> extended KCP1 decision sets use bounded compressed persistence without changing legacy logical plan IDs
+> 2026-07-30 M6 process aggregate 增量：fork `76f62f3b83` closes the new-leader/lookup-publication race under the
+> partition state lock；fresh `phase9M6KafkaProcessCheck --rerun-tasks` at product `4a0ec22` passes 94/94 tasks in
+> 34m21s，including five-profile transaction-resolution、mandatory NTC2、retention/DeleteRecords、Object/BookKeeper in-flight
+> takeover and all profile cold-recovery tasks。M7 full-format/large-randomized/chaos work remains separate
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
 ## 1. Ownership decisions
 
-| Concern | Owner | Storage form |
-| --- | --- | --- |
-| idempotent producer truth | committed Kafka RecordBatch bytes | Nereus stream |
-| in-memory duplicate/sequence state | stock `ProducerStateManager` | rebuilt + checkpoint acceleration |
-| partition transaction state / LSO | committed transactional/control batches | rebuilt + checkpoint |
-| group coordinator truth | `__consumer_offsets` | ordinary F9 partition stream，Kafka compacted view |
-| transaction coordinator truth | `__transaction_state` | ordinary F9 partition stream，Kafka compacted view |
-| aborted transaction fetch index | derived from committed bytes | memory + NKC1 section |
-| leader epoch/time/segment indexes | derived | memory + NKC1 sections |
-| logical topic retention | Kafka config/DeleteRecords | Nereus stream trim |
-| log compaction visibility | F4 NTC2 committed generation + binding coverage activation | sparse higher generation |
-| physical source deletion | existing F4/F1-BK reference/GC protocols | never group-offset driven |
+| Concern                            | Owner                                                      | Storage form                                      |
+|------------------------------------|------------------------------------------------------------|---------------------------------------------------|
+| idempotent producer truth          | committed Kafka RecordBatch bytes                          | Nereus stream                                     |
+| in-memory duplicate/sequence state | stock `ProducerStateManager`                               | rebuilt + checkpoint acceleration                 |
+| partition transaction state / LSO  | committed transactional/control batches                    | rebuilt + checkpoint                              |
+| group coordinator truth            | `__consumer_offsets`                                       | ordinary F9 partition stream，Kafka compacted view |
+| transaction coordinator truth      | `__transaction_state`                                      | ordinary F9 partition stream，Kafka compacted view |
+| aborted transaction fetch index    | derived from committed bytes                               | memory + NKC1 section                             |
+| leader epoch/time/segment indexes  | derived                                                    | memory + NKC1 sections                            |
+| logical topic retention            | Kafka config/DeleteRecords                                 | Nereus stream trim                                |
+| log compaction visibility          | F4 NTC2 committed generation + binding coverage activation | sparse higher generation                          |
+| physical source deletion           | existing F4/F1-BK reference/GC protocols                   | never group-offset driven                         |
 
-Native Kafka coordinator state is not duplicated into F9 Oxia records。Oxia binding/checkpoint pointers coordinate storage；
+Native Kafka coordinator state is not duplicated into F9 Oxia records。Oxia binding/checkpoint pointers coordinate
+storage；
 the internal topics remain replayable protocol truth。
 
 ## 2. Stock append ordering and post-commit failures
@@ -31,11 +48,11 @@ index and map-end offset only after append returns。F9 `NereusLocalLog.append` 
 
 This gives three classes：
 
-| Cut | Durable data | Kafka derived state | Action |
-| --- | --- | --- | --- |
-| validation/sequence error before local append | absent | unchanged | return stock client error |
-| storage known-not-committed | absent | unchanged | timeout/backpressure per mapping |
-| stable append then process/derived-index failure | present | possibly incomplete | treat `KNOWN_COMMITTED`，write-fence/replay |
+| Cut                                              | Durable data | Kafka derived state | Action                                     |
+|--------------------------------------------------|--------------|---------------------|--------------------------------------------|
+| validation/sequence error before local append    | absent       | unchanged           | return stock client error                  |
+| storage known-not-committed                      | absent       | unchanged           | timeout/backpressure per mapping           |
+| stable append then process/derived-index failure | present      | possibly incomplete | treat `KNOWN_COMMITTED`，write-fence/replay |
 
 After stable append，a failure updating ProducerStateManager/transaction index/virtual segment cannot be returned as a
 normal non-committed retry while partition remains writable。`NereusUnifiedLog` catches this boundary，marks
@@ -60,7 +77,8 @@ verified state image。It does not change：
 - producer ID expiration policy；
 - first unstable offset calculation。
 
-Any behavior change present only in the AutoMQ reference fork is not implicitly adopted。F9 compatibility compares against
+Any behavior change present only in the AutoMQ reference fork is not implicitly adopted。F9 compatibility compares
+against
 the selected Apache Kafka baseline and records explicit patches separately。
 
 ### 3.2 Target methods
@@ -78,7 +96,8 @@ final class NereusProducerStateManager extends ProducerStateManager {
 }
 ```
 
-The selected Kafka baseline needs one narrow inert stock-package constructor seam because `ProducerAppendInfo.appendDataBatch`
+The selected Kafka baseline needs one narrow inert stock-package constructor seam because
+`ProducerAppendInfo.appendDataBatch`
 cannot represent a marker-updated `lastTimestamp` independently from the retained data-batch window：
 
 ```java
@@ -94,13 +113,16 @@ public static ProducerStateEntry fromBatchMetadata(
 
 The factory requires at most `NUM_BATCHES_TO_RETAIN` non-null entries and copies them in supplied order without calling
 `addBatch`，so it never overwrites the separately supplied `lastTimestamp`。It is storage-neutral and unused by the stock
-path。`NereusProducerStateManager.restoreCanonical` converts each canonical batch directly to stock `BatchMetadata` and loads
-this exact entry into a fresh manager；replaying synthetic data batches merely to populate the queue is forbidden because a
+path。`NereusProducerStateManager.restoreCanonical` converts each canonical batch directly to stock `BatchMetadata` and
+loads
+this exact entry into a fresh manager；replaying synthetic data batches merely to populate the queue is forbidden because
+a
 later transaction marker legitimately changes the producer timestamp without entering the duplicate window。Import must
 still export byte-for-byte equal canonical state before publication。
 
 `takeSnapshot` may return an ephemeral placeholder only if the Kafka signature requires it；restart never loads it。A sync
-Kafka call means “state safely captured for the partition checkpoint coordinator” only when the caller explicitly requests
+Kafka call means “state safely captured for the partition checkpoint coordinator” only when the caller explicitly
+requests
 the F9 checkpoint barrier；ordinary producer append does not wait for object upload。
 
 ### 3.3 Producer-state NKC1 section V1
@@ -142,8 +164,10 @@ sequence wrap arithmetic，requires producer IDs to be strictly sorted and requi
 checkpoint offset。The codec is strict big-endian and rejects count/length/flag/version/trailing-byte ambiguity before a
 fork can import it。Isolated fork commit `ec7f0db991` implements `NereusProducerStateManager` import/export and exact
 COMMITTED-batch replay。Stock `ProducerStateEntry.fromBatchMetadata` reconstructs the retained five-batch deque without
-calling the scalar-mutating add path，so a later marker-updated `lastTimestamp` remains independent。Import is accepted only
-into a fresh manager and immediately re-exported for exact canonical equality；ordinary local snapshot IO remains disabled。
+calling the scalar-mutating add path，so a later marker-updated `lastTimestamp` remains independent。Import is accepted
+only
+into a fresh manager and immediately re-exported for exact canonical equality；ordinary local snapshot IO remains
+disabled。
 Deterministic tests cover sequence wrap、five-batch retention、marker timestamp preservation、checkpoint encode/decode and
 replay equality。该 commit 现已作为 published F9 branch 的第二十个 commit 包含在
 `nereusstream/kafka:nereus/future9-native-kafka-storage@50b46aab2d`。
@@ -153,7 +177,8 @@ replay equality。该 commit 现已作为 published F9 branch 的第二十个 co
 ### 4.1 Data truth
 
 Transactional data batch、commit marker and abort marker are exact Kafka batches in the same partition stream。Nereus does
-not create a side transaction log。Stable append ordering guarantees a marker is not acknowledged before its bytes commit。
+not create a side transaction log。Stable append ordering guarantees a marker is not acknowledged before its bytes
+commit。
 
 ### 4.2 Open-transaction section V1
 
@@ -170,8 +195,10 @@ for transaction sorted (firstOffset, producerId):
   lastOffset:i64                     present iff completed but not finalized in snapshot cut
 ```
 
-Cross-check every entry with producer section。At a normal checkpoint barrier，completed-but-not-finalized entries should be
-zero；the current decoder rejects them。A future crash-consistent captured boundary may support them only after an explicit
+Cross-check every entry with producer section。At a normal checkpoint barrier，completed-but-not-finalized entries should
+be
+zero；the current decoder rejects them。A future crash-consistent captured boundary may support them only after an
+explicit
 section flag is assigned and frozen；accepting an unflagged entry is forbidden。
 
 ### 4.3 Aborted transaction section V1
@@ -188,16 +215,19 @@ for entries sorted by strictly increasing lastOffset:
 ```
 
 Fields match Kafka `AbortedTxn` semantics，not its Java buffer layout。Entries must be non-overflowing、within checkpoint
-history，and monotonic for search。`lastStableOffset` is non-negative and may be lower than `lastOffset` when another earlier
+history，and monotonic for search。`lastStableOffset` is non-negative and may be lower than `lastOffset` when another
+earlier
 transaction remains unstable；it must not be validated as the marker's successor。Entries with
 `lastOffset < current logStartOffset` may be pruned at checkpoint creation。The current product codec implements this
 canonical payload and requires strictly increasing marker offsets，matching stock `TransactionIndex.append`。Fork
-`NereusTransactionIndex` now owns an ordered in-memory `AbortedTxn` list，implements append/import/truncate/filter/all/reset
+`NereusTransactionIndex` now owns an ordered in-memory `AbortedTxn` list，implements
+append/import/truncate/filter/all/reset
 without a truth-bearing local file，and is populated both by NKC1 import and exact committed-tail replay。
 
 ### 4.4 `NereusTransactionIndex`
 
-It stores verified `AbortedTxn` values in an immutable/snapshot-friendly ordered structure plus append tail。Methods used by
+It stores verified `AbortedTxn` values in an immutable/snapshot-friendly ordered structure plus append tail。Methods used
+by
 Kafka retain signatures：
 
 ```text
@@ -207,7 +237,8 @@ allAbortedTxns()
 reset()/close()
 ```
 
-`append` is an in-memory derived update after stable log append；checkpoint persists it asynchronously。Any invariant failure
+`append` is an in-memory derived update after stable log append；checkpoint persists it asynchronously。Any invariant
+failure
 write-fences the partition。No independent stream/index append is part of producer acknowledgement。
 
 ### 4.5 Recovery replay
@@ -228,7 +259,8 @@ At completion：producer map end、local LEO、stable head end equal；LSO `<= H
 
 Current fork implementation first decodes the complete seven-section `KafkaCanonicalCheckpointStateCodecV1` image。
 It restores producer/open/aborted state、leader-epoch ranges、virtual logical bytes and timestamp maxima before replaying
-the bounded committed tail。`NereusUnifiedLog.installRecoveredState` installs the same exact producer manager and repopulates
+the bounded committed tail。`NereusUnifiedLog.installRecoveredState` installs the same exact producer manager and
+repopulates
 the stock leader-epoch cache before publishing storage。On append，stock validation and verification run first；after the
 durable callback returns，the shell advances stock HW to the exact durable end、derives LSO and calls
 `publishDerivedOffsets`。Open transactions therefore hold LSO at their first offset，abort markers advance it only after
@@ -247,12 +279,15 @@ transactions with a bounded page and no truth-bearing snapshot/transaction-index
 - same NTC2 compaction implementation；
 - coordinator election only after log recovery completes。
 
-Consumer group committed offsets do **not** create Nereus cursor/reference records and never protect user-topic retention。
+Consumer group committed offsets do **not** create Nereus cursor/reference records and never protect user-topic
+retention。
 Offset expiration/tombstones are written by native group coordinator to `__consumer_offsets`；compaction removes obsolete
 coordinator keys through Kafka semantics。
 
-Transaction coordinator recovery reads `__transaction_state` through the mandatory compacted view。If NTC2 coverage for an
-activated internal-topic range is unavailable，coordinator election fails；it may not fall back to full COMMITTED bytes and
+Transaction coordinator recovery reads `__transaction_state` through the mandatory compacted view。If NTC2 coverage for
+an
+activated internal-topic range is unavailable，coordinator election fails；it may not fall back to full COMMITTED bytes
+and
 resurrect compacted state。
 
 ### 5.1 Mandatory compacted-read admission probe
@@ -288,23 +323,27 @@ coordinator election。
 9. complete only when `CompletableFuture.allOf` has validated every untrimmed activated generation。
 
 The one-record/one-byte limits make this an availability probe rather than a duplicate coordinator replay；
-`ALLOW_FIRST_ENTRY_OVERFLOW` permits a single Kafka RecordBatch without weakening the view constraint。A sparse generation
-with no surviving row is still valid only when its source-coverage result advances across the probed offset。Coverage wholly
-below the current authoritative log start needs no physical probe；coverage version 0 also succeeds after binding identity/
+`ALLOW_FIRST_ENTRY_OVERFLOW` permits a single Kafka RecordBatch without weakening the view constraint。A sparse
+generation
+with no surviving row is still valid only when its source-coverage result advances across the probed offset。Coverage
+wholly
+below the current authoritative log start needs no physical probe；coverage version 0 also succeeds after binding
+identity/
 lifecycle validation because no irreversible compacted prefix exists yet。
 
 Failure semantics are deliberately direct：
 
-| Failure | Result before coordinator election |
-| --- | --- |
-| binding missing、coverage outside snapshot、digest/constraint mismatch | fail open with original metadata/invariant code |
-| constrained reader unavailable | `UNSUPPORTED_READ_SEMANTICS` |
+| Failure                                                               | Result before coordinator election                              |
+|-----------------------------------------------------------------------|-----------------------------------------------------------------|
+| binding missing、coverage outside snapshot、digest/constraint mismatch  | fail open with original metadata/invariant code                 |
+| constrained reader unavailable                                        | `UNSUPPORTED_READ_SEMANTICS`                                    |
 | any untrimmed activated generation has no healthy same-view candidate | propagate `OBJECT_NOT_FOUND`/corruption/read-resolution failure |
-| deadline expires | `TIMEOUT` |
-| probe returns another stream/view/offset or no coverage progress | `METADATA_INVARIANT_VIOLATION` |
-| all probes succeed | allow fork installation and eventual ready callback |
+| deadline expires                                                      | `TIMEOUT`                                                       |
+| probe returns another stream/view/offset or no coverage progress      | `METADATA_INVARIANT_VIOLATION`                                  |
+| all probes succeed                                                    | allow fork installation and eventual ready callback             |
 
-There is no branch from this method to `StreamStorage.read(... COMMITTED ...)`。The only ordinary `read` call reused here is
+There is no branch from this method to `StreamStorage.read(... COMMITTED ...)`。The only ordinary `read` call reused here
+is
 the exact constrained `TOPIC_COMPACTED` overload；therefore lossless source bytes cannot resurrect tombstoned coordinator
 state even when they remain physically readable。
 
@@ -315,7 +354,8 @@ full-source rebuild path：it runs only when the historical binding digest uniqu
 object against the retained root with HEAD length/CRC32C/ETag plus a full expected-CRC read and content SHA-256，then CAS
 reactivates the exact root and generation。Finally it recomputes the generation-set digest from the new COMMITTED wrapper
 versions/SHAs and activates the same coverage with `REPLACE`，yielding a larger activation epoch。The probe reloads that
-returned binding and still reads only the new exact `TOPIC_COMPACTED` constraint；a mismatched repair remains unavailable。
+returned binding and still reads only the new exact `TOPIC_COMPACTED` constraint；a mismatched repair remains
+unavailable。
 
 Fork `89b66ab03b` implements the admission half inside `NereusListOffsetsLifecycle`，between manager recovery and exact
 storage/lookup installation。Group、transaction and share coordinator topics wait；user topics bypass the probe。A failed
@@ -339,20 +379,24 @@ Deterministic evidence is split at the ownership boundary：
 The full deterministic `f9CompactionPropertyTest` and source-locked `phase9M3KafkaForkBridgeCheck` pass against fork
 `768924da60`。Product `0ae8ca9` adds
 `f9MandatoryInternalTopicNtc2ProcessIntegrationTest.mandatoryInternalTopicNtc2FailureBlocksElectionUntilPhysicalRepair`：
-one real `__consumer_offsets-0` is compacted on broker 1，its activated physical NTC2 keys are decoded from the ObjectStore
+one real `__consumer_offsets-0` is compacted on broker 1，its activated physical NTC2 keys are decoded from the
+ObjectStore
 mapping and snapshotted with bytes/user metadata/content type/provider CRC。With broker 2 live, the gate:
 
 1. deletes every activated NTC2 object，moves the group partition to broker 2 and proves group lookup is unavailable；
 2. restores the exact snapshots，moves back to broker 1 and reloads committed offset `1`；
-3. flips one middle byte under each original key while preserving metadata，moves to broker 2 and again proves unavailable；
+3. flips one middle byte under each original key while preserving metadata，moves to broker 2 and again proves
+   unavailable；
 4. restores the exact snapshots a second time，moves back and reloads committed offset `1` again。
 
 Both brokers stay alive throughout。Each failed open quarantines the exact root/index before coordinator election；each
 repair is followed by an ordinary reassignment rather than a test-only election callback。Product `4676c12` factors this
 exact scenario into one profile runner and adds
 `remainingStorageProfilesBlockInternalTopicElectionUntilNtc2Repair` for `OBJECT_WAL_ASYNC_OBJECT` and all three
-BookKeeper profiles。Together with the original Object-sync task this executes ten real damage/repair scenarios across all
-five profiles。The fresh profile matrix passes 64/64 tasks in 5m34s and the following Object-sync run passes 73/73 tasks in
+BookKeeper profiles。Together with the original Object-sync task this executes ten real damage/repair scenarios across
+all
+five profiles。The fresh profile matrix passes 64/64 tasks in 5m34s and the following Object-sync run passes 73/73 tasks
+in
 1m29s。KF-TXN-016 is therefore `PASSED_CURRENT_SOURCE` for all-five-profile P/C/K；the F9 final aggregate remains a
 separate gate。
 
@@ -362,10 +406,13 @@ coordinator elections remain absent until `AsyncTopicDeltaLifecycle` reports the
 the request/lifecycle unit-test gap。The product `NereusKafkaNativeProcessIntegrationTest` now adds a real single-node
 graceful restart slice：the first JVM commits transactional data plus its COMMIT marker、joins/rebalances a real consumer
 group and commits offset 2；the second JVM concurrently recovers both internal topics，loads that committed offset，
-reinitializes the same transactional ID、commits the next transaction and resumes the group at the next visible data offset。
+reinitializes the same transactional ID、commits the next transaction and resumes the group at the next visible data
+offset。
 The same gate then leaves transaction data stable without an end marker、forcibly kills the broker and proves a fresh JVM
-reinitializing that transactional ID writes the missing ABORT before its next committed transaction；read-committed and the
-real group both skip the aborted data。This is partial KF-TXN-007/014 evidence only；the exact rows still require their locked
+reinitializing that transactional ID writes the missing ABORT before its next committed transaction；read-committed and
+the
+real group both skip the aborted data。This is partial KF-TXN-007/014 evidence only；the exact rows still require their
+locked
 BookKeeper/provider matrix，multi-broker coordinator takeover and mandatory NTC2 unavailability process gates；the native
 DeleteRecords checkpoint/virtual-segment trim/restart subset is covered in section 9.4.1。
 
@@ -381,9 +428,11 @@ for entries sorted startOffset:
   startOffset:i64
 ```
 
-Epoch and start offset strictly increase；first retained entry may start before logStart only when required to answer epoch
+Epoch and start offset strictly increase；first retained entry may start before logStart only when required to answer
+epoch
 queries；V1 uses its unique first position plus the outer logStart bound as the explicit carried-forward marker，and no
-later entry may start below logStart。An entry may start exactly at stable end to retain the current leader epoch before its
+later entry may start below logStart。An entry may start exactly at stable end to retain the current leader epoch before
+its
 first batch。Tail replay adds/extends entries。`endOffsetForEpoch` derives end from next start or stable end。No local
 leader-epoch checkpoint file is loaded as truth。
 
@@ -397,7 +446,8 @@ checkpoint-bound mismatches。A frozen digest plus 200 deterministic randomized 
 ### 7.1 Why segments remain
 
 Kafka configs and APIs depend on segment roll for retention、time lookup、compaction boundaries and metrics。F9 keeps
-virtual segment descriptors but stores all record bytes in one Nereus stream。A segment is an offset/byte/time interval，not a
+virtual segment descriptors but stores all record bytes in one Nereus stream。A segment is an offset/byte/time
+interval，not a
 data object or stream。
 
 ### 7.2 Descriptor V1
@@ -422,7 +472,8 @@ stateId:i32                         ACTIVE=1, CLOSED=2
 
 Descriptors sorted by base；ranges dense from retained segment floor to stable end；exactly one ACTIVE last descriptor。
 `logicalBytes == lastCumulative-firstCumulative`；cumulative byte ranges are also dense。Closed segments are non-empty
-and have `closedAtMillis > 0` and `closedAtMillis >= createdAtMillis >= 0`；the active segment has `closedAtMillis=0` and may be empty exactly at
+and have `closedAtMillis > 0` and `closedAtMillis >= createdAtMillis >= 0`；the active segment has `closedAtMillis=0` and
+may be empty exactly at
 stable end。Non-empty timestamp offsets remain inside `[baseOffset,endOffset)`。roll wire IDs：INITIAL=1、SIZE=2、
 TIME=3、RELATIVE_OFFSET_OVERFLOW=4、INDEX_FULL=5、CONFIG=6、MANUAL=7、TEST=8；unknown fail closed。
 
@@ -438,8 +489,10 @@ Stock `UnifiedLog.maybeRoll` executes before data append。F9：
 6. if outcome unknown，replay head determines whether new segment contains data；empty durable/local hints are discarded。
 
 No root CAS is required per roll in the hot path；committed bytes plus previous checkpoint deterministically reconstruct
-descriptors using batch offsets/timestamps and captured config epochs。To make dynamic config replay deterministic，runtime
-maintains a bounded `KafkaLogConfigHistory` in the partition checkpoint and KRaft metadata offsets；a config delta forces a
+descriptors using batch offsets/timestamps and captured config epochs。To make dynamic config replay
+deterministic，runtime
+maintains a bounded `KafkaLogConfigHistory` in the partition checkpoint and KRaft metadata offsets；a config delta forces
+a
 checkpoint before old history can be pruned。
 
 ### 7.4 Segment/checkpoint section
@@ -511,7 +564,8 @@ Only the first section-6 segment may carry a base below outer `logStartOffset`�
 `[max(segmentBaseOffset, logStartOffset), stableEndOffset)`。Negative fields、duplicate/unordered segments or entries、
 unknown flags/version、unsigned-count overflow、truncation and trailing bytes fail closed。
 
-Timestamp lookup chooses floor/candidate then scans exact COMMITTED batches to return first record timestamp `>= target`。
+Timestamp lookup chooses floor/candidate then scans exact COMMITTED batches to return first record timestamp
+`>= target`。
 Index never returns final answer without payload verification。
 
 ### 8.2 Logical-byte position section
@@ -549,7 +603,8 @@ all seven required sections in wire-ID order with a frozen combined digest。Can
 implemented。Kafka-fork `NereusCanonicalLogState` now constructs sparse time/logical samples from exact stable batches，
 preserves exact in-memory batch positions，restores them from checkpoint plus bounded committed-tail replay，and projects
 real `LogOffsetMetadata` through `NereusUnifiedLog.maybeConvertToOffsetMetadata`。Timestamp ListOffsets uses the time
-index only as a scan candidate and verifies the first qualifying timestamp against exact COMMITTED payload under the hard
+index only as a scan candidate and verifies the first qualifying timestamp against exact COMMITTED payload under the
+hard
 read bound。Fresh-process provider restart/takeover and differential stock evidence remain pending。
 
 ## 9. Retention semantics
@@ -569,7 +624,8 @@ current authority session
 now from injected clock
 ```
 
-It implements Kafka `retention.ms`、`retention.bytes` and cleanup-policy delete behavior over **closed** virtual segments。
+It implements Kafka `retention.ms`、`retention.bytes` and cleanup-policy delete behavior over **closed** virtual
+segments。
 Group offsets/cursors are not inputs。
 
 ### 9.2 Candidate calculation
@@ -581,7 +637,8 @@ Group offsets/cursors are not inputs。
 - candidate is next retained segment base，so scheduled retention is an entry boundary；
 - candidate capped at HW/stable end and cannot decrease log start。
 
-Policy computation is deterministic for the frozen snapshot。Before mutation re-read binding/head/config/authority and recompute
+Policy computation is deterministic for the frozen snapshot。Before mutation re-read binding/head/config/authority and
+recompute
 or abort on change。
 
 The executable product boundary is deliberately Kafka-artifact-neutral：
@@ -609,7 +666,8 @@ record Policy(
 `segmentRetentionTimestamp` is `largestTimestamp` when records exist and the frozen close-time roll fact otherwise。
 Evaluation stops at the first non-expired segment。For `retention.bytes`，the planner sums the logical bytes of all
 currently retained descriptors（including the complete first descriptor when logStart is inside it），computes
-`excess=max(total-retentionBytes,0)` and removes the oldest consecutive closed segments while the next whole segment fits
+`excess=max(total-retentionBytes,0)` and removes the oldest consecutive closed segments while the next whole segment
+fits
 inside `excess`。This matches stock segment-size behavior and never estimates physical object bytes。
 
 The time and size prefix counts are evaluated against the same immutable state and the farther prefix wins，which is
@@ -634,14 +692,14 @@ boundaries at `2/4/6` and leaves `[6,8)` active。For each case it converts the 
 `KafkaVirtualSegmentState` consumed by the product planner，then compares both selected segment count and final logStart
 against a real `UnifiedLog.deleteOldSegments()` call：
 
-| Case | Policy/HW | Expected logStart |
-| --- | --- | --- |
-| time | `retention.ms=5000`, HW `8` | `4` |
-| size | retain four record-batch bytes, HW `8` | `4` |
-| combined | time + size on the same image | `4` |
-| HW cap | `retention.ms=0`, HW `3` | `2` |
-| strict equality | `retention.ms=9000`, HW `8` | `0` |
-| compact-only | delete disabled | `0` |
+| Case            | Policy/HW                              | Expected logStart |
+|-----------------|----------------------------------------|-------------------|
+| time            | `retention.ms=5000`, HW `8`            | `4`               |
+| size            | retain four record-batch bytes, HW `8` | `4`               |
+| combined        | time + size on the same image          | `4`               |
+| HW cap          | `retention.ms=0`, HW `3`               | `2`               |
+| strict equality | `retention.ms=9000`, HW `8`            | `0`               |
+| compact-only    | delete disabled                        | `0`               |
 
 The dedicated product gate `phase9M5KafkaRetentionOracleCheck` publishes the exact `0.1.0-f9-dev` artifacts，checks the
 current fork source lock，runs fork Spotless/Checkstyle and executes only this oracle。KF-RET-001/002/003 are
@@ -685,36 +743,49 @@ interface DurableTrimListener {
 ```
 
 The captured snapshot requires one exact ACTIVE binding、stream head、Kafka leader append authority、
-`logStart/LSO/HW/stableEnd` view and planner input。`advance` recalculates and byte/value-compares the supplied plan before
+`logStart/LSO/HW/stableEnd` view and planner input。`advance` recalculates and byte/value-compares the supplied plan
+before
 calling the checkpoint gate。The returned reference must have `checkpointOffset >= T`、
 `logStartOffsetAtCheckpoint <= captured trim` and an object SHA equal to the verifier result。After publication/selection
 the barrier reloads the whole snapshot；partition incarnation、stream/payload/profile、leader/broker term、append authority、
-current config offset/digest and the exact checkpoint root must still match，and the recomputed candidate must still reach
+current config offset/digest and the exact checkpoint root must still match，and the recomputed candidate must still
+reach
 `T`。A later append or HW advance is allowed only through this recomputation；leadership/config changes abort before trim。
 
-`StreamStorage.trim` is followed by `getStableHeadSnapshot` even when trim returned success。If trim failed or its response
+`StreamStorage.trim` is followed by `getStableHeadSnapshot` even when trim returned success。If trim failed or its
+response
 was lost，the operation is nevertheless successful only when the reloaded durable `trimOffset >= T` under the same append
 authority and a monotonic commit head。Only then is `DurableTrimListener` invoked to advance the process-local
-`UnifiedLog.logStartOffset` and binding observed facts。A listener failure is retryable after a durable trim；the next attempt
+`UnifiedLog.logStartOffset` and binding observed facts。A listener failure is retryable after a durable trim；the next
+attempt
 observes `trimOffset >= T` and follows the already-applied path without a second mutation。
 
 Current implementation（2026-07-27）：`KafkaTrimBarrier` implements these validation and response-loss rules，with tests for
 checkpoint failure、insufficient/unrooted checkpoint、config race、normal trim、applied-but-response-lost and unapplied
-failure。`KafkaRetentionCheckpointGate` scans rooted references newest first，skips offsets that cannot cover the candidate，
-falls back only from confirmed not-found/checksum/format/invariant failures，pauses on transient metadata/storage failure，
+failure。`KafkaRetentionCheckpointGate` scans rooted references newest first，skips offsets that cannot cover the
+candidate，
+falls back only from confirmed not-found/checksum/format/invariant failures，pauses on transient metadata/storage
+failure，
 and otherwise requires a newly published checkpoint at the captured stable end。`KafkaRetentionCoordinator.runOnce`
-loads one frozen snapshot、returns without entering the barrier on a no-op plan and coalesces concurrent scheduler triggers
+loads one frozen snapshot、returns without entering the barrier on a no-op plan and coalesces concurrent scheduler
+triggers
 behind a cancellation-isolated future。`KafkaRetentionCheckpointServices` supplies the verifier/publisher composition
 through pinned
 `KafkaCheckpointRecoveryCoordinator.recoverReference`、the canonical publication factory/coordinator and an authoritative
-binding-root reload。Its `CaptureProvider` remains the partition-lock seam that supplies the exact source/canonical image。
-The existing local-file object-store integration test now publishes a canonical seven-section object through these services，
+binding-root reload。Its `CaptureProvider` remains the partition-lock seam that supplies the exact source/canonical
+image。
+The existing local-file object-store integration test now publishes a canonical seven-section object through these
+services，
 reloads its authoritative root and verifies the exact reference through a released reader pin。
-`KafkaRetentionCheckpointGate` now queries `KafkaCheckpointFailureQuarantine` before object verification。A rooted reference
-already quarantined for the exact partition incarnation/reference digest is skipped without object I/O；a newly classified
+`KafkaRetentionCheckpointGate` now queries `KafkaCheckpointFailureQuarantine` before object verification。A rooted
+reference
+already quarantined for the exact partition incarnation/reference digest is skipped without object I/O；a newly
+classified
 not-found/checksum/unsupported-format/invariant failure must await immutable Oxia quarantine create or response-loss
-reconciliation before the next older reference is verified。Any quarantine metadata read/write/collision failure fails the
-retention attempt closed and therefore prevents trim。The durable record is a first-failure audit only；it does not remove the
+reconciliation before the next older reference is verified。Any quarantine metadata read/write/collision failure fails
+the
+retention attempt closed and therefore prevents trim。The durable record is a first-failure audit only；it does not remove
+the
 reference from the binding root or authorize physical deletion。
 `KafkaRetentionDurableTrimListener` publishes monotonic observed logStart through binding CAS before invoking the exact
 local leader updater，recovers applied-but-response-lost CAS by reload and refuses changed leader terms。Product commits
@@ -725,12 +796,14 @@ publication，and starts a bounded non-overlapping periodic retention pass only 
 `f9RetentionTest` passes。Real provider trim、fresh-process restart/takeover and multi-broker race evidence remain
 pending，so this is still deterministic partial M5 evidence rather than an end-to-end retention claim。The focused
 `phase9M6CheckpointQuarantineCheck --rerun-tasks` composes immutable metadata contracts、real Oxia close/reconnect、
-recovery/retention ordering and production Object-WAL runtime wiring；it does not replace the pending real provider trim and
+recovery/retention ordering and production Object-WAL runtime wiring；it does not replace the pending real provider trim
+and
 fresh-process takeover gates。
 
 ### 9.4 DeleteRecords
 
-`Partition.deleteRecordsOnLeader` keeps stock validation：internal topic rejection、requested offset conversion (`-1` → HW)、
+`Partition.deleteRecordsOnLeader` keeps stock validation：internal topic rejection、requested offset conversion (`-1` →
+HW)、
 range/policy checks。F9 then：
 
 1. choose exact requested logical offset，which may fall inside a Kafka batch；
@@ -740,7 +813,8 @@ range/policy checks。F9 then：
 5. return RF1 low watermark equal to durable trim；
 6. wake fetch operations with new log start。
 
-Containing-entry read may physically retrieve a batch beginning before logStart，but `KafkaFetchAssembler` filters/rejects
+Containing-entry read may physically retrieve a batch beginning before logStart，but `KafkaFetchAssembler`
+filters/rejects
 records below current logStart。Requests below logStart get stock `OFFSET_OUT_OF_RANGE`。
 
 The product boundary does not import Kafka server classes：
@@ -765,10 +839,12 @@ logStart is an idempotent success without checkpoint publication or another trim
 current durable logStart，not the lower requested value。
 
 An advancing request calls the same checkpoint gate and durable-trim state machine as retention through
-`KafkaTrimBarrier.advanceDeleteRecords`。Unlike retention，the target is not rounded to a virtual-segment or batch boundary；
+`KafkaTrimBarrier.advanceDeleteRecords`。Unlike retention，the target is not rounded to a virtual-segment or batch
+boundary；
 the exact logical offset is legal even inside a containing entry。Before mutation the barrier requires the selected NKC1
 reference to remain rooted，requires the KRaft config offset/digest and delete policy to remain identical，revalidates the
-same partition incarnation/leader/broker/append authority and checks the target is still at or below current HW/stable end。
+same partition incarnation/leader/broker/append authority and checks the target is still at or below current HW/stable
+end。
 It never recomputes a retention candidate for this path。The canonical storage reason is：
 
 ```text
@@ -790,7 +866,8 @@ normalization，captures the product snapshot under the partition lock，waits o
 `NereusUnifiedLog` only after durable trim。Focused `PartitionTest` and `NereusUnifiedLogFactoryTest` cover normalized
 HW、exact mid-batch target and local log-start publication。The process slice below now supplies one exact
 `OBJECT_WAL_SYNC_OBJECT` start-boundary/Fetch-wake-up/forced-restart path；the following provider-applied response-loss
-slice and its companion profile matrix close the same cut across all five profiles。Section 9.4.3 supplies the independent
+slice and its companion profile matrix close the same cut across all five profiles。Section 9.4.3 supplies the
+independent
 start/middle/end/HW mapping gate and makes KF-RET-006 `PASSED_CURRENT_SOURCE`；the row is not a claim that every boundary
 was repeated under all five profiles。
 
@@ -910,12 +987,14 @@ The Gradle task is a first-class dependency of `phase9M6KafkaProcessCheck`，run
 before response-loss injection，uses its own evidence directory
 `nereus-kafka-adapter/build/f9-kafka-delete-records-boundary-evidence/` and is explicitly classified as Docker-backed so
 service availability is checked before execution。A forced fresh run passes 64/64 actionable tasks in 38s。Together with
-the deterministic range/policy/config-race tests and 9.4.1/9.4.2 recovery/idempotence gates，this closes the current-source
+the deterministic range/policy/config-race tests and 9.4.1/9.4.2 recovery/idempotence gates，this closes the
+current-source
 KF-RET-006 contract without marking F9-M5 final。
 
 ### 9.5 Trim vs materialization
 
-Logical trim is immediate visibility truth；physical source release waits for F4 task/generation/checkpoint/reader/reference
+Logical trim is immediate visibility truth；physical source release waits for F4
+task/generation/checkpoint/reader/reference
 proofs。Retention cannot directly delete Object WAL/BookKeeper ledger/NCP2/NTC2 objects。A protected in-flight
 materialization may finish or be retired by existing recovery logic。
 
@@ -994,10 +1073,14 @@ KafkaCompactionCoverageCoordinator
 KafkaCompactedFetchPlanner
 ```
 
-The older F4 `TopicCompactionDecoder`/`CompactionRecord` contract assumes one source entry equals one logical record and is
-not legal for F9 Kafka batches。The ranged SPI emits every logical record and keeps Kafka types module-local。Its tagged key
-must keep keyed-empty、unkeyed and control namespaces distinct；source batch SHA + base + dense record index bind the opaque
-rewrite token to the exact committed batch。Producer facts use Kafka sentinels only as a complete tuple；control markers are
+The older F4 `TopicCompactionDecoder`/`CompactionRecord` contract assumes one source entry equals one logical record and
+is
+not legal for F9 Kafka batches。The ranged SPI emits every logical record and keeps Kafka types module-local。Its tagged
+key
+must keep keyed-empty、unkeyed and control namespaces distinct；source batch SHA + base + dense record index bind the
+opaque
+rewrite token to the exact committed batch。Producer facts use Kafka sentinels only as a complete tuple；control markers
+are
 transactional、producer-bound、carry explicit COMMIT/ABORT plus coordinator epoch and use sequence `-1`。Unknown control
 types fail decode。All byte buffers are immutable copies。`RewrittenCompactionRecord`
 requires non-empty fetchable protocol bytes and verifies payload CRC32C in its constructor。
@@ -1006,10 +1089,13 @@ Current implementation（2026-07-27）：these four protocol-neutral contracts a
 `KafkaTopicCompactionCodecV1` is the first adapter implementation and freezes identity
 `kafka-topic-compaction-codec-v1/1` plus message-format SHA-256
 `2940e62ac155a477052b955c1b30a2e7e77862bb7383d240b792ca064f472104`。It requires exactly one complete valid
-magic-v2 batch whose base/next/count equal the `ReadBatch` range，decompresses through Kafka 3.9 client wire code，validates
-every record and emits KCK2 keyed/null/control identities with exact source SHA/index and owned batch bytes as the ephemeral
+magic-v2 batch whose base/next/count equal the `ReadBatch` range，decompresses through Kafka 3.9 client wire
+code，validates
+every record and emits KCK2 keyed/null/control identities with exact source SHA/index and owned batch bytes as the
+ephemeral
 rewrite token。The adapter compiles against `kafka-clients` with `compileOnly` and adds the locked 3.9 client only to its
-test classpath；a Kafka broker/fork therefore supplies its own matching Kafka runtime and does not receive a transitive 3.9
+test classpath；a Kafka broker/fork therefore supplies its own matching Kafka runtime and does not receive a transitive
+3.9
 client or LZ4 capability。Kafka server classes remain absent。
 
 ### 10.3 Plan ranges
@@ -1028,7 +1114,8 @@ decoder/strategy/key/rewrite/message-format digests
 ```
 
 Decision horizon includes newer records beyond output coverage so an older key can be removed when a newer key exists in
-the tail。New appends after frozen horizon may leave an extra old value，which is safe and removed by a later task；they never
+the tail。New appends after frozen horizon may leave an extra old value，which is safe and removed by a later task；they
+never
 cause premature removal。
 
 Range selection is a pure first stage：
@@ -1053,9 +1140,11 @@ record Candidate(
     long evaluatedAtMillis) {}
 ```
 
-The current policy must equal the final section-4 config-history entry。`firstDirty` is current logStart when no mandatory
+The current policy must equal the final section-4 config-history entry。`firstDirty` is current logStart when no
+mandatory
 coverage exists，otherwise the exact mandatory end。The planner walks the consecutive closed descriptors intersecting
-that offset and stops before the ACTIVE descriptor，before a descriptor ending beyond LSO，or at the first descriptor whose
+that offset and stops before the ACTIVE descriptor，before a descriptor ending beyond LSO，or at the first descriptor
+whose
 `largestTimestamp > now - min.compaction.lag.ms`（strict stock predicate；close time is fallback when there is no record
 timestamp）。The output therefore ends only at a closed segment boundary at or below LSO。`max.compaction.lag.ms` is frozen
 for scheduler priority but does not override the minimum-lag uncleanable boundary。The decision horizon is
@@ -1064,18 +1153,23 @@ for scheduler priority but does not override the minimum-lag uncleanable boundar
 Current implementation（2026-07-27）：`KafkaCompactionPlanner` implements this candidate stage and validates the immutable
 mandatory coverage tuple (start/end、activation epoch、generation/policy SHA)。Tests cover LSO boundary、strict min-lag
 equality/first-young stop、mandatory-end resume、active exclusion、delete-only no-op and config/coverage mismatch。
-Protocol-neutral `ExactSourceSet`/`ExactSourceSetVerifier` now canonicalize a gap-free source list and SHA，then require every
+Protocol-neutral `ExactSourceSet`/`ExactSourceSetVerifier` now canonicalize a gap-free source list and SHA，then require
+every
 batch in both passes to match the frozen range、generation/commit version、target identity、payload/schema/projection and
 per-source count/byte accounting。`KafkaCompactionTwoPassExecutor` additionally requires the output source set to be the
 exact prefix of the decision source set，so re-resolution to byte-equivalent alternate targets fails closed。
 `ExactSourceSetCodecV1` provides a strict bounded `EXS1` image containing every canonical physical target and accounting
-field。Its ordinary public form remains capped at 64 KiB and `MaterializationPolicy.MAX_SOURCE_RANGES`（128）；callers cannot
-raise those defaults。The overload accepting explicit limits is still hard-capped at 1 MiB/4096 sources and is reserved for
+field。Its ordinary public form remains capped at 64 KiB and `MaterializationPolicy.MAX_SOURCE_RANGES`（128）；callers
+cannot
+raise those defaults。The overload accepting explicit limits is still hard-capped at 1 MiB/4096 sources and is reserved
+for
 an enclosing codec that supplies its own durable bound。
 
-`KafkaCompactionPlan`/`KafkaCompactionPlanCodecV1` link the exact output `MaterializationTask` to the full decision horizon
+`KafkaCompactionPlan`/`KafkaCompactionPlanCodecV1` link the exact output `MaterializationTask` to the full decision
+horizon
 and freeze binding version、LSO/HW、config/mandatory-coverage facts、transaction/marker snapshot、resource caps and all
-strategy/key/rewrite/message-format identities in a deterministic `kcp1-*` id。The plan ID hashes the uncompressed logical
+strategy/key/rewrite/message-format identities in a deterministic `kcp1-*` id。The plan ID hashes the uncompressed
+logical
 EXS1 body under the extended hard bounds；therefore every previously legal raw KCP1 keeps the exact historical ID and
 compression-library output cannot change logical identity。
 
@@ -1115,34 +1209,43 @@ CompletableFuture<KafkaCompactionSourceResolver.ResolvedSources> resolve(
     MaterializationPolicy outputPolicy);
 ```
 
-The generic resolver scans at most 4096 candidate edges in pages of at most 1000，maps only COMMITTED candidates below the
-current head and searches a bounded 4096-state DAG for one deterministic exact path。Edges must start/end on the requested
+The generic resolver scans at most 4096 candidate edges in pages of at most 1000，maps only COMMITTED candidates below
+the
+current head and searches a bounded 4096-state DAG for one deterministic exact path。Edges must start/end on the
+requested
 boundaries，remain gap-free，preserve cumulative-byte continuity and have non-decreasing commit versions；a trim-straddling
 source is never clipped。For equivalent complete paths the stable order is fewer physical sources，then higher generation、
 farther edge end and canonical UTF-8 index key。
 
 The paginated scan is deliberately not called a snapshot transaction。After selection，every source is reread by
-`(stream, COMMITTED, offsetEnd, generation)` and compared byte-for-byte with its index version/SHA/physical target/accounting。
+`(stream, COMMITTED, offsetEnd, generation)` and compared byte-for-byte with its index version/SHA/physical
+target/accounting。
 The resolver reloads stream authority and normally requires an ACTIVE/SEALED object-materialization profile、matching
-direct/projection registration and retained bounds。`MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION` adds exactly
-one exception：`BOOKKEEPER_WAL_ONLY` must have no F4 materialization registration and no projection；its authority comes from
+direct/projection registration and retained bounds。`MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION` adds
+exactly
+one exception：`BOOKKEEPER_WAL_ONLY` must have no F4 materialization registration and no projection；its authority comes
+from
 the matching L0 stream snapshot and exact BookKeeper generation-zero sources。The normal `DIRECT_STREAM` and
-`PROJECTION_REQUIRED` modes still reject an absent registration，and any registration present for WAL-only compaction is an
+`PROJECTION_REQUIRED` modes still reject an absent registration，and any registration present for WAL-only compaction is
+an
 invariant violation。
 
 Source removal、profile/policy/projection drift or trim entering coverage fails closed。`KafkaCompactionSourceResolver`
 additionally requires KAFKA_RECORD_BATCH sources，derives the output set as an exact prefix ending at
 `outputCoverage.endOffset` and creates the deterministic `TOPIC_KEY_COMPACTION` task。Its mutation guard revalidates this
-source/head proof before the caller's binding/leader guard；`DefaultGenerationCommitter` admits registration-free publication
+source/head proof before the caller's binding/leader guard；`DefaultGenerationCommitter` admits registration-free
+publication
 only when the task is exactly `TOPIC_COMPACTED + TOPIC_KEY_COMPACTION + BOOKKEEPER_WAL_ONLY`，derives the
 `LiveStreamSubject` identity from L0 profile and rejects any projection hint。`KafkaGenerationProtocolActivationGuard`
 revalidates the same ACTIVE/SEALED profile、stream identity and policy version before/after readiness proof。A range-only
 `Candidate` is therefore still not publication authorization。
 
 `KafkaCompactionProductionRuntimeFactory` registers the Object source-protection adapter plus every primary provider's
-`MaterializationSourceProtectionAdapter` in one `MaterializationSourceProtectionRegistry`。BookKeeper ranges are therefore
+`MaterializationSourceProtectionAdapter` in one `MaterializationSourceProtectionRegistry`。BookKeeper ranges are
+therefore
 protected for both passes just like object slices。`GenerationReadResolver` permits positive generations for
-`TOPIC_COMPACTED` even under WAL-only because that is a derived object view；the unchanged COMMITTED-view branch continues
+`TOPIC_COMPACTED` even under WAL-only because that is a derived object view；the unchanged COMMITTED-view branch
+continues
 to reject a higher generation for primary-WAL-only profiles。
 
 Implementation correction at `main@03f0601` closes the source-retirement race exposed by the four-profile mandatory-NTC2
@@ -1168,12 +1271,14 @@ retired under another。
 BookKeeper has an additional immutable-source boundary。`BookKeeperMaterializationSourceProtectionAdapter` first looks up
 the deterministic dynamic `MATERIALIZATION_SOURCE` reference。If it exists，that reference is already a durable ledger-GC
 veto and may be revalidated or monotonically transferred to the recovered task owner even when the original fixed
-generation-zero `VISIBLE_GENERATION` anchor has since become `RETIRED`。Only creation of an absent dynamic reference requires
+generation-zero `VISIBLE_GENERATION` anchor has since become `RETIRED`。Only creation of an absent dynamic reference
+requires
 one exact ACTIVE fixed anchor。Exactly one matching RETIRED anchor raises
 `MaterializationSourceRetiredException`，which implements `MaterializationFailure` with
 `TaskFailureClass.SOURCE_RETIRED`；absence remains a retriable metadata condition and multiple ACTIVE anchors remain an
 invariant failure。`DefaultMaterializationWorker` and the Kafka pass preserve every provider-neutral
-`MaterializationFailure.failureClass()` instead of recognizing only an internal exception subtype。A claimed immutable task
+`MaterializationFailure.failureClass()` instead of recognizing only an internal exception subtype。A claimed immutable
+task
 that observes `SOURCE_RETIRED` is therefore durably `CANCELLED` and a later pass may plan from fresh higher-generation
 sources；it is never retried against bytes that the frozen task can no longer reopen。
 
@@ -1194,7 +1299,8 @@ exact terminal task + exact KCP1 + partition authority
   -> conditionally delete exact KCP1
 ```
 
-If recovery sees only the harmless plan orphan after an applied task delete，it skips source release because the task is no
+If recovery sees only the harmless plan orphan after an applied task delete，it skips source release because the task is
+no
 longer available as removal authority and converges the exact KCP1 delete。`RetirementResult.sourceProtectionsReleased`
 records the first-pass release count；a repeated release observes absence and returns zero。This ordering prevents both a
 source-read window without a GC veto and a provider protection orphan after task/KCP1 retirement。
@@ -1220,7 +1326,8 @@ Pass 2 over output coverage：
 - publish F4 TOPIC_COMPACTED generation；
 - activate mandatory coverage separately。
 
-Spill files private、bounded、checksummed and deleted on terminal path。Worker restart uses durable task identity，not partial
+Spill files private、bounded、checksummed and deleted on terminal path。Worker restart uses durable task identity，not
+partial
 spill data。
 
 The current bounded production composition has these executable boundaries：
@@ -1255,26 +1362,33 @@ KafkaTopicCompactedObjectWriteRequest KafkaCompactionWriteRequestFactory.create(
 ```
 
 `Snapshot` freezes output/decision ranges、transaction-state end、planning time、delete retention、complete aborted/open
-transaction ranges、one decision for every scanned control marker and record/key/in-memory budgets。Pass 1 requires a dense
+transaction ranges、one decision for every scanned control marker and record/key/in-memory budgets。Pass 1 requires a
+dense
 logical-offset scan，excludes ABORTED and OPEN data from the winner index，fails if OPEN crosses output coverage，and
 produces domain-separated SHA-256 digests for the full horizon and output prefix。This matches stock
 `Cleaner.buildOffsetMap` on the important rule that an aborted newer key cannot shadow an older committed value。Marker
 decisions remain an explicit upstream transaction-proof input；the collector does not guess them from a local key scan。
 
-Pass 2 must replay the output prefix densely and reproduce the exact pass-1 output digest before any `Result` is returned。
+Pass 2 must replay the output prefix densely and reproduce the exact pass-1 output digest before any `Result` is
+returned。
 For every retained decision，the executor uses the frozen effective delete horizon、rewrites one valid batch and maps it
 through `KafkaCompactionRowMapper` to one ordered NTC2 row。Source/output batch and byte limits fail the call without a
 publishable result。The result carries its verified output/decision ranges、exact decision/output source-set SHA-256、
-source/output batch counts and full/output fact digests。`KafkaCompactionWriteRequestFactory` rejects a task/result coverage
-mismatch and derives the closed NTC2 request metadata from those verified facts：output source-set SHA、record/batch/logical
-byte counts、`kafka-log-cleaner-v1/1`、`KCK2`、`KAFKA_RECORD_REWRITE_V1` and the codec message-format digest。The caller only
-supplies task-owned cluster/stream/attempt/policy/cumulative-size/Parquet-writer facts；it cannot substitute row accounting
+source/output batch counts and full/output fact digests。`KafkaCompactionWriteRequestFactory` rejects a task/result
+coverage
+mismatch and derives the closed NTC2 request metadata from those verified facts：output source-set
+SHA、record/batch/logical
+byte counts、`kafka-log-cleaner-v1/1`、`KCK2`、`KAFKA_RECORD_REWRITE_V1` and the codec message-format digest。The caller
+only
+supplies task-owned cluster/stream/attempt/policy/cumulative-size/Parquet-writer facts；it cannot substitute row
+accounting
 or compatibility identities。
 
 `KafkaCompactionWinnerIndex` is now the production pass-one key index。It owns a `TreeMap<KCK2,long>` whose accounting is
 `encodedKey.length + 64` per distinct resident key。Before adding a new key that would cross
 `Snapshot.maxInMemoryKeyBytes`，it flushes the current map；one single entry may temporarily exceed that budget by at most
-`maxKeyBytes + 64` so progress does not depend on the budget exceeding the largest admitted key。A resident duplicate only
+`maxKeyBytes + 64` so progress does not depend on the budget exceeding the largest admitted key。A resident duplicate
+only
 updates its greatest eligible offset。The one-argument collector and four-argument executor constructors remain
 strict-budget in-memory semantic-test paths；production construction supplies the shared `StagingFileManager` explicitly。
 
@@ -1295,34 +1409,42 @@ KCSR run V1
 Run keys are strictly increasing under unsigned lexicographic byte order and therefore unique inside one run。
 `PrivateStagingSpillFile.seal()` freezes file identity、length and whole-file SHA-256；every merge opens
 `openVerifiedInputStream()` and must consume through EOF，so a same-inode/same-length byte mutation still fails checksum
-verification。The merge queue holds at most `DEFAULT_MERGE_FAN_IN=16` readers，selects the greatest offset for equal keys and
+verification。The merge queue holds at most `DEFAULT_MERGE_FAN_IN=16` readers，selects the greatest offset for equal keys
+and
 recursively emits another checked run when the fan-in bound is reached。Key length/tag、header/version、strict order、
 offset range、entry count、trailing bytes and checksum all fail closed。
 
-The final merge does **not** retain another key map。It sets one `BitSet` position only when the greatest eligible offset is
-inside output coverage；the index is `absoluteOffset - outputCoverage.startOffset` and the bitmap is bounded by the frozen
+The final merge does **not** retain another key map。It sets one `BitSet` position only when the greatest eligible offset
+is
+inside output coverage；the index is `absoluteOffset - outputCoverage.startOffset` and the bitmap is bounded by the
+frozen
 output record count。`Facts.contextFor` consequently passes `latestForKey:boolean` rather than materializing the greatest
 offset again。A keyed output record whose bit is false is superseded；unkeyed/control and ABORTED/OPEN validation contexts
 carry `true` because they are not winner-index lookups。`Facts.spillRunCount` and `peakInMemoryKeyBytes` expose bounded
 execution evidence without becoming durable decision inputs。
 
 Success、parse/checksum failure、upstream decode failure、cancellation and explicit close all close every run，delete its
-private file and release the shared staging permit。Spill bytes are deliberately not durable state：after a process crash the
+private file and release the shared staging permit。Spill bytes are deliberately not durable state：after a process crash
+the
 orphan-grace scanner may remove them，while task recovery reloads KCP1 and deterministically replays the same exact
 decision/output sources。`KafkaCompactionWinnerIndexTest` proves spill/no-spill winner equivalence including a newer
 decision-tail key，two independent restart recomputations、same-length sealed-run corruption rejection and cancellation
 cleanup。
 
 `KafkaCompactionStreamingExecutor` is now the production composition of those exact inputs。Its decision stage subscribes
-to the full-horizon cold stream one batch at a time，runs `ExactSourceSetVerifier` before decode and finishes the spilling
+to the full-horizon cold stream one batch at a time，runs `ExactSourceSetVerifier` before decode and finishes the
+spilling
 collector。Its output stage independently subscribes to the output-prefix stream，reproduces the pass-one output fact SHA，
 applies strategy/rewrite/row mapping and writes only survivors to an execution-local KCRS spool。Both stages enforce
-`Limits.maxSourceBatches`；the spool enforces `maxOutputBatches/maxOutputBytes`。Cancellation atomically cancels the active
-stage future、closes both exact streams and closes the collector/spool，including a decision-pass cut after KCSR has already
+`Limits.maxSourceBatches`；the spool enforces `maxOutputBatches/maxOutputBytes`。Cancellation atomically cancels the
+active
+stage future、closes both exact streams and closes the collector/spool，including a decision-pass cut after KCSR has
+already
 reserved staging bytes。
 
 The extra spool is required because the closed NTC2 request/footer needs exact survivor rows、records and logical bytes
-before the Parquet writer starts，while KCP1 permits exactly two authoritative source passes and payloads cannot be retained
+before the Parquet writer starts，while KCP1 permits exactly two authoritative source passes and payloads cannot be
+retained
 in heap。KCRS V1 is not durable task state：
 
 ```text
@@ -1349,16 +1471,20 @@ KCRS row spool V1
   logicalBytes:int64
 ```
 
-The file is an owner-only `PrivateStagingSpillFile`，therefore seal freezes inode/length/whole-file SHA-256 and replay must
+The file is an owner-only `PrivateStagingSpillFile`，therefore seal freezes inode/length/whole-file SHA-256 and replay
+must
 consume verified EOF。The single subscriber receives rows only under positive demand；header/version、lengths、offset order、
 coverage、row constructors、running/terminal accounting、trailing bytes and whole-file SHA all fail closed。Verified EOF、
 cancel、explicit close、executor rejection and corruption all close/delete the file and release the shared staging permit。
 Empty survivor output is valid and is encoded by the terminal tuple `0/0/0` without fabricating a row。
 
-`KafkaCompactionWriteRequestFactory.create(input, StreamingResult)` derives immutable NTC2 metadata only after both passes
+`KafkaCompactionWriteRequestFactory.create(input, StreamingResult)` derives immutable NTC2 metadata only after both
+passes
 finish。`KafkaCompactionParquetPublisher.prepare` then consumes KCRS exactly once through
-`KafkaTopicCompactedObjectWriter` and returns an owned staged `PreparedObject` plus decision/output source SHA、fact SHA and
-spill metrics。The prepared object is not yet a committed generation：caller close owns its staged file until later upload、
+`KafkaTopicCompactedObjectWriter` and returns an owned staged `PreparedObject` plus decision/output source SHA、fact SHA
+and
+spill metrics。The prepared object is not yet a committed generation：caller close owns its staged file until later
+upload、
 strict verification and publication. `KafkaCompactionStreamingExecutorTest` compares its content SHA with the dense
 reference executor，uploads the staged file to `LocalFileObjectStore` and passes the strict ranged NTC2 verifier；it also
 proves empty-survivor NTC2 is strictly readable and cancellation during pass one releases an already-created KCSR run。
@@ -1374,11 +1500,14 @@ publication additionally requires the output physical format to equal the frozen
 published under an NTC1 policy digest。`GenerationIndexPublicationTest` proves a fully superseded NTC2 output reaches a
 zero-row `COMMITTED` generation without weakening COMMITTED-view accounting。
 
-`KafkaCompactionPublicationCoordinator` now owns the next production boundary。It claims/heartbeats the exact durable task，
-uploads the sealed NTC2 with per-attempt task/binding/config authority revalidation，reconciles uncertain PUT by exact HEAD，
+`KafkaCompactionPublicationCoordinator` now owns the next production boundary。It claims/heartbeats the exact durable
+task，
+uploads the sealed NTC2 with per-attempt task/binding/config authority revalidation，reconciles uncertain PUT by exact
+HEAD，
 then performs full-file SHA/CRC/closed-schema/row verification before freezing `OUTPUT_READY`。The generic
 `GenerationCommitter` is invoked only after that durable output exists；its returned COMMITTED index identity is encoded
-into a canonical、gap-free `KafkaCompactionGenerationSet` digest。Only the final exact binding CAS makes the set mandatory。
+into a canonical、gap-free `KafkaCompactionGenerationSet` digest。Only the final exact binding CAS makes the set
+mandatory。
 Initial、same-policy extension and verified replacement use explicit transition modes and increment `activationEpoch`
 exactly once。PUT response loss and coverage-CAS response loss reload exact state；a concurrent coverage/config/trim
 change after Generation commit leaves the generation non-mandatory and fails closed。The NTC2-specific F4 verifier also
@@ -1386,21 +1515,25 @@ maps physical `KAFKA_RECORD_BATCH_V1` back to the durable `KAFKA_RECORD_BATCH` p
 read target。
 
 After the output has reached durable `OUTPUT_READY`，`recoverPublication` is the only Kafka-specific restart re-entry：
-it accepts only `OUTPUT_READY/PUBLISHING/PUBLISHED` tasks whose frozen task/output still match the recovered KCP1 and exact
+it accepts only `OUTPUT_READY/PUBLISHING/PUBLISHED` tasks whose frozen task/output still match the recovered KCP1 and
+exact
 NTC2 format。It reloads the task/output and ACTIVE binding，revalidates the binding window plus caller authority，then
-re-enters the idempotent generic Generation state machine without a local staging file。If the binding already contains the
+re-enters the idempotent generic Generation state machine without a local staging file。If the binding already contains
+the
 canonical desired generation-set digest/range/policy and the activation epoch derived from the plan's previous mandatory
 coverage，recovery converges without a second coverage mutation；otherwise the exact frozen activation basis is checked
 again immediately before the bounded response-loss-safe CAS。A changed task/output、binding window、coverage basis or
 authority fails closed，and a committed but unactivated generation remains non-mandatory。
 
-`KafkaCompactionPublicationCoordinatorTest` executes a real staged Parquet NTC2 upload/read verifier and the durable task
+`KafkaCompactionPublicationCoordinatorTest` executes a real staged Parquet NTC2 upload/read verifier and the durable
+task
 claim/output transition，injects both response-loss cuts，accepts a same-owner heartbeat race and proves an unrelated
 coverage activation cannot be overwritten after Generation commit。It now also interrupts coverage activation after the
 durable output/Generation boundary，discards the staging context，then proves a fresh recovery call activates the exact
 coverage；a repeated recovery recognizes an already activated root without advancing its epoch。This is deterministic
 metadata/object-boundary restart evidence，not the still-required real-provider process-restart gate。The binding-rooted
-read-view router described in section 11.3、exact activated-generation-set discovery and generation-constrained Object-WAL
+read-view router described in section 11.3、exact activated-generation-set discovery and generation-constrained
+Object-WAL
 runtime reads are implemented。`KafkaCompactionPartitionPass` now owns the full single-partition composition；
 `KafkaCompactionRuntime` owns bounded partition enumeration、process-current leader revalidation and cross-partition
 scheduling。`KafkaCompactionProductionRuntimeFactory` now supplies the production Object-WAL composition behind both：
@@ -1408,17 +1541,22 @@ direct-stream COMMITTED source resolution、recovered-plan stream-bound exact re
 strict object verification、activation/partition-authority-fenced Generation commit、coverage activation、terminal
 retirement and the process scheduler all use the same Oxia/Object-WAL/read-pin/provider graph。Product commit `e18bf36`
 and Kafka fork commit `58342d9dca` close the former production-fork boundary：the product validates one exact
-ACTIVE binding/source and constructs the mutation guard；the fork enumerates current leaders，captures canonical state under
+ACTIVE binding/source and constructs the mutation guard；the fork enumerates current leaders，captures canonical state
+under
 the partition lock，then scans the selected decision horizon with stock `CleanedTransactionMetadata` and revalidates the
 producer/transaction image。The remaining boundary is the real-provider/process-restart and full stock-cleaner
 differential gate，not registration、authority capture、generation discovery、durable-output re-entry、per-partition
 lifecycle routing、process-level dispatch or product provider composition。
 
-`KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
+`KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the
+two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate
-authority and reread the exact task-addressed KCP1 immediately before task admission。A crash before task creation can leave
-only a harmless plan orphan；a visible task cannot be created after its plan disappears or changes。Restart recovery resolves
-the child directly by `materializationTaskId` and cross-validates every task identity/source/policy fact before returning the
+authority and reread the exact task-addressed KCP1 immediately before task admission。A crash before task creation can
+leave
+only a harmless plan orphan；a visible task cannot be created after its plan disappears or changes。Restart recovery
+resolves
+the child directly by `materializationTaskId` and cross-validates every task identity/source/policy fact before
+returning the
 frozen decision horizon。Exact terminal task-first/KCP1-second retirement is now implemented as described in `04`。
 `KafkaCompactionPlanMetadataStore.scanCompactionPlans` now adds partition-scoped opaque continuation and a strict
 `[1,1000]` page bound。`KafkaCompactionPlanOrphanScanner` freezes one scan time，caps both page and total plans，skips the
@@ -1427,12 +1565,15 @@ task-absence proof。An uncertain exact-version delete reloads the same task-add
 as applied。
 
 `KafkaCompactionBatchSource.open(recoveredPlan)` now turns that recovered KCP1 into two independent cold
-`ExactSourceSetBatchPublisher` instances：one for the full decision horizon and one for the output prefix。Each stream opens
-the frozen generations sequentially through `ExactSourceRangeReader`，holds the existing object pin for the active source，
+`ExactSourceSetBatchPublisher` instances：one for the full decision horizon and one for the output prefix。Each stream
+opens
+the frozen generations sequentially through `ExactSourceRangeReader`，holds the existing object pin for the active
+source，
 propagates one downstream request at a time and owns cancel/close。Every emitted batch must match range、generation、
 commitVersion、target bytes/identity、payload/schema/projection and per-source final accounting；no generation resolver or
 fallback is invoked between passes。The streams accept ranged Kafka batches，not the old one-entry/one-record assumption。
-Completion is signalled after the last source summary even when the last batch consumes the exact remaining demand；it never
+Completion is signalled after the last source summary even when the last batch consumes the exact remaining demand；it
+never
 requires a protocol-invalid extra request。The durable streams、checksummed winner spill、KCRS replay、streaming NTC2
 writer、upload/generation publication、coverage activation and exact terminal retirement now form executable product
 components。`KafkaCompactionPartitionPass` composes them into one recoverable per-partition execution：
@@ -1447,44 +1588,56 @@ components。`KafkaCompactionPartitionPass` composes them into one recoverable p
    process-scoped identity；
 5. heartbeat while KCSR/KCRS/NTC2 preparation runs，perform one final renewal before publication owns the claim，and close
    exact streams/staging on synchronous、asynchronous、cancellation and heartbeat failure cuts；
-6. persist a typed `TaskFailureClass` plus retry deadline by exact task-version CAS；`SOURCE_CHANGED/SOURCE_RETIRED/CLOSED`
+6. persist a typed `TaskFailureClass` plus retry deadline by exact task-version CAS；
+   `SOURCE_CHANGED/SOURCE_RETIRED/CLOSED`
    cancel，resource/metadata/object failures retry within the attempt bound，and corruption/unsupported/invariant failures
    become terminal；
-7. reconstruct INITIAL/EXTEND/REPLACE and the exact previous generation set from KCP1's frozen previous mandatory coverage，
+7. reconstruct INITIAL/EXTEND/REPLACE and the exact previous generation set from KCP1's frozen previous mandatory
+   coverage，
    never from a newer mutable binding snapshot；
 8. after publication or typed terminal cancellation，reload exact task/KCP1 roots，release every task-owned source
    protection while the task remains removal authority，then retire task first、plan second under the same partition
    authority；plan-only crash recovery never requires a deleted task to authorize a second release。
 
-Concurrent `runOnce` callers receive cancellation-isolated views of one in-flight pass。The deterministic integration test
-uses actual Parquet NTC2 write/read verification、local-file object storage、in-memory Generation/binding metadata and exact
+Concurrent `runOnce` callers receive cancellation-isolated views of one in-flight pass。The deterministic integration
+test
+uses actual Parquet NTC2 write/read verification、local-file object storage、in-memory Generation/binding metadata and
+exact
 source streams to prove `PLANNED → CLAIMED → OUTPUT_READY/PUBLISHING/PUBLISHED → coverage CAS → dual-root retirement`。
 
 `KafkaCompactionScheduler` is the process-level non-overlap owner for invoking partition passes。It schedules an
 immediate startup pass and fixed delay only after completion，keeps at most one active and one coalesced pending pass，and
-freezes all pending reasons with the highest operational priority。A trigger received during the active pass completes only
+freezes all pending reasons with the highest operational priority。A trigger received during the active pass completes
+only
 after the next pass consumes it；caller cancellation cannot cancel shared work。Close cancels the scheduler-owned deadline
-and active source but never closes the borrowed scheduler or callback executor。The `PassExecutor` remains the explicit seam
+and active source but never closes the borrowed scheduler or callback executor。The `PassExecutor` remains the explicit
+seam
 where runtime wiring must enumerate currently owned partitions、construct their concrete capture provider and invoke
 `KafkaCompactionPartitionPass`。`KafkaCompactionRuntime` now implements that product-side callback：the fork supplies one
 bounded immutable `OwnedPartition` snapshot containing canonical identity、observed leader epoch、INTERNAL/USER work class
 and the partition-lock-backed `CaptureProvider`。The runtime rejects duplicate durable partition IDs and over-limit
-snapshots，sorts INTERNAL before USER，rechecks each item against `KafkaPartitionStorageManager.current` immediately before
+snapshots，sorts INTERNAL before USER，rechecks each item against `KafkaPartitionStorageManager.current` immediately
+before
 launch，and skips missing、changed-epoch or non-writable leaders。It runs at most the configured number of partitions in
 parallel，attempts every accepted item even when another fails，and reports failures in stable partition order。Its
 non-cancellable aggregate lets scheduler close stop new deadlines while waiting for already accepted partition work；
 borrowed scheduler/callback executors are never closed。
 
 The activated Object-WAL creator accepts an optional `NereusKafkaCompactionContext` containing one validated
-`NereusKafkaCompactionRuntimeConfiguration` and the fork-owned `OwnedPartitionSource`。The configuration rejects a relative
+`NereusKafkaCompactionRuntimeConfiguration` and the fork-owned `OwnedPartitionSource`。The configuration rejects a
+relative
 staging directory、a pass bound below concurrency、a staging budget below one upload chunk、non-COMMITTED source reads and
 all individual hard-limit violations before provider work。`NereusKafkaObjectWalRuntimeFactory` creates one private
-`StagingFileManager` under that resource ledger，then defers `KafkaCompactionProductionRuntimeFactory.create` until the one
-process `KafkaPartitionStorageManager` exists。This prevents a compaction scheduler from observing another manager instance。
-`DefaultNereusKafkaRuntime.start` starts the resulting service after activation but before READY；drain closes it and waits
+`StagingFileManager` under that resource ledger，then defers `KafkaCompactionProductionRuntimeFactory.create` until the
+one
+process `KafkaPartitionStorageManager` exists。This prevents a compaction scheduler from observing another manager
+instance。
+`DefaultNereusKafkaRuntime.start` starts the resulting service after activation but before READY；drain closes it and
+waits
 accepted work before shutting the manager，and only then may provider/staging resources close。
 The Kafka runtime instance ID is hashed through the shared canonical SHA-256/base32 helper before it becomes any durable
-`processRunId`，including materialization worker claims and physical-object reader leases，so the fork's UUID-shaped process
+`processRunId`，including materialization worker claims and physical-object reader leases，so the fork's UUID-shaped
+process
 identity never reaches base32-only metadata records；all subsystems in one runtime derive the same canonical identity。
 
 `KafkaCompactionBatchSource.ReaderFactory` is intentionally keyed by the recovered KCP1 `streamId`。One process-global
@@ -1509,16 +1662,19 @@ For a normal survivor：
 Ordinary COMMITTED recovery never consumes rewritten NTC2，so producer sequence truth remains source/checkpoint-derived。
 
 `KafkaTopicCompactionCodecV1.rewrite` first SHA-verifies and re-decodes the opaque source batch，then value-compares all
-selected facts before creating one magic-v2 batch at the original absolute offset。For normal records it preserves timestamp
+selected facts before creating one magic-v2 batch at the original absolute offset。For normal records it preserves
+timestamp
 type/value、key/value/header order and bytes、partition leader epoch、transactional flag、producer id/epoch and the selected
 record sequence；for commit/abort control records it round-trips the exact `EndTransactionMarker` meaning。Original
 compression is preserved，with uncompressed retry permitted only when the frozen context explicitly enables it。The output
-is decoded again and compared before its CRC32C is published。The codec also preserves an existing magic-v2 delete horizon；
+is decoded again and compared before its CRC32C is published。The codec also preserves an existing magic-v2 delete
+horizon；
 for a first retained tombstone，or a `DELETE_ELIGIBLE` empty transaction marker，it writes the plan-frozen
 `now + delete.retention.ms` horizon into the rewritten batch；`RETAIN_REQUIRED` control markers preserve an absent
 horizon。Current tests cover empty-key/null-key/tombstone separation、GZIP value/header rewrite、transactional sequence、
 abort marker/horizon preservation and range/SHA/message-format drift rejection。`KafkaCompactionRowMapper` then copies
-the exact bytes/CRC/source identity to NTC2 without reinterpretation；the NTC2 row contract requires a non-empty fetchable
+the exact bytes/CRC/source identity to NTC2 without reinterpretation；the NTC2 row contract requires a non-empty
+fetchable
 payload for tombstones as well as all other survivors。
 
 ### 10.6 Transaction/control rules
@@ -1556,7 +1712,8 @@ enum MarkerStatus {
 }
 ```
 
-Pass 1 must provide these facts from the **entire frozen decision horizon**；callers cannot infer them while writing pass 2。
+Pass 1 must provide these facts from the **entire frozen decision horizon**；callers cannot infer them while writing pass
+2。
 For keyed data，only the offset marked by the final winner bitmap receives `latestForKey=true`；an older occurrence is
 superseded。
 ABORTED transactional data is dropped and OPEN fails closed。A non-transactional record cannot carry transactional facts，
@@ -1565,7 +1722,8 @@ and a transactional data record cannot carry `NON_TRANSACTIONAL` or marker-only 
 
 `horizonPassed` is true only when pass 1 supplied `fullScanHorizonProven=true`、a delete horizon and
 `deleteHorizonPreexisting=true`，and `nowMillis >= deleteHorizonMillis`。A first cleaning pass that assigns
-`now + delete.retention.ms` must retain the record even when retention is zero；only a later scan observes that horizon as
+`now + delete.retention.ms` must retain the record even when retention is zero；only a later scan observes that horizon
+as
 preexisting and may drop it at equality。Therefore an absent/new horizon、partial scan or `now < horizon` retains the
 tombstone/marker；equality is the first delete-eligible instant for a preexisting horizon。`RETAIN_REQUIRED` markers never
 use the time condition。
@@ -1575,9 +1733,11 @@ NTC2 rows remain unambiguous，but the current strategy returns `DROP_UNKEYED` b
 Empty keys remain normal keyed values and never collide with null-key/control identities。`RETAIN_UNKEYED` remains a
 durable NTC2 read disposition for backward compatibility；new stock-compatible plans do not emit it。
 
-Current tests prove latest/older keyed decisions、stock-compatible null-key drop、committed/aborted/open transaction handling、
+Current tests prove latest/older keyed decisions、stock-compatible null-key drop、committed/aborted/open transaction
+handling、
 tombstone and marker equality boundaries、first-pass horizon retention、missing full-scan proof fail-safe retention and
-fact-pair rejection。`KafkaCompactionPassOneCollectorTest` now supplies/proves these facts over a dense frozen horizon and
+fact-pair rejection。`KafkaCompactionPassOneCollectorTest` now supplies/proves these facts over a dense frozen horizon
+and
 re-proves the output prefix；`KafkaCompactionTwoPassExecutorTest` composes real Kafka decode、strategy、rewrite and NTC2
 mapping；`KafkaCompactionWinnerIndexTest` covers the production sorted spill and restart recomputation。
 `phase9M5KafkaCompactionOracleCheck` now publishes current product bytes and compares four real stock-cleaner traces，
@@ -1590,7 +1750,8 @@ Fork `c4a0a2d1fa` adds `KafkaCompactionOracleTest` and `KafkaCompactionOracleSup
 Every scenario appends the exact same `MemoryRecords` bytes to a legal stock `UnifiedLog` through
 `appendAsFollower` and wraps those bytes as Nereus `ReadBatch`/`ExactSourceSet` inputs。The stock side calls
 `Cleaner.buildOffsetMap` over the frozen stable horizon and `Cleaner.cleanSegments` over only the explicitly rolled
-output coverage；the Nereus side calls `KafkaCompactionTwoPassExecutor.prepare(...).rewrite(...)` with the same output and
+output coverage；the Nereus side calls `KafkaCompactionTwoPassExecutor.prepare(...).rewrite(...)` with the same output
+and
 decision ranges。The comparison sorts by logical offset and requires equality of：
 
 - key/value bytes、timestamp、compression and delete horizon；
@@ -1614,7 +1775,8 @@ horizon。Product `08fe686` adds `phase9M5KafkaCompactionOracleCheck` to `phase9
 with zero cache，so a gate cannot silently reuse an older fixed `0.1.0-f9-dev` artifact；the later head additionally owns
 the transaction-marker retry fix described in section 15.3。
 
-Mandatory differential tests run the same bounded log/config through stock Kafka cleaner and F9 engine，then compare visible
+Mandatory differential tests run the same bounded log/config through stock Kafka cleaner and F9 engine，then compare
+visible
 logical records for READ_UNCOMMITTED and READ_COMMITTED plus transaction metadata。Any deliberate difference requires a
 documented compatibility decision and version bump。
 
@@ -1622,7 +1784,8 @@ documented compatibility decision and version bump。
 
 ### 11.1 Why a root is required
 
-Once Kafka cleaner removes an older record，later changing cleanup policy or losing a compacted object must not make it visible
+Once Kafka cleaner removes an older record，later changing cleanup policy or losing a compacted object must not make it
+visible
 again。Nereus still has lossless COMMITTED source for recovery，so a naive fallback would resurrect data。
 
 Binding therefore contains a correctness field `KafkaCompactionCoverageRecord`：
@@ -1637,8 +1800,10 @@ policySha256:32 bytes
 activatedAtMillis:long
 ```
 
-Empty coverage uses `start=end=0, activationEpoch=0`。For an active partition，coverage is contiguous from the logStart that
-was current at first activation；trim may move start forward。`endOffset` never decreases。Replacement can change generation
+Empty coverage uses `start=end=0, activationEpoch=0`。For an active partition，coverage is contiguous from the logStart
+that
+was current at first activation；trim may move start forward。`endOffset` never decreases。Replacement can change
+generation
 digest at same/end-greater coverage with activation epoch +1。
 
 ### 11.2 Activation protocol
@@ -1682,15 +1847,21 @@ records do not reappear。Re-enabling compaction resumes/extends or replaces NTC
 
 Current implementation（2026-07-27）：`KafkaCompactedFetchPlanner` validates the exact ACTIVE partition/stream binding and
 freezes the activation epoch、generation-set SHA and policy SHA into an immutable two-segment plan。It treats the binding
-coverage as correctness state independently of the current cleanup policy。`KafkaCompactedFetchReader` reloads that root for
+coverage as correctness state independently of the current cleanup policy。`KafkaCompactedFetchReader` reloads that root
+for
 every Fetch，issues only `TOPIC_COMPACTED` calls below mandatory end，advances sparse/empty results by
-`sourceCoverageEndOffset` and then issues a new `COMMITTED` call at the exact boundary with the remaining record/byte/deadline
-budget。All mandatory failures propagate directly；there is no adapter path that retries the same offset through COMMITTED。
+`sourceCoverageEndOffset` and then issues a new `COMMITTED` call at the exact boundary with the remaining
+record/byte/deadline
+budget。All mandatory failures propagate directly；there is no adapter path that retries the same offset through
+COMMITTED。
 The production runtime now passes its borrowed partition metadata store into every opened storage instance；the legacy
-constructor remains committed-only for isolated compatibility tests。`KafkaActivatedGenerationSetResolver` scans a bounded
+constructor remains committed-only for isolated compatibility tests。`KafkaActivatedGenerationSetResolver` scans a
+bounded
 set of TOPIC_COMPACTED indexes，requires the unique gap-free path whose canonical identity digest matches the binding，and
-builds a `GenerationReadConstraint` containing every range/generation/publication/index key/version/SHA。The core resolver
-filters to those exact identities before decode/pin，so a newer unactivated unsupported or corrupt generation cannot mask the
+builds a `GenerationReadConstraint` containing every range/generation/publication/index key/version/SHA。The core
+resolver
+filters to those exact identities before decode/pin，so a newer unactivated unsupported or corrupt generation cannot mask
+the
 activated set。The Object-WAL runtime registers the NTC2 reader and constrained semantic reader；a runtime without those
 capabilities fails closed after coverage activation rather than exposing WAL/NCP2。Real-provider restart evidence remains
 part of the remaining M5 gate。
@@ -1699,12 +1870,13 @@ part of the remaining M5 gate。
 
 Two independent views：
 
-| View | Format | Purpose | Recovery eligible |
-| --- | --- | --- | --- |
-| `COMMITTED` | WAL/BK/NCP2 | exact source bytes | yes |
-| `TOPIC_COMPACTED` | NTC2 | Kafka client cleaned visibility | no |
+| View              | Format      | Purpose                         | Recovery eligible |
+|-------------------|-------------|---------------------------------|-------------------|
+| `COMMITTED`       | WAL/BK/NCP2 | exact source bytes              | yes               |
+| `TOPIC_COMPACTED` | NTC2        | Kafka client cleaned visibility | no                |
 
-F4 physical GC may replace primary WAL with NCP2 for COMMITTED recovery/read；it cannot claim NTC2 as lossless replacement。
+F4 physical GC may replace primary WAL with NCP2 for COMMITTED recovery/read；it cannot claim NTC2 as lossless
+replacement。
 Conversely NTC2 activation/retirement does not change stream head、LEO、HW、producer checkpoint or logical trim。
 
 ## 13. Planner scheduling and config changes
@@ -1718,7 +1890,8 @@ Scheduling：
 - exclude ranges beyond frozen stable end；
 - bound task sources/records/bytes/spill；
 - prioritize internal topics but apply quotas；
-- one active compaction-activation task per partition root；generic F4 workers may execute tasks concurrently across partitions；
+- one active compaction-activation task per partition root；generic F4 workers may execute tasks concurrently across
+  partitions；
 - policy change invalidates unclaimed task or prevents final activation after revalidation；
 - compact disable stops new tasks but preserves mandatory coverage。
 
@@ -1729,32 +1902,32 @@ per-partition serialization described above。
 
 ## 14. Failure/repair cases
 
-| Failure | Result |
-| --- | --- |
-| producer checkpoint upload fails | append continues；replay grows；retention pauses if barrier needed |
-| checkpoint ref corrupt | try older ref；full replay if trim=0；otherwise offline |
-| process dies after stable append before producer update | reopen/replay committed batch |
-| txn index update fails | known-committed fence/reopen |
-| compaction task crashes during spill/upload | no visibility；task recovery/GC |
-| NTC2 generation commits before binding CAS | not mandatory；retry/retire |
-| binding CAS applies but response lost | reload exact activation；serve NTC2 |
-| mandatory NTC2 object missing | same-view fallback or fail closed；no source resurrection |
-| policy disables compact during task | activation revalidation fails；old mandatory coverage remains |
-| trim response lost | reload stream trim；update local state idempotently |
-| retention races new append/config | revalidation/recompute；never decrease offsets |
-| group offset lags behind trim | expected Kafka behavior；consumer receives out-of-range/reset policy |
+| Failure                                                 | Result                                                              |
+|---------------------------------------------------------|---------------------------------------------------------------------|
+| producer checkpoint upload fails                        | append continues；replay grows；retention pauses if barrier needed    |
+| checkpoint ref corrupt                                  | try older ref；full replay if trim=0；otherwise offline               |
+| process dies after stable append before producer update | reopen/replay committed batch                                       |
+| txn index update fails                                  | known-committed fence/reopen                                        |
+| compaction task crashes during spill/upload             | no visibility；task recovery/GC                                      |
+| NTC2 generation commits before binding CAS              | not mandatory；retry/retire                                          |
+| binding CAS applies but response lost                   | reload exact activation；serve NTC2                                  |
+| mandatory NTC2 object missing                           | same-view fallback or fail closed；no source resurrection            |
+| policy disables compact during task                     | activation revalidation fails；old mandatory coverage remains        |
+| trim response lost                                      | reload stream trim；update local state idempotently                  |
+| retention races new append/config                       | revalidation/recompute；never decrease offsets                       |
+| group offset lags behind trim                           | expected Kafka behavior；consumer receives out-of-range/reset policy |
 
 ## 15. Planned classes/files
 
-| Owner | Class |
-| --- | --- |
-| Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex`、`NereusCanonicalLogState`、`NereusLogSegment` implemented locally；dedicated `NereusTimeIndex`/`NereusLeaderEpochCache` subclasses are unnecessary unless a later stock caller cannot consume the canonical facade |
-| adapter checkpoint | producer/txn/epoch/segment/time/byte section codecs V1 + full composition implemented |
-| adapter retention | planner/checkpoint/barrier/DeleteRecords/durable listener + per-partition maintenance + bounded periodic owned-partition runtime implemented；native forced-restart checkpoint/trim and all-five-profile provider-applied response-loss/no-repeat process gates pass，remaining boundaries/stock-oracle matrix pending |
+| Owner              | Class                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Kafka fork         | `NereusProducerStateManager`、`NereusTransactionIndex`、`NereusCanonicalLogState`、`NereusLogSegment` implemented locally；dedicated `NereusTimeIndex`/`NereusLeaderEpochCache` subclasses are unnecessary unless a later stock caller cannot consume the canonical facade                                                                                                                                                                                                                         |
+| adapter checkpoint | producer/txn/epoch/segment/time/byte section codecs V1 + full composition implemented                                                                                                                                                                                                                                                                                                                                                                                                          |
+| adapter retention  | planner/checkpoint/barrier/DeleteRecords/durable listener + per-partition maintenance + bounded periodic owned-partition runtime implemented；native forced-restart checkpoint/trim and all-five-profile provider-applied response-loss/no-repeat process gates pass，remaining boundaries/stock-oracle matrix pending                                                                                                                                                                           |
 | adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge + projection-free Kafka stream registration/ACTIVE-readiness generation guard + activated Object-WAL production composition + fork registration/concrete partition-lock/KRaft/local-log capture + stock marker pre-scan implemented；real-provider restart/takeover and full cleaner differential gate pending |
-| materialization | ranged decoder SPI、V2 two-pass engine/publisher/verifier + explicit projection-required/direct-stream authority modes and caller authority final-CAS fence |
-| metadata | binding compaction coverage nested record/codec/transition validators + partition-scoped KCP1 scan continuation |
-| object store | NTC2 writer/reader/goldens from document 02 |
+| materialization    | ranged decoder SPI、V2 two-pass engine/publisher/verifier + explicit projection-required/direct-stream authority modes and caller authority final-CAS fence                                                                                                                                                                                                                                                                                                                                     |
+| metadata           | binding compaction coverage nested record/codec/transition validators + partition-scoped KCP1 scan continuation                                                                                                                                                                                                                                                                                                                                                                                |
+| object store       | NTC2 writer/reader/goldens from document 02                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ### 15.1 Current completed-coordinator migration evidence
 
@@ -1785,7 +1958,8 @@ node 2:
 
 The gate proves the exact shared-storage handoff that coordinator election depends on：the new broker cannot successfully
 answer the group or transaction client until `NereusTopicDeltaLifecycle` has opened and published the recovered internal
-partition storage，after which stock coordinator replay consumes those bytes。It also proves old-owner resignation does not
+partition storage，after which stock coordinator replay consumes those bytes。It also proves old-owner resignation does
+not
 delete either shared binding while the old broker stays live。Fresh execution passes 73/73 actionable tasks in 1m07s；the
 baseline cold-restart and ordinary data-handoff regressions pass together at 74/74 in 1m50s。
 
@@ -1819,7 +1993,8 @@ node 1:
 
 For each direction the Admin request contains both partitions，and completion requires exact singleton
 leader/replicas/ISR、empty reassignment and both release JVMs alive。The original `KafkaProducer` object performs
-`commitTransaction()` or `abortTransaction()` after handoff，which exercises stock coordinator discovery/retry rather than
+`commitTransaction()` or `abortTransaction()` after handoff，which exercises stock coordinator discovery/retry rather
+than
 constructing a new producer before resolving the OPEN transaction。The ABORT assertion uses eventual LSO convergence：
 EndTxn completion may precede the asynchronous WriteTxnMarkers append，so the harness keeps checking broker liveness and
 captures both configs/logs if offset 6 does not arrive under `CLIENT_TIMEOUT`。Fresh execution passes 64/64 tasks in 47s
@@ -1842,7 +2017,8 @@ all production artifacts。Its exact seam is
   `CompletableFuture`；
 - `after-provider` lets the real future complete successfully，persists an `applied` marker and replaces only the caller
   completion with an incomplete future；
-- a create-once `captured` marker guarantees only one append is cut；separate failure advice records the first synchronous
+- a create-once `captured` marker guarantees only one append is cut；separate failure advice records the first
+  synchronous
   or executor exception if the configured boundary is never reached。
 
 The real-process fixture keeps `__transaction_state-0` on broker 1 and moves only the OPEN transaction's user partition
@@ -1877,7 +2053,8 @@ metadataCache.getPartitionLeaderEndpoint(topicPartition, listenerName)
   .orElse(if (metadataCache.contains(topicPartition)) Some(Node.noNode) else None)
 ```
 
-`Node.noNode` routes the marker into the existing unknown-broker queue；a later metadata update drains it to the recovered
+`Node.noNode` routes the marker into the existing unknown-broker queue；a later metadata update drains it to the
+recovered
 leader。Only a partition absent from metadata is skipped。The new
 `TransactionMarkerChannelManagerTest.shouldSaveForLaterWhenExistingPartitionHasNoLeader` passes with the focused fork
 suite。The product process gate then passes both cuts，and the final forced `--rerun-tasks` execution runs 66/66 tasks in
@@ -1888,7 +2065,8 @@ the fast `OBJECT_WAL_SYNC_OBJECT` gate；new
 `f9TransactionResolutionProfileMatrixProcessIntegrationTest` repeats both cuts for
 `OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT` and
 `BOOKKEEPER_WAL_SYNC_OBJECT`。Together they execute ten release-process scenarios。Every BookKeeper cut derives a distinct
-ledger-id authority seed from `(profileSeed * 2) + cutOffset`，so before/after-provider fixtures never reuse or revoke each
+ledger-id authority seed from `(profileSeed * 2) + cutOffset`，so before/after-provider fixtures never reuse or revoke
+each
 other's namespace。WAL-only requires zero objects；the other four profiles await a positive materialized-object count。
 
 The first real matrix run exposed a production capacity bug in `BookKeeperLedgerHandleCache`。With a two-handle bound，
@@ -1919,8 +2097,10 @@ aggregate remains a separate requirement。
 - `__transaction_state` coordinator failover and ongoing transaction；
 - corrupt mandatory internal-topic NTC2 fails election without COMMITTED fallback。
 
-Current executable subset：the first two bullets now include completed-state and live OPEN COMMIT/ABORT migration across two
-release brokers plus before/after-provider abort-marker process cuts across all five storage profiles；Object-WAL mandatory
+Current executable subset：the first two bullets now include completed-state and live OPEN COMMIT/ABORT migration across
+two
+release brokers plus before/after-provider abort-marker process cuts across all five storage profiles；Object-WAL
+mandatory
 internal-topic compaction/no-resurrection is also covered。Non-Object mandatory-NTC2 expansion and the final aggregate
 remain open。
 

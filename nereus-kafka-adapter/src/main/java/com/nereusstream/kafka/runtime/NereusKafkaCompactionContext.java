@@ -25,10 +25,10 @@ import java.util.Objects;
  * one product pass.
  */
 public record NereusKafkaCompactionContext(
-    NereusKafkaCompactionRuntimeConfiguration configuration,
-    KafkaCompactionRuntime.OwnedPartitionSource ownedPartitions) {
-  public NereusKafkaCompactionContext {
-    Objects.requireNonNull(configuration, "configuration");
-    Objects.requireNonNull(ownedPartitions, "ownedPartitions");
-  }
+        NereusKafkaCompactionRuntimeConfiguration configuration,
+        KafkaCompactionRuntime.OwnedPartitionSource ownedPartitions) {
+    public NereusKafkaCompactionContext {
+        Objects.requireNonNull(configuration, "configuration");
+        Objects.requireNonNull(ownedPartitions, "ownedPartitions");
+    }
 }

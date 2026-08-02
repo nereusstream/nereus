@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -12,7 +13,10 @@ import com.nereusstream.api.target.ReadTargetType;
  */
 public interface PhysicalReferenceProof {
     PhysicalReferencePurpose purpose();
+
     ReadTargetType targetType();
+
     Checksum targetIdentitySha256();
+
     String referenceId();
 }

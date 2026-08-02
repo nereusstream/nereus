@@ -42,7 +42,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Shared Phase 1 metadata codecs used by fake and future real Oxia adapters. */
+/**
+ * Shared Phase 1 metadata codecs used by fake and future real Oxia adapters.
+ */
 public final class Phase1MetadataCodecs {
     private static final int SCHEMA_VERSION = 1;
     private static final int MIN_READER_SCHEMA_VERSION = 1;
@@ -73,8 +75,7 @@ public final class Phase1MetadataCodecs {
             registered(TrimRecord.class),
             registered(VisibleSliceReferenceRecord.class)));
 
-    private Phase1MetadataCodecs() {
-    }
+    private Phase1MetadataCodecs() {}
 
     public static MetadataCodecRegistry registry() {
         return REGISTRY;
@@ -94,14 +95,13 @@ public final class Phase1MetadataCodecs {
         MetadataRecordEnvelope.DecodedEnvelope envelope = MetadataRecordEnvelope.decode(bytes);
         MetadataRecordCodec<T> codec = REGISTRY.codecForClass(recordClass);
         if (!codec.recordType().equals(envelope.recordType())) {
-            throw new MetadataCodecException("metadata envelope record type mismatch: expected "
-                    + codec.recordType() + " but found " + envelope.recordType());
+            throw new MetadataCodecException("metadata envelope record type mismatch: expected " + codec.recordType()
+                    + " but found " + envelope.recordType());
         }
         if (!MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1.equals(envelope.payloadEncoding())) {
             throw new MetadataCodecException("unsupported metadata payload encoding: " + envelope.payloadEncoding());
         }
-        if (!codec.supportsEnvelopeSchema(
-                envelope.schemaVersion(), envelope.minReaderSchemaVersion())) {
+        if (!codec.supportsEnvelopeSchema(envelope.schemaVersion(), envelope.minReaderSchemaVersion())) {
             throw new MetadataCodecException("unsupported metadata schema version for " + codec.recordType()
                     + ": writer=" + envelope.schemaVersion()
                     + ", minReader=" + envelope.minReaderSchemaVersion());
@@ -128,8 +128,7 @@ public final class Phase1MetadataCodecs {
     }
 
     private static <T> MapMetadataCodecRegistry.RegisteredCodec<T> registered(
-            Class<T> recordClass,
-            MetadataRecordCodec<T> codec) {
+            Class<T> recordClass, MetadataRecordCodec<T> codec) {
         return new MapMetadataCodecRegistry.RegisteredCodec<>(recordClass, codec);
     }
 
@@ -276,8 +275,10 @@ public final class Phase1MetadataCodecs {
                     Object value = component.getAccessor().invoke(record);
                     writeValue(value, component.getGenericType(), component.getType());
                 } catch (ReflectiveOperationException e) {
-                    throw new MetadataCodecException("failed to encode metadata field "
-                            + expectedClass.getSimpleName() + "." + component.getName(), e);
+                    throw new MetadataCodecException(
+                            "failed to encode metadata field " + expectedClass.getSimpleName() + "."
+                                    + component.getName(),
+                            e);
                 }
             }
         }
@@ -408,8 +409,8 @@ public final class Phase1MetadataCodecs {
                 RecordComponent component = components[i];
                 String fieldName = readString();
                 if (!component.getName().equals(fieldName)) {
-                    throw new MetadataCodecException("metadata field order mismatch for " + recordType
-                            + ": expected " + component.getName() + " but found " + fieldName);
+                    throw new MetadataCodecException("metadata field order mismatch for " + recordType + ": expected "
+                            + component.getName() + " but found " + fieldName);
                 }
                 args[i] = readValue(component.getGenericType(), component.getType());
                 parameterTypes[i] = component.getType();
@@ -426,8 +427,8 @@ public final class Phase1MetadataCodecs {
             requireRemaining(1);
             byte actual = buffer.get();
             if (actual != expected) {
-                throw new MetadataCodecException("metadata payload type mismatch: expected "
-                        + expected + " but found " + actual);
+                throw new MetadataCodecException(
+                        "metadata payload type mismatch: expected " + expected + " but found " + actual);
             }
         }
 

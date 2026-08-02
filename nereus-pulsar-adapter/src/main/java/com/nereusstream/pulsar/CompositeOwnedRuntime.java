@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import java.util.ArrayList;
@@ -9,7 +10,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Idempotent close owner for runtime components that must remain distinct from borrowed broker resources. */
+/**
+ * Idempotent close owner for runtime components that must remain distinct from borrowed broker resources.
+ */
 final class CompositeOwnedRuntime implements OwnedRuntimeComponents {
     private final List<AutoCloseable> resources;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -29,10 +32,7 @@ final class CompositeOwnedRuntime implements OwnedRuntimeComponents {
     @Override
     public <T extends AutoCloseable> Optional<T> component(Class<T> componentType) {
         Objects.requireNonNull(componentType, "componentType");
-        return resources.stream()
-                .filter(componentType::isInstance)
-                .findFirst()
-                .map(componentType::cast);
+        return resources.stream().filter(componentType::isInstance).findFirst().map(componentType::cast);
     }
 
     @Override

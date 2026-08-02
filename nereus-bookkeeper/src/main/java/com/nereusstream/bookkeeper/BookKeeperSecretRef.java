@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** Non-secret durable identity of a password resolved only at the composition boundary. */
+/**
+ * Non-secret durable identity of a password resolved only at the composition boundary.
+ */
 public record BookKeeperSecretRef(String reference, String identityVersion) {
     public BookKeeperSecretRef {
         reference = text(reference, "reference");
@@ -19,5 +22,8 @@ public record BookKeeperSecretRef(String reference, String identityVersion) {
         return value;
     }
 
-    @Override public String toString() { return "BookKeeperSecretRef[redacted, version=" + identityVersion + "]"; }
+    @Override
+    public String toString() {
+        return "BookKeeperSecretRef[redacted, version=" + identityVersion + "]";
+    }
 }

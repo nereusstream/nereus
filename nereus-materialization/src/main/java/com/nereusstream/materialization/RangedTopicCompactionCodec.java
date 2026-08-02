@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -19,8 +20,7 @@ public interface RangedTopicCompactionCodec {
 
     void decode(ReadBatch rangedBatch, DecodedRecordConsumer consumer);
 
-    RewrittenCompactionRecord rewrite(
-            DecodedCompactionRecord survivor, CompactionRewriteContext context);
+    RewrittenCompactionRecord rewrite(DecodedCompactionRecord survivor, CompactionRewriteContext context);
 
     @FunctionalInterface
     interface DecodedRecordConsumer {

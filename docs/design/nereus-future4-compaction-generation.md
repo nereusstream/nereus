@@ -470,7 +470,8 @@ Cursor integration is two distinct checks：
 
 F4 is also the first phase that may admit the F3-rejected `NereusAdminOperation.TRIM_TOPIC` and replace F3's no-op
 `ManagedLedger.trimConsumedLedgersInBackground(promise)`。Every broker housekeeping、policy or admin candidate must
-funnel through `CursorRetentionCoordinator.requestTrim` with the current owner session；the promise may complete after the recoverable logical trim
+funnel through `CursorRetentionCoordinator.requestTrim` with the current owner session；the promise may complete after
+the recoverable logical trim
 reaches ACTIVE/completed truth，but physical source/object deletion remains a later GC-worker boundary。No F4 call
 site may invoke `StreamStorage.trim` directly。If the topic has no cursor marker yet，that coordinator first runs the
 F3 capability guard and activates the projection marker；the current F3 writable open must already have created or
@@ -500,20 +501,20 @@ offset gap。
 
 ## 11. Failure Model
 
-| Failure | Expected behavior |
-| --- | --- |
-| Topic unload/process loss before task create | 64-shard registration scan reloads projection/head/index and recreates deterministic work |
-| Registration stale/missing/mismatched | Hint cannot activate a stream；mutation/async admission fails closed or open repairs exact identity |
-| Planner crash after task write | Other planner resumes from Oxia task state |
-| Worker crash before object upload | Task retries |
-| Worker crash after object upload before publish | Object is orphan until task retry or GC |
-| Publish CAS conflict | Task refreshes source entries; old output may become orphan |
-| New generation object checksum failure | Reader falls back only if lower generation still visible |
-| Lossy or byte-rewritten Pulsar output proposed for `COMMITTED` | Publish invariant failure; no index mutation |
-| Semantic-view generation visible to ordinary resolver | Namespace/view validation failure; never fall back across views |
-| Old generation deleted too early | GC invariant violation; Future 4 must prevent this by reference rules |
-| Cursor lags behind compacted range | Cursor reads through highest valid generation; old object kept only if needed |
-| Catalog references old generation | Future 6 catalog reference protects object from GC |
+| Failure                                                        | Expected behavior                                                                                  |
+|----------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| Topic unload/process loss before task create                   | 64-shard registration scan reloads projection/head/index and recreates deterministic work          |
+| Registration stale/missing/mismatched                          | Hint cannot activate a stream；mutation/async admission fails closed or open repairs exact identity |
+| Planner crash after task write                                 | Other planner resumes from Oxia task state                                                         |
+| Worker crash before object upload                              | Task retries                                                                                       |
+| Worker crash after object upload before publish                | Object is orphan until task retry or GC                                                            |
+| Publish CAS conflict                                           | Task refreshes source entries; old output may become orphan                                        |
+| New generation object checksum failure                         | Reader falls back only if lower generation still visible                                           |
+| Lossy or byte-rewritten Pulsar output proposed for `COMMITTED` | Publish invariant failure; no index mutation                                                       |
+| Semantic-view generation visible to ordinary resolver          | Namespace/view validation failure; never fall back across views                                    |
+| Old generation deleted too early                               | GC invariant violation; Future 4 must prevent this by reference rules                              |
+| Cursor lags behind compacted range                             | Cursor reads through highest valid generation; old object kept only if needed                      |
+| Catalog references old generation                              | Future 6 catalog reference protects object from GC                                                 |
 
 ## 12. Compatibility Impact
 
@@ -668,7 +669,8 @@ owner stop/rejoin、durable size-backlog eviction、unload 后 ACTIVE-binding lo
 ownership cut 保持一致；logical trim 只消费 publication/live-projection authority，物理 WAL bytes 不随 admin
 promise 删除。`StreamMetadataSnapshot` 的 versioned comparator 还明确排除 hydrated trim observation fields，
 同时保留 head version/commit/trim/policy truth。F4-M5 已 final-gated；BookKeeper primary-WAL profiles 也已在
-F1-BK BK-M0–M6 complete/final-gated（见 [BookKeeper Primary WAL Delivery](../phase-bk-bookkeeper-primary-wal/README.md)）：BK-M5 完成 production broker admission、runtime、ownership transfer 和
+F1-BK BK-M0–M6 complete/final-gated（见 [BookKeeper Primary WAL Delivery](../phase-bk-bookkeeper-primary-wal/README.md)
+）：BK-M5 完成 production broker admission、runtime、ownership transfer 和
 retention rollout，BK-M6 完成 aggregate scale/chaos/compatibility gate。Online WAL-profile migration 仍是独立后续交付。
 
 Checkpoint AP 已实现 configured-scope guarded PUT/exact HEAD/complete LIST/exact DELETE canary 和 deterministic

@@ -14,7 +14,8 @@ checkpoint-BQ aggregate evidence；F1-BK 目录记录当前 BookKeeper primary-W
 BK-M0 documentation gate 与 BK-M1 provider-neutral foundation 已于 2026-07-19 complete/final-gated；BK-M2
 `BOOKKEEPER_WAL_ONLY` 已实现 keyspace/record/codec、production/fake store、exact allocator/writer/recovery/reader、
 whole-ledger retention、module/facade runtime，以及 real Oxia + BookKeeper create-response-loss / late-create / restart /
-delete checkpoints and cold all-shard Oxia coverage。BK-M3 已实现 provider-neutral exact-source、durable source protection、async profile/runtime
+delete checkpoints and cold all-shard Oxia coverage。BK-M3 已实现 provider-neutral exact-source、durable source
+protection、async profile/runtime
 composition、shared lag、retirement-metadata authority、sealed shared-scanner and first real Oxia/BK/Object
 publication/read/retirement、physical ledger deletion and fresh-runtime task/source/output/publication response-loss
 plus real-load lag/physically-missing-Object fail-closed checkpoints；BK-M2/M3 aggregate final gates 已通过。

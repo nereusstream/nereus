@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -21,9 +22,10 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 
-/** Exact source/output protection reconstruction before publication becomes terminal. */
-public final class DefaultMaterializationTaskProtectionReconciler
-        implements MaterializationTaskProtectionReconciler {
+/**
+ * Exact source/output protection reconstruction before publication becomes terminal.
+ */
+public final class DefaultMaterializationTaskProtectionReconciler implements MaterializationTaskProtectionReconciler {
     private final String cluster;
     private final MaterializationTaskStore tasks;
     private final GenerationMetadataStore generations;
@@ -47,9 +49,8 @@ public final class DefaultMaterializationTaskProtectionReconciler
                 generations,
                 identities,
                 protections,
-                new MaterializationSourceProtectionRegistry(List.of(
-                        new ObjectMaterializationSourceProtectionAdapter(
-                                identities, protections))),
+                new MaterializationSourceProtectionRegistry(
+                        List.of(new ObjectMaterializationSourceProtectionAdapter(identities, protections))),
                 operationTimeout,
                 scheduler);
     }
@@ -68,15 +69,13 @@ public final class DefaultMaterializationTaskProtectionReconciler
         this.generations = Objects.requireNonNull(generations, "generations");
         this.identities = Objects.requireNonNull(identities, "identities");
         this.protections = Objects.requireNonNull(protections, "protections");
-        this.sourceProtectionAdapters = Objects.requireNonNull(
-                sourceProtectionAdapters, "sourceProtectionAdapters");
+        this.sourceProtectionAdapters = Objects.requireNonNull(sourceProtectionAdapters, "sourceProtectionAdapters");
         this.operationTimeout = requirePositive(operationTimeout, "operationTimeout");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     @Override
-    public CompletableFuture<MaterializationTaskProtections> reconcile(
-            VersionedMaterializationTask durable) {
+    public CompletableFuture<MaterializationTaskProtections> reconcile(VersionedMaterializationTask durable) {
         try {
             VersionedMaterializationTask expected = Objects.requireNonNull(durable, "durable");
             MaterializationTask task = tasks.requireTask(expected);
@@ -94,9 +93,7 @@ public final class DefaultMaterializationTaskProtectionReconciler
         private final ObjectProtectionOwner owner;
         private final List<MaterializationSourceProtection> sourceProtections = new ArrayList<>();
 
-        private Operation(
-                VersionedMaterializationTask durable,
-                MaterializationTask task) {
+        private Operation(VersionedMaterializationTask durable, MaterializationTask task) {
             this.durable = durable;
             this.task = task;
             this.deadline = new MaterializationDeadline(operationTimeout, scheduler);
@@ -108,8 +105,8 @@ public final class DefaultMaterializationTaskProtectionReconciler
                     .thenCompose(ignored -> reconcileSource(0))
                     .thenCompose(ignored -> reconcileOutput())
                     .thenCompose(output -> revalidateTaskOwner(owner)
-                            .thenApply(ignored -> new MaterializationTaskProtections(
-                                    durable, sourceProtections, output)));
+                            .thenApply(
+                                    ignored -> new MaterializationTaskProtections(durable, sourceProtections, output)));
         }
 
         private CompletableFuture<Void> reconcileSource(int index) {
@@ -121,30 +118,30 @@ public final class DefaultMaterializationTaskProtectionReconciler
                             () -> sourceProtectionAdapters.acquireOrTransfer(
                                     task.streamId(),
                                     source,
-                                    MaterializationProtectionIdentities.sourceReferenceId(
-                                            cluster, task, source),
+                                    MaterializationProtectionIdentities.sourceReferenceId(cluster, task, source),
                                     owner,
                                     this::revalidateTaskOwner),
                             "reconcile materialization source protection")
-                    .thenCompose(protection -> revalidateSource(source)
-                            .thenApply(ignored -> {
-                                sourceProtections.add(protection);
-                                return null;
-                            }))
+                    .thenCompose(protection -> revalidateSource(source).thenApply(ignored -> {
+                        sourceProtections.add(protection);
+                        return null;
+                    }))
                     .thenCompose(ignored -> reconcileSource(index + 1));
         }
 
         private CompletableFuture<Optional<ObjectProtection>> reconcileOutput() {
             if (durable.value().lifecycle() == TaskLifecycle.CLAIMED) {
                 if (durable.value().output().isPresent()) {
-                    return CompletableFuture.failedFuture(invariant(
-                            "CLAIMED materialization task cannot carry an output"));
+                    return CompletableFuture.failedFuture(
+                            invariant("CLAIMED materialization task cannot carry an output"));
                 }
                 return CompletableFuture.completedFuture(Optional.empty());
             }
             MaterializationOutput output = MaterializationRecordMapper.domainOutput(
-                    task, durable.value().output().orElseThrow(() -> invariant(
-                            "ready/publishing/published task is missing output")));
+                    task,
+                    durable.value()
+                            .output()
+                            .orElseThrow(() -> invariant("ready/publishing/published task is missing output")));
             return deadline.bound(
                             () -> protections.acquireOrTransfer(
                                     new ObjectProtectionRequest(
@@ -178,18 +175,16 @@ public final class DefaultMaterializationTaskProtectionReconciler
                     });
         }
 
-        private CompletableFuture<Void> revalidateTaskOwner(
-                ObjectProtectionOwner expectedOwner) {
+        private CompletableFuture<Void> revalidateTaskOwner(ObjectProtectionOwner expectedOwner) {
             if (!owner.equals(expectedOwner)) {
-                return CompletableFuture.failedFuture(condition(
-                        "materialization protection owner differs from recovered task"));
+                return CompletableFuture.failedFuture(
+                        condition("materialization protection owner differs from recovered task"));
             }
             return deadline.bound(
                             () -> tasks.get(task.streamId(), task.taskId()),
                             "revalidate materialization task protection owner")
                     .thenAccept(actual -> {
-                        if (actual.isEmpty()
-                                || !sameVersioned(durable, actual.orElseThrow())) {
+                        if (actual.isEmpty() || !sameVersioned(durable, actual.orElseThrow())) {
                             throw condition("materialization task changed during protection recovery");
                         }
                     });
@@ -200,14 +195,11 @@ public final class DefaultMaterializationTaskProtectionReconciler
         if (lifecycle != TaskLifecycle.CLAIMED
                 && lifecycle != TaskLifecycle.OUTPUT_READY
                 && lifecycle != TaskLifecycle.PUBLISHING) {
-            throw new IllegalArgumentException(
-                    "task lifecycle does not own materialization protections: " + lifecycle);
+            throw new IllegalArgumentException("task lifecycle does not own materialization protections: " + lifecycle);
         }
     }
 
-    private static boolean sameVersioned(
-            VersionedMaterializationTask expected,
-            VersionedMaterializationTask actual) {
+    private static boolean sameVersioned(VersionedMaterializationTask expected, VersionedMaterializationTask actual) {
         return expected.key().equals(actual.key())
                 && expected.metadataVersion() == actual.metadataVersion()
                 && expected.durableValueSha256().equals(actual.durableValueSha256())

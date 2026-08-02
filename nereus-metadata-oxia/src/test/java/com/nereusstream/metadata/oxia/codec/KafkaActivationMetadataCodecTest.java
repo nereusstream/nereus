@@ -1,6 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.metadata.oxia.KafkaActivationTestValues;
 import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPayloadMapping;
@@ -12,14 +15,11 @@ import java.util.HexFormat;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 class KafkaActivationMetadataCodecTest {
     @Test
     void activationCapabilityAndReadinessRoundTripWithFrozenBytes() {
-        KafkaStorageProtocolActivationRecord activation = KafkaActivationTestValues.activation(
-                KafkaStorageActivationLifecycle.PREPARED, 0);
+        KafkaStorageProtocolActivationRecord activation =
+                KafkaActivationTestValues.activation(KafkaStorageActivationLifecycle.PREPARED, 0);
         KafkaBrokerCapabilityRecord capability = KafkaActivationTestValues.capability(1_100, 31_100);
         KafkaStorageReadinessRecord readiness = KafkaActivationTestValues.readiness(7, 101, 1_200);
 
@@ -37,33 +37,32 @@ class KafkaActivationMetadataCodecTest {
 
     @Test
     void invalidLifecycleProfilesDigestAndHeartbeatFailClosed() {
-        assertThatThrownBy(() -> KafkaActivationTestValues.activation(
-                KafkaStorageActivationLifecycle.ACTIVE, 0))
+        assertThatThrownBy(() -> KafkaActivationTestValues.activation(KafkaStorageActivationLifecycle.ACTIVE, 0))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new KafkaStorageProtocolActivationRecord(
-                1,
-                KafkaStorageActivationLifecycle.PREPARED.wireId(),
-                "kraft",
-                1,
-                1,
-                2,
-                1,
-                KafkaPayloadMapping.KAFKA_RECORD_BATCH_V1.wireId(),
-                1,
-                2,
-                2,
-                1,
-                1,
-                List.of("OBJECT_WAL_SYNC_OBJECT", "BOOKKEEPER_WAL_ONLY"),
-                "OBJECT_WAL_SYNC_OBJECT",
-                KafkaActivationTestValues.bytes(1),
-                KafkaActivationTestValues.bytes(2),
-                1,
-                100,
-                3,
-                1_000,
-                0,
-                0))
+                        1,
+                        KafkaStorageActivationLifecycle.PREPARED.wireId(),
+                        "kraft",
+                        1,
+                        1,
+                        2,
+                        1,
+                        KafkaPayloadMapping.KAFKA_RECORD_BATCH_V1.wireId(),
+                        1,
+                        2,
+                        2,
+                        1,
+                        1,
+                        List.of("OBJECT_WAL_SYNC_OBJECT", "BOOKKEEPER_WAL_ONLY"),
+                        "OBJECT_WAL_SYNC_OBJECT",
+                        KafkaActivationTestValues.bytes(1),
+                        KafkaActivationTestValues.bytes(2),
+                        1,
+                        100,
+                        3,
+                        1_000,
+                        0,
+                        0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("sorted");
         assertThatThrownBy(() -> KafkaActivationTestValues.capability(31_100, 31_100))
@@ -71,17 +70,17 @@ class KafkaActivationMetadataCodecTest {
 
         KafkaStorageReadinessRecord valid = KafkaActivationTestValues.readiness(7, 101, 1_200);
         assertThatThrownBy(() -> new KafkaStorageReadinessRecord(
-                valid.recordVersion(),
-                valid.kafkaClusterId(),
-                valid.readinessEpoch(),
-                valid.kraftMetadataOffset(),
-                valid.brokers(),
-                KafkaActivationTestValues.bytes(99),
-                valid.capabilitySha256(),
-                valid.providerScopeSha256(),
-                valid.createdAtMillis(),
-                valid.expiresAtMillis(),
-                0))
+                        valid.recordVersion(),
+                        valid.kafkaClusterId(),
+                        valid.readinessEpoch(),
+                        valid.kraftMetadataOffset(),
+                        valid.brokers(),
+                        KafkaActivationTestValues.bytes(99),
+                        valid.capabilitySha256(),
+                        valid.providerScopeSha256(),
+                        valid.createdAtMillis(),
+                        valid.expiresAtMillis(),
+                        0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("canonical broker set");
     }

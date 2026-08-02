@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
@@ -28,11 +28,7 @@ class DefaultMaterializationTaskDispatcherTest {
     void enforcesGlobalAndPerStreamConcurrencyWhileSkippingASaturatedStream() throws Exception {
         ControlledWorker worker = new ControlledWorker();
         DefaultMaterializationTaskDispatcher dispatcher = new DefaultMaterializationTaskDispatcher(
-                worker,
-                (task, output) -> CompletableFuture.completedFuture(null),
-                Runnable::run,
-                2,
-                1);
+                worker, (task, output) -> CompletableFuture.completedFuture(null), Runnable::run, 2, 1);
         MaterializationTask a1 = task(new StreamId("stream-a"), false);
         MaterializationTask a2 = task(new StreamId("stream-a"), true);
         MaterializationTask b1 = task(new StreamId("stream-b"), false);
@@ -93,29 +89,25 @@ class DefaultMaterializationTaskDispatcherTest {
         ControlledWorker worker = new ControlledWorker();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         DefaultMaterializationTaskDispatcher dispatcher = new DefaultMaterializationTaskDispatcher(
-                worker,
-                (task, output) -> CompletableFuture.completedFuture(null),
-                Runnable::run,
-                1,
-                1);
+                worker, (task, output) -> CompletableFuture.completedFuture(null), Runnable::run, 1, 1);
         MaterializationTask active = task(new StreamId("stream-close-active"), false);
         MaterializationTask queued = task(new StreamId("stream-close-queued"), false);
         CompletableFuture<Void> activeCall = dispatcher.dispatch(durable(active, 1), active);
         CompletableFuture<Void> queuedCall = dispatcher.dispatch(durable(queued, 2), queued);
         try {
-            CompletableFuture<Void> close = dispatcher.closeAsync(
-                    Duration.ofMillis(50), scheduler);
+            CompletableFuture<Void> close = dispatcher.closeAsync(Duration.ofMillis(50), scheduler);
 
             assertThatThrownBy(queuedCall::join)
                     .hasRootCauseInstanceOf(NereusException.class)
                     .satisfies(failure -> assertThat(root(failure))
-                            .isInstanceOfSatisfying(NereusException.class, nereus ->
-                                    assertThat(nereus.code()).isEqualTo(ErrorCode.STORAGE_CLOSED)));
+                            .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                                    .isEqualTo(ErrorCode.STORAGE_CLOSED)));
             close.get(2, TimeUnit.SECONDS);
             assertThat(worker.cancellations).hasValue(1);
             assertThat(activeCall).isCompletedExceptionally();
             assertThat(dispatcher.activeTaskCount()).isZero();
-            assertThatThrownBy(() -> dispatcher.dispatch(durable(active, 3), active).join())
+            assertThatThrownBy(() ->
+                            dispatcher.dispatch(durable(active, 3), active).join())
                     .hasRootCauseInstanceOf(NereusException.class);
         } finally {
             scheduler.shutdownNow();
@@ -126,8 +118,7 @@ class DefaultMaterializationTaskDispatcherTest {
         List<VersionedGenerationCandidate> candidates = List.of(
                 MaterializationPlannerTestSupport.zero("/index/dispatch-2", 0, 2, 0, 100, 2),
                 MaterializationPlannerTestSupport.zero("/index/dispatch-4", 2, 4, 100, 100, 4));
-        MaterializationTask base = MaterializationPlannerTestSupport.planner(
-                        candidates, List.of(), 0, 4)
+        MaterializationTask base = MaterializationPlannerTestSupport.planner(candidates, List.of(), 0, 4)
                 .plan(
                         MaterializationPlannerTestSupport.STREAM,
                         new OffsetRange(0, 4),
@@ -136,8 +127,7 @@ class DefaultMaterializationTaskDispatcherTest {
                 .join()
                 .get(0);
         MaterializationPolicy policy = alternatePolicy
-                ? MaterializationPolicyFactory.losslessCommitted(
-                        2, 16, 1_000, 1_000_000, 128, "UNCOMPRESSED")
+                ? MaterializationPolicyFactory.losslessCommitted(2, 16, 1_000, 1_000_000, 128, "UNCOMPRESSED")
                 : base.policy();
         return MaterializationTask.create(streamId, base.coverage(), base.sources(), policy);
     }
@@ -166,8 +156,7 @@ class DefaultMaterializationTaskDispatcherTest {
 
     private static final class ControlledWorker implements MaterializationWorker {
         private final List<String> started = new CopyOnWriteArrayList<>();
-        private final Map<String, CompletableFuture<MaterializationOutput>> operations =
-                new ConcurrentHashMap<>();
+        private final Map<String, CompletableFuture<MaterializationOutput>> operations = new ConcurrentHashMap<>();
         private final AtomicInteger cancellations = new AtomicInteger();
 
         @Override

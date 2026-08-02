@@ -17,7 +17,9 @@ package com.nereusstream.metadata.oxia;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Connection, bounded-scan, and pending-operation settings for the production Oxia adapter. */
+/**
+ * Connection, bounded-scan, and pending-operation settings for the production Oxia adapter.
+ */
 public record OxiaClientConfiguration(
         String serviceAddress,
         String namespace,
@@ -40,12 +42,7 @@ public record OxiaClientConfiguration(
 
     public static OxiaClientConfiguration defaults(String serviceAddress) {
         return new OxiaClientConfiguration(
-                serviceAddress,
-                "default",
-                Duration.ofSeconds(30),
-                Duration.ofSeconds(30),
-                10_000,
-                1_024);
+                serviceAddress, "default", Duration.ofSeconds(30), Duration.ofSeconds(30), 10_000, 1_024);
     }
 
     private static String requireNonBlank(String value, String name) {

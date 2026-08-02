@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.api.Checksum;
@@ -12,15 +13,30 @@ import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.target.ReadTargetType;
 import java.util.Optional;
 
-/** NRO1 object-slice target payload. */
+/**
+ * NRO1 object-slice target payload.
+ */
 public final class ObjectSliceReadTargetCodecV1 implements ReadTargetCodec<ObjectSliceReadTarget> {
-    @Override public ReadTargetType targetType() { return ReadTargetType.OBJECT_SLICE; }
-    @Override public int targetVersion() { return 1; }
-    @Override public Class<ObjectSliceReadTarget> targetClass() { return ObjectSliceReadTarget.class; }
+    @Override
+    public ReadTargetType targetType() {
+        return ReadTargetType.OBJECT_SLICE;
+    }
+
+    @Override
+    public int targetVersion() {
+        return 1;
+    }
+
+    @Override
+    public Class<ObjectSliceReadTarget> targetClass() {
+        return ObjectSliceReadTarget.class;
+    }
 
     @Override
     public byte[] encode(ObjectSliceReadTarget target) {
-        if (target.version() != 1) throw new MetadataCodecException("unsupported object target version");
+        if (target.version() != 1) {
+            throw new MetadataCodecException("unsupported object target version");
+        }
         CanonicalTargetBinary.Writer writer = new CanonicalTargetBinary.Writer();
         writer.magic("NRO1");
         writer.string(target.objectId().value());
@@ -72,9 +88,21 @@ public final class ObjectSliceReadTargetCodecV1 implements ReadTargetCodec<Objec
                     indexObjectId.isEmpty() ? Optional.empty() : Optional.of(new ObjectId(indexObjectId)),
                     indexObjectKey.isEmpty() ? Optional.empty() : Optional.of(new ObjectKey(indexObjectKey)),
                     inline.length == 0 ? Optional.empty() : Optional.of(inline),
-                    indexOffset, indexLength, indexChecksum);
-            return new ObjectSliceReadTarget(1, objectId, objectKey, objectType,
-                    physicalFormat, logicalFormat, sliceId, objectOffset, objectLength, sliceChecksum, index);
+                    indexOffset,
+                    indexLength,
+                    indexChecksum);
+            return new ObjectSliceReadTarget(
+                    1,
+                    objectId,
+                    objectKey,
+                    objectType,
+                    physicalFormat,
+                    logicalFormat,
+                    sliceId,
+                    objectOffset,
+                    objectLength,
+                    sliceChecksum,
+                    index);
         } catch (MetadataCodecException e) {
             throw e;
         } catch (RuntimeException e) {

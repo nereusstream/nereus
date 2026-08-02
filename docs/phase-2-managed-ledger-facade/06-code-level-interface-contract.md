@@ -9,25 +9,25 @@ interface default，也不能用 `null`、空集合、零值或成功 callback �
 目标仍是 `nereusstream/pulsar@100d3ef0ff7c7da36d497453b141ddff6f34a9d3`。
 除 `01` 已锁定的核心接口外，F2 直接实现或返回的 surface 还包括：
 
-| File | Locked Git blob | Declared surface |
-| --- | --- | ---: |
-| `ReadOnlyCursor.java` | `016298cb108bb2f3abc3e9b9a48c0c45486dcfef` | 11 methods |
-| `ReadOnlyManagedLedger.java` | `91b8f92eb637e6350c659f4a44df24800696c88b` | 4 methods |
-| `Entry.java` | `24ea5c17c0d66c324e73b60d3c53bf991cd456fd` | 13 methods including defaults |
-| `Position.java` | `d0d6d865c9558a7a02707c48fb19b09d7fc1014b` | 10 methods including defaults/bridge |
-| `AsyncCallbacks.java` | `70db427afce4f811670dd018c6dd98d44230d4bc` | callback signatures |
-| `ManagedLedgerException.java` | `1fa565d6ec788df22f5fe725afdaea73141e024a` | exception subclasses |
-| `ManagedLedgerInfo.java` | `3e4e56187e5eed531a33e1d0cf8d9bab0c94116c` | admin DTO |
-| `EntryCacheManager.java` | `816ccd4a3e459f296a7b5775bd3d48bcd163f463` | 11 methods |
-| `EntryCache.java` | `b2ebf7430560cb37f420ff5cd21984ba04b00c96` | 8 methods |
-| `ManagedLedgerFactoryMXBean.java` | `43e8196daa9ae4cb1e4299abe2b5f3425009445c` | 16 methods |
-| `ManagedLedgerMXBean.java` | `1d978e23785690bd17c2f0a9a898397361c933cb` | 37 methods |
-| `ManagedCursorMXBean.java` | `7402bd65f793eddab8b34b0ac5ed0c40c24cf6a1` | 13 methods |
-| `ManagedLedgerInternalStats.java` | `c109e269202115ada9c032c6168d9f6420a3eeec` | ledger/cursor admin DTO |
-| `ManagedLedgerConfig.java` | `9dd5ced2dc787cae110b535fa89e91af40ba03f1` | per-ledger mutable config |
-| `ManagedLedgerFactoryConfig.java` | `a915d651bd6b2bf01eb9aadb26d1c82fa6f60a0b` | factory compatibility config |
-| `ScanOutcome.java` | `c679c40e85e9174da793cc99ebd73009a55e7dfe` | scan terminal enum |
-| `PersistentOfflineTopicStats.java` | `f1cb0dfd088803be1cf4c9b88525d31c0af6ddc8` | offline admin DTO |
+| File                               | Locked Git blob                            |                     Declared surface |
+|------------------------------------|--------------------------------------------|-------------------------------------:|
+| `ReadOnlyCursor.java`              | `016298cb108bb2f3abc3e9b9a48c0c45486dcfef` |                           11 methods |
+| `ReadOnlyManagedLedger.java`       | `91b8f92eb637e6350c659f4a44df24800696c88b` |                            4 methods |
+| `Entry.java`                       | `24ea5c17c0d66c324e73b60d3c53bf991cd456fd` |        13 methods including defaults |
+| `Position.java`                    | `d0d6d865c9558a7a02707c48fb19b09d7fc1014b` | 10 methods including defaults/bridge |
+| `AsyncCallbacks.java`              | `70db427afce4f811670dd018c6dd98d44230d4bc` |                  callback signatures |
+| `ManagedLedgerException.java`      | `1fa565d6ec788df22f5fe725afdaea73141e024a` |                 exception subclasses |
+| `ManagedLedgerInfo.java`           | `3e4e56187e5eed531a33e1d0cf8d9bab0c94116c` |                            admin DTO |
+| `EntryCacheManager.java`           | `816ccd4a3e459f296a7b5775bd3d48bcd163f463` |                           11 methods |
+| `EntryCache.java`                  | `b2ebf7430560cb37f420ff5cd21984ba04b00c96` |                            8 methods |
+| `ManagedLedgerFactoryMXBean.java`  | `43e8196daa9ae4cb1e4299abe2b5f3425009445c` |                           16 methods |
+| `ManagedLedgerMXBean.java`         | `1d978e23785690bd17c2f0a9a898397361c933cb` |                           37 methods |
+| `ManagedCursorMXBean.java`         | `7402bd65f793eddab8b34b0ac5ed0c40c24cf6a1` |                           13 methods |
+| `ManagedLedgerInternalStats.java`  | `c109e269202115ada9c032c6168d9f6420a3eeec` |              ledger/cursor admin DTO |
+| `ManagedLedgerConfig.java`         | `9dd5ced2dc787cae110b535fa89e91af40ba03f1` |            per-ledger mutable config |
+| `ManagedLedgerFactoryConfig.java`  | `a915d651bd6b2bf01eb9aadb26d1c82fa6f60a0b` |         factory compatibility config |
+| `ScanOutcome.java`                 | `c679c40e85e9174da793cc99ebd73009a55e7dfe` |                   scan terminal enum |
+| `PersistentOfflineTopicStats.java` | `f1cb0dfd088803be1cf4c9b88525d31c0af6ddc8` |                    offline admin DTO |
 
 The target blob in this table is authoritative. The API probe and all source assertions in this document were
 rechecked against the exact clean checkout at
@@ -36,13 +36,13 @@ checkout or online source is part of the F2 contract.
 
 The following labels are used below:
 
-| Label | Meaning |
-| --- | --- |
-| `I` | Implemented by the F2 target design |
-| `L` | Implemented as broker-local state only; restart does not preserve it |
-| `N` | Deliberate neutral behavior because the concept does not exist in F2 |
-| `U` | Explicitly unsupported; use the method's failure channel |
-| `D` | Locked interface default is audited and intentionally inherited |
+| Label | Meaning                                                              |
+|-------|----------------------------------------------------------------------|
+| `I`   | Implemented by the F2 target design                                  |
+| `L`   | Implemented as broker-local state only; restart does not preserve it |
+| `N`   | Deliberate neutral behavior because the concept does not exist in F2 |
+| `U`   | Explicitly unsupported; use the method's failure channel             |
+| `D`   | Locked interface default is audited and intentionally inherited      |
 
 `N` is not an accidental no-op. Every `N` row below states why the neutral result is correct. `U` behavior is
 standardized by `ManagedLedgerErrorMapper.unsupported(operation)` and includes the stable prefix
@@ -207,7 +207,8 @@ public interface StreamStorage extends AutoCloseable {
 - an unknown/expired attempt ID is `METADATA_INVARIANT_VIOLATION`, not permission to submit new bytes。
 
 The current Phase 1 replay search restarts at the latest head after each bounded-scan exhaustion. That is insufficient
-for an F2 suspended callback because an attempt older than `maxCommitChainScan` would never make progress. P15-M2/M4 add a
+for an F2 suspended callback because an attempt older than `maxCommitChainScan` would never make progress. P15-M2/M4 add
+a
 protocol-neutral, metadata-internal paged search:
 
 ```java
@@ -303,23 +304,23 @@ idempotency key.
 
 `seal` state table:
 
-| Observed L0 state | Result |
-| --- | --- |
-| `CREATING` | retriable `STREAM_NOT_ACTIVE`; F2 never publishes a projection to this state |
-| `ACTIVE` | CAS to `SEALED`, retry on version conflict until deadline |
-| `SEALED` | idempotently return the current snapshot |
-| `DELETING` / `DELETED` | fail non-retriably |
-| missing | `STREAM_NOT_FOUND` |
+| Observed L0 state      | Result                                                                       |
+|------------------------|------------------------------------------------------------------------------|
+| `CREATING`             | retriable `STREAM_NOT_ACTIVE`; F2 never publishes a projection to this state |
+| `ACTIVE`               | CAS to `SEALED`, retry on version conflict until deadline                    |
+| `SEALED`               | idempotently return the current snapshot                                     |
+| `DELETING` / `DELETED` | fail non-retriably                                                           |
+| missing                | `STREAM_NOT_FOUND`                                                           |
 
 `delete` state table:
 
-| Observed L0 state | Result |
-| --- | --- |
-| `CREATING` | retriable `STREAM_NOT_ACTIVE`; creation recovery must finish first |
-| `ACTIVE` / `SEALED` | CAS to `DELETING`, then CAS to `DELETED` |
-| `DELETING` | resume the terminal CAS |
-| `DELETED` | idempotently return the tombstone snapshot |
-| missing | `STREAM_NOT_FOUND` |
+| Observed L0 state   | Result                                                             |
+|---------------------|--------------------------------------------------------------------|
+| `CREATING`          | retriable `STREAM_NOT_ACTIVE`; creation recovery must finish first |
+| `ACTIVE` / `SEALED` | CAS to `DELETING`, then CAS to `DELETED`                           |
+| `DELETING`          | resume the terminal CAS                                            |
+| `DELETED`           | idempotently return the tombstone snapshot                         |
+| missing             | `STREAM_NOT_FOUND`                                                 |
 
 The first successful transition to `DELETING` is the logical delete point: append/read/trim/session acquisition are
 rejected from that point. `DELETED` records completion. No object is physically removed. Concurrent append versus
@@ -609,14 +610,14 @@ public final class PositionProjection {
 
 Legal ranges:
 
-| Role | Legal entry ID |
-| --- | --- |
-| readable entry | `[trimOffset, committedEndOffset)` |
-| next-read position | `[trimOffset, committedEndOffset]` |
+| Role                                                            | Legal entry ID                                                             |
+|-----------------------------------------------------------------|----------------------------------------------------------------------------|
+| readable entry                                                  | `[trimOffset, committedEndOffset)`                                         |
+| next-read position                                              | `[trimOffset, committedEndOffset]`                                         |
 | concrete cursor-start/mark-delete input used to find next-valid | same-ledger `[-1, committedEndOffset)`; values before trim advance to trim |
-| reset read-position input | same-ledger `[-1, Long.MAX_VALUE]`; clamp to retained/tail range |
-| mark-delete position | `[trimOffset - 1, committedEndOffset - 1]` |
-| inclusive max position input | null, `EARLIEST`, `LATEST`, or current-ledger entry ID `>= -1` |
+| reset read-position input                                       | same-ledger `[-1, Long.MAX_VALUE]`; clamp to retained/tail range           |
+| mark-delete position                                            | `[trimOffset - 1, committedEndOffset - 1]`                                 |
+| inclusive max position input                                    | null, `EARLIEST`, `LATEST`, or current-ledger entry ID `>= -1`             |
 
 `PositionFactory.EARLIEST` and `LATEST` are recognized before virtual-ledger validation. Every other position must
 carry the current virtual ledger ID. Inclusive max normalization maps null/`LATEST` to `lastConfirmed`, `EARLIEST`
@@ -635,24 +636,24 @@ This method must not replace `requireReadPositionOffset`: direct seek/reset/read
 
 All 26 declared members are covered below.
 
-| Label | Exact method(s) | F2 contract |
-| --- | --- | --- |
-| `I` | `open(String)`; `open(String, ManagedLedgerConfig)` | Stock-shaped latch wrappers over the async core；add no independent timer, restore interruption and throw the mapped `ManagedLedgerException`. The async metadata deadline guarantees ordinary terminal completion. |
-| `I` | both `asyncOpen(...)` overloads | Deduplicate by exact managed-ledger name; acquire/validate the fork binding permit, honor `config.isCreateIfMissing()`, and return one live local facade. |
-| `I` | `openReadOnlyCursor(...)`; `asyncOpenReadOnlyCursor(...)` | Never create a missing topic regardless of `createIfMissing`; normalize the supplied position as a next-read position. |
-| `I` | `asyncOpenReadOnlyManagedLedger(...)` | Get-only open and return `NereusReadOnlyManagedLedger`; no projection/L0 creation, append session or writable facade. |
-| `I` | `getManagedLedgerInfo(...)`; `asyncGetManagedLedgerInfo(...)` | Get-only; synthesize one virtual ledger from an `ACTIVE/SEALED` L0 snapshot and an empty durable cursor map. `DELETING/DELETED` is not found. |
-| `I` | both `delete(...)` overloads; both `asyncDelete(...)` overloads | Delete the open facade or resolve the current projection without creating it, then perform logical L0 delete. An existing `DELETED` tombstone is idempotent success; a missing projection is not found. `mlConfigFuture` is null-checked but is not used for offload cleanup. |
-| `I` | `shutdown()`; `shutdownAsync()` | Idempotent close sequence; async method reports failure through the returned future and never throws due to ordinary closed state. |
-| `I` | `asyncExists(String)` | Topic projection missing is false; current L0 `ACTIVE/SEALED` is true; `DELETING/DELETED` is false; a present projection with missing L0 head is corruption, not false. |
-| `I` | `getEntryCacheManager()` | Return the F2 zero-capacity manager described in section 11. |
-| `I` | `updateCacheEvictionTimeThreshold(long)`; `getCacheEvictionTimeThreshold()` | Validate/store the compatibility setting; it does not create a BookKeeper cache. |
-| `I` | both cache TTL extension update defaults | Override and forward to the zero-capacity manager so target drift is visible in tests. |
-| `I` | `getManagedLedgerPropertiesAsync(String)` | Return an empty map for genuinely `MISSING` state or a terminal `DELETED` lifetime so broker pre-create probing and immediate recreation remain write-free；return a defensive property snapshot for `ACTIVE/SEALED`；treat `DELETING` as not found and projection/L0 mismatch as corruption. |
-| `I` | `getManagedLedgers()` | Return an immutable snapshot containing only live writable facades. |
-| `I` | `getCacheStats()` | Return Nereus counters; BookKeeper hit/miss/eviction counters remain zero. |
-| `I` | `estimateUnloadedTopicBacklog(...)` | Blocking admin-only get bounded by metadata timeout. Ignore the BookKeeper-shaped `ctx`; set one virtual-ledger detail only when `accurate=true`; no durable cursor detail in F2; deleted is not found. |
-| `I` | `getConfig()` | Return one stable, factory-owned compatibility config with zero cache and the real stats period; never allocate a new default instance per call. |
+| Label | Exact method(s)                                                             | F2 contract                                                                                                                                                                                                                                                                                 |
+|-------|-----------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `I`   | `open(String)`; `open(String, ManagedLedgerConfig)`                         | Stock-shaped latch wrappers over the async core；add no independent timer, restore interruption and throw the mapped `ManagedLedgerException`. The async metadata deadline guarantees ordinary terminal completion.                                                                          |
+| `I`   | both `asyncOpen(...)` overloads                                             | Deduplicate by exact managed-ledger name; acquire/validate the fork binding permit, honor `config.isCreateIfMissing()`, and return one live local facade.                                                                                                                                   |
+| `I`   | `openReadOnlyCursor(...)`; `asyncOpenReadOnlyCursor(...)`                   | Never create a missing topic regardless of `createIfMissing`; normalize the supplied position as a next-read position.                                                                                                                                                                      |
+| `I`   | `asyncOpenReadOnlyManagedLedger(...)`                                       | Get-only open and return `NereusReadOnlyManagedLedger`; no projection/L0 creation, append session or writable facade.                                                                                                                                                                       |
+| `I`   | `getManagedLedgerInfo(...)`; `asyncGetManagedLedgerInfo(...)`               | Get-only; synthesize one virtual ledger from an `ACTIVE/SEALED` L0 snapshot and an empty durable cursor map. `DELETING/DELETED` is not found.                                                                                                                                               |
+| `I`   | both `delete(...)` overloads; both `asyncDelete(...)` overloads             | Delete the open facade or resolve the current projection without creating it, then perform logical L0 delete. An existing `DELETED` tombstone is idempotent success; a missing projection is not found. `mlConfigFuture` is null-checked but is not used for offload cleanup.               |
+| `I`   | `shutdown()`; `shutdownAsync()`                                             | Idempotent close sequence; async method reports failure through the returned future and never throws due to ordinary closed state.                                                                                                                                                          |
+| `I`   | `asyncExists(String)`                                                       | Topic projection missing is false; current L0 `ACTIVE/SEALED` is true; `DELETING/DELETED` is false; a present projection with missing L0 head is corruption, not false.                                                                                                                     |
+| `I`   | `getEntryCacheManager()`                                                    | Return the F2 zero-capacity manager described in section 11.                                                                                                                                                                                                                                |
+| `I`   | `updateCacheEvictionTimeThreshold(long)`; `getCacheEvictionTimeThreshold()` | Validate/store the compatibility setting; it does not create a BookKeeper cache.                                                                                                                                                                                                            |
+| `I`   | both cache TTL extension update defaults                                    | Override and forward to the zero-capacity manager so target drift is visible in tests.                                                                                                                                                                                                      |
+| `I`   | `getManagedLedgerPropertiesAsync(String)`                                   | Return an empty map for genuinely `MISSING` state or a terminal `DELETED` lifetime so broker pre-create probing and immediate recreation remain write-free；return a defensive property snapshot for `ACTIVE/SEALED`；treat `DELETING` as not found and projection/L0 mismatch as corruption. |
+| `I`   | `getManagedLedgers()`                                                       | Return an immutable snapshot containing only live writable facades.                                                                                                                                                                                                                         |
+| `I`   | `getCacheStats()`                                                           | Return Nereus counters; BookKeeper hit/miss/eviction counters remain zero.                                                                                                                                                                                                                  |
+| `I`   | `estimateUnloadedTopicBacklog(...)`                                         | Blocking admin-only get bounded by metadata timeout. Ignore the BookKeeper-shaped `ctx`; set one virtual-ledger detail only when `accurate=true`; no durable cursor detail in F2; deleted is not found.                                                                                     |
+| `I`   | `getConfig()`                                                               | Return one stable, factory-owned compatibility config with zero cache and the real stats period; never allocate a new default instance per call.                                                                                                                                            |
 
 Open-time `ManagedLedgerConfig` rules:
 
@@ -714,72 +715,72 @@ All 87 declared members, including defaults that could be semantically unsafe, a
 
 ### 7.1 Identity, append and cursors
 
-| Label | Exact method(s) | F2 contract |
-| --- | --- | --- |
-| `I` | `getName()` | Exact broker-supplied persistence name. |
-| `I` | all four synchronous `addEntry(byte[]...)` overloads | Validate slice/count, copy exact bytes, call the same async core and wait for its single terminal callback. Like locked stock code, the wrapper adds no second timeout race；the admitted async operation already owns append/recovery deadlines. Interruption is restored and propagated. |
-| `I` | all five `asyncAddEntry(...)` overloads | Funnel into `asyncAddEntry(ByteBuf,int,...)`; one Pulsar Entry consumes one L0 offset. |
-| `I` | three `openCursor(...)` overloads; three `asyncOpenCursor(...)` overloads | Create/join an F2 durable-boundary cursor. Its initial state is local; durable progress mutation is unsupported. |
-| `I` | three `newNonDurableCursor(...)` overloads | Create/join a broker-local cursor; reject `isReadCompacted=true`。A concrete Position is the already-consumed coordinate and reads next-valid; explicit `EARLIEST` maps to trim; null、`LATEST` and concrete future Positions consult `InitialPosition`; the two-argument overload defaults Latest. Anonymous cursors use collision-resistant unique names. |
-| `L` | `deleteCursor(String)`; `asyncDeleteCursor(...)` | Close/remove the local cursor. Missing name is `CursorNotFoundException`; no durable cursor record is claimed. |
-| `I` | `removeWaitingCursor(ManagedCursor)` | Remove only that cursor's registered waiter; identity mismatch is ignored after validation. |
-| `I` | `getCursors()`; `getActiveCursors()` | Immutable snapshots; active variant filters the cursor-local active flag. |
+| Label | Exact method(s)                                                           | F2 contract                                                                                                                                                                                                                                                                                                                                               |
+|-------|---------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `I`   | `getName()`                                                               | Exact broker-supplied persistence name.                                                                                                                                                                                                                                                                                                                   |
+| `I`   | all four synchronous `addEntry(byte[]...)` overloads                      | Validate slice/count, copy exact bytes, call the same async core and wait for its single terminal callback. Like locked stock code, the wrapper adds no second timeout race；the admitted async operation already owns append/recovery deadlines. Interruption is restored and propagated.                                                                 |
+| `I`   | all five `asyncAddEntry(...)` overloads                                   | Funnel into `asyncAddEntry(ByteBuf,int,...)`; one Pulsar Entry consumes one L0 offset.                                                                                                                                                                                                                                                                    |
+| `I`   | three `openCursor(...)` overloads; three `asyncOpenCursor(...)` overloads | Create/join an F2 durable-boundary cursor. Its initial state is local; durable progress mutation is unsupported.                                                                                                                                                                                                                                          |
+| `I`   | three `newNonDurableCursor(...)` overloads                                | Create/join a broker-local cursor; reject `isReadCompacted=true`。A concrete Position is the already-consumed coordinate and reads next-valid; explicit `EARLIEST` maps to trim; null、`LATEST` and concrete future Positions consult `InitialPosition`; the two-argument overload defaults Latest. Anonymous cursors use collision-resistant unique names. |
+| `L`   | `deleteCursor(String)`; `asyncDeleteCursor(...)`                          | Close/remove the local cursor. Missing name is `CursorNotFoundException`; no durable cursor record is claimed.                                                                                                                                                                                                                                            |
+| `I`   | `removeWaitingCursor(ManagedCursor)`                                      | Remove only that cursor's registered waiter; identity mismatch is ignored after validation.                                                                                                                                                                                                                                                               |
+| `I`   | `getCursors()`; `getActiveCursors()`                                      | Immutable snapshots; active variant filters the cursor-local active flag.                                                                                                                                                                                                                                                                                 |
 
 ### 7.2 Counts, size and time
 
-| Label | Exact method(s) | F2 contract |
-| --- | --- | --- |
-| `I` | `getNumberOfEntries()` | `committedEndOffset - trimOffset` from the latest complete local snapshot. |
-| `I` | `getNumberOfEntries(Range<Position>)` | Exact open/closed bound arithmetic after role-aware projection and clipping to the retained range. |
-| `I` | `getNumberOfActiveEntries()` | Zero when there is no durable-boundary cursor; otherwise entries after the slowest local mark-delete. |
-| `I` | `getTotalSize()` | L0 `cumulativeSize`: exact lifetime logical payload still protected by F2 because F2 performs no physical GC. It is not object-store physical bytes and not post-trim logical size. |
-| `I` | `getEstimatedBacklogSize()`; `getEstimatedBacklogSize(Position)` | No cursor means zero for the no-arg form; otherwise use retained/lifetime average-entry size from the supplied or slowest local mark-delete position. These methods are explicitly estimates. |
-| `I` | `getEarliestMessagePublishTimeInBacklog()` | Return `0` without a durable-boundary cursor, `-1` when that cursor has no backlog, otherwise read the first backlog entry and parse its persisted Pulsar timestamp. |
-| `N` | `getOffloadedSize()`; `getLastOffloadedLedgerId()`; both offload timestamp getters | Return `0`; F2 has no Pulsar offload domain and never reports a virtual ledger as offloaded. |
-| `I` | `getLastAddEntryTime()` | Local timestamp of the last successful append callback; `0` before the first local success. |
-| `I` | `getMetadataCreationTimestamp()` | Current projection incarnation `createdAtMillis`. |
+| Label | Exact method(s)                                                                    | F2 contract                                                                                                                                                                                   |
+|-------|------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `I`   | `getNumberOfEntries()`                                                             | `committedEndOffset - trimOffset` from the latest complete local snapshot.                                                                                                                    |
+| `I`   | `getNumberOfEntries(Range<Position>)`                                              | Exact open/closed bound arithmetic after role-aware projection and clipping to the retained range.                                                                                            |
+| `I`   | `getNumberOfActiveEntries()`                                                       | Zero when there is no durable-boundary cursor; otherwise entries after the slowest local mark-delete.                                                                                         |
+| `I`   | `getTotalSize()`                                                                   | L0 `cumulativeSize`: exact lifetime logical payload still protected by F2 because F2 performs no physical GC. It is not object-store physical bytes and not post-trim logical size.           |
+| `I`   | `getEstimatedBacklogSize()`; `getEstimatedBacklogSize(Position)`                   | No cursor means zero for the no-arg form; otherwise use retained/lifetime average-entry size from the supplied or slowest local mark-delete position. These methods are explicitly estimates. |
+| `I`   | `getEarliestMessagePublishTimeInBacklog()`                                         | Return `0` without a durable-boundary cursor, `-1` when that cursor has no backlog, otherwise read the first backlog entry and parse its persisted Pulsar timestamp.                          |
+| `N`   | `getOffloadedSize()`; `getLastOffloadedLedgerId()`; both offload timestamp getters | Return `0`; F2 has no Pulsar offload domain and never reports a virtual ledger as offloaded.                                                                                                  |
+| `I`   | `getLastAddEntryTime()`                                                            | Local timestamp of the last successful append callback; `0` before the first local success.                                                                                                   |
+| `I`   | `getMetadataCreationTimestamp()`                                                   | Current projection incarnation `createdAtMillis`.                                                                                                                                             |
 
 ### 7.3 Lifecycle and compatibility state
 
-| Label | Exact method(s) | F2 contract |
-| --- | --- | --- |
-| `N` | `unfenceForInterceptorException()` | Inherited no-op is safe because F2 rejects interceptors at open. |
-| `I` | `terminate()`; `asyncTerminate(...)`; `isTerminated()` | Ordered append barrier, L0 `seal`, final LAC. Idempotent. |
-| `U` | `asyncMigrate()`; `isMigrated()` | Future fails; `isMigrated()` is false. Migration is not silently treated as termination. |
-| `I` | `close()`; `asyncClose(...)` | Local close only; accepted operations drain before resources are released. |
-| `I` | `delete()`; `asyncDelete(...)` | Logical L0 delete；on success close/release the local facade and remove its factory handle before completing the caller callback, so an immediate same-name open cannot reuse the deleted stream. No object is physically deleted. |
-| `U` | `offloadPrefix(...)`; `asyncOffloadPrefix(...)` | Checked throw or failure callback. Virtual IDs never reach an offloader. |
-| `I` | `getConfig()`; `setConfig(...)` | Retain/return the exact current config reference like stock. `setConfig` validates then atomically replaces the volatile reference. Each operation captures one immutable validated view before admission and never rereads the mutable object during that operation. |
-| `I` | `getLastConfirmedEntry()` | `(virtualLedgerId,-1)` only for a never-appended stream; otherwise `(virtualLedgerId, committedEndOffset-1)`, even after full trim. |
-| `I` | `readyToCreateNewLedger()` | No rollover. If there is no suspended/non-known attempt, atomically discard only the cached append session so the next append auto-acquires a fresh one. The void method does no remote IO and never clears `WRITE_FENCED`. |
-| `N` | `trimConsumedLedgersInBackground(CompletableFuture<?>)` | Complete the promise normally and increment a deferred-retention metric; F2 has no cursor-driven trim/physical GC. |
-| `N` | `rolloverCursorsInBackground()` | No durable cursor ledger exists in F2. |
-| `U` | `skipNonRecoverableLedger(long)` | Throw stable unsupported runtime exception; data loss is never converted into a position skip. |
-| `N` | `rollCurrentLedgerIfFull()`; `checkInactiveLedgerAndRollOver()` | No physical/virtual rollover; void method records a metric and check returns false. |
+| Label | Exact method(s)                                                 | F2 contract                                                                                                                                                                                                                                                           |
+|-------|-----------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `N`   | `unfenceForInterceptorException()`                              | Inherited no-op is safe because F2 rejects interceptors at open.                                                                                                                                                                                                      |
+| `I`   | `terminate()`; `asyncTerminate(...)`; `isTerminated()`          | Ordered append barrier, L0 `seal`, final LAC. Idempotent.                                                                                                                                                                                                             |
+| `U`   | `asyncMigrate()`; `isMigrated()`                                | Future fails; `isMigrated()` is false. Migration is not silently treated as termination.                                                                                                                                                                              |
+| `I`   | `close()`; `asyncClose(...)`                                    | Local close only; accepted operations drain before resources are released.                                                                                                                                                                                            |
+| `I`   | `delete()`; `asyncDelete(...)`                                  | Logical L0 delete；on success close/release the local facade and remove its factory handle before completing the caller callback, so an immediate same-name open cannot reuse the deleted stream. No object is physically deleted.                                     |
+| `U`   | `offloadPrefix(...)`; `asyncOffloadPrefix(...)`                 | Checked throw or failure callback. Virtual IDs never reach an offloader.                                                                                                                                                                                              |
+| `I`   | `getConfig()`; `setConfig(...)`                                 | Retain/return the exact current config reference like stock. `setConfig` validates then atomically replaces the volatile reference. Each operation captures one immutable validated view before admission and never rereads the mutable object during that operation. |
+| `I`   | `getLastConfirmedEntry()`                                       | `(virtualLedgerId,-1)` only for a never-appended stream; otherwise `(virtualLedgerId, committedEndOffset-1)`, even after full trim.                                                                                                                                   |
+| `I`   | `readyToCreateNewLedger()`                                      | No rollover. If there is no suspended/non-known attempt, atomically discard only the cached append session so the next append auto-acquires a fresh one. The void method does no remote IO and never clears `WRITE_FENCED`.                                           |
+| `N`   | `trimConsumedLedgersInBackground(CompletableFuture<?>)`         | Complete the promise normally and increment a deferred-retention metric; F2 has no cursor-driven trim/physical GC.                                                                                                                                                    |
+| `N`   | `rolloverCursorsInBackground()`                                 | No durable cursor ledger exists in F2.                                                                                                                                                                                                                                |
+| `U`   | `skipNonRecoverableLedger(long)`                                | Throw stable unsupported runtime exception; data loss is never converted into a position skip.                                                                                                                                                                        |
+| `N`   | `rollCurrentLedgerIfFull()`; `checkInactiveLedgerAndRollOver()` | No physical/virtual rollover; void method records a metric and check returns false.                                                                                                                                                                                   |
 
 ### 7.4 Properties, search, stats and navigation
 
-| Label | Exact method(s) | F2 contract |
-| --- | --- | --- |
-| `I` | `getProperties()`; all set/delete property sync/async methods | Topic projection property map；sync methods wait for the async metadata-deadline terminal without adding a second timer. `setProperties` replaces the entire user map. |
-| `U` | `asyncAddLedgerProperty`; `asyncRemoveLedgerProperty`; `asyncGetLedgerProperty` | Per-BookKeeper-ledger/offload properties are unsupported even when the ID matches the virtual ledger. |
-| `I` | `asyncFindPosition(Predicate<Entry>)` | Bounded newest-match scan used for sequence lookup: empty stream returns null, no match returns first available, a match returns its next valid position, and budget/read failure fails the future rather than fabricating null. |
-| `N` | `getManagedLedgerInterceptor()` | Return null because non-null configuration is rejected. |
-| `I` | `getLedgerInfo(long)`; `getOptionalLedgerInfo(long)` | Matching virtual ID returns the synthetic protobuf info; wrong ID returns `null`/empty exactly like stock lookup. |
-| `U` | `asyncTruncate()` | Failed future. Topic truncate requires cursor/retention semantics beyond F2. |
-| `I` | `getManagedLedgerInternalStats(boolean)` | Populate Nereus values and one virtual ledger; BookKeeper ensemble metadata is null and under-replicated is false. |
-| `N` | `checkCursorsToCacheEntries()` | Deliberate no-op with metric because F2 cache capacity is zero. |
-| `D` | `getManagedLedgerAttributes()` | Locked default is safe and creates only metrics attributes. |
-| `I` | `asyncReadEntry(...)` | Exact one-entry L0 read; sentinels/future/trimmed positions fail through callback. |
-| `I` | `getLedgersInfo()` | Immutable sorted map with exactly the current virtual ledger. |
-| `I` | `getNextValidPosition(...)`; `getPreviousPosition(...)` | Dense one-ledger formula, clipped to `beforeFirstAvailable` and `onePastLast`. |
-| `I` | `getPositionAfterN(...)` | Checked arithmetic, correct `PositionBound`, clamp to LAC. |
-| `I` | `getPendingAddEntriesCount()` | Accepted but not terminal append operations. |
-| `N` | `getCacheSize()` | Zero under the F2 cache policy. |
-| `I` | `getLastDispatchablePosition(...)` | LAC for an unconditional predicate; otherwise bounded backward scan. Never inherit the default `EARLIEST`. |
-| `I` | `getFirstPosition()` | `beforeFirstAvailable == (virtualLedgerId, trimOffset-1)`. |
-| `I` | `getStats()` | Nereus `ManagedLedgerMXBean`; no BookKeeper pending-op claims. |
-| `I` | `getSlowestConsumer()` | Lowest local mark-delete among durable-boundary cursors; null when none. |
+| Label | Exact method(s)                                                                 | F2 contract                                                                                                                                                                                                                      |
+|-------|---------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `I`   | `getProperties()`; all set/delete property sync/async methods                   | Topic projection property map；sync methods wait for the async metadata-deadline terminal without adding a second timer. `setProperties` replaces the entire user map.                                                            |
+| `U`   | `asyncAddLedgerProperty`; `asyncRemoveLedgerProperty`; `asyncGetLedgerProperty` | Per-BookKeeper-ledger/offload properties are unsupported even when the ID matches the virtual ledger.                                                                                                                            |
+| `I`   | `asyncFindPosition(Predicate<Entry>)`                                           | Bounded newest-match scan used for sequence lookup: empty stream returns null, no match returns first available, a match returns its next valid position, and budget/read failure fails the future rather than fabricating null. |
+| `N`   | `getManagedLedgerInterceptor()`                                                 | Return null because non-null configuration is rejected.                                                                                                                                                                          |
+| `I`   | `getLedgerInfo(long)`; `getOptionalLedgerInfo(long)`                            | Matching virtual ID returns the synthetic protobuf info; wrong ID returns `null`/empty exactly like stock lookup.                                                                                                                |
+| `U`   | `asyncTruncate()`                                                               | Failed future. Topic truncate requires cursor/retention semantics beyond F2.                                                                                                                                                     |
+| `I`   | `getManagedLedgerInternalStats(boolean)`                                        | Populate Nereus values and one virtual ledger; BookKeeper ensemble metadata is null and under-replicated is false.                                                                                                               |
+| `N`   | `checkCursorsToCacheEntries()`                                                  | Deliberate no-op with metric because F2 cache capacity is zero.                                                                                                                                                                  |
+| `D`   | `getManagedLedgerAttributes()`                                                  | Locked default is safe and creates only metrics attributes.                                                                                                                                                                      |
+| `I`   | `asyncReadEntry(...)`                                                           | Exact one-entry L0 read; sentinels/future/trimmed positions fail through callback.                                                                                                                                               |
+| `I`   | `getLedgersInfo()`                                                              | Immutable sorted map with exactly the current virtual ledger.                                                                                                                                                                    |
+| `I`   | `getNextValidPosition(...)`; `getPreviousPosition(...)`                         | Dense one-ledger formula, clipped to `beforeFirstAvailable` and `onePastLast`.                                                                                                                                                   |
+| `I`   | `getPositionAfterN(...)`                                                        | Checked arithmetic, correct `PositionBound`, clamp to LAC.                                                                                                                                                                       |
+| `I`   | `getPendingAddEntriesCount()`                                                   | Accepted but not terminal append operations.                                                                                                                                                                                     |
+| `N`   | `getCacheSize()`                                                                | Zero under the F2 cache policy.                                                                                                                                                                                                  |
+| `I`   | `getLastDispatchablePosition(...)`                                              | LAC for an unconditional predicate; otherwise bounded backward scan. Never inherit the default `EARLIEST`.                                                                                                                       |
+| `I`   | `getFirstPosition()`                                                            | `beforeFirstAvailable == (virtualLedgerId, trimOffset-1)`.                                                                                                                                                                       |
+| `I`   | `getStats()`                                                                    | Nereus `ManagedLedgerMXBean`; no BookKeeper pending-op claims.                                                                                                                                                                   |
+| `I`   | `getSlowestConsumer()`                                                          | Lowest local mark-delete among durable-boundary cursors; null when none.                                                                                                                                                         |
 
 `getLedgerInfo`、`getOptionalLedgerInfo` and `getLedgersInfo` return the generated protobuf
 `MLDataFormats.ManagedLedgerInfo.LedgerInfo`，whose exact builder surface includes `properties`:
@@ -856,12 +857,12 @@ that these local values survived restart.
 
 ### 8.1 ReadOnlyManagedLedger
 
-| Label | Exact method | F2 contract |
-| --- | --- | --- |
-| `I` | `asyncReadEntry(...)` | Same direct-read core as writable facade. |
-| `I` | `getNumberOfEntries()` | Retained entry count from refreshed snapshot. |
-| `I` | `createReadOnlyCursor(Position)` | Position is the next entry to read; `EARLIEST` becomes `trimOffset`, `LATEST` becomes `committedEndOffset`. |
-| `I` | `getProperties()` | Immutable snapshot from the latest validated projection-property cache. |
+| Label | Exact method                     | F2 contract                                                                                                 |
+|-------|----------------------------------|-------------------------------------------------------------------------------------------------------------|
+| `I`   | `asyncReadEntry(...)`            | Same direct-read core as writable facade.                                                                   |
+| `I`   | `getNumberOfEntries()`           | Retained entry count from refreshed snapshot.                                                               |
+| `I`   | `createReadOnlyCursor(Position)` | Position is the next entry to read; `EARLIEST` becomes `trimOffset`, `LATEST` becomes `committedEndOffset`. |
+| `I`   | `getProperties()`                | Immutable snapshot from the latest validated projection-property cache.                                     |
 
 ### 8.2 ReadOnlyCursor
 
@@ -894,30 +895,30 @@ The facade never returns an `Entry` backed by caller-owned append memory.
 
 Three classes intentionally expose different durability:
 
-| Type | Interface | Durable truth |
-| --- | --- | --- |
-| `NereusReadOnlyCursor` | `ReadOnlyCursor` | none; local next-read position |
-| `NereusNonDurableCursor` | `ManagedCursor` | none; local read/mark-delete/properties |
-| `NereusManagedCursorBoundary` | `ManagedCursor` | initial identity only; no successful durable mutation until F3 |
+| Type                          | Interface        | Durable truth                                                  |
+|-------------------------------|------------------|----------------------------------------------------------------|
+| `NereusReadOnlyCursor`        | `ReadOnlyCursor` | none; local next-read position                                 |
+| `NereusNonDurableCursor`      | `ManagedCursor`  | none; local read/mark-delete/properties                        |
+| `NereusManagedCursorBoundary` | `ManagedCursor`  | initial identity only; no successful durable mutation until F3 |
 
 Together the two `ManagedCursor` implementations assign all 89 locked methods plus the interface constant; no
 default is inherited without an `I/L/N/U/D` decision.
 
 ### 9.1 Identity, properties and reads
 
-| Exact method group | Non-durable | Durable boundary |
-| --- | --- | --- |
-| `getName`, `getLastActive`, `updateLastActive` | `L`: local clock/state | `L`: local clock/state |
-| `getProperties`, `getCursorProperties` | `L`: immutable snapshots | initial snapshots only |
-| `put/removeProperty` | local update, boolean success | return false |
-| `put/set/removeCursorProperty` | local completed future | failed future (`U`) |
-| all `readEntries` overloads | `I` | `I` |
-| `asyncReadEntriesWithSkip` | evaluate the exact `Predicate<Position>` before L0 IO；a skipped coordinate advances locally without allocating or releasing an `Entry` | same |
-| `getNthEntry` / `asyncGetNthEntry` | require `n > 0`; non-mutating 1-based read after local mark-delete; return success with null when fewer than `n` entries remain | same; Include/Exclude individual-deleted modes are equal because F2 has no ack holes |
-| all `readEntriesOrWait` overloads | `I` | `I` |
-| both `asyncReadEntriesWithSkipOrWait` overloads | same pre-IO `Predicate<Position>` rule；if every currently visible coordinate is skipped, install/recheck the waiter at the resulting next offset | same |
-| `cancelPendingReadRequest` | atomically remove without invoking callback; return true only when this call removed a live waiter | same |
-| `hasMoreEntries`, count/backlog methods | exact dense-offset formulas | exact dense-offset formulas |
+| Exact method group                              | Non-durable                                                                                                                                      | Durable boundary                                                                     |
+|-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| `getName`, `getLastActive`, `updateLastActive`  | `L`: local clock/state                                                                                                                           | `L`: local clock/state                                                               |
+| `getProperties`, `getCursorProperties`          | `L`: immutable snapshots                                                                                                                         | initial snapshots only                                                               |
+| `put/removeProperty`                            | local update, boolean success                                                                                                                    | return false                                                                         |
+| `put/set/removeCursorProperty`                  | local completed future                                                                                                                           | failed future (`U`)                                                                  |
+| all `readEntries` overloads                     | `I`                                                                                                                                              | `I`                                                                                  |
+| `asyncReadEntriesWithSkip`                      | evaluate the exact `Predicate<Position>` before L0 IO；a skipped coordinate advances locally without allocating or releasing an `Entry`           | same                                                                                 |
+| `getNthEntry` / `asyncGetNthEntry`              | require `n > 0`; non-mutating 1-based read after local mark-delete; return success with null when fewer than `n` entries remain                  | same; Include/Exclude individual-deleted modes are equal because F2 has no ack holes |
+| all `readEntriesOrWait` overloads               | `I`                                                                                                                                              | `I`                                                                                  |
+| both `asyncReadEntriesWithSkipOrWait` overloads | same pre-IO `Predicate<Position>` rule；if every currently visible coordinate is skipped, install/recheck the waiter at the resulting next offset | same                                                                                 |
+| `cancelPendingReadRequest`                      | atomically remove without invoking callback; return true only when this call removed a live waiter                                               | same                                                                                 |
+| `hasMoreEntries`, count/backlog methods         | exact dense-offset formulas                                                                                                                      | exact dense-offset formulas                                                          |
 
 `readEntriesOrWait` allows at most one pending waiter. A second request fails with
 `ConcurrentWaitCallbackException`. Cursor close fails the installed waiter once with
@@ -926,45 +927,45 @@ does not invoke it.
 
 ### 9.2 Progress and position mutation
 
-| Exact method group | Non-durable | Durable boundary |
-| --- | --- | --- |
-| all `markDelete` overloads | local cumulative mark-delete, reject ack-set/partial-batch extensions | failure (`U`) |
-| `delete(Position/Iterable)` and async variants | failure (`U`); individual ack holes are F3 | failure (`U`) |
-| `getReadPosition`, `getMarkDeletedPosition` | local values | local values |
-| `getPersistentMarkDeletedPosition` | null | null; F2 has persisted no cursor progress |
-| `rewind`, `rewind(boolean)` | reset to next retained offset after local mark-delete; reject `readCompacted=true` | same local read-position behavior |
-| `seek(Position[,force])` | direct read-position update with no `+1`; when force is false clamp to next after local mark-delete | same; does not change ack truth |
-| `clearBacklog` / async | local mark-delete to current LAC | failure (`U`) |
-| `skipEntries` / async | local next-read advance | same |
-| `resetCursor` / async | Position is direct read target; normalize `EARLIEST`/`LATEST` and trimmed/future targets, set mark-delete to the previous retained coordinate; force cannot resurrect trimmed F2 bytes | failure (`U`) |
-| replay overloads | synchronously return positions at/below local mark-delete as skipped, asynchronously reread every other retained position, honor `sortEntries`, and fail callback on a wrong/trimmed/future position | same; no individual ack-hole inference |
+| Exact method group                             | Non-durable                                                                                                                                                                                          | Durable boundary                          |
+|------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| all `markDelete` overloads                     | local cumulative mark-delete, reject ack-set/partial-batch extensions                                                                                                                                | failure (`U`)                             |
+| `delete(Position/Iterable)` and async variants | failure (`U`); individual ack holes are F3                                                                                                                                                           | failure (`U`)                             |
+| `getReadPosition`, `getMarkDeletedPosition`    | local values                                                                                                                                                                                         | local values                              |
+| `getPersistentMarkDeletedPosition`             | null                                                                                                                                                                                                 | null; F2 has persisted no cursor progress |
+| `rewind`, `rewind(boolean)`                    | reset to next retained offset after local mark-delete; reject `readCompacted=true`                                                                                                                   | same local read-position behavior         |
+| `seek(Position[,force])`                       | direct read-position update with no `+1`; when force is false clamp to next after local mark-delete                                                                                                  | same; does not change ack truth           |
+| `clearBacklog` / async                         | local mark-delete to current LAC                                                                                                                                                                     | failure (`U`)                             |
+| `skipEntries` / async                          | local next-read advance                                                                                                                                                                              | same                                      |
+| `resetCursor` / async                          | Position is direct read target; normalize `EARLIEST`/`LATEST` and trimmed/future targets, set mark-delete to the previous retained coordinate; force cannot resurrect trimmed F2 bytes               | failure (`U`)                             |
+| replay overloads                               | synchronously return positions at/below local mark-delete as skipped, asynchronously reread every other retained position, honor `sortEntries`, and fail callback on a wrong/trimmed/future position | same; no individual ack-hole inference    |
 
 ### 9.3 Search, lifecycle and stats
 
-| Exact method group | F2 contract |
-| --- | --- |
-| all `findNewestMatching` overloads | Bounded scan. `isFindFromLedger` has identical behavior because the Pulsar entry cache is zero-capacity. Range overload honors both endpoints. |
-| default `scan(...)` | Override with bounded forward scan: `COMPLETED` at end, `ABORTED` on timeout/entry budget, `USER_INTERRUPTED` when predicate stops; only validation/read/storage errors fail the future. |
-| `close`, `asyncClose`, `isClosed` | Idempotent local close; close fails an installed waiter once. |
-| `getFirstPosition` | Ledger `beforeFirstAvailable`. |
-| active/inactive methods | Local atomic flag; `setAlwaysInactive` is terminal inactive. |
-| `isDurable` | false for non-durable, true for durable boundary. |
-| ack-range counts/serialized size | zero; F2 creates no individual ranges. |
-| `getEstimatedSizeSinceMarkDeletePosition` | Stock-style average-size estimate. |
-| `skipNonRecoverableLedger` | Explicit unsupported runtime failure. |
-| throttle getters/setter | Local validated value; it does not make durable mark-delete supported. |
-| `getManagedLedger` | Owning facade identity. |
-| `getLastIndividualDeletedRange` | null. |
-| `trimDeletedEntries` | Release/remove only entries at or below local mark-delete; no individual holes. |
-| batch-index ack getters | null; empty arrays would incorrectly claim a present empty ack set. |
-| `getStats`, `getCursorStats`, attributes | Nereus/local stats; cursor-ledger IDs are `-1`. |
-| `checkAndUpdateReadPositionChanged` | Atomic compare/update of the stats snapshot. |
-| `isCursorDataFullyPersistable` | true for non-durable; false for durable boundary until F3. |
-| `periodicRollover` | false. |
-| `isMessageDeleted` | true at/below local mark-delete, false above it. |
-| `duplicateNonDurableCursor` | New local cursor with copied positions/properties, no shared waiter. |
-| `applyMaxSizeCap` | Estimate a count but return at least one when `maxEntries > 0`. |
-| `updateReadStats` | Add to local counters with overflow saturation for metrics only. |
+| Exact method group                        | F2 contract                                                                                                                                                                              |
+|-------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| all `findNewestMatching` overloads        | Bounded scan. `isFindFromLedger` has identical behavior because the Pulsar entry cache is zero-capacity. Range overload honors both endpoints.                                           |
+| default `scan(...)`                       | Override with bounded forward scan: `COMPLETED` at end, `ABORTED` on timeout/entry budget, `USER_INTERRUPTED` when predicate stops; only validation/read/storage errors fail the future. |
+| `close`, `asyncClose`, `isClosed`         | Idempotent local close; close fails an installed waiter once.                                                                                                                            |
+| `getFirstPosition`                        | Ledger `beforeFirstAvailable`.                                                                                                                                                           |
+| active/inactive methods                   | Local atomic flag; `setAlwaysInactive` is terminal inactive.                                                                                                                             |
+| `isDurable`                               | false for non-durable, true for durable boundary.                                                                                                                                        |
+| ack-range counts/serialized size          | zero; F2 creates no individual ranges.                                                                                                                                                   |
+| `getEstimatedSizeSinceMarkDeletePosition` | Stock-style average-size estimate.                                                                                                                                                       |
+| `skipNonRecoverableLedger`                | Explicit unsupported runtime failure.                                                                                                                                                    |
+| throttle getters/setter                   | Local validated value; it does not make durable mark-delete supported.                                                                                                                   |
+| `getManagedLedger`                        | Owning facade identity.                                                                                                                                                                  |
+| `getLastIndividualDeletedRange`           | null.                                                                                                                                                                                    |
+| `trimDeletedEntries`                      | Release/remove only entries at or below local mark-delete; no individual holes.                                                                                                          |
+| batch-index ack getters                   | null; empty arrays would incorrectly claim a present empty ack set.                                                                                                                      |
+| `getStats`, `getCursorStats`, attributes  | Nereus/local stats; cursor-ledger IDs are `-1`.                                                                                                                                          |
+| `checkAndUpdateReadPositionChanged`       | Atomic compare/update of the stats snapshot.                                                                                                                                             |
+| `isCursorDataFullyPersistable`            | true for non-durable; false for durable boundary until F3.                                                                                                                               |
+| `periodicRollover`                        | false.                                                                                                                                                                                   |
+| `isMessageDeleted`                        | true at/below local mark-delete, false above it.                                                                                                                                         |
+| `duplicateNonDurableCursor`               | New local cursor with copied positions/properties, no shared waiter.                                                                                                                     |
+| `applyMaxSizeCap`                         | Estimate a count but return at least one when `maxEntries > 0`.                                                                                                                          |
+| `updateReadStats`                         | Add to local counters with overflow saturation for metrics only.                                                                                                                         |
 
 ## 10. One-entry Read Loop
 
@@ -1027,18 +1028,18 @@ explicitly because no Nereus path may call them.
 
 All locked cache methods have concrete behavior:
 
-| Type / method group | Contract |
-| --- | --- |
-| manager `getEntryCache(ml)` | Null-check; return one stable zero cache by exact ledger name while that facade is live. |
-| manager `removeEntryCache(name)` / `clear()` | Remove local compatibility objects only; never close a ledger or L0 cache. |
-| manager `getSize()` / `getMaxSize()` | Always `0`. |
-| manager `updateCacheSizeAndThreshold(maxSize)` | Reject negative; record requested value for diagnostics but keep effective max at zero. |
-| manager watermark update/get | Require finite `0.0 < value <= 1.0`, store/return compatibility value; it cannot enable caching. |
-| manager `doCacheEviction()` | No-op plus invocation metric; there are no entries. |
-| both manager TTL-extension updates | Validate nonnegative max-times/store boolean for config observability; no cache behavior changes. |
-| cache `getName()` / `getSize()` | Exact managed-ledger name / `0`. |
-| cache `insert(entry)` | Null-check and return false without retaining or releasing caller-owned entry. |
-| cache invalidation / `clear()` | Validate non-null position where applicable, otherwise no-op. |
+| Type / method group                                 | Contract                                                                                                                   |
+|-----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| manager `getEntryCache(ml)`                         | Null-check; return one stable zero cache by exact ledger name while that facade is live.                                   |
+| manager `removeEntryCache(name)` / `clear()`        | Remove local compatibility objects only; never close a ledger or L0 cache.                                                 |
+| manager `getSize()` / `getMaxSize()`                | Always `0`.                                                                                                                |
+| manager `updateCacheSizeAndThreshold(maxSize)`      | Reject negative; record requested value for diagnostics but keep effective max at zero.                                    |
+| manager watermark update/get                        | Require finite `0.0 < value <= 1.0`, store/return compatibility value; it cannot enable caching.                           |
+| manager `doCacheEviction()`                         | No-op plus invocation metric; there are no entries.                                                                        |
+| both manager TTL-extension updates                  | Validate nonnegative max-times/store boolean for config observability; no cache behavior changes.                          |
+| cache `getName()` / `getSize()`                     | Exact managed-ledger name / `0`.                                                                                           |
+| cache `insert(entry)`                               | Null-check and return false without retaining or releasing caller-owned entry.                                             |
+| cache invalidation / `clear()`                      | Validate non-null position where applicable, otherwise no-op.                                                              |
 | both cache `asyncReadEntry(ReadHandle,...)` methods | Do not inspect/call the handle; fail the supplied callback once with `NEREUS_UNSUPPORTED_OPERATION:cache-bookkeeper-read`. |
 
 The manager's per-ledger map is bounded by the factory handle limit and entries are removed on writable close /
@@ -1114,16 +1115,16 @@ Read ownership:
 
 ## 13. Append Outcome Mapping
 
-| L0 result | Facade behavior |
-| --- | --- |
-| normal `AppendResult` | validate one-entry result and `addComplete` |
-| `KNOWN_NOT_COMMITTED` | `addFailed` with mapped exception |
-| `KNOWN_COMMITTED` + attempt ID | call `recoverAppend`; success becomes `addComplete` |
-| `MAY_HAVE_COMMITTED` + attempt ID | call `recoverAppend`; do not submit another physical append |
-| recovery proves `KNOWN_NOT_COMMITTED` | fail the callback if it is still pending; release the exact attempt/lane and clear the local fence without a second callback |
-| recovery deadline expires retryably uncertain | one failure callback and transition facade to `WRITE_FENCED`; background single-flight exact recovery continues |
-| permanent recovery invariant/corruption | fail once if still pending, stop retrying and leave this facade permanently `WRITE_FENCED` |
-| non-known outcome without attempt ID | invariant violation and permanent `WRITE_FENCED` |
+| L0 result                                     | Facade behavior                                                                                                              |
+|-----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| normal `AppendResult`                         | validate one-entry result and `addComplete`                                                                                  |
+| `KNOWN_NOT_COMMITTED`                         | `addFailed` with mapped exception                                                                                            |
+| `KNOWN_COMMITTED` + attempt ID                | call `recoverAppend`; success becomes `addComplete`                                                                          |
+| `MAY_HAVE_COMMITTED` + attempt ID             | call `recoverAppend`; do not submit another physical append                                                                  |
+| recovery proves `KNOWN_NOT_COMMITTED`         | fail the callback if it is still pending; release the exact attempt/lane and clear the local fence without a second callback |
+| recovery deadline expires retryably uncertain | one failure callback and transition facade to `WRITE_FENCED`; background single-flight exact recovery continues              |
+| permanent recovery invariant/corruption       | fail once if still pending, stop retrying and leave this facade permanently `WRITE_FENCED`                                   |
+| non-known outcome without attempt ID          | invariant violation and permanent `WRITE_FENCED`                                                                             |
 
 The facade never derives success merely from `committedEndOffset` advancing, because another fenced/renewed writer may
 have committed that range.
@@ -1182,7 +1183,7 @@ integration case to its owning milestone and final composition：
    `KNOWN_NOT_COMMITTED` releases the suspended lane without issuing a second callback, while a permanent invariant
    leaves that facade fenced；
 10. replay recovery older than one commit-scan page advances an anchored continuation, waits for the original mutation
-   runner to quiesce and never falsely proves non-commit while a late original CAS can still land；
+    runner to quiesce and never falsely proves non-commit while a late original CAS can still land；
 11. zero-capacity cache paths never receive a virtual ID as a BookKeeper handle/ledger ID；
 12. all callback and `ByteBuf` race tests finish with one terminal signal and zero facade-owned leaked references；
     tests whose callback throws must explicitly release any entry ownership they accepted；

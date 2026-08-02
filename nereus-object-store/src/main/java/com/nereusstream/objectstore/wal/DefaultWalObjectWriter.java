@@ -23,8 +23,6 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
-import com.nereusstream.api.PayloadFormat;
-import com.nereusstream.api.SchemaRef;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.api.keys.KeyComponentCodec;
@@ -34,7 +32,6 @@ import com.nereusstream.objectstore.PutObjectAttemptGuard;
 import com.nereusstream.objectstore.PutObjectOptions;
 import com.nereusstream.objectstore.PutObjectResult;
 import java.io.ByteArrayOutputStream;
-import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -70,10 +67,8 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
         Objects.requireNonNull(request, "request");
         try {
             LayoutPlan plan = plan(request);
-            WalObjectLayout.EncodedObject encoded = WalObjectLayout.encodeObject(
-                    plan.sections(),
-                    plan.footerOffset(),
-                    plan.footerLength());
+            WalObjectLayout.EncodedObject encoded =
+                    WalObjectLayout.encodeObject(plan.sections(), plan.footerOffset(), plan.footerLength());
             WalWriteResult result = new WalWriteResult(
                     plan.objectId(),
                     plan.objectKey(),
@@ -85,7 +80,8 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
                     writerVersion,
                     plan.createdAtMillis(),
                     plan.writtenSlices());
-            return new PreparedWalObject(result, encoded.bytes(), request.options().uploadTimeout());
+            return new PreparedWalObject(
+                    result, encoded.bytes(), request.options().uploadTimeout());
         } catch (NereusException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -97,35 +93,29 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
     public CompletableFuture<WalWriteResult> upload(PreparedWalObject preparedObject) {
         Objects.requireNonNull(preparedObject, "preparedObject");
         WalWriteResult result = preparedObject.result();
-        return objectStore.putObject(
-                        result.objectKey(),
-                        preparedObject.payload(),
-                        putOptions(preparedObject))
+        return objectStore
+                .putObject(result.objectKey(), preparedObject.payload(), putOptions(preparedObject))
                 .thenApply(putResult -> verifyPutResult(result, putResult))
                 .exceptionally(DefaultWalObjectWriter::unwrapCompletionException);
     }
 
     @Override
     public CompletableFuture<WalWriteResult> upload(
-            PreparedWalObject preparedObject,
-            PutObjectAttemptGuard attemptGuard) {
+            PreparedWalObject preparedObject, PutObjectAttemptGuard attemptGuard) {
         Objects.requireNonNull(preparedObject, "preparedObject");
         Objects.requireNonNull(attemptGuard, "attemptGuard");
         WalWriteResult result = preparedObject.result();
         PutObjectOptions options = putOptions(preparedObject);
-        ByteBufferObjectUpload source = new ByteBufferObjectUpload(
-                preparedObject.payload());
+        ByteBufferObjectUpload source = new ByteBufferObjectUpload(preparedObject.payload());
         CompletableFuture<PutObjectResult> upload;
         try {
-            upload = objectStore.putObject(
-                    result.objectKey(), source, options, attemptGuard);
+            upload = objectStore.putObject(result.objectKey(), source, options, attemptGuard);
         } catch (Throwable failure) {
             source.close();
             return CompletableFuture.failedFuture(failure);
         }
         upload.whenComplete((ignored, failure) -> source.close());
-        return upload
-                .thenApply(putResult -> verifyPutResult(result, putResult))
+        return upload.thenApply(putResult -> verifyPutResult(result, putResult))
                 .exceptionally(DefaultWalObjectWriter::unwrapCompletionException);
     }
 
@@ -144,7 +134,11 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
             throw failure(ErrorCode.UNSUPPORTED_FORMAT, false, "Phase 1 supports only CompressionType.NONE");
         }
         if (request.options().forceSingleStreamObject()
-                && request.slices().stream().map(WalStreamSliceInput::streamId).distinct().count() > 1) {
+                && request.slices().stream()
+                                .map(WalStreamSliceInput::streamId)
+                                .distinct()
+                                .count()
+                        > 1) {
             throw failure(ErrorCode.INVALID_ARGUMENT, false, "forceSingleStreamObject rejects multiple stream ids");
         }
         Instant now = clock.instant();
@@ -153,10 +147,11 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
         ObjectId objectId = new ObjectId("wo-" + OBJECT_TIME.format(now) + "-"
                 + writerIdHash + "-" + request.writerRunIdHash() + "-"
                 + KeyComponentCodec.encodeNonNegativeLong(sequence));
-        ObjectKey objectKey = WalObjectKeys.objectKey(
-                request.cluster(), writerIdHash, request.writerRunIdHash(), objectId, now);
+        ObjectKey objectKey =
+                WalObjectKeys.objectKey(request.cluster(), writerIdHash, request.writerRunIdHash(), objectId, now);
         List<WalStreamSliceInput> sortedInputs = request.slices().stream()
-                .sorted(Comparator.comparing((WalStreamSliceInput input) -> input.streamId().value()))
+                .sorted(Comparator.comparing(
+                        (WalStreamSliceInput input) -> input.streamId().value()))
                 .toList();
         List<PreparedSlice> preparedSlices = new ArrayList<>();
         for (int ordinal = 0; ordinal < sortedInputs.size(); ordinal++) {
@@ -184,11 +179,10 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
                 preparedSlices.size(),
                 minEventTime,
                 maxEventTime);
-        List<StreamSliceDescriptor> placeholderDescriptors = preparedSlices.stream()
-                .map(slice -> slice.descriptor(0, 0))
-                .toList();
-        int directoryLength = WalObjectLayout.sectionEncodedLength(
-                WalObjectLayout.encodeSliceDirectory(placeholderDescriptors));
+        List<StreamSliceDescriptor> placeholderDescriptors =
+                preparedSlices.stream().map(slice -> slice.descriptor(0, 0)).toList();
+        int directoryLength =
+                WalObjectLayout.sectionEncodedLength(WalObjectLayout.encodeSliceDirectory(placeholderDescriptors));
         long offset = WalObjectLayout.COMMON_HEADER_LENGTH;
         offset = checkedAdd(offset, WalObjectLayout.sectionEncodedLength(headerPayload));
         offset = checkedAdd(offset, directoryLength);
@@ -261,11 +255,7 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
                 writtenSlices);
     }
 
-    private PreparedSlice prepareSlice(
-            ObjectId objectId,
-            long writerEpoch,
-            int ordinal,
-            WalStreamSliceInput input) {
+    private PreparedSlice prepareSlice(ObjectId objectId, long writerEpoch, int ordinal, WalStreamSliceInput input) {
         AppendBatch batch = input.batch();
         ByteArrayOutputStream payload = new ByteArrayOutputStream();
         List<EntryIndexItem> items = new ArrayList<>();
@@ -306,7 +296,8 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
 
     private WalWriteResult verifyPutResult(WalWriteResult result, PutObjectResult putResult) {
         if (!putResult.checksum().equals(result.storageChecksum())) {
-            throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "object store returned mismatched storage checksum");
+            throw failure(
+                    ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "object store returned mismatched storage checksum");
         }
         if (putResult.objectLength() != result.objectLength()) {
             throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "object store returned mismatched object length");

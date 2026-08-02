@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Stable on-wire kind identifiers for recoverable protection intents. */
+/**
+ * Stable on-wire kind identifiers for recoverable protection intents.
+ */
 public enum CursorProtectionKind {
     CREATE(1),
     RECREATE(2),

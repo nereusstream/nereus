@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.Checksum;
@@ -9,7 +10,9 @@ import com.nereusstream.api.ResolvedRange;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Exact durable index identity admitted for one physical read attempt. */
+/**
+ * Exact durable index identity admitted for one physical read attempt.
+ */
 public record GenerationReadCandidate(
         ReadView view,
         ResolvedRange resolvedRange,
@@ -32,8 +35,7 @@ public record GenerationReadCandidate(
         publicationId = Objects.requireNonNull(publicationId, "publicationId");
         if (generationZero) {
             if (resolvedRange.generation() != 0 || publicationId.isPresent()) {
-                throw new IllegalArgumentException(
-                        "generation-zero candidate cannot carry higher-generation identity");
+                throw new IllegalArgumentException("generation-zero candidate cannot carry higher-generation identity");
             }
         } else if (resolvedRange.generation() <= 0 || publicationId.isEmpty()) {
             throw new IllegalArgumentException(

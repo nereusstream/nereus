@@ -15,9 +15,8 @@
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
-import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.AppendOutcome;
+import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -35,8 +34,8 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
-import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.keys.DeterministicIds;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
@@ -75,8 +74,7 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
     private static final ProjectionPublishGuard ALLOW_PUBLISH = () -> CompletableFuture.completedFuture(null);
 
     @Container
-    private static final OxiaContainer OXIA =
-            new OxiaContainer(DockerImageName.parse(IMAGE)).withShards(4);
+    private static final OxiaContainer OXIA = new OxiaContainer(DockerImageName.parse(IMAGE)).withShards(4);
 
     @Test
     void sharedRuntimeProjectionContractSurvivesRepairRecreationAndRestart() throws Exception {
@@ -92,46 +90,65 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
                                 config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC())) {
             ProjectionCreateRequest firstRequest = projectionRequest(l0, cluster, managedLedgerName, 3, 1);
             List<CompletableFuture<TopicProjectionRecord>> firstCreates = IntStream.range(0, 16)
-                    .mapToObj(ignored -> projection.createFirstProjection(
-                            cluster, firstRequest, ALLOW_PUBLISH))
+                    .mapToObj(ignored -> projection.createFirstProjection(cluster, firstRequest, ALLOW_PUBLISH))
                     .toList();
-            CompletableFuture.allOf(firstCreates.toArray(CompletableFuture[]::new)).join();
+            CompletableFuture.allOf(firstCreates.toArray(CompletableFuture[]::new))
+                    .join();
             TopicProjectionRecord first = firstCreates.getFirst().join();
-            assertThat(firstCreates).allSatisfy(future -> assertThat(future.join()).isEqualTo(first));
+            assertThat(firstCreates)
+                    .allSatisfy(future -> assertThat(future.join()).isEqualTo(first));
 
             ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(cluster);
             StreamId firstStreamId = new StreamId(first.streamId());
             try (var raw = OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
                 raw.delete(
                         keyspace.positionIndexKey(firstStreamId),
-                        Set.of(DeleteOption.PartitionKey(keyspace.streamPartitionKey(firstStreamId).value())));
+                        Set.of(DeleteOption.PartitionKey(
+                                keyspace.streamPartitionKey(firstStreamId).value())));
             }
             assertThat(projection.repairProjectionIndexes(cluster, first).join())
                     .isEqualTo(new ProjectionRepairResult(
-                            ProjectionRepairStatus.ALREADY_VALID,
-                            ProjectionRepairStatus.CREATED));
+                            ProjectionRepairStatus.ALREADY_VALID, ProjectionRepairStatus.CREATED));
 
-            TopicProjectionRecord deleting = projection.mirrorFacadeState(
-                    cluster, managedLedgerName, first.projectionIdentity(), first.metadataVersion(),
-                    ManagedLedgerFacadeState.DELETING).join();
-            TopicProjectionRecord deleted = projection.mirrorFacadeState(
-                    cluster, managedLedgerName, deleting.projectionIdentity(), deleting.metadataVersion(),
-                    ManagedLedgerFacadeState.DELETED).join();
+            TopicProjectionRecord deleting = projection
+                    .mirrorFacadeState(
+                            cluster,
+                            managedLedgerName,
+                            first.projectionIdentity(),
+                            first.metadataVersion(),
+                            ManagedLedgerFacadeState.DELETING)
+                    .join();
+            TopicProjectionRecord deleted = projection
+                    .mirrorFacadeState(
+                            cluster,
+                            managedLedgerName,
+                            deleting.projectionIdentity(),
+                            deleting.metadataVersion(),
+                            ManagedLedgerFacadeState.DELETED)
+                    .join();
             ProjectionCreateRequest nextRequest = projectionRequest(l0, cluster, managedLedgerName, 4, 2);
             List<CompletableFuture<TopicProjectionRecord>> recreations = IntStream.range(0, 12)
                     .mapToObj(ignored -> projection.recreateDeletedProjection(
-                            cluster, deleted.projectionIdentity(), deleted.metadataVersion(), nextRequest,
+                            cluster,
+                            deleted.projectionIdentity(),
+                            deleted.metadataVersion(),
+                            nextRequest,
                             ALLOW_PUBLISH))
                     .toList();
-            CompletableFuture.allOf(recreations.toArray(CompletableFuture[]::new)).join();
+            CompletableFuture.allOf(recreations.toArray(CompletableFuture[]::new))
+                    .join();
             recreated = recreations.getFirst().join();
-            assertThat(recreations).allSatisfy(future -> assertThat(future.join()).isEqualTo(recreated));
+            assertThat(recreations)
+                    .allSatisfy(future -> assertThat(future.join()).isEqualTo(recreated));
             assertThat(recreated.incarnation()).isEqualTo(2);
             assertThat(recreated.streamId()).isNotEqualTo(first.streamId());
             assertThat(recreated.virtualLedgerId()).isNotEqualTo(first.virtualLedgerId());
 
             projection.close();
-            assertThat(l0.getStreamSnapshot(cluster, new StreamId(recreated.streamId())).join().metadata().state())
+            assertThat(l0.getStreamSnapshot(cluster, new StreamId(recreated.streamId()))
+                            .join()
+                            .metadata()
+                            .state())
                     .isEqualTo(StreamState.ACTIVE.name());
         }
 
@@ -139,13 +156,12 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
                 ManagedLedgerProjectionMetadataStore restarted =
                         ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                                 config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC())) {
-            TopicProjectionRecord recovered = restarted.getProjection(cluster, managedLedgerName)
-                    .join().orElseThrow();
+            TopicProjectionRecord recovered =
+                    restarted.getProjection(cluster, managedLedgerName).join().orElseThrow();
             assertThat(recovered).isEqualTo(recreated);
             assertThat(restarted.repairProjectionIndexes(cluster, recovered).join())
                     .isEqualTo(new ProjectionRepairResult(
-                            ProjectionRepairStatus.ALREADY_VALID,
-                            ProjectionRepairStatus.ALREADY_VALID));
+                            ProjectionRepairStatus.ALREADY_VALID, ProjectionRepairStatus.ALREADY_VALID));
         }
     }
 
@@ -161,14 +177,14 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
                 ManagedLedgerProjectionMetadataStore projection =
                         ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                                 config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC())) {
-            authority = projection.createFirstProjection(
-                    cluster,
-                    projectionRequest(l0, cluster, managedLedgerName, 3, 1),
-                    ALLOW_PUBLISH).join();
+            authority = projection
+                    .createFirstProjection(
+                            cluster, projectionRequest(l0, cluster, managedLedgerName, 3, 1), ALLOW_PUBLISH)
+                    .join();
             ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(cluster);
             StreamId streamId = new StreamId(authority.streamId());
-            Set<DeleteOption> partition = Set.of(
-                    DeleteOption.PartitionKey(keyspace.streamPartitionKey(streamId).value()));
+            Set<DeleteOption> partition = Set.of(DeleteOption.PartitionKey(
+                    keyspace.streamPartitionKey(streamId).value()));
             try (var raw = OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
                 raw.delete(keyspace.virtualLedgerProjectionKey(streamId), partition);
                 raw.delete(keyspace.positionIndexKey(streamId), partition);
@@ -179,17 +195,15 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
                 ManagedLedgerProjectionMetadataStore restarted =
                         ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                                 config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC())) {
-            TopicProjectionRecord recovered = restarted.getProjection(cluster, managedLedgerName)
-                    .join().orElseThrow();
+            TopicProjectionRecord recovered =
+                    restarted.getProjection(cluster, managedLedgerName).join().orElseThrow();
             assertThat(recovered).isEqualTo(authority);
             assertThat(restarted.repairProjectionIndexes(cluster, recovered).join())
-                    .isEqualTo(new ProjectionRepairResult(
-                            ProjectionRepairStatus.CREATED,
-                            ProjectionRepairStatus.CREATED));
+                    .isEqualTo(
+                            new ProjectionRepairResult(ProjectionRepairStatus.CREATED, ProjectionRepairStatus.CREATED));
             assertThat(restarted.repairProjectionIndexes(cluster, recovered).join())
                     .isEqualTo(new ProjectionRepairResult(
-                            ProjectionRepairStatus.ALREADY_VALID,
-                            ProjectionRepairStatus.ALREADY_VALID));
+                            ProjectionRepairStatus.ALREADY_VALID, ProjectionRepairStatus.ALREADY_VALID));
         }
     }
 
@@ -205,40 +219,63 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
                         OxiaJavaClientMetadataStore.usingSharedRuntime(config, runtime, clock);
                 OxiaJavaPhysicalObjectMetadataStore physical =
                         OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(config, runtime, clock)) {
-            streamId = new StreamId(store.createOrGetStream(cluster, new StreamName("mixed"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId());
-            AppendSessionRecord session = store.acquireAppendSession(cluster, streamId,
-                    new AppendSessionOptions(WRITER, Duration.ofSeconds(30), false)).join();
+            streamId = new StreamId(store.createOrGetStream(
+                            cluster,
+                            new StreamName("mixed"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId());
+            AppendSessionRecord session = store.acquireAppendSession(
+                            cluster, streamId, new AppendSessionOptions(WRITER, Duration.ofSeconds(30), false))
+                    .join();
             CommitSliceRequest legacy = request(streamId, session, "legacy", "slice-legacy", 0);
             store.putObjectManifest(cluster, manifest(legacy)).join();
             store.commitStreamSlice(cluster, legacy).join();
-            CommitSliceRequest genericSlice = request(
-                    streamId, session, "generic", "slice-generic", 1);
+            CommitSliceRequest genericSlice = request(streamId, session, "generic", "slice-generic", 1);
             store.putObjectManifest(cluster, manifest(genericSlice)).join();
             generic = genericRequest(genericSlice);
 
-            StableAppendResult stable = commitProtected(
-                    store, physical, cluster, generic, clock.millis());
+            StableAppendResult stable = commitProtected(store, physical, cluster, generic, clock.millis());
             assertThat(stable.headAdvancedByThisCall()).isTrue();
             assertThat(store.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(1);
             store.materializeGenerationZero(cluster, stable.reachableAppend()).join();
             assertThat(store.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(2);
-            assertThat(store.searchAppendReplay(cluster, generic, Optional.empty(), 1).join().status())
+            assertThat(store.searchAppendReplay(cluster, generic, Optional.empty(), 1)
+                            .join()
+                            .status())
                     .isEqualTo(AppendReplayStatus.FOUND);
 
-            StreamMetadataSnapshot active = store.getStreamSnapshot(cluster, streamId).join();
-            StreamMetadataSnapshot sealed = store.transitionStreamState(cluster, new StreamStateTransitionRequest(
-                    streamId, StreamState.ACTIVE, StreamState.SEALED, active.metadataVersion())).join();
-            StreamMetadataSnapshot deleting = store.transitionStreamState(cluster, new StreamStateTransitionRequest(
-                    streamId, StreamState.SEALED, StreamState.DELETING, sealed.metadataVersion())).join();
-            store.transitionStreamState(cluster, new StreamStateTransitionRequest(
-                    streamId, StreamState.DELETING, StreamState.DELETED, deleting.metadataVersion())).join();
+            StreamMetadataSnapshot active =
+                    store.getStreamSnapshot(cluster, streamId).join();
+            StreamMetadataSnapshot sealed = store.transitionStreamState(
+                            cluster,
+                            new StreamStateTransitionRequest(
+                                    streamId, StreamState.ACTIVE, StreamState.SEALED, active.metadataVersion()))
+                    .join();
+            StreamMetadataSnapshot deleting = store.transitionStreamState(
+                            cluster,
+                            new StreamStateTransitionRequest(
+                                    streamId, StreamState.SEALED, StreamState.DELETING, sealed.metadataVersion()))
+                    .join();
+            store.transitionStreamState(
+                            cluster,
+                            new StreamStateTransitionRequest(
+                                    streamId, StreamState.DELETING, StreamState.DELETED, deleting.metadataVersion()))
+                    .join();
         }
         try (OxiaJavaClientMetadataStore restarted = OxiaJavaClientMetadataStore.connect(config, Clock.systemUTC())) {
-            assertThat(restarted.getStreamSnapshot(cluster, streamId).join().metadata().state())
+            assertThat(restarted
+                            .getStreamSnapshot(cluster, streamId)
+                            .join()
+                            .metadata()
+                            .state())
                     .isEqualTo(StreamState.DELETED.name());
-            assertThat(restarted.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(2);
-            assertThat(restarted.searchAppendReplay(cluster, generic, Optional.empty(), 10).join().status())
+            assertThat(restarted.scanOffsetIndex(cluster, streamId, 0, 10).join())
+                    .hasSize(2);
+            assertThat(restarted
+                            .searchAppendReplay(cluster, generic, Optional.empty(), 10)
+                            .join()
+                            .status())
                     .isEqualTo(AppendReplayStatus.FOUND);
         }
     }
@@ -251,30 +288,35 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
         CommitSliceRequest request;
         try (OxiaJavaClientMetadataStore first = OxiaJavaClientMetadataStore.connect(config, Clock.systemUTC())) {
             streamId = new StreamId(first.createOrGetStream(
-                    cluster,
-                    new StreamName("orders"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
-                    .join().streamId());
+                            cluster,
+                            new StreamName("orders"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId());
             AppendSessionRecord session = first.acquireAppendSession(
-                    cluster,
-                    streamId,
-                    new AppendSessionOptions(WRITER, Duration.ofSeconds(30), false)).join();
+                            cluster, streamId, new AppendSessionOptions(WRITER, Duration.ofSeconds(30), false))
+                    .join();
             request = request(streamId, session, "object-1", "slice-1", 0);
             first.putObjectManifest(cluster, manifest(request)).join();
 
-            CommitSliceResult committed = first.commitStreamSlice(cluster, request).join();
+            CommitSliceResult committed =
+                    first.commitStreamSlice(cluster, request).join();
             assertThat(committed.commitVersion()).isEqualTo(1);
             assertThat(first.commitStreamSlice(cluster, request).join()).isEqualTo(committed);
             assertThat(first.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(1);
             assertThat(first.getObjectReferences(cluster, request.objectId()).join())
-                    .get().extracting(reference -> reference.visibleSlices().size()).isEqualTo(1);
+                    .get()
+                    .extracting(reference -> reference.visibleSlices().size())
+                    .isEqualTo(1);
         }
 
         try (OxiaJavaClientMetadataStore restarted = OxiaJavaClientMetadataStore.connect(config, Clock.systemUTC())) {
             assertThat(restarted.getCommittedEndOffset(cluster, streamId).join().committedEndOffset())
                     .isEqualTo(1);
-            assertThat(restarted.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(1);
-            assertThat(restarted.commitStreamSlice(cluster, request).join().commitVersion()).isEqualTo(1);
+            assertThat(restarted.scanOffsetIndex(cluster, streamId, 0, 10).join())
+                    .hasSize(1);
+            assertThat(restarted.commitStreamSlice(cluster, request).join().commitVersion())
+                    .isEqualTo(1);
             restarted.updateTrim(cluster, streamId, 1, "restart-retention").join();
             assertThat(restarted.getTrim(cluster, streamId).join().trimOffset()).isEqualTo(1);
         }
@@ -286,14 +328,14 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
         OxiaClientConfiguration config = configuration();
         try (OxiaJavaClientMetadataStore store = OxiaJavaClientMetadataStore.connect(config, Clock.systemUTC())) {
             StreamId streamId = new StreamId(store.createOrGetStream(
-                    cluster,
-                    new StreamName("repair"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
-                    .join().streamId());
+                            cluster,
+                            new StreamName("repair"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId());
             AppendSessionRecord session = store.acquireAppendSession(
-                    cluster,
-                    streamId,
-                    new AppendSessionOptions(WRITER, Duration.ofSeconds(30), false)).join();
+                            cluster, streamId, new AppendSessionOptions(WRITER, Duration.ofSeconds(30), false))
+                    .join();
             CommitSliceRequest first = request(streamId, session, "object-a", "slice-a", 0);
             CommitSliceRequest second = request(streamId, session, "object-b", "slice-b", 1);
             store.putObjectManifest(cluster, manifest(first)).join();
@@ -305,15 +347,18 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
             try (var raw = OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
                 raw.delete(
                         keyspace.offsetIndexKey(streamId, 1, 0),
-                        Set.of(DeleteOption.PartitionKey(keyspace.streamPartitionKey(streamId).value())));
+                        Set.of(DeleteOption.PartitionKey(
+                                keyspace.streamPartitionKey(streamId).value())));
             }
             assertThat(store.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(1);
 
             DerivedIndexRepairResult firstPage = store.repairDerivedStreamIndexes(
-                    cluster, streamId, 0, Optional.empty(), 1).join();
+                            cluster, streamId, 0, Optional.empty(), 1)
+                    .join();
             assertThat(firstPage.repairBudgetExhausted()).isTrue();
             DerivedIndexRepairResult secondPage = store.repairDerivedStreamIndexes(
-                    cluster, streamId, 0, firstPage.continuation(), 1).join();
+                            cluster, streamId, 0, firstPage.continuation(), 1)
+                    .join();
             assertThat(secondPage.targetCovered()).isTrue();
             assertThat(secondPage.repairedRecords()).isEqualTo(1);
             assertThat(store.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(2);
@@ -327,18 +372,17 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
         try (OxiaJavaClientMetadataStore first = OxiaJavaClientMetadataStore.connect(config, Clock.systemUTC());
                 OxiaJavaClientMetadataStore second = OxiaJavaClientMetadataStore.connect(config, Clock.systemUTC())) {
             StreamId streamId = new StreamId(first.createOrGetStream(
-                    cluster,
-                    new StreamName("cas"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
-                    .join().streamId());
+                            cluster,
+                            new StreamName("cas"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId());
             AppendSessionRecord owner = first.acquireAppendSession(
-                    cluster,
-                    streamId,
-                    new AppendSessionOptions(WRITER, Duration.ofSeconds(30), false)).join();
+                            cluster, streamId, new AppendSessionOptions(WRITER, Duration.ofSeconds(30), false))
+                    .join();
             AppendSessionRecord sameOwner = second.acquireAppendSession(
-                    cluster,
-                    streamId,
-                    new AppendSessionOptions(WRITER, Duration.ofSeconds(30), false)).join();
+                            cluster, streamId, new AppendSessionOptions(WRITER, Duration.ofSeconds(30), false))
+                    .join();
             assertThat(sameOwner.epoch()).isEqualTo(owner.epoch());
             assertThat(sameOwner.leaseVersion()).isGreaterThan(owner.leaseVersion());
             CommitSliceRequest left = request(streamId, sameOwner, "cas-left", "slice-left", 0);
@@ -346,21 +390,24 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
             first.putObjectManifest(cluster, manifest(left)).join();
             second.putObjectManifest(cluster, manifest(right)).join();
 
-            List<CompletableFuture<CommitSliceResult>> attempts = List.of(
-                    first.commitStreamSlice(cluster, left),
-                    second.commitStreamSlice(cluster, right));
+            List<CompletableFuture<CommitSliceResult>> attempts =
+                    List.of(first.commitStreamSlice(cluster, left), second.commitStreamSlice(cluster, right));
             CompletableFuture.allOf(attempts.stream()
-                    .map(future -> future.handle((value, error) -> null))
-                    .toArray(CompletableFuture[]::new)).join();
+                            .map(future -> future.handle((value, error) -> null))
+                            .toArray(CompletableFuture[]::new))
+                    .join();
 
-            assertThat(attempts.stream().filter(future -> !future.isCompletedExceptionally())).hasSize(1);
+            assertThat(attempts.stream().filter(future -> !future.isCompletedExceptionally()))
+                    .hasSize(1);
             CompletableFuture<CommitSliceResult> loser = attempts.stream()
                     .filter(CompletableFuture::isCompletedExceptionally)
-                    .findFirst().orElseThrow();
+                    .findFirst()
+                    .orElseThrow();
             NereusException failure = failure(loser);
             assertThat(failure.code()).isEqualTo(ErrorCode.OFFSET_CONFLICT);
             assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
-            assertThat(first.getCommittedEndOffset(cluster, streamId).join().committedEndOffset()).isEqualTo(1);
+            assertThat(first.getCommittedEndOffset(cluster, streamId).join().committedEndOffset())
+                    .isEqualTo(1);
             assertThat(first.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(1);
         }
     }
@@ -371,15 +418,15 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
         try (OxiaJavaClientMetadataStore store =
                 OxiaJavaClientMetadataStore.connect(configuration(), Clock.systemUTC())) {
             StreamId streamId = new StreamId(store.createOrGetStream(
-                    cluster,
-                    new StreamName("watch"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
-                    .join().streamId());
+                            cluster,
+                            new StreamName("watch"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId());
             CountDownLatch trimObserved = new CountDownLatch(1);
             try (WatchRegistration ignored = store.watchStream(cluster, streamId, new MetadataWatcher() {
                 @Override
-                public void onOffsetIndexUpdated(StreamId changed, long endOffset, long metadataVersion) {
-                }
+                public void onOffsetIndexUpdated(StreamId changed, long endOffset, long metadataVersion) {}
 
                 @Override
                 public void onTrimUpdated(StreamId changed, long trimOffset, long metadataVersion) {
@@ -389,8 +436,7 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
                 }
 
                 @Override
-                public void onAppendSessionChanged(StreamId changed, long epoch, long leaseVersion) {
-                }
+                public void onAppendSessionChanged(StreamId changed, long epoch, long leaseVersion) {}
             })) {
                 store.updateTrim(cluster, streamId, 0, "watch").join();
                 assertThat(trimObserved.await(5, TimeUnit.SECONDS)).isTrue();
@@ -402,20 +448,15 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
     void realAdapterPassesTheSharedFakeRealOperationContract() {
         try (OxiaJavaClientMetadataStore store =
                 OxiaJavaClientMetadataStore.connect(configuration(), Clock.systemUTC())) {
-            assertThat(OxiaMetadataStoreContractScenario.run(
-                            store, "shared/real/" + UUID.randomUUID()).commitVersion())
+            assertThat(OxiaMetadataStoreContractScenario.run(store, "shared/real/" + UUID.randomUUID())
+                            .commitVersion())
                     .isEqualTo(1);
         }
     }
 
     private static OxiaClientConfiguration configuration() {
         return new OxiaClientConfiguration(
-                OXIA.getServiceAddress(),
-                "default",
-                Duration.ofSeconds(10),
-                Duration.ofSeconds(30),
-                100,
-                1_024);
+                OXIA.getServiceAddress(), "default", Duration.ofSeconds(10), Duration.ofSeconds(30), 100, 1_024);
     }
 
     private static ProjectionCreateRequest projectionRequest(
@@ -429,11 +470,11 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
                 ManagedLedgerProjectionNames.PAYLOAD_MAPPING_ATTRIBUTE,
                 ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1);
         StreamId streamId = new StreamId(l0.createOrGetStream(
-                        cluster,
-                        streamName,
-                        new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, attributes))
-                .join().streamId());
-        StreamMetadataSnapshot snapshot = l0.getStreamSnapshot(cluster, streamId).join();
+                        cluster, streamName, new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, attributes))
+                .join()
+                .streamId());
+        StreamMetadataSnapshot snapshot =
+                l0.getStreamSnapshot(cluster, streamId).join();
         StreamMetadata empty = new StreamMetadata(
                 streamId,
                 streamName,
@@ -450,11 +491,7 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
     }
 
     private static CommitSliceRequest request(
-            StreamId streamId,
-            AppendSessionRecord session,
-            String objectId,
-            String sliceId,
-            long offset) {
+            StreamId streamId, AppendSessionRecord session, String objectId, String sliceId, long offset) {
         return new CommitSliceRequest(
                 streamId,
                 WRITER,
@@ -529,13 +566,33 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
 
     private static CommitAppendRequest genericRequest(CommitSliceRequest request) {
         ObjectSliceReadTarget target = new ObjectSliceReadTarget(
-                1, request.objectId(), request.objectKey(), ObjectType.MULTI_STREAM_WAL_OBJECT,
-                "WAL_OBJECT_V1", "OPAQUE_SLICE", request.sliceId(), request.objectOffset(), request.objectLength(),
-                request.sliceChecksum(), request.entryIndexRef());
-        return new CommitAppendRequest(request.streamId(), request.writerId(), request.writerRunIdHash(),
-                request.epoch(), request.fencingToken(), request.expectedStartOffset(), target,
-                request.payloadFormat(), request.recordCount(), request.entryCount(), request.logicalBytes(),
-                request.schemaRefs(), request.minEventTimeMillis(), request.maxEventTimeMillis(), request.projectionRef());
+                1,
+                request.objectId(),
+                request.objectKey(),
+                ObjectType.MULTI_STREAM_WAL_OBJECT,
+                "WAL_OBJECT_V1",
+                "OPAQUE_SLICE",
+                request.sliceId(),
+                request.objectOffset(),
+                request.objectLength(),
+                request.sliceChecksum(),
+                request.entryIndexRef());
+        return new CommitAppendRequest(
+                request.streamId(),
+                request.writerId(),
+                request.writerRunIdHash(),
+                request.epoch(),
+                request.fencingToken(),
+                request.expectedStartOffset(),
+                target,
+                request.payloadFormat(),
+                request.recordCount(),
+                request.entryCount(),
+                request.logicalBytes(),
+                request.schemaRefs(),
+                request.minEventTimeMillis(),
+                request.maxEventTimeMillis(),
+                request.projectionRef());
     }
 
     private static StableAppendResult commitProtected(
@@ -545,52 +602,57 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
             CommitAppendRequest request,
             long now) {
         ObjectSliceReadTarget target = (ObjectSliceReadTarget) request.readTarget();
-        PreparedStableAppend prepared = metadata.prepareStableAppend(cluster, request).join();
-        var root = physical.createRoot(cluster, new PhysicalObjectRootRecord(
-                1,
-                ObjectKeyHash.from(target.objectKey()).value(),
-                target.objectKey().value(),
-                target.objectId().value(),
-                1,
-                128,
-                ChecksumType.CRC32C.name(),
-                "44444444",
-                "",
-                "",
-                PhysicalObjectLifecycle.ACTIVE,
-                1,
-                now,
-                now + Duration.ofDays(1).toMillis(),
-                "",
-                "",
-                0,
-                0,
-                0,
-                0,
-                0,
-                "",
-                "",
-                0)).join();
-        String referenceId = "ra1-" + DeterministicIds.stableHashComponent(
-                request.streamId().value()
+        PreparedStableAppend prepared =
+                metadata.prepareStableAppend(cluster, request).join();
+        var root = physical.createRoot(
+                        cluster,
+                        new PhysicalObjectRootRecord(
+                                1,
+                                ObjectKeyHash.from(target.objectKey()).value(),
+                                target.objectKey().value(),
+                                target.objectId().value(),
+                                1,
+                                128,
+                                ChecksumType.CRC32C.name(),
+                                "44444444",
+                                "",
+                                "",
+                                PhysicalObjectLifecycle.ACTIVE,
+                                1,
+                                now,
+                                now + Duration.ofDays(1).toMillis(),
+                                "",
+                                "",
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                "",
+                                "",
+                                0))
+                .join();
+        String referenceId = "ra1-"
+                + DeterministicIds.stableHashComponent(request.streamId().value()
                         + prepared.commitId()
                         + prepared.objectKeyHash().value());
         ObjectProtectionIdentity identity = new ObjectProtectionIdentity(
-                prepared.objectKeyHash(),
-                ObjectProtectionType.REACHABLE_APPEND,
-                referenceId);
-        var protection = physical.createProtection(cluster, new ObjectProtectionRecord(
-                1,
-                prepared.objectKeyHash().value(),
-                ObjectProtectionType.REACHABLE_APPEND.wireId(),
-                referenceId,
-                prepared.commitKey(),
-                prepared.commitMetadataVersion(),
-                prepared.commitRecordSha256().value(),
-                root.value().lifecycleEpoch(),
-                now,
-                0,
-                0)).join();
+                prepared.objectKeyHash(), ObjectProtectionType.REACHABLE_APPEND, referenceId);
+        var protection = physical.createProtection(
+                        cluster,
+                        new ObjectProtectionRecord(
+                                1,
+                                prepared.objectKeyHash().value(),
+                                ObjectProtectionType.REACHABLE_APPEND.wireId(),
+                                referenceId,
+                                prepared.commitKey(),
+                                prepared.commitMetadataVersion(),
+                                prepared.commitRecordSha256().value(),
+                                root.value().lifecycleEpoch(),
+                                now,
+                                0,
+                                0))
+                .join();
         return metadata.commitPreparedStableAppend(
                         cluster,
                         prepared,

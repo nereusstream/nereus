@@ -24,7 +24,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 
-/** Verifies Nereus read batches and concatenates exact Kafka batches into an owned Fetch buffer. */
+/**
+ * Verifies Nereus read batches and concatenates exact Kafka batches into an owned Fetch buffer.
+ */
 public final class KafkaFetchAssembler {
     private final KafkaRecordBatchCodec codec;
 

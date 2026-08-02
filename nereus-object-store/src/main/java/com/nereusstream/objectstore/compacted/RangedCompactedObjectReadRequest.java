@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.EntryIndexLocation;
@@ -12,7 +13,9 @@ import com.nereusstream.api.target.ObjectSliceReadTarget;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Exact immutable NCP2 target, boundary mode, and logical read limits. */
+/**
+ * Exact immutable NCP2 target, boundary mode, and logical read limits.
+ */
 public record RangedCompactedObjectReadRequest(
         StreamId streamId,
         OffsetRange sourceCoverage,
@@ -57,7 +60,9 @@ public record RangedCompactedObjectReadRequest(
                 || target.entryIndexRef().length() > CompactedObjectFormatV2.MAX_FOOTER_BYTES
                 || !target.entryIndexRef().objectId().equals(java.util.Optional.of(target.objectId()))
                 || !target.entryIndexRef().objectKey().equals(java.util.Optional.of(target.objectKey()))
-                || Math.addExact(target.entryIndexRef().offset(), target.entryIndexRef().length())
+                || Math.addExact(
+                                target.entryIndexRef().offset(),
+                                target.entryIndexRef().length())
                         != target.objectLength()) {
             throw new IllegalArgumentException("V2 compacted read target identity/footer is inconsistent");
         }

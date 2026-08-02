@@ -17,7 +17,9 @@ package com.nereusstream.metadata.oxia;
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-/** Opaque continuation for a bounded backward walk of one stream's committed append chain. */
+/**
+ * Opaque continuation for a bounded backward walk of one stream's committed append chain.
+ */
 public record DerivedIndexRepairCursor(
         StreamId streamId,
         long targetOffset,
@@ -31,8 +33,11 @@ public record DerivedIndexRepairCursor(
         Objects.requireNonNull(streamId, "streamId");
         observedHeadCommitId = requireNonBlank(observedHeadCommitId, "observedHeadCommitId");
         nextCommitId = requireNonBlank(nextCommitId, "nextCommitId");
-        if (targetOffset < 0 || observedCommitVersion <= 0
-                || nextOffsetEnd <= targetOffset || nextCumulativeSize < 0 || nextCommitVersion <= 0
+        if (targetOffset < 0
+                || observedCommitVersion <= 0
+                || nextOffsetEnd <= targetOffset
+                || nextCumulativeSize < 0
+                || nextCommitVersion <= 0
                 || nextCommitVersion >= observedCommitVersion) {
             throw new IllegalArgumentException(
                     "repair cursor offsets and versions must describe an earlier positive commit");

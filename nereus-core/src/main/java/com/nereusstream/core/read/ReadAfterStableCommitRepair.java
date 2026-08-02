@@ -20,7 +20,9 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** Protected live-tail repair used when a WAL_DURABLE append is visible in the head before its gen-0 index. */
+/**
+ * Protected live-tail repair used when a WAL_DURABLE append is visible in the head before its gen-0 index.
+ */
 public final class ReadAfterStableCommitRepair implements GenerationIndexRepairer {
     private final GenerationZeroRepairScanner scanner;
 
@@ -33,11 +35,8 @@ public final class ReadAfterStableCommitRepair implements GenerationIndexRepaire
             StreamId streamId, long targetOffset, Duration timeout) {
         return scanner.repairCovering(streamId, targetOffset, timeout)
                 .thenApply(result -> result.trimmed()
-                        ? GenerationIndexRepairResult.trimmed(
-                                result.streamId(), result.targetOffset())
+                        ? GenerationIndexRepairResult.trimmed(result.streamId(), result.targetOffset())
                         : GenerationIndexRepairResult.live(
-                                result.streamId(),
-                                result.targetOffset(),
-                                result.scannedCommits()));
+                                result.streamId(), result.targetOffset(), result.scannedCommits()));
     }
 }

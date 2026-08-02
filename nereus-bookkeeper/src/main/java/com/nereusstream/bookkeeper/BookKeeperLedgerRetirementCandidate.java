@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -10,7 +11,9 @@ import com.nereusstream.metadata.oxia.records.BookKeeperWriterStateRecord;
 import java.util.List;
 import java.util.Objects;
 
-/** Complete empty-reference capture for one sealed ledger; this is not a durable second truth. */
+/**
+ * Complete empty-reference capture for one sealed ledger; this is not a durable second truth.
+ */
 public record BookKeeperLedgerRetirementCandidate(
         BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
         BookKeeperVersionedValue<BookKeeperWriterStateRecord> writer,
@@ -21,8 +24,7 @@ public record BookKeeperLedgerRetirementCandidate(
     public BookKeeperLedgerRetirementCandidate {
         Objects.requireNonNull(root, "root");
         Objects.requireNonNull(writer, "writer");
-        retiredProtections = List.copyOf(Objects.requireNonNull(
-                retiredProtections, "retiredProtections"));
+        retiredProtections = List.copyOf(Objects.requireNonNull(retiredProtections, "retiredProtections"));
         Objects.requireNonNull(referenceSetSha256, "referenceSetSha256");
         if (referenceSetSha256.type() != ChecksumType.SHA256 || capturedAtMillis < 0) {
             throw new IllegalArgumentException("invalid BookKeeper retirement capture");

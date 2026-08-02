@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.objectstore.PutObjectOptions;
@@ -26,21 +26,18 @@ class CompactedParquetStrictReaderTest {
         byte[] first = "first".getBytes(StandardCharsets.UTF_8);
         byte[] second = "second".getBytes(StandardCharsets.UTF_8);
         byte[] third = "third".getBytes(StandardCharsets.UTF_8);
-        CompactedObjectWriteRequest writeRequest = CompactedParquetTestSupport.committedRequest(
-                3,
-                first.length + second.length + third.length,
-                2,
-                "ZSTD");
+        CompactedObjectWriteRequest writeRequest =
+                CompactedParquetTestSupport.committedRequest(3, first.length + second.length + third.length, 2, "ZSTD");
 
-        try (StagingFileManager staging =
-                        CompactedParquetTestSupport.staging(temporaryDirectory, 32L << 20);
-                LocalFileObjectStore store =
-                        new LocalFileObjectStore(temporaryDirectory.resolve("objects"));
+        try (StagingFileManager staging = CompactedParquetTestSupport.staging(temporaryDirectory, 32L << 20);
+                LocalFileObjectStore store = new LocalFileObjectStore(temporaryDirectory.resolve("objects"));
                 CompactedObjectWriteResult written = new ParquetCompactedObjectWriter(staging, Runnable::run)
-                        .write(writeRequest, CompactedParquetTestSupport.publisher(List.of(
-                                CompactedParquetTestSupport.denseRow(10, first),
-                                CompactedParquetTestSupport.denseRow(11, second),
-                                CompactedParquetTestSupport.denseRow(12, third))))
+                        .write(
+                                writeRequest,
+                                CompactedParquetTestSupport.publisher(List.of(
+                                        CompactedParquetTestSupport.denseRow(10, first),
+                                        CompactedParquetTestSupport.denseRow(11, second),
+                                        CompactedParquetTestSupport.denseRow(12, third))))
                         .join()) {
             store.putObject(
                             written.objectKey(),
@@ -65,8 +62,7 @@ class CompactedParquetStrictReaderTest {
                     written.objectLength(),
                     written.storageCrc32c(),
                     written.entryIndexRef());
-            ParquetCompactedObjectReader reader =
-                    new ParquetCompactedObjectReader(store, Runnable::run);
+            ParquetCompactedObjectReader reader = new ParquetCompactedObjectReader(store, Runnable::run);
 
             CompactedObjectReadResult full = reader.read(new CompactedObjectReadRequest(
                             writeRequest.streamId(),
@@ -80,9 +76,9 @@ class CompactedParquetStrictReaderTest {
                             Duration.ofSeconds(10)))
                     .join();
             assertThat(full.metadata().sourceSetSha256()).isEqualTo(writeRequest.sourceSetSha256());
-            assertThat(full.rows()).extracting(CompactedObjectRow::streamOffset)
-                    .containsExactly(10L, 11L, 12L);
-            assertThat(full.rows()).extracting(CompactedParquetStrictReaderTest::payload)
+            assertThat(full.rows()).extracting(CompactedObjectRow::streamOffset).containsExactly(10L, 11L, 12L);
+            assertThat(full.rows())
+                    .extracting(CompactedParquetStrictReaderTest::payload)
                     .containsExactly("first", "second", "third");
             assertThat(full.sourceCoverageEndOffset()).isEqualTo(13);
             assertThat(full.footerBytesRead()).isEqualTo(written.entryIndexRef().length());
@@ -99,7 +95,8 @@ class CompactedParquetStrictReaderTest {
                             second.length,
                             Duration.ofSeconds(10)))
                     .join();
-            assertThat(limited.rows()).extracting(CompactedObjectRow::streamOffset)
+            assertThat(limited.rows())
+                    .extracting(CompactedObjectRow::streamOffset)
                     .containsExactly(11L);
             assertThat(payload(limited.rows().get(0))).isEqualTo("second");
             assertThat(limited.sourceCoverageEndOffset()).isEqualTo(12);

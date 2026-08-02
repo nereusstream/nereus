@@ -16,12 +16,10 @@ package com.nereusstream.kafka.fetch;
 
 import java.util.Objects;
 
-/** Frozen terminal facts for a stock-compatible whole-request Fetch read wave. */
-public record KafkaFetchWaveResult<T>(
-        T response,
-        int responseBytes,
-        boolean timedOut,
-        int readAttempts) {
+/**
+ * Frozen terminal facts for a stock-compatible whole-request Fetch read wave.
+ */
+public record KafkaFetchWaveResult<T>(T response, int responseBytes, boolean timedOut, int readAttempts) {
     public KafkaFetchWaveResult {
         Objects.requireNonNull(response, "response");
         if (responseBytes < 0 || readAttempts <= 0) {

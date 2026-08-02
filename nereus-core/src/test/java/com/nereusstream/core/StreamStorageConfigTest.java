@@ -15,7 +15,6 @@
 package com.nereusstream.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.PublicationId;
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +23,6 @@ class StreamStorageConfigTest {
     void defaultProcessIdentityIsValidForGenerationReadPins() {
         StreamStorageConfig configuration = StreamStorageConfig.defaults("cluster", "writer");
 
-        assertThat(new PublicationId(configuration.processRunId()).value())
-                .matches("[a-z2-7]{52}");
+        assertThat(new PublicationId(configuration.processRunId()).value()).matches("[a-z2-7]{52}");
     }
 }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.recovery;
 
 import com.nereusstream.api.ErrorCode;
@@ -20,18 +21,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** Bounded exact-page adapter from the public COMMITTED stream view to Kafka recovery batches. */
+/**
+ * Bounded exact-page adapter from the public COMMITTED stream view to Kafka recovery batches.
+ */
 public final class DefaultKafkaRecoveryBatchSource implements KafkaRecoveryBatchSource {
     private final StreamStorage streams;
     private final StreamId streamId;
     private final int chunkRecords;
     private final int chunkBytes;
 
-    public DefaultKafkaRecoveryBatchSource(
-            StreamStorage streams,
-            StreamId streamId,
-            int chunkRecords,
-            int chunkBytes) {
+    public DefaultKafkaRecoveryBatchSource(StreamStorage streams, StreamId streamId, int chunkRecords, int chunkBytes) {
         this.streams = Objects.requireNonNull(streams, "streams");
         this.streamId = Objects.requireNonNull(streamId, "streamId");
         if (chunkRecords <= 0 || chunkBytes <= 0) {
@@ -43,13 +42,11 @@ public final class DefaultKafkaRecoveryBatchSource implements KafkaRecoveryBatch
 
     @Override
     public CompletableFuture<KafkaRecoveryBatchPage> readCommittedPage(
-            long startOffset,
-            long endOffset,
-            Duration timeout) {
+            long startOffset, long endOffset, Duration timeout) {
         Objects.requireNonNull(timeout, "timeout");
         if (startOffset < 0 || endOffset <= startOffset) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "Kafka recovery page must request a non-empty non-negative range"));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("Kafka recovery page must request a non-empty non-negative range"));
         }
         ReadRequest request = new ReadRequest(
                 startOffset,
@@ -57,15 +54,11 @@ public final class DefaultKafkaRecoveryBatchSource implements KafkaRecoveryBatch
                 ReadBoundaryMode.EXACT_START,
                 FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
                 new ReadOptions(chunkRecords, chunkBytes, ReadIsolation.COMMITTED, timeout));
-        return streams.read(streamId, request)
-                .thenApply(result -> exactPage(streamId, startOffset, endOffset, result));
+        return streams.read(streamId, request).thenApply(result -> exactPage(streamId, startOffset, endOffset, result));
     }
 
     private static KafkaRecoveryBatchPage exactPage(
-            StreamId streamId,
-            long startOffset,
-            long endOffset,
-            SemanticReadResult result) {
+            StreamId streamId, long startOffset, long endOffset, SemanticReadResult result) {
         Objects.requireNonNull(result, "result");
         if (result.view() != ReadView.COMMITTED
                 || result.result().requestedOffset() != startOffset
@@ -86,9 +79,7 @@ public final class DefaultKafkaRecoveryBatchSource implements KafkaRecoveryBatch
                 throw invariant("Kafka recovery read returned a non-Kafka or out-of-range batch");
             }
             batches.add(new KafkaReplayBatch(
-                    value.range().startOffset(),
-                    value.range().endOffset() - 1,
-                    value.payload()));
+                    value.range().startOffset(), value.range().endOffset() - 1, value.payload()));
             cursor = value.range().endOffset();
         }
         if (result.result().nextOffset() != cursor) {

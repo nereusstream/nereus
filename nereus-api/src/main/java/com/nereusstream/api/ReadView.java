@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** A durable, explicitly encoded physical read view. */
+/**
+ * A durable, explicitly encoded physical read view.
+ */
 public enum ReadView {
     COMMITTED(1),
     TOPIC_COMPACTED(2);

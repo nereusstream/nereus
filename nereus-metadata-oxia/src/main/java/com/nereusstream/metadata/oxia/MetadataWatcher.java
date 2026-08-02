@@ -16,7 +16,9 @@ package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.StreamId;
 
-/** Invalidation hints emitted by an Oxia metadata watch. */
+/**
+ * Invalidation hints emitted by an Oxia metadata watch.
+ */
 public interface MetadataWatcher {
     void onOffsetIndexUpdated(StreamId streamId, long committedEndOffset, long metadataVersion);
 
@@ -24,6 +26,5 @@ public interface MetadataWatcher {
 
     void onAppendSessionChanged(StreamId streamId, long epoch, long leaseVersion);
 
-    default void onWatchReconnected(StreamId streamId, long metadataVersion) {
-    }
+    default void onWatchReconnected(StreamId streamId, long metadataVersion) {}
 }

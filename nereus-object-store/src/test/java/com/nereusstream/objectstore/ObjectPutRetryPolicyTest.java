@@ -16,15 +16,13 @@ package com.nereusstream.objectstore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 class ObjectPutRetryPolicyTest {
     @Test
     void computesSaturatingCappedExponentialBackoff() {
-        ObjectPutRetryPolicy policy = new ObjectPutRetryPolicy(
-                10, Duration.ofMillis(25), Duration.ofMillis(100));
+        ObjectPutRetryPolicy policy = new ObjectPutRetryPolicy(10, Duration.ofMillis(25), Duration.ofMillis(100));
 
         assertThat(policy.maximumBackoffMillis(2)).isEqualTo(25);
         assertThat(policy.maximumBackoffMillis(3)).isEqualTo(50);
@@ -34,24 +32,17 @@ class ObjectPutRetryPolicyTest {
 
     @Test
     void rejectsInvalidAttemptAndDurationBounds() {
-        assertThatThrownBy(() -> new ObjectPutRetryPolicy(
-                        0, Duration.ofMillis(1), Duration.ofMillis(2)))
+        assertThatThrownBy(() -> new ObjectPutRetryPolicy(0, Duration.ofMillis(1), Duration.ofMillis(2)))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ObjectPutRetryPolicy(
-                        11, Duration.ofMillis(1), Duration.ofMillis(2)))
+        assertThatThrownBy(() -> new ObjectPutRetryPolicy(11, Duration.ofMillis(1), Duration.ofMillis(2)))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ObjectPutRetryPolicy(
-                        2, Duration.ZERO, Duration.ofMillis(2)))
+        assertThatThrownBy(() -> new ObjectPutRetryPolicy(2, Duration.ZERO, Duration.ofMillis(2)))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ObjectPutRetryPolicy(
-                        2, Duration.ofMillis(3), Duration.ofMillis(2)))
+        assertThatThrownBy(() -> new ObjectPutRetryPolicy(2, Duration.ofMillis(3), Duration.ofMillis(2)))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        ObjectPutRetryPolicy policy = new ObjectPutRetryPolicy(
-                2, Duration.ofMillis(1), Duration.ofMillis(2));
-        assertThatThrownBy(() -> policy.maximumBackoffMillis(1))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> policy.maximumBackoffMillis(3))
-                .isInstanceOf(IllegalArgumentException.class);
+        ObjectPutRetryPolicy policy = new ObjectPutRetryPolicy(2, Duration.ofMillis(1), Duration.ofMillis(2));
+        assertThatThrownBy(() -> policy.maximumBackoffMillis(1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> policy.maximumBackoffMillis(3)).isInstanceOf(IllegalArgumentException.class);
     }
 }

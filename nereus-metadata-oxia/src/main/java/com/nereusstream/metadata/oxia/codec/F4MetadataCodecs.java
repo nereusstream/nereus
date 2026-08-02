@@ -1,12 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
-import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
-import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
-import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
+import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
+import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
@@ -18,14 +19,16 @@ import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
 import java.util.HexFormat;
 import java.util.List;
 
-/** Explicit Phase 4 record family using NRM1/binary-v1 envelopes and per-value schema dispatch. */
+/**
+ * Explicit Phase 4 record family using NRM1/binary-v1 envelopes and per-value schema dispatch.
+ */
 public final class F4MetadataCodecs {
     private static final MapMetadataCodecRegistry REGISTRY = new MapMetadataCodecRegistry(List.of(
             registered(GenerationSequenceRecord.class, new GenerationSequenceRecordCodecV1()),
             registered(GenerationIndexRecord.class, new GenerationIndexRecordCodecV1()),
-            registered(GenerationProtocolActivationRecord.class,
-                    new GenerationProtocolActivationRecordCodecV1()),
-            registered(MaterializationStreamRegistrationRecord.class,
+            registered(GenerationProtocolActivationRecord.class, new GenerationProtocolActivationRecordCodecV1()),
+            registered(
+                    MaterializationStreamRegistrationRecord.class,
                     new MaterializationStreamRegistrationRecordCodecV1()),
             registered(MaterializationTaskRecord.class, new MaterializationTaskRecordCodecV2()),
             registered(MaterializationCheckpointRecord.class, new MaterializationCheckpointRecordCodecV1()),
@@ -38,8 +41,7 @@ public final class F4MetadataCodecs {
             registered(GcRetirementProtectionRecord.class, new GcRetirementProtectionRecordCodecV1()),
             registered(GcRetirementRemovalRecord.class, new GcRetirementRemovalRecordCodecV1())));
 
-    private F4MetadataCodecs() {
-    }
+    private F4MetadataCodecs() {}
 
     public static MetadataCodecRegistry registry() {
         return REGISTRY;
@@ -60,16 +62,13 @@ public final class F4MetadataCodecs {
         MetadataRecordCodec<T> codec = REGISTRY.codecForClass(recordClass);
         if (!codec.recordType().equals(envelope.recordType())
                 || !MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1.equals(envelope.payloadEncoding())
-                || !codec.supportsEnvelopeSchema(
-                        envelope.schemaVersion(), envelope.minReaderSchemaVersion())) {
+                || !codec.supportsEnvelopeSchema(envelope.schemaVersion(), envelope.minReaderSchemaVersion())) {
             throw new MetadataCodecException("unsupported F4 metadata envelope for " + recordClass.getSimpleName());
         }
         T value = codec.decode(envelope.payload());
         if (codec.schemaVersion(value) != envelope.schemaVersion()
-                || codec.minReaderSchemaVersion(value)
-                        != envelope.minReaderSchemaVersion()) {
-            throw new MetadataCodecException(
-                    "F4 metadata payload schema does not match its envelope");
+                || codec.minReaderSchemaVersion(value) != envelope.minReaderSchemaVersion()) {
+            throw new MetadataCodecException("F4 metadata payload schema does not match its envelope");
         }
         return value;
     }

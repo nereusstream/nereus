@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.materialization.MaterializationConfig;
 import java.nio.file.Path;
@@ -43,43 +43,84 @@ class PhysicalGcConfigTest {
     @Test
     void boundsAndLeaseSafetyAreFailClosed() {
         assertThatThrownBy(() -> new PhysicalGcConfig(
-                        false, true, 0, 256, 4, 4_096, 10, 10,
-                        Duration.ofMinutes(1), Duration.ofMinutes(2), Duration.ofSeconds(30),
-                        Duration.ofSeconds(5), Duration.ofMinutes(3), Duration.ofHours(1),
-                        Duration.ofHours(25), Duration.ofDays(7), Duration.ofSeconds(30),
+                        false,
+                        true,
+                        0,
+                        256,
+                        4,
+                        4_096,
+                        10,
+                        10,
+                        Duration.ofMinutes(1),
+                        Duration.ofMinutes(2),
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(5),
+                        Duration.ofMinutes(3),
+                        Duration.ofHours(1),
+                        Duration.ofHours(25),
+                        Duration.ofDays(7),
+                        Duration.ofSeconds(30),
                         Duration.ofSeconds(30)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("metadataScanPageSize");
         assertThatThrownBy(() -> config(
-                        false, true, Duration.ofMinutes(1), Duration.ofHours(25), Duration.ofDays(7),
-                        Duration.ofMinutes(2), Duration.ofSeconds(41), Duration.ofMinutes(3),
-                        Duration.ofSeconds(30), Duration.ofSeconds(5)))
+                        false,
+                        true,
+                        Duration.ofMinutes(1),
+                        Duration.ofHours(25),
+                        Duration.ofDays(7),
+                        Duration.ofMinutes(2),
+                        Duration.ofSeconds(41),
+                        Duration.ofMinutes(3),
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(5)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("one third");
         assertThatThrownBy(() -> config(
-                        false, true, Duration.ofMinutes(1), Duration.ofHours(25), Duration.ofDays(7),
-                        Duration.ofMinutes(2), Duration.ofSeconds(30), Duration.ofMinutes(2),
-                        Duration.ofSeconds(30), Duration.ofSeconds(5)))
+                        false,
+                        true,
+                        Duration.ofMinutes(1),
+                        Duration.ofHours(25),
+                        Duration.ofDays(7),
+                        Duration.ofMinutes(2),
+                        Duration.ofSeconds(30),
+                        Duration.ofMinutes(2),
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(5)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("drainGrace");
         assertThatThrownBy(() -> config(
-                        false, true, Duration.ofMinutes(1), Duration.ofHours(25), Duration.ofDays(7),
-                        Duration.ofMinutes(2), Duration.ofSeconds(30), Duration.ofMinutes(3),
-                        Duration.ofMinutes(2), Duration.ZERO))
+                        false,
+                        true,
+                        Duration.ofMinutes(1),
+                        Duration.ofHours(25),
+                        Duration.ofDays(7),
+                        Duration.ofMinutes(2),
+                        Duration.ofSeconds(30),
+                        Duration.ofMinutes(3),
+                        Duration.ofMinutes(2),
+                        Duration.ZERO))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("operationTimeout");
     }
 
     @Test
     void durationsMustBeExactlyMillisecondRepresentable() {
-        assertThatThrownBy(() -> config(
-                        false, true, Duration.ofNanos(1_500_000), Duration.ofHours(25), Duration.ofDays(7)))
+        assertThatThrownBy(() ->
+                        config(false, true, Duration.ofNanos(1_500_000), Duration.ofHours(25), Duration.ofDays(7)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("millisecond");
         assertThatThrownBy(() -> config(
-                        false, true, Duration.ofMinutes(1), Duration.ofHours(25), Duration.ofDays(7),
-                        Duration.ofMinutes(2), Duration.ofSeconds(30), Duration.ofMinutes(3),
-                        Duration.ofSeconds(30), Duration.ofNanos(1)))
+                        false,
+                        true,
+                        Duration.ofMinutes(1),
+                        Duration.ofHours(25),
+                        Duration.ofDays(7),
+                        Duration.ofMinutes(2),
+                        Duration.ofSeconds(30),
+                        Duration.ofMinutes(3),
+                        Duration.ofSeconds(30),
+                        Duration.ofNanos(1)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("millisecond");
     }
@@ -88,13 +129,11 @@ class PhysicalGcConfigTest {
     void crossValidationRejectsShortOrphanAndTombstoneWindows(@TempDir Path stagingDirectory) {
         MaterializationConfig materialization = MaterializationConfig.defaults(stagingDirectory);
 
-        assertThatThrownBy(() -> config(
-                        false, true, Duration.ofMinutes(1), Duration.ofHours(1), Duration.ofDays(7))
+        assertThatThrownBy(() -> config(false, true, Duration.ofMinutes(1), Duration.ofHours(1), Duration.ofDays(7))
                         .validateAgainst(materialization))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("orphanGrace");
-        assertThatThrownBy(() -> config(
-                        false, true, Duration.ofMinutes(1), Duration.ofHours(25), Duration.ofHours(48))
+        assertThatThrownBy(() -> config(false, true, Duration.ofMinutes(1), Duration.ofHours(25), Duration.ofHours(48))
                         .validateAgainst(materialization))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("metadataAuditGrace");

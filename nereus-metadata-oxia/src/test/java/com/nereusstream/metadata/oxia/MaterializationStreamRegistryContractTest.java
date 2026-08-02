@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static com.nereusstream.metadata.oxia.F4MetadataTestValues.CLUSTER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import java.time.Clock;
@@ -28,21 +28,23 @@ class MaterializationStreamRegistryContractTest {
             MaterializationStreamRegistrationRecord registration =
                     F4MetadataTestValues.registration(stream.value(), shard);
             VersionedMaterializationStreamRegistration value = store.createOrVerifyStreamRegistration(
-                    CLUSTER, registration).join();
+                            CLUSTER, registration)
+                    .join();
             assertThat(keys.materializationRegistryShard(stream)).isEqualTo(shard);
-            assertThat(store.createOrVerifyStreamRegistration(CLUSTER, registration).join())
+            assertThat(store.createOrVerifyStreamRegistration(CLUSTER, registration)
+                            .join())
                     .isEqualTo(value);
             created.put(shard, value);
         });
 
         F4ScanToken shardZeroToken = null;
         for (int shard = 0; shard < 64; shard++) {
-            StreamRegistrationScanPage first = store.scanStreamRegistrations(
-                    CLUSTER, shard, Optional.empty(), 1).join();
+            StreamRegistrationScanPage first = store.scanStreamRegistrations(CLUSTER, shard, Optional.empty(), 1)
+                    .join();
             assertThat(first.values()).containsExactly(created.get(shard));
             assertThat(first.continuation()).isPresent();
-            StreamRegistrationScanPage terminal = store.scanStreamRegistrations(
-                    CLUSTER, shard, first.continuation(), 1).join();
+            StreamRegistrationScanPage terminal = store.scanStreamRegistrations(CLUSTER, shard, first.continuation(), 1)
+                    .join();
             assertThat(terminal.values()).isEmpty();
             assertThat(terminal.continuation()).isEmpty();
             if (shard == 0) {
@@ -51,8 +53,8 @@ class MaterializationStreamRegistryContractTest {
         }
 
         F4ScanToken wrongScope = shardZeroToken;
-        assertThatThrownBy(() -> store.scanStreamRegistrations(
-                        CLUSTER, 1, Optional.of(wrongScope), 1).join())
+        assertThatThrownBy(() -> store.scanStreamRegistrations(CLUSTER, 1, Optional.of(wrongScope), 1)
+                        .join())
                 .isInstanceOfAny(IllegalArgumentException.class, CompletionException.class);
 
         StreamId stream = streams.get(0);
@@ -68,14 +70,16 @@ class MaterializationStreamRegistryContractTest {
                 1_000,
                 0);
         VersionedMaterializationStreamRegistration updated = store.compareAndSetStreamRegistration(
-                CLUSTER, advanced, original.metadataVersion()).join();
-        assertThat(updated.value().registeredAtMillis()).isEqualTo(original.value().registeredAtMillis());
+                        CLUSTER, advanced, original.metadataVersion())
+                .join();
+        assertThat(updated.value().registeredAtMillis())
+                .isEqualTo(original.value().registeredAtMillis());
         assertThat(updated.value().lastHintCommitVersion()).isEqualTo(999);
 
         MaterializationStreamRegistrationRecord sameIdentityDifferentHint =
                 F4MetadataTestValues.registration(stream.value(), 1);
-        assertThat(store.createOrVerifyStreamRegistration(
-                        CLUSTER, sameIdentityDifferentHint).join())
+        assertThat(store.createOrVerifyStreamRegistration(CLUSTER, sameIdentityDifferentHint)
+                        .join())
                 .isEqualTo(updated);
 
         MaterializationStreamRegistrationRecord collision = new MaterializationStreamRegistrationRecord(
@@ -88,11 +92,11 @@ class MaterializationStreamRegistryContractTest {
                 0,
                 100,
                 0);
-        assertThatThrownBy(() -> store.createOrVerifyStreamRegistration(CLUSTER, collision).join())
-                .satisfies(error -> assertThat(unwrap(error))
-                        .isInstanceOf(com.nereusstream.api.NereusException.class));
-        assertThatThrownBy(() -> store.deleteStreamRegistration(
-                        CLUSTER, stream, original.metadataVersion()).join())
+        assertThatThrownBy(() -> store.createOrVerifyStreamRegistration(CLUSTER, collision)
+                        .join())
+                .satisfies(error -> assertThat(unwrap(error)).isInstanceOf(com.nereusstream.api.NereusException.class));
+        assertThatThrownBy(() -> store.deleteStreamRegistration(CLUSTER, stream, original.metadataVersion())
+                        .join())
                 .hasCauseInstanceOf(F4MetadataConditionFailedException.class);
 
         created.forEach((shard, value) -> {

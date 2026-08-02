@@ -1,14 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.recovery;
 
 import java.util.List;
 import java.util.Objects;
 
-/** One exact, dense COMMITTED recovery page whose next offset is the next page cursor. */
-public record KafkaRecoveryBatchPage(
-        long requestedOffset,
-        long nextOffset,
-        List<KafkaReplayBatch> batches) {
+/**
+ * One exact, dense COMMITTED recovery page whose next offset is the next page cursor.
+ */
+public record KafkaRecoveryBatchPage(long requestedOffset, long nextOffset, List<KafkaReplayBatch> batches) {
     public KafkaRecoveryBatchPage {
         batches = List.copyOf(Objects.requireNonNull(batches, "batches"));
         if (requestedOffset < 0 || nextOffset < requestedOffset) {

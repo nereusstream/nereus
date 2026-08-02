@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import java.util.Objects;
 
-/** Exact durable activation and the three producer-owned proof identities installed by its one CAS. */
+/**
+ * Exact durable activation and the three producer-owned proof identities installed by its one CAS.
+ */
 public record BookKeeperDeletionActivationResult(
         BookKeeperProtocolActivation activation,
         Checksum rootCoverageProofSha256,

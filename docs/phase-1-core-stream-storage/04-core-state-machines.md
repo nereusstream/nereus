@@ -333,14 +333,14 @@ Phase 1 behavior:
 
 Append timeout and cancellation must be classified by the last irreversible boundary reached:
 
-| Boundary | Error + append outcome | Visibility guarantee |
-| --- | --- | --- |
-| before WAL upload starts | `TIMEOUT/CANCELLED + KNOWN_NOT_COMMITTED` | no object and no head commit |
-| during WAL upload | `TIMEOUT + KNOWN_NOT_COMMITTED` | object may become orphan；the timed-out attempt must not start head commit |
-| after upload before manifest commit starts | `TIMEOUT + KNOWN_NOT_COMMITTED` | object may exist，but no head commit |
-| during manifest commit | `TIMEOUT + KNOWN_NOT_COMMITTED` | manifest may exist，but no head commit may be started by that timed-out attempt |
-| after stream-head CAS is sent, response unavailable | `TIMEOUT/CANCELLED + MAY_HAVE_COMMITTED` | stream head may or may not have committed |
-| head success known, index confirmation unavailable | `TIMEOUT/CANCELLED/METADATA_UNAVAILABLE + KNOWN_COMMITTED` | logical append committed；derived index may lag until repair |
+| Boundary                                            | Error + append outcome                                     | Visibility guarantee                                                           |
+|-----------------------------------------------------|------------------------------------------------------------|--------------------------------------------------------------------------------|
+| before WAL upload starts                            | `TIMEOUT/CANCELLED + KNOWN_NOT_COMMITTED`                  | no object and no head commit                                                   |
+| during WAL upload                                   | `TIMEOUT + KNOWN_NOT_COMMITTED`                            | object may become orphan；the timed-out attempt must not start head commit      |
+| after upload before manifest commit starts          | `TIMEOUT + KNOWN_NOT_COMMITTED`                            | object may exist，but no head commit                                            |
+| during manifest commit                              | `TIMEOUT + KNOWN_NOT_COMMITTED`                            | manifest may exist，but no head commit may be started by that timed-out attempt |
+| after stream-head CAS is sent, response unavailable | `TIMEOUT/CANCELLED + MAY_HAVE_COMMITTED`                   | stream head may or may not have committed                                      |
+| head success known, index confirmation unavailable  | `TIMEOUT/CANCELLED/METADATA_UNAVAILABLE + KNOWN_COMMITTED` | logical append committed；derived index may lag until repair                    |
 
 If timeout or cancellation fires after `commitStreamSlice` has been sent, the implementation must not report
 success without the commit result. A retry that still has the same in-memory `objectId/sliceId` attempt can
@@ -810,12 +810,12 @@ object store and does not expose delete. `MetadataOrphanObjectScanner` reads the
 calls `repairObjectReferences` before classification，so reachable stream-head commits remain authoritative
 and missing derived indexes are materialized before an orphan decision.
 
-| Status | Meaning |
-| --- | --- |
-| `MISSING_MANIFEST` | caller supplied an object id with no manifest；bytes may or may not exist |
+| Status                  | Meaning                                                                        |
+|-------------------------|--------------------------------------------------------------------------------|
+| `MISSING_MANIFEST`      | caller supplied an object id with no manifest；bytes may or may not exist       |
 | `UNREFERENCED_MANIFEST` | manifest exists but no slice has a reachable head commit；orphan candidate only |
-| `PARTIALLY_REFERENCED` | at least one but not all manifest slices are reachable |
-| `FULLY_REFERENCED` | every manifest slice is reachable |
+| `PARTIALLY_REFERENCED`  | at least one but not all manifest slices are reachable                         |
+| `FULLY_REFERENCED`      | every manifest slice is reachable                                              |
 
 `OrphanObjectAssessment.deletionAllowed()` is always `false` in Phase 1. TTL、manifest state and an empty
 reference list are diagnostic inputs only；none proves that physical deletion is safe.
@@ -887,27 +887,27 @@ Threading:
 
 Suggested initial defaults:
 
-| Setting | Default |
-| --- | --- |
-| `appendSessionTtl` | 30 seconds |
-| `appendSessionRenewBefore` | 10 seconds |
-| `appendSessionMinCommitRemaining` | 5 seconds |
-| `appendTimeout` | 30 seconds |
-| `readTimeout` | 30 seconds |
-| `shutdownGrace` | 30 seconds |
-| `maxResolveRanges` | 64 |
-| `maxCommitChainScan` | 10000 |
-| `maxDerivedIndexRepairCommitsPerCall` | 256 |
-| `maxCachedStreams` | 10000 |
-| `maxInFlightAppends` | 1024 |
-| `maxBufferedBytes` | 64 MiB |
-| `maxConcurrentObjectReads` | 64 |
-| `maxReadBufferBytes` | 128 MiB |
-| `maxObjectBytes` | 16 MiB |
-| `maxAppendBatchRecords` | 100000 |
-| `offsetIndexCacheTtl` | 5 seconds |
-| `enableMetadataWatch` | false |
-| `enableOffsetIndexCache` | true |
+| Setting                               | Default    |
+|---------------------------------------|------------|
+| `appendSessionTtl`                    | 30 seconds |
+| `appendSessionRenewBefore`            | 10 seconds |
+| `appendSessionMinCommitRemaining`     | 5 seconds  |
+| `appendTimeout`                       | 30 seconds |
+| `readTimeout`                         | 30 seconds |
+| `shutdownGrace`                       | 30 seconds |
+| `maxResolveRanges`                    | 64         |
+| `maxCommitChainScan`                  | 10000      |
+| `maxDerivedIndexRepairCommitsPerCall` | 256        |
+| `maxCachedStreams`                    | 10000      |
+| `maxInFlightAppends`                  | 1024       |
+| `maxBufferedBytes`                    | 64 MiB     |
+| `maxConcurrentObjectReads`            | 64         |
+| `maxReadBufferBytes`                  | 128 MiB    |
+| `maxObjectBytes`                      | 16 MiB     |
+| `maxAppendBatchRecords`               | 100000     |
+| `offsetIndexCacheTtl`                 | 5 seconds  |
+| `enableMetadataWatch`                 | false      |
+| `enableOffsetIndexCache`              | true       |
 
 These defaults are implementation starting points, not product SLA. Tests should override them with small
 values to exercise timeout and backpressure paths.

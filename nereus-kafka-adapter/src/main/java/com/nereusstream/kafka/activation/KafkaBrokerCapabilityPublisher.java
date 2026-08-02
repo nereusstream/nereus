@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
 import com.nereusstream.api.ErrorCode;
@@ -18,7 +19,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-/** Publishes one broker-epoch capability and owns only its scheduled heartbeat operation. */
+/**
+ * Publishes one broker-epoch capability and owns only its scheduled heartbeat operation.
+ */
 public final class KafkaBrokerCapabilityPublisher implements AutoCloseable {
     private final Object guard = new Object();
     private final KafkaStorageActivationMetadataStore store;
@@ -43,8 +46,7 @@ public final class KafkaBrokerCapabilityPublisher implements AutoCloseable {
         this.specification = Objects.requireNonNull(specification, "specification");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.heartbeatFailureHandler = Objects.requireNonNull(
-                heartbeatFailureHandler, "heartbeatFailureHandler");
+        this.heartbeatFailureHandler = Objects.requireNonNull(heartbeatFailureHandler, "heartbeatFailureHandler");
     }
 
     public CompletionStage<VersionedKafkaBrokerCapability> start() {
@@ -84,8 +86,7 @@ public final class KafkaBrokerCapabilityPublisher implements AutoCloseable {
                         false,
                         "broker epoch capability is already owned by different immutable facts"));
             }
-            return store.heartbeatCapability(
-                    exact, specification.heartbeatRecord(exact.value(), now));
+            return store.heartbeatCapability(exact, specification.heartbeatRecord(exact.value(), now));
         });
     }
 
@@ -132,8 +133,7 @@ public final class KafkaBrokerCapabilityPublisher implements AutoCloseable {
         CompletableFuture<VersionedKafkaBrokerCapability> attempt;
         try {
             attempt = store.heartbeatCapability(
-                    expected,
-                    specification.heartbeatRecord(expected.value(), clock.millis()));
+                    expected, specification.heartbeatRecord(expected.value(), clock.millis()));
         } catch (Throwable failure) {
             heartbeatInFlight.set(false);
             failHeartbeat(failure);
@@ -161,7 +161,9 @@ public final class KafkaBrokerCapabilityPublisher implements AutoCloseable {
             return;
         }
         synchronized (guard) {
-            if (heartbeatTask != null) heartbeatTask.cancel(false);
+            if (heartbeatTask != null) {
+                heartbeatTask.cancel(false);
+            }
         }
         try {
             heartbeatFailureHandler.accept(failure);
@@ -173,9 +175,13 @@ public final class KafkaBrokerCapabilityPublisher implements AutoCloseable {
     @Override
     public void close() {
         synchronized (guard) {
-            if (closed) return;
+            if (closed) {
+                return;
+            }
             closed = true;
-            if (heartbeatTask != null) heartbeatTask.cancel(false);
+            if (heartbeatTask != null) {
+                heartbeatTask.cancel(false);
+            }
         }
     }
 

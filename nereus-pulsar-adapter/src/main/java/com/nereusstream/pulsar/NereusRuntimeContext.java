@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadinessProvider;
@@ -12,7 +13,9 @@ import java.util.Objects;
 import java.util.Optional;
 import org.apache.bookkeeper.client.api.BookKeeper;
 
-/** Borrowed broker resources. The Nereus runtime never closes any value in this record. */
+/**
+ * Borrowed broker resources. The Nereus runtime never closes any value in this record.
+ */
 public record NereusRuntimeContext(
         EventLoopGroup eventLoopGroup,
         OpenTelemetry openTelemetry,
@@ -146,21 +149,12 @@ public record NereusRuntimeContext(
         Objects.requireNonNull(openTelemetry, "openTelemetry");
         Objects.requireNonNull(creationGuard, "creationGuard");
         Objects.requireNonNull(cursorProtocolActivationGuard, "cursorProtocolActivationGuard");
-        Objects.requireNonNull(
-                generationCapabilityReadinessProvider,
-                "generationCapabilityReadinessProvider");
+        Objects.requireNonNull(generationCapabilityReadinessProvider, "generationCapabilityReadinessProvider");
         Objects.requireNonNull(secretResolver, "secretResolver");
         Objects.requireNonNull(pluginClassLoader, "pluginClassLoader");
-        borrowedBookKeeperClient = Objects.requireNonNull(
-                borrowedBookKeeperClient, "borrowedBookKeeperClient");
-        Objects.requireNonNull(
-                bookKeeperBrokerReadinessProvider,
-                "bookKeeperBrokerReadinessProvider");
-        Objects.requireNonNull(
-                bookKeeperPrimaryWalCapabilitySink,
-                "bookKeeperPrimaryWalCapabilitySink");
-        Objects.requireNonNull(
-                bookKeeperPrimaryWalAdministrationSink,
-                "bookKeeperPrimaryWalAdministrationSink");
+        borrowedBookKeeperClient = Objects.requireNonNull(borrowedBookKeeperClient, "borrowedBookKeeperClient");
+        Objects.requireNonNull(bookKeeperBrokerReadinessProvider, "bookKeeperBrokerReadinessProvider");
+        Objects.requireNonNull(bookKeeperPrimaryWalCapabilitySink, "bookKeeperPrimaryWalCapabilitySink");
+        Objects.requireNonNull(bookKeeperPrimaryWalAdministrationSink, "bookKeeperPrimaryWalAdministrationSink");
     }
 }

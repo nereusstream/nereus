@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectKey;
@@ -24,7 +24,6 @@ import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.VirtualLedgerProjectionRecord;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,8 +32,7 @@ import org.junit.jupiter.api.Test;
 class Phase4PhysicalRootLifecycleRouterTest {
     private static final String CLUSTER = "cluster-a";
     private static final String TOPIC = "persistent://tenant/ns/gc-router";
-    private static final Checksum SHA =
-            new Checksum(ChecksumType.SHA256, "a".repeat(64));
+    private static final Checksum SHA = new Checksum(ChecksumType.SHA256, "a".repeat(64));
 
     @Test
     void routesEveryLifecycleAndDeduplicatesActiveCursorInventoryByStream() {
@@ -47,53 +45,76 @@ class Phase4PhysicalRootLifecycleRouterTest {
         AtomicInteger deleting = new AtomicInteger();
         AtomicInteger deleted = new AtomicInteger();
         ArrayList<CursorLedgerIdentity> routedLedgers = new ArrayList<>();
-        Phase4PhysicalRootLifecycleRouter router =
-                new Phase4PhysicalRootLifecycleRouter(
-                        CLUSTER,
-                        projections,
-                        exact -> {
-                            cursorScans.incrementAndGet();
-                            routedLedgers.add(exact);
-                            return CompletableFuture.completedFuture(null);
-                        },
-                        (exact, root) -> {
-                            cursorRecoveries.incrementAndGet();
-                            routedLedgers.add(exact);
-                            return CompletableFuture.completedFuture(null);
-                        },
-                        root -> {
-                            ownerlessActive.incrementAndGet();
-                            return CompletableFuture.completedFuture(null);
-                        },
-                        root -> {
-                            ownerlessMarked.incrementAndGet();
-                            return CompletableFuture.completedFuture(null);
-                        },
-                        root -> {
-                            deleting.incrementAndGet();
-                            return CompletableFuture.completedFuture(null);
-                        },
-                        root -> {
-                            deleted.incrementAndGet();
-                            return CompletableFuture.completedFuture(null);
-                        });
+        Phase4PhysicalRootLifecycleRouter router = new Phase4PhysicalRootLifecycleRouter(
+                CLUSTER,
+                projections,
+                exact -> {
+                    cursorScans.incrementAndGet();
+                    routedLedgers.add(exact);
+                    return CompletableFuture.completedFuture(null);
+                },
+                (exact, root) -> {
+                    cursorRecoveries.incrementAndGet();
+                    routedLedgers.add(exact);
+                    return CompletableFuture.completedFuture(null);
+                },
+                root -> {
+                    ownerlessActive.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                },
+                root -> {
+                    ownerlessMarked.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                },
+                root -> {
+                    deleting.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                },
+                root -> {
+                    deleted.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                });
 
-        router.visit(root(cursorKey(ledger, "0".repeat(32)),
-                PhysicalObjectKind.CURSOR_SNAPSHOT, PhysicalObjectLifecycle.ACTIVE)).join();
-        router.visit(root(cursorKey(ledger, "1".repeat(32)),
-                PhysicalObjectKind.CURSOR_SNAPSHOT, PhysicalObjectLifecycle.ACTIVE)).join();
-        router.visit(root(new ObjectKey("objects/plain-active"),
-                PhysicalObjectKind.COMMITTED_COMPACTED, PhysicalObjectLifecycle.ACTIVE)).join();
-        router.visit(root(cursorKey(ledger, "2".repeat(32)),
-                PhysicalObjectKind.CURSOR_SNAPSHOT, PhysicalObjectLifecycle.MARKED)).join();
-        router.visit(root(new ObjectKey("objects/plain-marked"),
-                PhysicalObjectKind.COMMITTED_COMPACTED, PhysicalObjectLifecycle.MARKED)).join();
-        router.visit(root(new ObjectKey("objects/plain-deleting"),
-                PhysicalObjectKind.COMMITTED_COMPACTED, PhysicalObjectLifecycle.DELETING)).join();
-        router.visit(root(new ObjectKey("objects/plain-deleted"),
-                PhysicalObjectKind.COMMITTED_COMPACTED, PhysicalObjectLifecycle.DELETED)).join();
-        router.visit(root(new ObjectKey("objects/plain-quarantined"),
-                PhysicalObjectKind.COMMITTED_COMPACTED, PhysicalObjectLifecycle.QUARANTINED)).join();
+        router.visit(root(
+                        cursorKey(ledger, "0".repeat(32)),
+                        PhysicalObjectKind.CURSOR_SNAPSHOT,
+                        PhysicalObjectLifecycle.ACTIVE))
+                .join();
+        router.visit(root(
+                        cursorKey(ledger, "1".repeat(32)),
+                        PhysicalObjectKind.CURSOR_SNAPSHOT,
+                        PhysicalObjectLifecycle.ACTIVE))
+                .join();
+        router.visit(root(
+                        new ObjectKey("objects/plain-active"),
+                        PhysicalObjectKind.COMMITTED_COMPACTED,
+                        PhysicalObjectLifecycle.ACTIVE))
+                .join();
+        router.visit(root(
+                        cursorKey(ledger, "2".repeat(32)),
+                        PhysicalObjectKind.CURSOR_SNAPSHOT,
+                        PhysicalObjectLifecycle.MARKED))
+                .join();
+        router.visit(root(
+                        new ObjectKey("objects/plain-marked"),
+                        PhysicalObjectKind.COMMITTED_COMPACTED,
+                        PhysicalObjectLifecycle.MARKED))
+                .join();
+        router.visit(root(
+                        new ObjectKey("objects/plain-deleting"),
+                        PhysicalObjectKind.COMMITTED_COMPACTED,
+                        PhysicalObjectLifecycle.DELETING))
+                .join();
+        router.visit(root(
+                        new ObjectKey("objects/plain-deleted"),
+                        PhysicalObjectKind.COMMITTED_COMPACTED,
+                        PhysicalObjectLifecycle.DELETED))
+                .join();
+        router.visit(root(
+                        new ObjectKey("objects/plain-quarantined"),
+                        PhysicalObjectKind.COMMITTED_COMPACTED,
+                        PhysicalObjectLifecycle.QUARANTINED))
+                .join();
 
         assertThat(cursorScans).hasValue(1);
         assertThat(cursorRecoveries).hasValue(1);
@@ -108,24 +129,24 @@ class Phase4PhysicalRootLifecycleRouterTest {
     void missingHistoricalBindingFallsBackOnlyToOwnerlessGlobalProof() {
         CursorLedgerIdentity ledger = ledger();
         AtomicInteger ownerless = new AtomicInteger();
-        Phase4PhysicalRootLifecycleRouter router =
-                new Phase4PhysicalRootLifecycleRouter(
-                        CLUSTER,
-                        projections(ledger, false),
-                        ignored -> CompletableFuture.failedFuture(
-                                new AssertionError("cursor scan must not run")),
-                        (ignored, root) -> CompletableFuture.failedFuture(
-                                new AssertionError("cursor recovery must not run")),
-                        root -> {
-                            ownerless.incrementAndGet();
-                            return CompletableFuture.completedFuture(null);
-                        },
-                        root -> CompletableFuture.completedFuture(null),
-                        root -> CompletableFuture.completedFuture(null),
-                        root -> CompletableFuture.completedFuture(null));
+        Phase4PhysicalRootLifecycleRouter router = new Phase4PhysicalRootLifecycleRouter(
+                CLUSTER,
+                projections(ledger, false),
+                ignored -> CompletableFuture.failedFuture(new AssertionError("cursor scan must not run")),
+                (ignored, root) -> CompletableFuture.failedFuture(new AssertionError("cursor recovery must not run")),
+                root -> {
+                    ownerless.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                },
+                root -> CompletableFuture.completedFuture(null),
+                root -> CompletableFuture.completedFuture(null),
+                root -> CompletableFuture.completedFuture(null));
 
-        router.visit(root(cursorKey(ledger, "3".repeat(32)),
-                PhysicalObjectKind.CURSOR_SNAPSHOT, PhysicalObjectLifecycle.ACTIVE)).join();
+        router.visit(root(
+                        cursorKey(ledger, "3".repeat(32)),
+                        PhysicalObjectKind.CURSOR_SNAPSHOT,
+                        PhysicalObjectLifecycle.ACTIVE))
+                .join();
 
         assertThat(ownerless).hasValue(1);
     }
@@ -136,30 +157,29 @@ class Phase4PhysicalRootLifecycleRouterTest {
         AtomicInteger referencedActive = new AtomicInteger();
         AtomicInteger referencedMarked = new AtomicInteger();
         AtomicInteger ownerless = new AtomicInteger();
-        Phase4PhysicalRootLifecycleRouter router =
-                new Phase4PhysicalRootLifecycleRouter(
-                        CLUSTER,
-                        projections(ledger, true),
-                        ignored -> CompletableFuture.completedFuture(null),
-                        (ignored, root) -> CompletableFuture.completedFuture(null),
-                        root -> {
-                            referencedActive.incrementAndGet();
-                            return CompletableFuture.completedFuture(true);
-                        },
-                        root -> {
-                            referencedMarked.incrementAndGet();
-                            return CompletableFuture.completedFuture(true);
-                        },
-                        root -> {
-                            ownerless.incrementAndGet();
-                            return CompletableFuture.completedFuture(null);
-                        },
-                        root -> {
-                            ownerless.incrementAndGet();
-                            return CompletableFuture.completedFuture(null);
-                        },
-                        root -> CompletableFuture.completedFuture(null),
-                        root -> CompletableFuture.completedFuture(null));
+        Phase4PhysicalRootLifecycleRouter router = new Phase4PhysicalRootLifecycleRouter(
+                CLUSTER,
+                projections(ledger, true),
+                ignored -> CompletableFuture.completedFuture(null),
+                (ignored, root) -> CompletableFuture.completedFuture(null),
+                root -> {
+                    referencedActive.incrementAndGet();
+                    return CompletableFuture.completedFuture(true);
+                },
+                root -> {
+                    referencedMarked.incrementAndGet();
+                    return CompletableFuture.completedFuture(true);
+                },
+                root -> {
+                    ownerless.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                },
+                root -> {
+                    ownerless.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                },
+                root -> CompletableFuture.completedFuture(null),
+                root -> CompletableFuture.completedFuture(null));
 
         router.visit(root(
                         new ObjectKey("objects/referenced-active"),
@@ -185,23 +205,19 @@ class Phase4PhysicalRootLifecycleRouterTest {
                 (proxy, method, arguments) -> {
                     if (method.getName().equals("getProjectionByStream")) {
                         StreamId stream = (StreamId) arguments[1];
-                        Optional<VersionedVirtualLedgerProjection> binding = bindingPresent
-                                ? Optional.of(binding(ledger))
-                                : Optional.empty();
+                        Optional<VersionedVirtualLedgerProjection> binding =
+                                bindingPresent ? Optional.of(binding(ledger)) : Optional.empty();
                         return CompletableFuture.completedFuture(
-                                new ManagedLedgerStreamProjection(
-                                        stream, binding, Optional.empty()));
+                                new ManagedLedgerStreamProjection(stream, binding, Optional.empty()));
                     }
                     if (method.getName().equals("close")) {
                         return null;
                     }
-                    return CompletableFuture.failedFuture(new UnsupportedOperationException(
-                            method.getName()));
+                    return CompletableFuture.failedFuture(new UnsupportedOperationException(method.getName()));
                 });
     }
 
-    private static VersionedVirtualLedgerProjection binding(
-            CursorLedgerIdentity ledger) {
+    private static VersionedVirtualLedgerProjection binding(CursorLedgerIdentity ledger) {
         return new VersionedVirtualLedgerProjection(
                 "/projection/binding",
                 new VirtualLedgerProjectionRecord(
@@ -217,48 +233,31 @@ class Phase4PhysicalRootLifecycleRouterTest {
 
     private static CursorLedgerIdentity ledger() {
         StreamId stream = ManagedLedgerProjectionNames.streamId(TOPIC, 1);
-        ManagedLedgerProjectionIdentity projection =
-                new ManagedLedgerProjectionIdentity(
-                        1,
-                        1,
-                        stream.value(),
-                        ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID + 1);
-        return new CursorLedgerIdentity(
-                TOPIC,
-                ManagedLedgerProjectionNames.managedLedgerNameHash(TOPIC),
-                projection);
+        ManagedLedgerProjectionIdentity projection = new ManagedLedgerProjectionIdentity(
+                1, 1, stream.value(), ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID + 1);
+        return new CursorLedgerIdentity(TOPIC, ManagedLedgerProjectionNames.managedLedgerNameHash(TOPIC), projection);
     }
 
-    private static ObjectKey cursorKey(
-            CursorLedgerIdentity ledger, String snapshotId) {
+    private static ObjectKey cursorKey(CursorLedgerIdentity ledger, String snapshotId) {
         String cursor = "subscription-a";
         return CursorSnapshotKeys.objectKey(
-                CLUSTER,
-                new CursorIdentity(
-                        ledger,
-                        cursor,
-                        CursorNames.cursorNameHash(cursor),
-                        1),
-                snapshotId);
+                CLUSTER, new CursorIdentity(ledger, cursor, CursorNames.cursorNameHash(cursor), 1), snapshotId);
     }
 
     private static VersionedPhysicalObjectRoot root(
-            ObjectKey key,
-            PhysicalObjectKind kind,
-            PhysicalObjectLifecycle lifecycle) {
-        long epoch = switch (lifecycle) {
-            case ACTIVE, QUARANTINED -> 1;
-            case MARKED -> 2;
-            case DELETING -> 3;
-            case DELETED -> 4;
-        };
+            ObjectKey key, PhysicalObjectKind kind, PhysicalObjectLifecycle lifecycle) {
+        long epoch =
+                switch (lifecycle) {
+                    case ACTIVE, QUARANTINED -> 1;
+                    case MARKED -> 2;
+                    case DELETING -> 3;
+                    case DELETED -> 4;
+                };
         boolean gc = lifecycle == PhysicalObjectLifecycle.MARKED
                 || lifecycle == PhysicalObjectLifecycle.DELETING
                 || lifecycle == PhysicalObjectLifecycle.DELETED;
-        long started = lifecycle == PhysicalObjectLifecycle.DELETING
-                        || lifecycle == PhysicalObjectLifecycle.DELETED
-                ? 300
-                : 0;
+        long started =
+                lifecycle == PhysicalObjectLifecycle.DELETING || lifecycle == PhysicalObjectLifecycle.DELETED ? 300 : 0;
         long deleted = lifecycle == PhysicalObjectLifecycle.DELETED ? 400 : 0;
         PhysicalObjectRootRecord value = new PhysicalObjectRootRecord(
                 1,
@@ -283,14 +282,9 @@ class Phase4PhysicalRootLifecycleRouterTest {
                 deleted,
                 0,
                 "",
-                lifecycle == PhysicalObjectLifecycle.QUARANTINED
-                        ? "test quarantine"
-                        : "",
+                lifecycle == PhysicalObjectLifecycle.QUARANTINED ? "test quarantine" : "",
                 0);
         return new VersionedPhysicalObjectRoot(
-                "/root/" + ObjectKeyHash.from(key).value(),
-                value,
-                0,
-                SHA);
+                "/root/" + ObjectKeyHash.from(key).value(), value, 0, SHA);
     }
 }

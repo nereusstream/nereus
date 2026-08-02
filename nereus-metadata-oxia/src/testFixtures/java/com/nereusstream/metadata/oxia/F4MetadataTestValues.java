@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -15,16 +16,16 @@ import com.nereusstream.api.SchemaRef;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
-import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
-import com.nereusstream.metadata.oxia.records.GenerationBackfillProofRecord;
-import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
-import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationLifecycle;
-import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
-import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
 import com.nereusstream.metadata.oxia.records.GcDomainSnapshotProofRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
+import com.nereusstream.metadata.oxia.records.GenerationBackfillProofRecord;
+import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
+import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationLifecycle;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
+import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationOutputRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationPolicyRecord;
@@ -48,7 +49,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-/** Canonical complete-branch values shared by F4 codec and metadata-store contracts. */
+/**
+ * Canonical complete-branch values shared by F4 codec and metadata-store contracts.
+ */
 public final class F4MetadataTestValues {
     public static final String CLUSTER = "cluster-f4";
     public static final String STREAM = "stream-f4";
@@ -67,8 +70,7 @@ public final class F4MetadataTestValues {
     private static final ObjectKey OBJECT_KEY = new ObjectKey("objects/f4/compacted-object");
     private static final List<SchemaRef> SCHEMAS = List.of(new SchemaRef("pulsar", "schema-a", 3));
 
-    private F4MetadataTestValues() {
-    }
+    private F4MetadataTestValues() {}
 
     public static ReadTargetRecord readTarget() {
         EntryIndexRef entryIndex = new EntryIndexRef(
@@ -99,8 +101,7 @@ public final class F4MetadataTestValues {
     }
 
     public static GenerationSequenceRecord allocatedSequence() {
-        return new GenerationSequenceRecord(
-                1, STREAM, ReadView.COMMITTED.wireId(), 7, 7, PUBLICATION, 101, 0);
+        return new GenerationSequenceRecord(1, STREAM, ReadView.COMMITTED.wireId(), 7, 7, PUBLICATION, 101, 0);
     }
 
     public static GenerationIndexRecord generation(GenerationLifecycle lifecycle) {
@@ -164,8 +165,7 @@ public final class F4MetadataTestValues {
     }
 
     public static GenerationProtocolActivationRecord deletionActivation() {
-        GenerationBackfillProofRecord complete = new GenerationBackfillProofRecord(
-                ATTEMPT, 8, HASH_A, true, 175);
+        GenerationBackfillProofRecord complete = new GenerationBackfillProofRecord(ATTEMPT, 8, HASH_A, true, 175);
         return new GenerationProtocolActivationRecord(
                 1,
                 1,
@@ -186,10 +186,7 @@ public final class F4MetadataTestValues {
                 0);
     }
 
-    private static GenerationIndexRecord generation(
-            GenerationLifecycle lifecycle,
-            ReadView view,
-            boolean sparse) {
+    private static GenerationIndexRecord generation(GenerationLifecycle lifecycle, ReadView view, boolean sparse) {
         boolean visible = lifecycle == GenerationLifecycle.COMMITTED
                 || lifecycle == GenerationLifecycle.QUARANTINED
                 || lifecycle == GenerationLifecycle.DRAINING
@@ -300,8 +297,7 @@ public final class F4MetadataTestValues {
         boolean outputReady = lifecycle == TaskLifecycle.OUTPUT_READY
                 || lifecycle == TaskLifecycle.PUBLISHING
                 || lifecycle == TaskLifecycle.PUBLISHED;
-        boolean publishing = lifecycle == TaskLifecycle.PUBLISHING
-                || lifecycle == TaskLifecycle.PUBLISHED;
+        boolean publishing = lifecycle == TaskLifecycle.PUBLISHING || lifecycle == TaskLifecycle.PUBLISHED;
         boolean failed = lifecycle == TaskLifecycle.RETRY_WAIT
                 || lifecycle == TaskLifecycle.CANCELLED
                 || lifecycle == TaskLifecycle.TERMINAL_FAILED;
@@ -324,9 +320,7 @@ public final class F4MetadataTestValues {
                 policy(),
                 lifecycle,
                 attempt,
-                claimed
-                        ? Optional.of(new WorkerClaimRecord(CLAIM, PROCESS, 1, 120, 220))
-                        : Optional.empty(),
+                claimed ? Optional.of(new WorkerClaimRecord(CLAIM, PROCESS, 1, 120, 220)) : Optional.empty(),
                 outputReady ? Optional.of(output()) : Optional.empty(),
                 publishing ? OptionalLong.of(3) : OptionalLong.empty(),
                 publishing ? PUBLICATION : "",
@@ -341,13 +335,32 @@ public final class F4MetadataTestValues {
     public static MaterializationTaskRecord publishingTaskWithoutGeneration() {
         MaterializationTaskRecord allocated = task(TaskLifecycle.PUBLISHING);
         return new MaterializationTaskRecord(
-                allocated.schemaVersion(), allocated.taskId(), allocated.taskSequence(), allocated.streamId(),
-                allocated.readViewId(), allocated.taskKindId(), allocated.offsetStart(), allocated.offsetEnd(),
-                allocated.sources(), allocated.sourceSetSha256(), allocated.policyId(), allocated.policyVersion(),
-                allocated.policySha256(), allocated.policy(), allocated.lifecycle(), allocated.attempt(), allocated.workerClaim(),
-                allocated.output(), OptionalLong.empty(), allocated.publicationId(), allocated.failureClassId(),
-                allocated.failureMessage(), allocated.retryNotBeforeMillis(), allocated.createdAtMillis(),
-                allocated.updatedAtMillis(), 0);
+                allocated.schemaVersion(),
+                allocated.taskId(),
+                allocated.taskSequence(),
+                allocated.streamId(),
+                allocated.readViewId(),
+                allocated.taskKindId(),
+                allocated.offsetStart(),
+                allocated.offsetEnd(),
+                allocated.sources(),
+                allocated.sourceSetSha256(),
+                allocated.policyId(),
+                allocated.policyVersion(),
+                allocated.policySha256(),
+                allocated.policy(),
+                allocated.lifecycle(),
+                allocated.attempt(),
+                allocated.workerClaim(),
+                allocated.output(),
+                OptionalLong.empty(),
+                allocated.publicationId(),
+                allocated.failureClassId(),
+                allocated.failureMessage(),
+                allocated.retryNotBeforeMillis(),
+                allocated.createdAtMillis(),
+                allocated.updatedAtMillis(),
+                0);
     }
 
     public static MaterializationTaskRecord taskV2() {
@@ -400,13 +413,11 @@ public final class F4MetadataTestValues {
     }
 
     public static MaterializationCheckpointRecord emptyMaterializationCheckpoint() {
-        return new MaterializationCheckpointRecord(
-                1, STREAM, "policy-f4", 1, HASH_B, 0, 0, 0, "", 100, 0);
+        return new MaterializationCheckpointRecord(1, STREAM, "policy-f4", 1, HASH_B, 0, 0, 0, "", 100, 0);
     }
 
     public static MaterializationCheckpointRecord advancedMaterializationCheckpoint() {
-        return new MaterializationCheckpointRecord(
-                1, STREAM, "policy-f4", 1, HASH_B, 20, 7, 4, "task-f4", 1_200, 0);
+        return new MaterializationCheckpointRecord(1, STREAM, "policy-f4", 1, HASH_B, 20, 7, 4, "task-f4", 1_200, 0);
     }
 
     public static RangeRetentionStatsRecord retentionStats(long offsetStart, long offsetEnd, long commitVersion) {
@@ -429,8 +440,7 @@ public final class F4MetadataTestValues {
     }
 
     public static RecoveryCheckpointRootRecord emptyRecoveryRoot() {
-        return new RecoveryCheckpointRootRecord(
-                1, STREAM, 0, 0, 0, 0, 0, 0, 0, "", "", List.of(), "", "", 0, 0, 0);
+        return new RecoveryCheckpointRootRecord(1, STREAM, 0, 0, 0, 0, 0, 0, 0, "", "", List.of(), "", "", 0, 0, 0);
     }
 
     public static RecoveryCheckpointReferenceRecord checkpointReference() {
@@ -490,14 +500,12 @@ public final class F4MetadataTestValues {
         return physicalRoot(PhysicalObjectLifecycle.DELETED, true);
     }
 
-    private static PhysicalObjectRootRecord physicalRoot(
-            PhysicalObjectLifecycle lifecycle,
-            boolean tombstone) {
+    private static PhysicalObjectRootRecord physicalRoot(PhysicalObjectLifecycle lifecycle, boolean tombstone) {
         boolean gc = lifecycle == PhysicalObjectLifecycle.MARKED
                 || lifecycle == PhysicalObjectLifecycle.DELETING
                 || lifecycle == PhysicalObjectLifecycle.DELETED;
-        boolean deleting = lifecycle == PhysicalObjectLifecycle.DELETING
-                || lifecycle == PhysicalObjectLifecycle.DELETED;
+        boolean deleting =
+                lifecycle == PhysicalObjectLifecycle.DELETING || lifecycle == PhysicalObjectLifecycle.DELETED;
         boolean deleted = lifecycle == PhysicalObjectLifecycle.DELETED;
         ObjectKey key = new ObjectKey("objects/f4/physical-root");
         return new PhysicalObjectRootRecord(
@@ -566,8 +574,7 @@ public final class F4MetadataTestValues {
                 ATTEMPT,
                 GcRetirementManifestRecord.REFERENCE_SET_PROTOCOL_VERSION,
                 HASH_A,
-                List.of(new GcDomainSnapshotProofRecord(
-                        "projection-generation-v1", 1, HASH_A, HASH_B)),
+                List.of(new GcDomainSnapshotProofRecord("projection-generation-v1", 1, HASH_A, HASH_B)),
                 1,
                 1,
                 HASH_C,

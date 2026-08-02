@@ -95,21 +95,22 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
         this.maxEventRereads = maxEventRereads;
     }
 
-    /** Registers all request signals before scheduling the initial wave. */
+    /**
+     * Registers all request signals before scheduling the initial wave.
+     */
     public CompletableFuture<KafkaFetchWaveResult<T>> start() {
-        if (!started.compareAndSet(false, true)) return completion;
+        if (!started.compareAndSet(false, true)) {
+            return completion;
+        }
         try {
-            subscription = Objects.requireNonNull(
-                    source.subscribe(this::signal), "Kafka Fetch wave subscription");
+            subscription = Objects.requireNonNull(source.subscribe(this::signal), "Kafka Fetch wave subscription");
             if (terminal.get()) {
                 closeSubscription();
                 return completion;
             }
             if (!maxWait.isZero()) {
                 deadlineTask = deadlineScheduler.schedule(
-                        () -> dispatchControl(this::handleDeadline),
-                        maxWait.toNanos(),
-                        TimeUnit.NANOSECONDS);
+                        () -> dispatchControl(this::handleDeadline), maxWait.toNanos(), TimeUnit.NANOSECONDS);
             }
             dispatchControl(() -> beginRead(ReadKind.INITIAL));
         } catch (Throwable failure) {
@@ -130,13 +131,12 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
         return inFlight;
     }
 
-    /** Only broker lifecycle teardown calls this; cancelling the returned future is deliberately disabled. */
+    /**
+     * Only broker lifecycle teardown calls this; cancelling the returned future is deliberately disabled.
+     */
     public void cancel() {
         completeFailure(
-                new NereusException(
-                        ErrorCode.CANCELLED,
-                        false,
-                        "Kafka Fetch wave operation was cancelled"),
+                new NereusException(ErrorCode.CANCELLED, false, "Kafka Fetch wave operation was cancelled"),
                 KafkaFetchOperationState.CANCELLED);
     }
 
@@ -150,7 +150,9 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
     }
 
     private void handleSignal() {
-        if (terminal.get() || deadlineExpired) return;
+        if (terminal.get() || deadlineExpired) {
+            return;
+        }
         dirty = true;
         if (!inFlight && state == KafkaFetchOperationState.WAITING) {
             beginEventReadIfAllowed();
@@ -158,11 +160,15 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
     }
 
     private void handleDeadline() {
-        if (terminal.get()) return;
+        if (terminal.get()) {
+            return;
+        }
         deadlineExpired = true;
         dirty = false;
         state = KafkaFetchOperationState.TIMED_READING;
-        if (!inFlight) beginDeadlineRead();
+        if (!inFlight) {
+            beginDeadlineRead();
+        }
     }
 
     private void beginEventReadIfAllowed() {
@@ -176,34 +182,35 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
     }
 
     private void beginDeadlineRead() {
-        if (deadlineReadStarted) return;
+        if (deadlineReadStarted) {
+            return;
+        }
         deadlineReadStarted = true;
         beginRead(ReadKind.DEADLINE);
     }
 
     private void beginRead(ReadKind kind) {
-        if (terminal.get() || inFlight) return;
+        if (terminal.get() || inFlight) {
+            return;
+        }
         inFlight = true;
-        state = kind == ReadKind.DEADLINE
-                ? KafkaFetchOperationState.TIMED_READING
-                : KafkaFetchOperationState.READING;
+        state = kind == ReadKind.DEADLINE ? KafkaFetchOperationState.TIMED_READING : KafkaFetchOperationState.READING;
         readAttempts++;
         CompletionStage<T> stage;
         try {
-            stage = Objects.requireNonNull(
-                    source.read(kind == ReadKind.INITIAL),
-                    "Kafka Fetch wave read future");
+            stage = Objects.requireNonNull(source.read(kind == ReadKind.INITIAL), "Kafka Fetch wave read future");
         } catch (Throwable failure) {
             stage = CompletableFuture.failedFuture(failure);
         }
         CompletableFuture<T> read = stage.toCompletableFuture();
         inFlightFuture = read;
-        read.whenComplete((result, failure) ->
-                dispatchControl(() -> finishRead(kind, result, failure)));
+        read.whenComplete((result, failure) -> dispatchControl(() -> finishRead(kind, result, failure)));
     }
 
     private void finishRead(ReadKind kind, T result, Throwable suppliedFailure) {
-        if (terminal.get() || !inFlight) return;
+        if (terminal.get() || !inFlight) {
+            return;
+        }
         inFlight = false;
         inFlightFuture = null;
         if (suppliedFailure != null) {
@@ -231,24 +238,15 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
             completeFailure(failure, KafkaFetchOperationState.COMPLETE);
             return;
         }
-        if (mustComplete
-                || kind == ReadKind.DEADLINE
-                || maxWait.isZero()) {
-            completeSuccess(new KafkaFetchWaveResult<>(
-                    exactResult,
-                    exactBytes,
-                    kind == ReadKind.DEADLINE,
-                    readAttempts));
+        if (mustComplete || kind == ReadKind.DEADLINE || maxWait.isZero()) {
+            completeSuccess(
+                    new KafkaFetchWaveResult<>(exactResult, exactBytes, kind == ReadKind.DEADLINE, readAttempts));
             return;
         }
         if (deadlineExpired) {
             beginDeadlineRead();
         } else if (exactBytes >= minBytes) {
-            completeSuccess(new KafkaFetchWaveResult<>(
-                    exactResult,
-                    exactBytes,
-                    false,
-                    readAttempts));
+            completeSuccess(new KafkaFetchWaveResult<>(exactResult, exactBytes, false, readAttempts));
         } else if (dirty) {
             beginEventReadIfAllowed();
         } else {
@@ -257,7 +255,9 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
     }
 
     private void completeSuccess(KafkaFetchWaveResult<T> result) {
-        if (!terminal.compareAndSet(false, true)) return;
+        if (!terminal.compareAndSet(false, true)) {
+            return;
+        }
         state = KafkaFetchOperationState.COMPLETE;
         cleanup();
         dispatchCompletion(() -> completion.completeFromOperation(result));
@@ -265,7 +265,9 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
 
     private void completeFailure(Throwable failure, KafkaFetchOperationState terminalState) {
         Objects.requireNonNull(failure, "failure");
-        if (!terminal.compareAndSet(false, true)) return;
+        if (!terminal.compareAndSet(false, true)) {
+            return;
+        }
         state = terminalState;
         cleanup();
         dispatchCompletion(() -> completion.failFromOperation(failure));
@@ -273,10 +275,14 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
 
     private void cleanup() {
         ScheduledFuture<?> deadline = deadlineTask;
-        if (deadline != null) deadline.cancel(false);
+        if (deadline != null) {
+            deadline.cancel(false);
+        }
         closeSubscription();
         CompletableFuture<T> read = inFlightFuture;
-        if (read != null) read.cancel(true);
+        if (read != null) {
+            read.cancel(true);
+        }
         inFlightFuture = null;
         inFlight = false;
         synchronized (controlGuard) {
@@ -287,7 +293,9 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
     private void closeSubscription() {
         AutoCloseable exactSubscription = subscription;
         subscription = null;
-        if (exactSubscription == null) return;
+        if (exactSubscription == null) {
+            return;
+        }
         try {
             exactSubscription.close();
         } catch (Throwable ignored) {
@@ -298,7 +306,9 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
     private void dispatchCompletion(Runnable action) {
         AtomicBoolean invoked = new AtomicBoolean();
         Runnable exactlyOnce = () -> {
-            if (invoked.compareAndSet(false, true)) action.run();
+            if (invoked.compareAndSet(false, true)) {
+                action.run();
+            }
         };
         try {
             callbackExecutor.execute(exactlyOnce);
@@ -308,15 +318,23 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
     }
 
     private void dispatchControl(Runnable task) {
-        if (terminal.get()) return;
+        if (terminal.get()) {
+            return;
+        }
         boolean submit;
         synchronized (controlGuard) {
-            if (terminal.get()) return;
+            if (terminal.get()) {
+                return;
+            }
             controlTasks.addLast(task);
             submit = !controlScheduled;
-            if (submit) controlScheduled = true;
+            if (submit) {
+                controlScheduled = true;
+            }
         }
-        if (!submit) return;
+        if (!submit) {
+            return;
+        }
         try {
             readExecutor.execute(this::drainControlTasks);
         } catch (RejectedExecutionException rejected) {
@@ -368,7 +386,9 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
         DEADLINE
     }
 
-    /** Prevents caller cancellation or completion from bypassing operation-owned cleanup. */
+    /**
+     * Prevents caller cancellation or completion from bypassing operation-owned cleanup.
+     */
     private static final class OperationFuture<T> extends CompletableFuture<T> {
         private boolean completeFromOperation(T value) {
             return super.complete(value);

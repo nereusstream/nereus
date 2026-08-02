@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.core.capability.LiveProjectionSubject;
 import com.nereusstream.core.physical.GcReferenceDomainConfig;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProjectionRefV1;
@@ -38,17 +38,15 @@ class ManagedLedgerStreamRetirementAuthorityReaderTest {
             assertThat(empty.authorities()).hasSize(1);
 
             store.createRetention(CLUSTER, retention()).join();
-            var active = store.createCursor(
-                    CLUSTER, cursor(CursorRecordLifecycle.ACTIVE, 1)).join();
+            var active = store.createCursor(CLUSTER, cursor(CursorRecordLifecycle.ACTIVE, 1))
+                    .join();
             var blocked = reader.capture(subject).join();
             assertThat(blocked.complete()).isTrue();
             assertThat(blocked.referenceFree()).isFalse();
             assertThat(blocked.liveReferenceCount()).isOne();
 
-            store.compareAndSetCursor(
-                    CLUSTER,
-                    cursor(CursorRecordLifecycle.DELETED, 2),
-                    active.metadataVersion()).join();
+            store.compareAndSetCursor(CLUSTER, cursor(CursorRecordLifecycle.DELETED, 2), active.metadataVersion())
+                    .join();
             var clear = reader.capture(subject).join();
             assertThat(clear.complete()).isTrue();
             assertThat(clear.referenceFree()).isTrue();
@@ -61,8 +59,8 @@ class ManagedLedgerStreamRetirementAuthorityReaderTest {
     void authorityLimitAndTransitionalRetentionFailClosed() {
         try (var store = new FakeCursorMetadataStore()) {
             var created = store.createRetention(CLUSTER, retention()).join();
-            store.createCursor(
-                    CLUSTER, cursor(CursorRecordLifecycle.DELETED, 2)).join();
+            store.createCursor(CLUSTER, cursor(CursorRecordLifecycle.DELETED, 2))
+                    .join();
 
             var bounded = reader(store, 1).capture(subject()).join();
             assertThat(bounded.complete()).isFalse();
@@ -83,8 +81,8 @@ class ManagedLedgerStreamRetirementAuthorityReaderTest {
                     OptionalLong.of(1),
                     Optional.of("nereus-cursor-retention/" + ATTEMPT + ":test"),
                     3);
-            store.compareAndSetRetention(
-                    CLUSTER, pending, created.metadataVersion()).join();
+            store.compareAndSetRetention(CLUSTER, pending, created.metadataVersion())
+                    .join();
             var transitional = reader(store, 100).capture(subject()).join();
             assertThat(transitional.complete()).isTrue();
             assertThat(transitional.referenceFree()).isFalse();
@@ -92,17 +90,13 @@ class ManagedLedgerStreamRetirementAuthorityReaderTest {
     }
 
     private static ManagedLedgerStreamRetirementAuthorityReader reader(
-            FakeCursorMetadataStore store,
-            int maxAuthorities) {
+            FakeCursorMetadataStore store, int maxAuthorities) {
         return new ManagedLedgerStreamRetirementAuthorityReader(
-                CLUSTER,
-                store,
-                new GcReferenceDomainConfig(1, maxAuthorities, 100));
+                CLUSTER, store, new GcReferenceDomainConfig(1, maxAuthorities, 100));
     }
 
     private static LiveProjectionSubject subject() {
-        ManagedLedgerGenerationProjectionRefV1 ref =
-                new ManagedLedgerGenerationProjectionRefV1(NAME, projection());
+        ManagedLedgerGenerationProjectionRefV1 ref = new ManagedLedgerGenerationProjectionRefV1(NAME, projection());
         return new LiveProjectionSubject(
                 new com.nereusstream.api.StreamId(projection().streamId()),
                 ref.toProjectionRef(),
@@ -133,9 +127,7 @@ class ManagedLedgerStreamRetirementAuthorityReaderTest {
                 1);
     }
 
-    private static CursorStateRecord cursor(
-            CursorRecordLifecycle lifecycle,
-            long sequence) {
+    private static CursorStateRecord cursor(CursorRecordLifecycle lifecycle, long sequence) {
         String name = "subscription-a";
         boolean deleted = lifecycle == CursorRecordLifecycle.DELETED;
         return new CursorStateRecord(

@@ -1,13 +1,15 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
 import com.nereusstream.metadata.oxia.records.KafkaStorageReadinessRecord;
 import java.util.ArrayList;
 
-/** Closed field-order codec for an expiring exact-broker readiness snapshot. */
-public final class KafkaStorageReadinessRecordCodecV1
-        extends AbstractF4RecordCodecV1<KafkaStorageReadinessRecord> {
+/**
+ * Closed field-order codec for an expiring exact-broker readiness snapshot.
+ */
+public final class KafkaStorageReadinessRecordCodecV1 extends AbstractF4RecordCodecV1<KafkaStorageReadinessRecord> {
     public KafkaStorageReadinessRecordCodecV1() {
         super(KafkaStorageReadinessRecord.class);
     }
@@ -46,13 +48,10 @@ public final class KafkaStorageReadinessRecordCodecV1
             long readinessEpoch = reader.readLong("readinessEpoch");
             long kraftMetadataOffset = reader.readLong("kraftMetadataOffset");
             int brokerCount = reader.readCount(
-                    "brokerCount",
-                    Integer.BYTES + Long.BYTES,
-                    KafkaStorageReadinessRecord.MAX_BROKERS);
+                    "brokerCount", Integer.BYTES + Long.BYTES, KafkaStorageReadinessRecord.MAX_BROKERS);
             ArrayList<KafkaBrokerIdentity> brokers = new ArrayList<>(brokerCount);
             for (int index = 0; index < brokerCount; index++) {
-                brokers.add(new KafkaBrokerIdentity(
-                        reader.readInt("brokerId"), reader.readLong("brokerEpoch")));
+                brokers.add(new KafkaBrokerIdentity(reader.readInt("brokerId"), reader.readLong("brokerEpoch")));
             }
             byte[] brokerSetSha256 = reader.readFixedBytes("brokerSetSha256", 32);
             byte[] capabilitySha256 = reader.readFixedBytes("capabilitySha256", 32);

@@ -5,6 +5,7 @@
  *
  *   https://www.apache.org/licenses/LICENSE-2.0
  */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.Checksum;
@@ -17,7 +18,9 @@ import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import java.util.List;
 import java.util.Objects;
 
-/** Exact, gap-free durable generation identities admitted by an external activation root. */
+/**
+ * Exact, gap-free durable generation identities admitted by an external activation root.
+ */
 public record GenerationReadConstraint(
         StreamId streamId, ReadView view, OffsetRange coverage, List<Identity> identities) {
     public GenerationReadConstraint {
@@ -26,8 +29,7 @@ public record GenerationReadConstraint(
         Objects.requireNonNull(coverage, "coverage");
         identities = List.copyOf(Objects.requireNonNull(identities, "identities"));
         if (coverage.isEmpty() || identities.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "generation read constraint must cover a non-empty range");
+            throw new IllegalArgumentException("generation read constraint must cover a non-empty range");
         }
         long cursor = coverage.startOffset();
         for (Identity identity : identities) {
@@ -38,8 +40,7 @@ public record GenerationReadConstraint(
             cursor = identity.coverage().endOffset();
         }
         if (cursor != coverage.endOffset()) {
-            throw new IllegalArgumentException(
-                    "generation read constraint identities do not cover the declared range");
+            throw new IllegalArgumentException("generation read constraint identities do not cover the declared range");
         }
     }
 
@@ -60,7 +61,9 @@ public record GenerationReadConstraint(
         return identities.stream().anyMatch(identity -> identity.matches(index));
     }
 
-    /** Exact committed index identity rooted by the activation authority. */
+    /**
+     * Exact committed index identity rooted by the activation authority.
+     */
     public record Identity(
             OffsetRange coverage,
             long generation,

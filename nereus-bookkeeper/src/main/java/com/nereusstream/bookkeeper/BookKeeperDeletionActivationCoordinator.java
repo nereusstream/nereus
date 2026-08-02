@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -25,19 +26,11 @@ public final class BookKeeperDeletionActivationCoordinator {
     private final BookKeeperBrokerReadinessProvider readinessProvider;
     private final BookKeeperProtocolActivationStore activationStore;
     private final BookKeeperProtocolActivationCoordinator activationCoordinator;
-    private final BiFunction<
-                    BookKeeperBrokerReadiness,
-                    Duration,
-                    CompletableFuture<BookKeeperRootCoverageProof>>
+    private final BiFunction<BookKeeperBrokerReadiness, Duration, CompletableFuture<BookKeeperRootCoverageProof>>
             rootCoverage;
-    private final BiFunction<
-                    BookKeeperBrokerReadiness,
-                    Duration,
-                    CompletableFuture<BookKeeperStreamCoverageProof>>
+    private final BiFunction<BookKeeperBrokerReadiness, Duration, CompletableFuture<BookKeeperStreamCoverageProof>>
             streamCoverage;
-    private final Function<
-                    BookKeeperScopeCapabilityRequest,
-                    CompletableFuture<BookKeeperScopeCapabilityProof>>
+    private final Function<BookKeeperScopeCapabilityRequest, CompletableFuture<BookKeeperScopeCapabilityProof>>
             scopeProbe;
 
     public BookKeeperDeletionActivationCoordinator(
@@ -58,49 +51,43 @@ public final class BookKeeperDeletionActivationCoordinator {
         this.namespaceVerifier = Objects.requireNonNull(namespaceVerifier, "namespaceVerifier");
         this.readinessProvider = Objects.requireNonNull(readinessProvider, "readinessProvider");
         this.activationStore = Objects.requireNonNull(activationStore, "activationStore");
-        this.activationCoordinator = Objects.requireNonNull(
-                activationCoordinator, "activationCoordinator");
-        this.rootCoverage =
-                Objects.requireNonNull(rootCoverage, "rootCoverage")::produce;
-        this.streamCoverage =
-                Objects.requireNonNull(streamCoverage, "streamCoverage")::produce;
-        this.scopeProbe =
-                Objects.requireNonNull(scopeProbe, "scopeProbe")::probe;
+        this.activationCoordinator = Objects.requireNonNull(activationCoordinator, "activationCoordinator");
+        this.rootCoverage = Objects.requireNonNull(rootCoverage, "rootCoverage")::produce;
+        this.streamCoverage = Objects.requireNonNull(streamCoverage, "streamCoverage")::produce;
+        this.scopeProbe = Objects.requireNonNull(scopeProbe, "scopeProbe")::probe;
     }
 
-    public CompletableFuture<BookKeeperDeletionActivationResult> activate(
-            BookKeeperDeletionActivationRequest request) {
+    public CompletableFuture<BookKeeperDeletionActivationResult> activate(BookKeeperDeletionActivationRequest request) {
         final BookKeeperDeletionActivationRequest exact;
         final BookKeeperOperationDeadline deadline;
         try {
             exact = Objects.requireNonNull(request, "request");
             if (!gcConfiguration.enabled() || gcConfiguration.dryRun()) {
-                throw notReady(
-                        "BookKeeper deletion activation requires enabled non-dry-run ledger GC configuration");
+                throw notReady("BookKeeper deletion activation requires enabled non-dry-run ledger GC configuration");
             }
             deadline = new BookKeeperOperationDeadline(exact.timeout());
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return activationStore.read(configuration, namespace, deadline.remaining())
+        return activationStore
+                .read(configuration, namespace, deadline.remaining())
                 .thenCompose(optional -> {
-                    BookKeeperProtocolActivation current = optional.orElseThrow(() -> notReady(
-                            "BookKeeper publication activation is absent"));
+                    BookKeeperProtocolActivation current =
+                            optional.orElseThrow(() -> notReady("BookKeeper publication activation is absent"));
                     requirePublication(current);
-                    return readinessProvider.requireBookKeeperPrimaryWalReadiness()
+                    return readinessProvider
+                            .requireBookKeeperPrimaryWalReadiness()
                             .thenCompose(readiness -> {
                                 requireCapacity(readiness);
-                                if (current.value().ledgerDeletionEnabled()
-                                        && matchesReadiness(current, readiness)) {
+                                if (current.value().ledgerDeletionEnabled() && matchesReadiness(current, readiness)) {
                                     return currentResult(current, readiness, deadline);
                                 }
-                                if (current.metadataVersion()
-                                        != exact.expectedActivationMetadataVersion()) {
+                                if (current.metadataVersion() != exact.expectedActivationMetadataVersion()) {
                                     return CompletableFuture.failedFuture(notReady(
-                                            "BookKeeper activation metadata version changed before deletion proof production"));
+                                            "BookKeeper activation metadata version changed before deletion proof "
+                                                    + "production"));
                                 }
-                                return produceAndInstall(
-                                        exact, current, readiness, deadline);
+                                return produceAndInstall(exact, current, readiness, deadline);
                             });
                 });
     }
@@ -112,27 +99,22 @@ public final class BookKeeperDeletionActivationCoordinator {
             BookKeeperOperationDeadline deadline) {
         requireCapacity(readiness);
         return scopeProbe
-                .apply(new BookKeeperScopeCapabilityRequest(
-                        request.runId(), readiness, deadline.remaining()))
-                .thenCompose(scope -> requireCurrent(readiness, deadline)
-                        .thenApply(ignored -> requireScopeBinding(readiness, scope)))
+                .apply(new BookKeeperScopeCapabilityRequest(request.runId(), readiness, deadline.remaining()))
+                .thenCompose(scope ->
+                        requireCurrent(readiness, deadline).thenApply(ignored -> requireScopeBinding(readiness, scope)))
                 .thenCompose(scope -> rootCoverage
                         .apply(readiness, deadline.remaining())
                         .thenCompose(root -> requireCurrent(readiness, deadline)
-                                .thenApply(ignored -> new ScopedCoverage(scope, requireRootBinding(
-                                        readiness, root)))))
+                                .thenApply(ignored -> new ScopedCoverage(scope, requireRootBinding(readiness, root)))))
                 .thenCompose(coverage -> streamCoverage
                         .apply(readiness, deadline.remaining())
                         .thenCompose(stream -> requireCurrent(readiness, deadline)
                                 .thenApply(ignored -> new Proofs(
-                                        coverage.root(),
-                                        requireStreamBinding(readiness, stream),
-                                        coverage.scope()))))
+                                        coverage.root(), requireStreamBinding(readiness, stream), coverage.scope()))))
                 .thenCompose(proofs -> namespaceVerifier
                         .requireActive(configuration, deadline.remaining())
                         .thenApply(this::requireNamespace)
-                        .thenCompose(ignored -> install(
-                                current, readiness, proofs, deadline)));
+                        .thenCompose(ignored -> install(current, readiness, proofs, deadline)));
     }
 
     private CompletableFuture<BookKeeperDeletionActivationResult> install(
@@ -171,13 +153,11 @@ public final class BookKeeperDeletionActivationCoordinator {
                 })
                 .thenCompose(Function.identity())
                 .thenCompose(installed -> requireCurrent(readiness, deadline)
-                        .thenCompose(ignored -> activationStore
-                                .read(configuration, namespace, deadline.remaining()))
+                        .thenCompose(ignored -> activationStore.read(configuration, namespace, deadline.remaining()))
                         .thenApply(reloaded -> {
-                            BookKeeperProtocolActivation exact = reloaded.orElseThrow(() -> notReady(
-                                    "BookKeeper deletion activation disappeared after CAS"));
-                            if (!sameProofs(exact, readiness, proofs)
-                                    || !exact.equals(installed)) {
+                            BookKeeperProtocolActivation exact = reloaded.orElseThrow(
+                                    () -> notReady("BookKeeper deletion activation disappeared after CAS"));
+                            if (!sameProofs(exact, readiness, proofs) || !exact.equals(installed)) {
                                 throw notReady(
                                         "BookKeeper deletion activation changed during final proof revalidation");
                             }
@@ -191,31 +171,27 @@ public final class BookKeeperDeletionActivationCoordinator {
             BookKeeperOperationDeadline deadline) {
         requireReadiness(current, readiness);
         return requireCurrent(readiness, deadline)
-                .thenCompose(ignored -> namespaceVerifier
-                        .requireActive(configuration, deadline.remaining()))
+                .thenCompose(ignored -> namespaceVerifier.requireActive(configuration, deadline.remaining()))
                 .thenApply(this::requireNamespace)
                 .thenApply(ignored -> result(current, false))
                 .thenCompose(result -> activationStore
                         .read(configuration, namespace, deadline.remaining())
                         .thenApply(reloaded -> {
-                            BookKeeperProtocolActivation exact = reloaded.orElseThrow(() -> notReady(
-                                    "BookKeeper deletion activation disappeared during idempotent read"));
+                            BookKeeperProtocolActivation exact = reloaded.orElseThrow(() ->
+                                    notReady("BookKeeper deletion activation disappeared during idempotent read"));
                             if (!exact.equals(result.activation())) {
-                                throw notReady(
-                                        "BookKeeper deletion activation changed during idempotent read");
+                                throw notReady("BookKeeper deletion activation changed during idempotent read");
                             }
                             return result;
                         }));
     }
 
     private CompletableFuture<Void> requireCurrent(
-            BookKeeperBrokerReadiness expected,
-            BookKeeperOperationDeadline deadline) {
+            BookKeeperBrokerReadiness expected, BookKeeperOperationDeadline deadline) {
         return deadline.bound(readinessProvider.requireBookKeeperPrimaryWalReadiness())
                 .thenAccept(actual -> {
                     if (!actual.equals(expected)) {
-                        throw notReady(
-                                "BookKeeper broker readiness changed during deletion proof production");
+                        throw notReady("BookKeeper broker readiness changed during deletion proof production");
                     }
                     requireCapacity(actual);
                 });
@@ -223,20 +199,21 @@ public final class BookKeeperDeletionActivationCoordinator {
 
     private void requirePublication(BookKeeperProtocolActivation activation) {
         if (!activation.supportsAllPublications()) {
-            throw notReady(
-                    "BookKeeper deletion requires WAL_ONLY, async and sync publication activation");
+            throw notReady("BookKeeper deletion requires WAL_ONLY, async and sync publication activation");
         }
-        if (!activation.value().configurationBindingSha256()
+        if (!activation
+                        .value()
+                        .configurationBindingSha256()
                         .equals(configuration.configurationBindingSha256().value())
-                || !activation.value().ledgerIdNamespaceSha256()
+                || !activation
+                        .value()
+                        .ledgerIdNamespaceSha256()
                         .equals(namespace.ledgerIdNamespaceSha256().value())) {
-            throw notReady(
-                    "BookKeeper publication activation does not match the exact deletion binding");
+            throw notReady("BookKeeper publication activation does not match the exact deletion binding");
         }
     }
 
-    private BookKeeperLedgerIdNamespaceReservation requireNamespace(
-            BookKeeperLedgerIdNamespaceReservation actual) {
+    private BookKeeperLedgerIdNamespaceReservation requireNamespace(BookKeeperLedgerIdNamespaceReservation actual) {
         BookKeeperLedgerIdNamespaceReservation exact = Objects.requireNonNull(actual, "namespace");
         if (!exact.equals(namespace)) {
             throw notReady("BookKeeper namespace changed during deletion proof production");
@@ -245,62 +222,46 @@ public final class BookKeeperDeletionActivationCoordinator {
     }
 
     private void requireCapacity(BookKeeperBrokerReadiness readiness) {
-        if ((long) readiness.persistentBrokerCount() + 1L
-                > configuration.maxReaderLeasesPerLedger()) {
-            throw notReady(
-                    "BookKeeper reader-lease slots cannot cover the broker set plus restart overlap");
+        if ((long) readiness.persistentBrokerCount() + 1L > configuration.maxReaderLeasesPerLedger()) {
+            throw notReady("BookKeeper reader-lease slots cannot cover the broker set plus restart overlap");
         }
     }
 
-    private static void requireReadiness(
-            BookKeeperProtocolActivation activation,
-            BookKeeperBrokerReadiness readiness) {
+    private static void requireReadiness(BookKeeperProtocolActivation activation, BookKeeperBrokerReadiness readiness) {
         if (!matchesReadiness(activation, readiness)) {
-            throw notReady(
-                    "BookKeeper deletion activation does not match live broker readiness");
+            throw notReady("BookKeeper deletion activation does not match live broker readiness");
         }
     }
 
     private static boolean matchesReadiness(
-            BookKeeperProtocolActivation activation,
-            BookKeeperBrokerReadiness readiness) {
-        return activation.value().brokerReadinessEpoch()
-                        == readiness.brokerReadinessEpoch()
-                && activation.value().brokerReadinessSha256()
+            BookKeeperProtocolActivation activation, BookKeeperBrokerReadiness readiness) {
+        return activation.value().brokerReadinessEpoch() == readiness.brokerReadinessEpoch()
+                && activation
+                        .value()
+                        .brokerReadinessSha256()
                         .equals(readiness.brokerSetSha256().value());
     }
 
     private static BookKeeperScopeCapabilityProof requireScopeBinding(
             BookKeeperBrokerReadiness readiness, BookKeeperScopeCapabilityProof proof) {
-        requireProofBinding(
-                readiness,
-                proof.brokerReadinessEpoch(),
-                proof.brokerSetSha256());
+        requireProofBinding(readiness, proof.brokerReadinessEpoch(), proof.brokerSetSha256());
         return proof;
     }
 
     private static BookKeeperRootCoverageProof requireRootBinding(
             BookKeeperBrokerReadiness readiness, BookKeeperRootCoverageProof proof) {
-        requireProofBinding(
-                readiness,
-                proof.brokerReadinessEpoch(),
-                proof.brokerSetSha256());
+        requireProofBinding(readiness, proof.brokerReadinessEpoch(), proof.brokerSetSha256());
         return proof;
     }
 
     private static BookKeeperStreamCoverageProof requireStreamBinding(
             BookKeeperBrokerReadiness readiness, BookKeeperStreamCoverageProof proof) {
-        requireProofBinding(
-                readiness,
-                proof.brokerReadinessEpoch(),
-                proof.brokerSetSha256());
+        requireProofBinding(readiness, proof.brokerReadinessEpoch(), proof.brokerSetSha256());
         return proof;
     }
 
     private static void requireProofBinding(
-            BookKeeperBrokerReadiness readiness,
-            long proofReadinessEpoch,
-            Checksum proofBrokerSetSha256) {
+            BookKeeperBrokerReadiness readiness, long proofReadinessEpoch, Checksum proofBrokerSetSha256) {
         if (proofReadinessEpoch != readiness.brokerReadinessEpoch()
                 || !proofBrokerSetSha256.equals(readiness.brokerSetSha256())) {
             throw notReady("BookKeeper deletion proof does not match broker readiness");
@@ -308,19 +269,24 @@ public final class BookKeeperDeletionActivationCoordinator {
     }
 
     private static boolean sameProofs(
-            BookKeeperProtocolActivation activation,
-            BookKeeperBrokerReadiness readiness,
-            Proofs proofs) {
+            BookKeeperProtocolActivation activation, BookKeeperBrokerReadiness readiness, Proofs proofs) {
         return activation.value().ledgerDeletionEnabled()
-                && activation.value().brokerReadinessEpoch()
-                        == readiness.brokerReadinessEpoch()
-                && activation.value().brokerReadinessSha256()
+                && activation.value().brokerReadinessEpoch() == readiness.brokerReadinessEpoch()
+                && activation
+                        .value()
+                        .brokerReadinessSha256()
                         .equals(readiness.brokerSetSha256().value())
-                && activation.value().rootCoverageProofSha256()
+                && activation
+                        .value()
+                        .rootCoverageProofSha256()
                         .equals(proofs.root().coverageSha256().value())
-                && activation.value().streamCoverageProofSha256()
+                && activation
+                        .value()
+                        .streamCoverageProofSha256()
                         .equals(proofs.stream().coverageSha256().value())
-                && activation.value().bookKeeperScopeProofSha256()
+                && activation
+                        .value()
+                        .bookKeeperScopeProofSha256()
                         .equals(proofs.scope().capabilitySha256().value());
     }
 
@@ -348,18 +314,13 @@ public final class BookKeeperDeletionActivationCoordinator {
     }
 
     private static NereusException notReady(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_CONDITION_FAILED, true, message);
+        return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
 
-    private record ScopedCoverage(
-            BookKeeperScopeCapabilityProof scope,
-            BookKeeperRootCoverageProof root) {
-    }
+    private record ScopedCoverage(BookKeeperScopeCapabilityProof scope, BookKeeperRootCoverageProof root) {}
 
     private record Proofs(
             BookKeeperRootCoverageProof root,
             BookKeeperStreamCoverageProof stream,
-            BookKeeperScopeCapabilityProof scope) {
-    }
+            BookKeeperScopeCapabilityProof scope) {}
 }

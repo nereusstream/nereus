@@ -18,10 +18,10 @@ import com.nereusstream.api.ReadBatch;
 import java.util.List;
 import java.util.Objects;
 
-/** Batches and exact full-slice read accounting produced by one WAL reader call. */
-public record WalReadResult(
-        List<ReadBatch> batches,
-        List<WalSliceReadStats> sliceStats) {
+/**
+ * Batches and exact full-slice read accounting produced by one WAL reader call.
+ */
+public record WalReadResult(List<ReadBatch> batches, List<WalSliceReadStats> sliceStats) {
     public WalReadResult {
         batches = List.copyOf(Objects.requireNonNull(batches, "batches"));
         sliceStats = List.copyOf(Objects.requireNonNull(sliceStats, "sliceStats"));

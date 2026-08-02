@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.StreamId;
@@ -10,9 +11,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Production F2 projection metadata adapter using a caller-owned shared Oxia runtime. */
-public final class OxiaJavaManagedLedgerProjectionMetadataStore
-        implements ManagedLedgerProjectionMetadataStore {
+/**
+ * Production F2 projection metadata adapter using a caller-owned shared Oxia runtime.
+ */
+public final class OxiaJavaManagedLedgerProjectionMetadataStore implements ManagedLedgerProjectionMetadataStore {
     private final ProjectionMetadataStoreCore core;
 
     public static OxiaJavaManagedLedgerProjectionMetadataStore usingSharedRuntime(
@@ -29,30 +31,23 @@ public final class OxiaJavaManagedLedgerProjectionMetadataStore
     }
 
     private OxiaJavaManagedLedgerProjectionMetadataStore(
-            SharedOxiaClientRuntime runtime,
-            ProjectionMetadataStoreConfig storeConfig,
-            Clock clock) {
-        this.core = new ProjectionMetadataStoreCore(runtime.client(), storeConfig, clock, ignored -> { });
+            SharedOxiaClientRuntime runtime, ProjectionMetadataStoreConfig storeConfig, Clock clock) {
+        this.core = new ProjectionMetadataStoreCore(runtime.client(), storeConfig, clock, ignored -> {});
     }
 
     @Override
-    public CompletableFuture<Optional<TopicProjectionRecord>> getProjection(
-            String cluster,
-            String managedLedgerName) {
+    public CompletableFuture<Optional<TopicProjectionRecord>> getProjection(String cluster, String managedLedgerName) {
         return core.getProjection(cluster, managedLedgerName);
     }
 
     @Override
-    public CompletableFuture<ManagedLedgerStreamProjection> getProjectionByStream(
-            String cluster, StreamId streamId) {
+    public CompletableFuture<ManagedLedgerStreamProjection> getProjectionByStream(String cluster, StreamId streamId) {
         return core.getProjectionByStream(cluster, streamId);
     }
 
     @Override
     public CompletableFuture<TopicProjectionRecord> createFirstProjection(
-            String cluster,
-            ProjectionCreateRequest request,
-            ProjectionPublishGuard publishGuard) {
+            String cluster, ProjectionCreateRequest request, ProjectionPublishGuard publishGuard) {
         return core.createFirstProjection(cluster, request, publishGuard);
     }
 
@@ -74,8 +69,7 @@ public final class OxiaJavaManagedLedgerProjectionMetadataStore
             ManagedLedgerProjectionIdentity expectedIdentity,
             long expectedVersion,
             Map<String, String> properties) {
-        return core.updateProperties(
-                cluster, managedLedgerName, expectedIdentity, expectedVersion, properties);
+        return core.updateProperties(cluster, managedLedgerName, expectedIdentity, expectedVersion, properties);
     }
 
     @Override
@@ -84,8 +78,7 @@ public final class OxiaJavaManagedLedgerProjectionMetadataStore
             String managedLedgerName,
             ManagedLedgerProjectionIdentity expectedIdentity,
             long expectedMetadataVersion) {
-        return core.activateCursorProtocol(
-                cluster, managedLedgerName, expectedIdentity, expectedMetadataVersion);
+        return core.activateCursorProtocol(cluster, managedLedgerName, expectedIdentity, expectedMetadataVersion);
     }
 
     @Override
@@ -94,8 +87,7 @@ public final class OxiaJavaManagedLedgerProjectionMetadataStore
             String managedLedgerName,
             ManagedLedgerProjectionIdentity expectedIdentity,
             long expectedMetadataVersion) {
-        return core.activateGenerationProtocol(
-                cluster, managedLedgerName, expectedIdentity, expectedMetadataVersion);
+        return core.activateGenerationProtocol(cluster, managedLedgerName, expectedIdentity, expectedMetadataVersion);
     }
 
     @Override
@@ -105,14 +97,12 @@ public final class OxiaJavaManagedLedgerProjectionMetadataStore
             ManagedLedgerProjectionIdentity expectedIdentity,
             long expectedVersion,
             ManagedLedgerFacadeState state) {
-        return core.mirrorFacadeState(
-                cluster, managedLedgerName, expectedIdentity, expectedVersion, state);
+        return core.mirrorFacadeState(cluster, managedLedgerName, expectedIdentity, expectedVersion, state);
     }
 
     @Override
     public CompletableFuture<ProjectionRepairResult> repairProjectionIndexes(
-            String cluster,
-            TopicProjectionRecord authoritative) {
+            String cluster, TopicProjectionRecord authoritative) {
         return core.repairProjectionIndexes(cluster, authoritative);
     }
 

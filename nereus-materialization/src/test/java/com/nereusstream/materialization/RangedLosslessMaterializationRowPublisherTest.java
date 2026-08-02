@@ -16,7 +16,6 @@ package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -48,21 +47,16 @@ class RangedLosslessMaterializationRowPublisherTest {
         byte[] returned = new byte[row.exactPayload().remaining()];
         row.exactPayload().get(returned);
         assertThat(returned).containsExactly(payload);
-        assertThat(row.payloadCrc32c())
-                .isEqualTo(Crc32cChecksums.intValue(Crc32cChecksums.checksum(payload)));
+        assertThat(row.payloadCrc32c()).isEqualTo(Crc32cChecksums.intValue(Crc32cChecksums.checksum(payload)));
     }
 
     @Test
     void rejectsNonKafkaPayloadWithoutReinterpretingIt() {
-        ReadBatch opaque = batch(
-                new OffsetRange(10, 11),
-                PayloadFormat.OPAQUE_RECORD_BATCH,
-                new byte[] {1});
+        ReadBatch opaque = batch(new OffsetRange(10, 11), PayloadFormat.OPAQUE_RECORD_BATCH, new byte[] {1});
 
         assertThatThrownBy(() -> RangedLosslessMaterializationRowPublisher.row(opaque, 0))
-                .isInstanceOfSatisfying(
-                        NereusException.class,
-                        failure -> assertThat(failure.code()).isEqualTo(ErrorCode.UNSUPPORTED_FORMAT));
+                .isInstanceOfSatisfying(NereusException.class, failure -> assertThat(failure.code())
+                        .isEqualTo(ErrorCode.UNSUPPORTED_FORMAT));
     }
 
     private static ReadBatch batch(OffsetRange range, PayloadFormat format, byte[] payload) {
@@ -74,12 +68,7 @@ class RangedLosslessMaterializationRowPublisherTest {
                 1,
                 BookKeeperEntryMapping.RANGED_NEREUS_ENTRY_V1,
                 new Checksum(ChecksumType.SHA256, "1".repeat(64)));
-        ReadSourceRef source = new ReadSourceRef(
-                range,
-                0,
-                1,
-                target,
-                ReadTargetIdentities.sha256(target));
+        ReadSourceRef source = new ReadSourceRef(range, 0, 1, target, ReadTargetIdentities.sha256(target));
         return new ReadBatch(range, format, payload, List.of(), Optional.empty(), source);
     }
 }

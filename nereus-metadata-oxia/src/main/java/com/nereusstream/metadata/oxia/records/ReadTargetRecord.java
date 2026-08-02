@@ -5,13 +5,16 @@
  *
  *   https://www.apache.org/licenses/LICENSE-2.0
  */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.ApiLimits;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Durable, codec-neutral envelope for a physical read target. */
+/**
+ * Durable, codec-neutral envelope for a physical read target.
+ */
 public record ReadTargetRecord(
         String targetType,
         int targetVersion,
@@ -25,8 +28,7 @@ public record ReadTargetRecord(
         payload = Objects.requireNonNull(payload, "payload").clone();
         identityChecksumType = requireText(identityChecksumType, "identityChecksumType");
         identityChecksumValue = requireText(identityChecksumValue, "identityChecksumValue");
-        if (targetVersion <= 0 || payload.length == 0
-                || payload.length > ApiLimits.MAX_READ_TARGET_ENCODED_BYTES) {
+        if (targetVersion <= 0 || payload.length == 0 || payload.length > ApiLimits.MAX_READ_TARGET_ENCODED_BYTES) {
             throw new IllegalArgumentException("invalid read target version or payload length");
         }
     }
@@ -49,8 +51,10 @@ public record ReadTargetRecord(
 
     @Override
     public int hashCode() {
-        return 31 * Objects.hash(targetType, targetVersion, payloadEncoding,
-                identityChecksumType, identityChecksumValue) + Arrays.hashCode(payload);
+        return 31
+                        * Objects.hash(
+                                targetType, targetVersion, payloadEncoding, identityChecksumType, identityChecksumValue)
+                + Arrays.hashCode(payload);
     }
 
     private static String requireText(String value, String name) {

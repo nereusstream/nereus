@@ -22,7 +22,9 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.zip.CRC32C;
 
-/** Strict header, range, producer-fact and CRC validator for byte-exact Kafka magic-v2 batches. */
+/**
+ * Strict header, range, producer-fact and CRC validator for byte-exact Kafka magic-v2 batches.
+ */
 public final class KafkaRecordBatchCodec {
     public static final byte MAGIC_VALUE_V2 = 2;
     public static final int RECORD_BATCH_OVERHEAD = 61;
@@ -49,7 +51,9 @@ public final class KafkaRecordBatchCodec {
     private static final int NO_SEQUENCE = -1;
     private static final int MAX_COMPRESSION_TYPE_ID = 4;
 
-    /** Decodes one exact batch without changing the supplied buffer's position, limit or byte order. */
+    /**
+     * Decodes one exact batch without changing the supplied buffer's position, limit or byte order.
+     */
     public KafkaRecordBatch decode(ByteBuffer encodedBatch) {
         Objects.requireNonNull(encodedBatch, "encodedBatch");
         List<KafkaRecordBatch> batches = decodeAll(encodedBatch);
@@ -64,7 +68,9 @@ public final class KafkaRecordBatchCodec {
         return decode(ByteBuffer.wrap(encodedBatch));
     }
 
-    /** Decodes concatenated batches while preserving each batch as a separate owned byte array. */
+    /**
+     * Decodes concatenated batches while preserving each batch as a separate owned byte array.
+     */
     public List<KafkaRecordBatch> decodeAll(ByteBuffer encodedRecords) {
         Objects.requireNonNull(encodedRecords, "encodedRecords");
         ByteBuffer input = encodedRecords.duplicate().order(ByteOrder.BIG_ENDIAN);
@@ -105,9 +111,7 @@ public final class KafkaRecordBatchCodec {
         crc32c.update(encoded, ATTRIBUTES_OFFSET, encoded.length - ATTRIBUTES_OFFSET);
         if (storedChecksum != crc32c.getValue()) {
             throw invalid(
-                    "Kafka record batch CRC mismatch: stored %08x, computed %08x",
-                    storedChecksum,
-                    crc32c.getValue());
+                    "Kafka record batch CRC mismatch: stored %08x, computed %08x", storedChecksum, crc32c.getValue());
         }
 
         long baseOffset = batch.getLong(0);
@@ -132,8 +136,7 @@ public final class KafkaRecordBatchCodec {
         }
         int recordCount = batch.getInt(RECORDS_COUNT_OFFSET);
         if (recordCount < 0 || recordCount > logicalRecordCount) {
-            throw invalid(
-                    "Kafka physical record count %d is outside logical span %d", recordCount, logicalRecordCount);
+            throw invalid("Kafka physical record count %d is outside logical span %d", recordCount, logicalRecordCount);
         }
 
         long baseTimestamp = batch.getLong(BASE_TIMESTAMP_OFFSET);
@@ -165,11 +168,7 @@ public final class KafkaRecordBatchCodec {
     }
 
     private static void validateProducerFacts(
-            long producerId,
-            short producerEpoch,
-            int baseSequence,
-            boolean transactional,
-            boolean control) {
+            long producerId, short producerEpoch, int baseSequence, boolean transactional, boolean control) {
         if (producerId < NO_PRODUCER_ID) {
             throw invalid("Kafka producer id must be -1 or non-negative");
         }
@@ -177,9 +176,7 @@ public final class KafkaRecordBatchCodec {
             if (transactional || control) {
                 throw invalid("transactional/control Kafka batch requires a producer id");
             }
-        } else if (producerEpoch < 0
-                || baseSequence < NO_SEQUENCE
-                || (!control && baseSequence == NO_SEQUENCE)) {
+        } else if (producerEpoch < 0 || baseSequence < NO_SEQUENCE || (!control && baseSequence == NO_SEQUENCE)) {
             throw invalid("Kafka batch with producer id has invalid producer epoch or sequence");
         }
     }

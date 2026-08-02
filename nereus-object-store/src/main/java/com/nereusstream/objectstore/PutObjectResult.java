@@ -18,11 +18,7 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ObjectKey;
 import java.util.Objects;
 
-public record PutObjectResult(
-        ObjectKey key,
-        long objectLength,
-        Checksum checksum,
-        String etag) {
+public record PutObjectResult(ObjectKey key, long objectLength, Checksum checksum, String etag) {
     public PutObjectResult {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(checksum, "checksum");

@@ -17,7 +17,9 @@ package com.nereusstream.api;
 import java.util.Objects;
 import java.util.OptionalLong;
 
-/** Protocol-neutral logical-offset condition applied by the append linearization point. */
+/**
+ * Protocol-neutral logical-offset condition applied by the append linearization point.
+ */
 public record AppendPrecondition(OptionalLong expectedStartOffset) {
     private static final AppendPrecondition NONE = new AppendPrecondition(OptionalLong.empty());
 

@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -75,27 +75,27 @@ class ProviderNeutralObjectReadRegressionTest {
         WalObjectReader reader = new WalObjectReader() {
             @Override
             public CompletableFuture<WalReadResult> readWithStats(
-                    long startOffset,
-                    List<ResolvedObjectRange> ranges,
-                    ReadOptions options) {
+                    long startOffset, List<ResolvedObjectRange> ranges, ReadOptions options) {
                 assertThat(ranges).hasSize(1);
                 assertThat(ranges.getFirst().readTarget()).isEqualTo(target);
                 return CompletableFuture.completedFuture(legacy);
             }
         };
 
-        PhysicalReadResult result = new ObjectWalReaderAdapter(reader).readPhysicalWithStats(
-                new StreamId("stream"),
-                5,
-                List.of(range),
-                new ReadOptions(10, 10, ReadIsolation.COMMITTED, Duration.ofSeconds(1)))
+        PhysicalReadResult result = new ObjectWalReaderAdapter(reader)
+                .readPhysicalWithStats(
+                        new StreamId("stream"),
+                        5,
+                        List.of(range),
+                        new ReadOptions(10, 10, ReadIsolation.COMMITTED, Duration.ofSeconds(1)))
                 .join();
 
         assertThat(result.batches()).containsExactly(batch);
         assertThat(result.rangeStats()).singleElement().satisfies(stats -> {
             assertThat(stats.targetIdentity()).isEqualTo(ReadTargetIdentities.sha256(target));
             assertThat(stats.resolvedPayloadBytes()).isEqualTo(target.objectLength());
-            assertThat(stats.resolvedAuxiliaryBytes()).isEqualTo(target.entryIndexRef().length());
+            assertThat(stats.resolvedAuxiliaryBytes())
+                    .isEqualTo(target.entryIndexRef().length());
             assertThat(stats.physicalPayloadBytesRead()).isEqualTo(12);
             assertThat(stats.physicalAuxiliaryBytesRead()).isEqualTo(4);
             assertThat(stats.returnedPayloadBytes()).isEqualTo(3);

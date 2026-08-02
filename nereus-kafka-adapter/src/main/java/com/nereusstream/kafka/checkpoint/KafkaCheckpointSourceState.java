@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.checkpoint;
 
 import com.nereusstream.api.AppendAuthority;
@@ -7,7 +8,9 @@ import com.nereusstream.api.ChecksumType;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** Durable stream-head and process-local Kafka-state facts captured under the partition snapshot lock. */
+/**
+ * Durable stream-head and process-local Kafka-state facts captured under the partition snapshot lock.
+ */
 public record KafkaCheckpointSourceState(
         AppendAuthority authority,
         String writerId,
@@ -30,8 +33,12 @@ public record KafkaCheckpointSourceState(
         if (headSha256.type() != ChecksumType.SHA256) {
             throw new IllegalArgumentException("headSha256 must use SHA256");
         }
-        if (sessionEpoch < 0 || leaseVersion < 0 || trimOffset < 0 || endOffset < trimOffset
-                || commitVersion < 0 || stateMapEndOffset < 0) {
+        if (sessionEpoch < 0
+                || leaseVersion < 0
+                || trimOffset < 0
+                || endOffset < trimOffset
+                || commitVersion < 0
+                || stateMapEndOffset < 0) {
             throw new IllegalArgumentException("invalid Kafka checkpoint source state");
         }
     }
@@ -50,8 +57,7 @@ public record KafkaCheckpointSourceState(
 
     private static String bounded(String value, String name, boolean allowEmpty) {
         Objects.requireNonNull(value, name);
-        if ((!allowEmpty && value.isBlank())
-                || value.getBytes(StandardCharsets.UTF_8).length > 64 * 1024) {
+        if ((!allowEmpty && value.isBlank()) || value.getBytes(StandardCharsets.UTF_8).length > 64 * 1024) {
             throw new IllegalArgumentException(name + " must be bounded and have valid emptiness");
         }
         return value;

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadinessProvider;
@@ -27,8 +28,7 @@ public record NereusKafkaBookKeeperWalRuntimeContext(
                 client,
                 brokerReadiness,
                 passwords,
-                new DefaultBookKeeperClientOperations(
-                        Objects.requireNonNull(client, "client")));
+                new DefaultBookKeeperClientOperations(Objects.requireNonNull(client, "client")));
     }
 
     public NereusKafkaBookKeeperWalRuntimeContext {

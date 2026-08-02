@@ -18,16 +18,15 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Immutable, exactly-sized WAL object that has not yet been uploaded. */
+/**
+ * Immutable, exactly-sized WAL object that has not yet been uploaded.
+ */
 public final class PreparedWalObject {
     private final WalWriteResult result;
     private final byte[] encodedBytes;
     private final Duration uploadTimeout;
 
-    public PreparedWalObject(
-            WalWriteResult result,
-            byte[] encodedBytes,
-            Duration uploadTimeout) {
+    public PreparedWalObject(WalWriteResult result, byte[] encodedBytes, Duration uploadTimeout) {
         this.result = Objects.requireNonNull(result, "result");
         this.encodedBytes = Objects.requireNonNull(encodedBytes, "encodedBytes").clone();
         this.uploadTimeout = Objects.requireNonNull(uploadTimeout, "uploadTimeout");

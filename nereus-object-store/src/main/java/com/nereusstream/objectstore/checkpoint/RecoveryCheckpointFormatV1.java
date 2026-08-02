@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -16,7 +17,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Objects;
 
-/** Closed NRC1 constants, hard limits, and deterministic object identity rules. */
+/**
+ * Closed NRC1 constants, hard limits, and deterministic object identity rules.
+ */
 public final class RecoveryCheckpointFormatV1 {
     public static final int MAJOR_VERSION = 1;
     public static final int FLAGS = 0;
@@ -38,13 +41,12 @@ public final class RecoveryCheckpointFormatV1 {
     static final byte[] HEADER_MAGIC = "NRC1".getBytes(StandardCharsets.US_ASCII);
     static final byte[] FOOTER_MAGIC = "NRF1".getBytes(StandardCharsets.US_ASCII);
 
-    private RecoveryCheckpointFormatV1() {
-    }
+    private RecoveryCheckpointFormatV1() {}
 
     public static ObjectKeyPrefix prefix(String cluster) {
-        return new ObjectKeyPrefix(KeyComponentCodec.encodeComponent(
-                        RecoveryCheckpointValidation.requireText(cluster, "cluster"))
-                + "/recovery-checkpoints/v1/");
+        return new ObjectKeyPrefix(
+                KeyComponentCodec.encodeComponent(RecoveryCheckpointValidation.requireText(cluster, "cluster"))
+                        + "/recovery-checkpoints/v1/");
     }
 
     public static ObjectKey objectKey(RecoveryCheckpointWriteRequest request, Checksum contentSha256) {
@@ -71,9 +73,10 @@ public final class RecoveryCheckpointFormatV1 {
         return ObjectKeyHash.from(Objects.requireNonNull(objectKey, "objectKey"));
     }
 
-    /** Strict ownerless inverse used only by complete object inventory. */
-    public static ParsedRecoveryCheckpointKey parseObjectKey(
-            String cluster, ObjectKey objectKey) {
+    /**
+     * Strict ownerless inverse used only by complete object inventory.
+     */
+    public static ParsedRecoveryCheckpointKey parseObjectKey(String cluster, ObjectKey objectKey) {
         Objects.requireNonNull(objectKey, "objectKey");
         String exactPrefix = prefix(cluster).value();
         if (!objectKey.value().startsWith(exactPrefix)) {
@@ -96,8 +99,7 @@ public final class RecoveryCheckpointFormatV1 {
         }
         Checksum contentSha256 = new Checksum(ChecksumType.SHA256, identity[1]);
         RecoveryCheckpointValidation.requireSha256(contentSha256, "contentSha256");
-        String attempt = RecoveryCheckpointValidation.requireBase32Id(
-                identity[2], "checkpointAttemptId");
+        String attempt = RecoveryCheckpointValidation.requireBase32Id(identity[2], "checkpointAttemptId");
         String canonical = exactPrefix
                 + KeyComponentCodec.encodeComponent(streamId.value())
                 + "/"
@@ -110,17 +112,13 @@ public final class RecoveryCheckpointFormatV1 {
         if (!canonical.equals(objectKey.value())) {
             throw new IllegalArgumentException("recovery checkpoint key is not canonical");
         }
-        return new ParsedRecoveryCheckpointKey(
-                streamId,
-                sequence,
-                contentSha256,
-                attempt,
-                objectId(objectKey));
+        return new ParsedRecoveryCheckpointKey(streamId, sequence, contentSha256, attempt, objectId(objectKey));
     }
 
     static Checksum sha256(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
-        return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(newSha256().digest(bytes)));
+        return new Checksum(
+                ChecksumType.SHA256, HexFormat.of().formatHex(newSha256().digest(bytes)));
     }
 
     static MessageDigest newSha256() {
@@ -142,10 +140,9 @@ public final class RecoveryCheckpointFormatV1 {
             if (checkpointSequence <= 0) {
                 throw new IllegalArgumentException("checkpointSequence must be positive");
             }
-            contentSha256 = RecoveryCheckpointValidation.requireSha256(
-                    contentSha256, "contentSha256");
-            checkpointAttemptId = RecoveryCheckpointValidation.requireBase32Id(
-                    checkpointAttemptId, "checkpointAttemptId");
+            contentSha256 = RecoveryCheckpointValidation.requireSha256(contentSha256, "contentSha256");
+            checkpointAttemptId =
+                    RecoveryCheckpointValidation.requireBase32Id(checkpointAttemptId, "checkpointAttemptId");
             Objects.requireNonNull(objectId, "objectId");
         }
     }

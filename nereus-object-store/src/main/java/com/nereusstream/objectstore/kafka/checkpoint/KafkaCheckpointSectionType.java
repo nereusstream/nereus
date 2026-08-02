@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.kafka.checkpoint;
 
-/** Closed required NKC1 section IDs. */
+/**
+ * Closed required NKC1 section IDs.
+ */
 public enum KafkaCheckpointSectionType {
     PRODUCER_STATE(1),
     ABORTED_TRANSACTION_INDEX(2),
@@ -23,7 +26,9 @@ public enum KafkaCheckpointSectionType {
 
     public static KafkaCheckpointSectionType fromWireId(int wireId) {
         for (KafkaCheckpointSectionType value : values()) {
-            if (value.wireId == wireId) return value;
+            if (value.wireId == wireId) {
+                return value;
+            }
         }
         throw new IllegalArgumentException("unknown Kafka checkpoint section id: " + wireId);
     }

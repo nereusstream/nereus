@@ -16,14 +16,13 @@ package com.nereusstream.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendPrecondition;
-import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendRecoveryOptions;
+import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.DurabilityLevel;
@@ -84,11 +83,14 @@ class DefaultStreamStorageAppendTest {
         try (TestContext context = context(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run)) {
             StreamMetadata stream = context.createStream("orders");
 
-            AppendResult first = context.storage.append(
-                    stream.streamId(), batch("a", "bb"), appendOptions(Duration.ofSeconds(5))).join();
-            var firstHead = context.storage.getStableHeadSnapshot(stream.streamId()).join();
-            AppendResult second = context.storage.append(
-                    stream.streamId(), batch("ccc"), appendOptions(Duration.ofSeconds(5))).join();
+            AppendResult first = context.storage
+                    .append(stream.streamId(), batch("a", "bb"), appendOptions(Duration.ofSeconds(5)))
+                    .join();
+            var firstHead =
+                    context.storage.getStableHeadSnapshot(stream.streamId()).join();
+            AppendResult second = context.storage
+                    .append(stream.streamId(), batch("ccc"), appendOptions(Duration.ofSeconds(5)))
+                    .join();
 
             assertThat(first.range()).isEqualTo(new OffsetRange(0, 2));
             assertThat(second.range()).isEqualTo(new OffsetRange(2, 3));
@@ -98,30 +100,51 @@ class DefaultStreamStorageAppendTest {
             ObjectSliceReadTarget firstTarget = (ObjectSliceReadTarget) first.readTarget();
             ObjectSliceReadTarget secondTarget = (ObjectSliceReadTarget) second.readTarget();
             assertThat(firstTarget.objectId()).isNotEqualTo(secondTarget.objectId());
-            assertThat(context.metadata.getObjectManifest("cluster/a", firstTarget.objectId()).join()).isPresent();
-            assertThat(context.metadata.scanOffsetIndex("cluster/a", stream.streamId(), 0, 10).join())
+            assertThat(context.metadata
+                            .getObjectManifest("cluster/a", firstTarget.objectId())
+                            .join())
+                    .isPresent();
+            assertThat(context.metadata
+                            .scanOffsetIndex("cluster/a", stream.streamId(), 0, 10)
+                            .join())
                     .extracting(record -> record.offsetEnd())
                     .containsExactly(2L, 3L);
-            StreamMetadata current = context.storage.getStreamMetadata(stream.streamId()).join();
+            StreamMetadata current =
+                    context.storage.getStreamMetadata(stream.streamId()).join();
             assertThat(current.committedEndOffset()).isEqualTo(3);
             assertThat(current.cumulativeSize()).isEqualTo(6);
-            var stableHead = context.storage.getStableHeadSnapshot(stream.streamId()).join();
+            var stableHead =
+                    context.storage.getStableHeadSnapshot(stream.streamId()).join();
             assertThat(stableHead.committedEndOffset()).isEqualTo(3);
             assertThat(stableHead.cumulativeSize()).isEqualTo(6);
             assertThat(stableHead.commitVersion()).isEqualTo(2);
             assertThat(stableHead.lastCommitId()).isNotBlank();
             assertThat(stableHead.appendSession()).isPresent();
-            assertThat(context.storage.isCommitReachable(
-                    stableHead.commitAnchor(), firstHead.lastCommitId(), firstHead.commitVersion()).join()).isTrue();
-            assertThat(context.storage.isCommitReachable(
-                    stableHead.commitAnchor(), stableHead.lastCommitId(), stableHead.commitVersion()).join()).isTrue();
-            assertThat(context.storage.isCommitReachable(
-                    stableHead.commitAnchor(), firstHead.lastCommitId(), stableHead.commitVersion()).join()).isFalse();
-            assertThat(context.storage.isCommitReachable(
-                    firstHead.commitAnchor(), stableHead.lastCommitId(), stableHead.commitVersion()).join()).isFalse();
-            AppendSession beforeRenewal = stableHead.appendSession().orElseThrow().session();
-            AppendSession renewed = context.storage.renewAppendSession(
-                    beforeRenewal, Duration.ofSeconds(30)).join();
+            assertThat(context.storage
+                            .isCommitReachable(
+                                    stableHead.commitAnchor(), firstHead.lastCommitId(), firstHead.commitVersion())
+                            .join())
+                    .isTrue();
+            assertThat(context.storage
+                            .isCommitReachable(
+                                    stableHead.commitAnchor(), stableHead.lastCommitId(), stableHead.commitVersion())
+                            .join())
+                    .isTrue();
+            assertThat(context.storage
+                            .isCommitReachable(
+                                    stableHead.commitAnchor(), firstHead.lastCommitId(), stableHead.commitVersion())
+                            .join())
+                    .isFalse();
+            assertThat(context.storage
+                            .isCommitReachable(
+                                    firstHead.commitAnchor(), stableHead.lastCommitId(), stableHead.commitVersion())
+                            .join())
+                    .isFalse();
+            AppendSession beforeRenewal =
+                    stableHead.appendSession().orElseThrow().session();
+            AppendSession renewed = context.storage
+                    .renewAppendSession(beforeRenewal, Duration.ofSeconds(30))
+                    .join();
             assertThat(renewed.fencingToken()).isEqualTo(beforeRenewal.fencingToken());
             assertThat(renewed.epoch()).isEqualTo(beforeRenewal.epoch());
             assertThat(renewed.leaseVersion()).isGreaterThan(beforeRenewal.leaseVersion());
@@ -131,17 +154,16 @@ class DefaultStreamStorageAppendTest {
     @Test
     void conditionalAppendUsesFreshHeadAndRejectsMismatchBeforeWalPreparation() {
         CountingWriter writer = new CountingWriter(newWriter(new LocalFileObjectStore(root)));
-        try (TestContext context = context(
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                Runnable::run,
-                writer)) {
+        try (TestContext context = context(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run, writer)) {
             StreamId streamId = context.createStream("conditional").streamId();
 
-            AppendResult accepted = context.storage.append(
-                    streamId,
-                    kafkaBatch("first-secret", 3),
-                    appendOptions(Duration.ofSeconds(5)),
-                    AppendPrecondition.expectedStartOffset(0)).join();
+            AppendResult accepted = context.storage
+                    .append(
+                            streamId,
+                            kafkaBatch("first-secret", 3),
+                            appendOptions(Duration.ofSeconds(5)),
+                            AppendPrecondition.expectedStartOffset(0))
+                    .join();
 
             assertThat(accepted.range()).isEqualTo(new OffsetRange(0, 3));
             assertThat(accepted.recordCount()).isEqualTo(3);
@@ -170,10 +192,9 @@ class DefaultStreamStorageAppendTest {
             assertThat(higher.getMessage()).doesNotContain("higher-secret");
             assertThat(writer.prepareCount).hasValue(1);
 
-            AppendResult legacy = context.storage.append(
-                    streamId,
-                    batch("legacy"),
-                    appendOptions(Duration.ofSeconds(5))).join();
+            AppendResult legacy = context.storage
+                    .append(streamId, batch("legacy"), appendOptions(Duration.ofSeconds(5)))
+                    .join();
             assertThat(legacy.range()).isEqualTo(new OffsetRange(3, 4));
             assertThat(writer.prepareCount).hasValue(2);
         }
@@ -186,16 +207,18 @@ class DefaultStreamStorageAppendTest {
             StreamId streamId = context.createStream("sequenced").streamId();
             List<CompletableFuture<AppendResult>> appends = java.util.stream.IntStream.range(0, 20)
                     .mapToObj(index -> context.storage.append(
-                            streamId,
-                            batch("value-" + index),
-                            appendOptions(Duration.ofSeconds(10))))
+                            streamId, batch("value-" + index), appendOptions(Duration.ofSeconds(10))))
                     .toList();
             CompletableFuture.allOf(appends.toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
 
             assertThat(appends)
                     .extracting(future -> future.join().range().startOffset())
-                    .containsExactlyInAnyOrderElementsOf(java.util.stream.LongStream.range(0, 20).boxed().toList());
-            assertThat(context.metadata.getCommittedEndOffset("cluster/a", streamId).join().committedEndOffset())
+                    .containsExactlyInAnyOrderElementsOf(
+                            java.util.stream.LongStream.range(0, 20).boxed().toList());
+            assertThat(context.metadata
+                            .getCommittedEndOffset("cluster/a", streamId)
+                            .join()
+                            .committedEndOffset())
                     .isEqualTo(20);
         } finally {
             executor.shutdownNow();
@@ -207,21 +230,19 @@ class DefaultStreamStorageAppendTest {
         CountingWriter writer = new CountingWriter(newWriter(new LocalFileObjectStore(root)));
         try (TestContext context = context(StorageProfile.BOOKKEEPER_WAL_ONLY, Runnable::run, writer)) {
             StreamId streamId = context.createStream("bk").streamId();
-            NereusException profileFailure = appendFailure(context.storage.append(
-                    streamId, batch("a"), appendOptions(Duration.ofSeconds(5))));
+            NereusException profileFailure =
+                    appendFailure(context.storage.append(streamId, batch("a"), appendOptions(Duration.ofSeconds(5))));
             assertThat(profileFailure.code()).isEqualTo(ErrorCode.UNSUPPORTED_STORAGE_PROFILE);
             assertThat(profileFailure.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
             assertThat(writer.prepareCount).hasValue(0);
         }
 
         CountingWriter durabilityWriter = new CountingWriter(newWriter(new LocalFileObjectStore(root.resolve("d"))));
-        try (TestContext context = context(
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run, durabilityWriter)) {
+        try (TestContext context = context(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run, durabilityWriter)) {
             StreamId streamId = context.createStream("durability").streamId();
             AppendOptions options = new AppendOptions(
                     Optional.empty(), DurabilityLevel.WAL_DURABLE, Duration.ofSeconds(5), true, Map.of());
-            NereusException durabilityFailure = appendFailure(
-                    context.storage.append(streamId, batch("a"), options));
+            NereusException durabilityFailure = appendFailure(context.storage.append(streamId, batch("a"), options));
             assertThat(durabilityFailure.code()).isEqualTo(ErrorCode.UNSUPPORTED_DURABILITY_LEVEL);
             assertThat(durabilityWriter.prepareCount).hasValue(0);
         }
@@ -229,13 +250,12 @@ class DefaultStreamStorageAppendTest {
 
     @Test
     void uploadTimeoutAndCancellationNeverStartManifestCommit() throws Exception {
-        BlockingUploadWriter timeoutWriter = new BlockingUploadWriter(
-                newWriter(new LocalFileObjectStore(root.resolve("timeout"))));
-        try (TestContext context = context(
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run, timeoutWriter)) {
+        BlockingUploadWriter timeoutWriter =
+                new BlockingUploadWriter(newWriter(new LocalFileObjectStore(root.resolve("timeout"))));
+        try (TestContext context = context(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run, timeoutWriter)) {
             StreamId streamId = context.createStream("timeout").streamId();
-            CompletableFuture<AppendResult> append = context.storage.append(
-                    streamId, batch("a"), appendOptions(Duration.ofSeconds(2)));
+            CompletableFuture<AppendResult> append =
+                    context.storage.append(streamId, batch("a"), appendOptions(Duration.ofSeconds(2)));
             assertThat(timeoutWriter.uploadStarted.await(5, TimeUnit.SECONDS)).isTrue();
 
             NereusException failure = appendFailure(append);
@@ -243,24 +263,29 @@ class DefaultStreamStorageAppendTest {
             assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
             PreparedWalObject prepared = timeoutWriter.prepared;
             assertThat(prepared).isNotNull();
-            assertThat(context.metadata.getObjectManifest(
-                    "cluster/a", prepared.result().objectId()).join()).isEmpty();
+            assertThat(context.metadata
+                            .getObjectManifest("cluster/a", prepared.result().objectId())
+                            .join())
+                    .isEmpty();
         }
 
-        BlockingUploadWriter cancelledWriter = new BlockingUploadWriter(
-                newWriter(new LocalFileObjectStore(root.resolve("cancel"))));
-        try (TestContext context = context(
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run, cancelledWriter)) {
+        BlockingUploadWriter cancelledWriter =
+                new BlockingUploadWriter(newWriter(new LocalFileObjectStore(root.resolve("cancel"))));
+        try (TestContext context = context(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run, cancelledWriter)) {
             StreamId streamId = context.createStream("cancel").streamId();
-            CompletableFuture<AppendResult> append = context.storage.append(
-                    streamId, batch("a"), appendOptions(Duration.ofSeconds(5)));
+            CompletableFuture<AppendResult> append =
+                    context.storage.append(streamId, batch("a"), appendOptions(Duration.ofSeconds(5)));
             assertThat(cancelledWriter.uploadStarted.await(5, TimeUnit.SECONDS)).isTrue();
             assertThat(append.cancel(false)).isTrue();
             NereusException failure = appendFailure(append);
             assertThat(failure.code()).isEqualTo(ErrorCode.CANCELLED);
             assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
-            assertThat(context.metadata.getObjectManifest(
-                    "cluster/a", cancelledWriter.prepared.result().objectId()).join()).isEmpty();
+            assertThat(context.metadata
+                            .getObjectManifest(
+                                    "cluster/a",
+                                    cancelledWriter.prepared.result().objectId())
+                            .join())
+                    .isEmpty();
         }
     }
 
@@ -268,8 +293,7 @@ class DefaultStreamStorageAppendTest {
     void unconfirmedCommitResponseIsMayHaveCommittedAndSuspendsLane() throws Exception {
         FakeOxiaMetadataStore fake = new FakeOxiaMetadataStore(CLOCK::millis);
         CountDownLatch commitStarted = new CountDownLatch(1);
-        OxiaMetadataStore delayedCommit = delayMethod(
-                fake, "commitPreparedStableAppend", commitStarted::countDown);
+        OxiaMetadataStore delayedCommit = delayMethod(fake, "commitPreparedStableAppend", commitStarted::countDown);
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         try (TestContext context = context(
                 StorageProfile.OBJECT_WAL_SYNC_OBJECT,
@@ -279,15 +303,15 @@ class DefaultStreamStorageAppendTest {
                 delayedCommit,
                 objectStore)) {
             StreamId streamId = context.createStream("uncertain").streamId();
-            CompletableFuture<AppendResult> append = context.storage.append(
-                    streamId, batch("a"), appendOptions(Duration.ofSeconds(1)));
+            CompletableFuture<AppendResult> append =
+                    context.storage.append(streamId, batch("a"), appendOptions(Duration.ofSeconds(1)));
             assertThat(commitStarted.await(5, TimeUnit.SECONDS)).isTrue();
             NereusException failure = appendFailure(append);
             assertThat(failure.code()).isEqualTo(ErrorCode.TIMEOUT);
             assertThat(failure.appendOutcome()).contains(AppendOutcome.MAY_HAVE_COMMITTED);
 
-            NereusException suspended = appendFailure(context.storage.append(
-                    streamId, batch("b"), appendOptions(Duration.ofSeconds(1))));
+            NereusException suspended =
+                    appendFailure(context.storage.append(streamId, batch("b"), appendOptions(Duration.ofSeconds(1))));
             assertThat(suspended.code()).isEqualTo(ErrorCode.METADATA_UNAVAILABLE);
             assertThat(suspended.appendOutcome()).contains(AppendOutcome.MAY_HAVE_COMMITTED);
         }
@@ -299,21 +323,32 @@ class DefaultStreamStorageAppendTest {
             StreamId streamId = context.createStream("known").streamId();
             context.metadata.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
 
-            NereusException failure = appendFailure(context.storage.append(
-                    streamId, batch("a"), appendOptions(Duration.ofSeconds(5))));
+            NereusException failure =
+                    appendFailure(context.storage.append(streamId, batch("a"), appendOptions(Duration.ofSeconds(5))));
             assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
             assertThat(failure.appendAttemptId()).isPresent();
-            assertThat(context.metadata.getCommittedEndOffset("cluster/a", streamId).join().committedEndOffset())
+            assertThat(context.metadata
+                            .getCommittedEndOffset("cluster/a", streamId)
+                            .join()
+                            .committedEndOffset())
                     .isEqualTo(1);
-            assertThat(context.metadata.scanOffsetIndex("cluster/a", streamId, 0, 10).join()).isEmpty();
+            assertThat(context.metadata
+                            .scanOffsetIndex("cluster/a", streamId, 0, 10)
+                            .join())
+                    .isEmpty();
 
-            AppendResult recovered = context.storage.recoverAppend(
-                    streamId, failure.appendAttemptId().orElseThrow(),
-                    new AppendRecoveryOptions(Duration.ofSeconds(1))).join();
+            AppendResult recovered = context.storage
+                    .recoverAppend(
+                            streamId,
+                            failure.appendAttemptId().orElseThrow(),
+                            new AppendRecoveryOptions(Duration.ofSeconds(1)))
+                    .join();
             assertThat(recovered.range()).isEqualTo(new OffsetRange(0, 1));
             assertThat(recovered.cumulativeSize()).isEqualTo(1);
-            assertThat(context.storage.append(
-                    streamId, batch("b"), appendOptions(Duration.ofSeconds(1))).join().range())
+            assertThat(context.storage
+                            .append(streamId, batch("b"), appendOptions(Duration.ofSeconds(1)))
+                            .join()
+                            .range())
                     .isEqualTo(new OffsetRange(1, 2));
         }
     }
@@ -341,8 +376,7 @@ class DefaultStreamStorageAppendTest {
                         throw e.getCause();
                     }
                 });
-        StreamStorageConfig storageConfig = recoveryConfig(
-                "writer-a", "process-terminal", Duration.ofMillis(100));
+        StreamStorageConfig storageConfig = recoveryConfig("writer-a", "process-terminal", Duration.ofMillis(100));
         try (DefaultStreamStorage storage = new DefaultStreamStorage(
                 storageConfig,
                 transientHeadRead,
@@ -352,17 +386,20 @@ class DefaultStreamStorageAppendTest {
                 CLOCK,
                 Runnable::run)) {
             StreamId streamId = storage.createOrGetStream(
-                    new StreamName("terminal-recovery"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
+                            new StreamName("terminal-recovery"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
             metadata.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
-            NereusException appendFailure = appendFailure(storage.append(
-                    streamId, batch("a"), appendOptions(Duration.ofSeconds(5))));
+            NereusException appendFailure =
+                    appendFailure(storage.append(streamId, batch("a"), appendOptions(Duration.ofSeconds(5))));
 
             failNextHeadRead.set(true);
             AppendResult recovered = storage.recoverAppend(
-                    streamId,
-                    appendFailure.appendAttemptId().orElseThrow(),
-                    new AppendRecoveryOptions(Duration.ofSeconds(3))).join();
+                            streamId,
+                            appendFailure.appendAttemptId().orElseThrow(),
+                            new AppendRecoveryOptions(Duration.ofSeconds(3)))
+                    .join();
 
             assertThat(recovered.range()).isEqualTo(new OffsetRange(0, 1));
             assertThat(failNextHeadRead).isFalse();
@@ -392,20 +429,23 @@ class DefaultStreamStorageAppendTest {
                 Runnable::run);
         try {
             StreamId streamId = first.createOrGetStream(
-                    new StreamName("later-head-recovery"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
+                            new StreamName("later-head-recovery"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
             metadata.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
 
-            NereusException failure = appendFailure(first.append(
-                    streamId, batch("aa"), appendOptions(Duration.ofSeconds(5))));
+            NereusException failure =
+                    appendFailure(first.append(streamId, batch("aa"), appendOptions(Duration.ofSeconds(5))));
             assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
 
-            AppendResult later = second.append(
-                    streamId, batch("later"), appendOptions(Duration.ofSeconds(5))).join();
+            AppendResult later = second.append(streamId, batch("later"), appendOptions(Duration.ofSeconds(5)))
+                    .join();
             AppendResult recovered = first.recoverAppend(
-                    streamId,
-                    failure.appendAttemptId().orElseThrow(),
-                    new AppendRecoveryOptions(Duration.ofSeconds(2))).join();
+                            streamId,
+                            failure.appendAttemptId().orElseThrow(),
+                            new AppendRecoveryOptions(Duration.ofSeconds(2)))
+                    .join();
 
             assertThat(later.range()).isEqualTo(new OffsetRange(1, 2));
             assertThat(later.cumulativeSize()).isEqualTo(7);
@@ -425,8 +465,8 @@ class DefaultStreamStorageAppendTest {
         StreamId streamId = context.createStream("closed").streamId();
         context.storage.close();
 
-        NereusException failure = appendFailure(context.storage.append(
-                streamId, batch("a"), appendOptions(Duration.ofSeconds(1))));
+        NereusException failure =
+                appendFailure(context.storage.append(streamId, batch("a"), appendOptions(Duration.ofSeconds(1))));
         assertThat(failure.code()).isEqualTo(ErrorCode.STORAGE_CLOSED);
         assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
         context.close();
@@ -439,21 +479,18 @@ class DefaultStreamStorageAppendTest {
         BlockingUploadWriter writer = new BlockingUploadWriter(newWriter(objectStore));
         StreamStorageConfig oneInFlight = config(1 << 20, 4L << 20, 4L << 20, 1);
         try (DefaultStreamStorage storage = new DefaultStreamStorage(
-                oneInFlight,
-                metadata,
-                writer,
-                new DefaultWalObjectReader(objectStore),
-                CLOCK,
-                Runnable::run)) {
+                oneInFlight, metadata, writer, new DefaultWalObjectReader(objectStore), CLOCK, Runnable::run)) {
             StreamId streamId = storage.createOrGetStream(
-                    new StreamName("backpressure"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
-            CompletableFuture<AppendResult> first = storage.append(
-                    streamId, batch("a"), appendOptions(Duration.ofSeconds(5)));
+                            new StreamName("backpressure"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
+            CompletableFuture<AppendResult> first =
+                    storage.append(streamId, batch("a"), appendOptions(Duration.ofSeconds(5)));
             assertThat(writer.uploadStarted.await(5, TimeUnit.SECONDS)).isTrue();
 
-            NereusException rejected = appendFailure(storage.append(
-                    streamId, batch("b"), appendOptions(Duration.ofSeconds(1))));
+            NereusException rejected =
+                    appendFailure(storage.append(streamId, batch("b"), appendOptions(Duration.ofSeconds(1))));
             assertThat(rejected.code()).isEqualTo(ErrorCode.BACKPRESSURE_REJECTED);
             assertThat(rejected.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
 
@@ -469,9 +506,9 @@ class DefaultStreamStorageAppendTest {
     void nearExpirySuppliedSessionIsRenewedBeforeWalUpload() {
         try (TestContext context = context(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run)) {
             StreamId streamId = context.createStream("renew").streamId();
-            AppendSession session = context.storage.acquireAppendSession(
-                    streamId,
-                    new AppendSessionOptions("writer-a", Duration.ofSeconds(1), true)).join();
+            AppendSession session = context.storage
+                    .acquireAppendSession(streamId, new AppendSessionOptions("writer-a", Duration.ofSeconds(1), true))
+                    .join();
             long headWritesBeforeAppend = headConditionalWrites(context.metadata);
             AppendOptions supplied = new AppendOptions(
                     Optional.of(session),
@@ -480,10 +517,12 @@ class DefaultStreamStorageAppendTest {
                     false,
                     Map.of());
 
-            AppendResult result = context.storage.append(streamId, batch("a"), supplied).join();
+            AppendResult result =
+                    context.storage.append(streamId, batch("a"), supplied).join();
 
             assertThat(result.range()).isEqualTo(new OffsetRange(0, 1));
-            assertThat(headConditionalWrites(context.metadata) - headWritesBeforeAppend).isEqualTo(2);
+            assertThat(headConditionalWrites(context.metadata) - headWritesBeforeAppend)
+                    .isEqualTo(2);
         }
     }
 
@@ -491,9 +530,9 @@ class DefaultStreamStorageAppendTest {
     void disabledAutoAcquireRequiresAnExplicitSessionEvenWhenCacheIsWarm() {
         try (TestContext context = context(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run)) {
             StreamId streamId = context.createStream("explicit-session").streamId();
-            context.storage.acquireAppendSession(
-                    streamId,
-                    new AppendSessionOptions("writer-a", Duration.ofSeconds(30), true)).join();
+            context.storage
+                    .acquireAppendSession(streamId, new AppendSessionOptions("writer-a", Duration.ofSeconds(30), true))
+                    .join();
             AppendOptions noExplicitSession = new AppendOptions(
                     Optional.empty(),
                     DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
@@ -501,8 +540,7 @@ class DefaultStreamStorageAppendTest {
                     false,
                     Map.of());
 
-            NereusException failure = appendFailure(
-                    context.storage.append(streamId, batch("a"), noExplicitSession));
+            NereusException failure = appendFailure(context.storage.append(streamId, batch("a"), noExplicitSession));
 
             assertThat(failure.code()).isEqualTo(ErrorCode.APPEND_SESSION_EXPIRED);
             assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
@@ -515,16 +553,11 @@ class DefaultStreamStorageAppendTest {
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         MismatchingWriter writer = new MismatchingWriter(newWriter(objectStore));
         try (TestContext context = context(
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                Runnable::run,
-                writer,
-                metadata,
-                metadata,
-                objectStore)) {
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run, writer, metadata, metadata, objectStore)) {
             StreamId streamId = context.createStream("bad-writer").streamId();
 
-            NereusException failure = appendFailure(context.storage.append(
-                    streamId, batch("a"), appendOptions(Duration.ofSeconds(1))));
+            NereusException failure =
+                    appendFailure(context.storage.append(streamId, batch("a"), appendOptions(Duration.ofSeconds(1))));
 
             assertThat(failure.code()).isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION);
             assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
@@ -553,13 +586,15 @@ class DefaultStreamStorageAppendTest {
                 Runnable::run);
         try {
             StreamId streamId = first.createOrGetStream(
-                    new StreamName("offset-race"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
-            CompletableFuture<AppendResult> losing = first.append(
-                    streamId, batch("losing"), appendOptions(Duration.ofSeconds(5)));
+                            new StreamName("offset-race"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
+            CompletableFuture<AppendResult> losing =
+                    first.append(streamId, batch("losing"), appendOptions(Duration.ofSeconds(5)));
             assertThat(gatedWriter.uploadStarted.await(5, TimeUnit.SECONDS)).isTrue();
-            AppendResult winner = second.append(
-                    streamId, batch("winner"), appendOptions(Duration.ofSeconds(5))).join();
+            AppendResult winner = second.append(streamId, batch("winner"), appendOptions(Duration.ofSeconds(5)))
+                    .join();
             assertThat(winner.range()).isEqualTo(new OffsetRange(0, 1));
 
             gatedWriter.release();
@@ -567,8 +602,8 @@ class DefaultStreamStorageAppendTest {
             assertThat(conflict.code()).isEqualTo(ErrorCode.OFFSET_CONFLICT);
             assertThat(conflict.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
 
-            AppendResult recovered = first.append(
-                    streamId, batch("next"), appendOptions(Duration.ofSeconds(5))).join();
+            AppendResult recovered = first.append(streamId, batch("next"), appendOptions(Duration.ofSeconds(5)))
+                    .join();
             assertThat(recovered.range()).isEqualTo(new OffsetRange(1, 2));
         } finally {
             first.close();
@@ -595,9 +630,7 @@ class DefaultStreamStorageAppendTest {
     }
 
     private TestContext context(
-            StorageProfile profile,
-            java.util.concurrent.Executor executor,
-            WalObjectWriter writer) {
+            StorageProfile profile, java.util.concurrent.Executor executor, WalObjectWriter writer) {
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("store-" + profile.name()));
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         return context(profile, executor, writer, metadata, metadata, objectStore);
@@ -623,31 +656,18 @@ class DefaultStreamStorageAppendTest {
     }
 
     private static GenerationZeroPhysicalReferencePublisher physicalReferences(
-            StreamStorageConfig config,
-            FakeOxiaMetadataStore metadata) {
+            StreamStorageConfig config, FakeOxiaMetadataStore metadata) {
         DefaultObjectProtectionManager protections = new DefaultObjectProtectionManager(
-                config.cluster(),
-                metadata,
-                Duration.ofMinutes(10),
-                Duration.ZERO,
-                Duration.ofHours(24),
-                CLOCK);
-        return new DefaultGenerationZeroPhysicalReferencePublisher(
-                config.cluster(), metadata, metadata, protections);
+                config.cluster(), metadata, Duration.ofMinutes(10), Duration.ZERO, Duration.ofHours(24), CLOCK);
+        return new DefaultGenerationZeroPhysicalReferencePublisher(config.cluster(), metadata, metadata, protections);
     }
 
-    private static StreamStorageConfig config(
-            int maxObjectBytes,
-            long maxBufferedBytes,
-            long maxReadBufferBytes) {
+    private static StreamStorageConfig config(int maxObjectBytes, long maxBufferedBytes, long maxReadBufferBytes) {
         return config(maxObjectBytes, maxBufferedBytes, maxReadBufferBytes, 64);
     }
 
     private static StreamStorageConfig config(
-            int maxObjectBytes,
-            long maxBufferedBytes,
-            long maxReadBufferBytes,
-            int maxInFlightAppends) {
+            int maxObjectBytes, long maxBufferedBytes, long maxReadBufferBytes, int maxInFlightAppends) {
         return new StreamStorageConfig(
                 "cluster/a",
                 "writer-a",
@@ -673,10 +693,7 @@ class DefaultStreamStorageAppendTest {
                 true);
     }
 
-    private static StreamStorageConfig recoveryConfig(
-            String writerId,
-            String processRunId,
-            Duration recoveryBackoff) {
+    private static StreamStorageConfig recoveryConfig(String writerId, String processRunId, Duration recoveryBackoff) {
         return new StreamStorageConfig(
                 "cluster/a",
                 writerId,
@@ -715,8 +732,7 @@ class DefaultStreamStorageAppendTest {
 
     private static AppendBatch batch(String... values) {
         List<AppendEntry> entries = java.util.Arrays.stream(values)
-                .map(value -> new AppendEntry(
-                        value.getBytes(StandardCharsets.UTF_8), 1, NOW.toEpochMilli(), Map.of()))
+                .map(value -> new AppendEntry(value.getBytes(StandardCharsets.UTF_8), 1, NOW.toEpochMilli(), Map.of()))
                 .toList();
         return new AppendBatch(
                 PayloadFormat.OPAQUE_RECORD_BATCH,
@@ -731,11 +747,8 @@ class DefaultStreamStorageAppendTest {
     }
 
     private static AppendBatch kafkaBatch(String value, int recordCount) {
-        AppendEntry entry = new AppendEntry(
-                value.getBytes(StandardCharsets.UTF_8),
-                recordCount,
-                NOW.toEpochMilli(),
-                Map.of());
+        AppendEntry entry =
+                new AppendEntry(value.getBytes(StandardCharsets.UTF_8), recordCount, NOW.toEpochMilli(), Map.of());
         return new AppendBatch(
                 PayloadFormat.KAFKA_RECORD_BATCH,
                 List.of(entry),
@@ -750,11 +763,7 @@ class DefaultStreamStorageAppendTest {
 
     private static AppendOptions appendOptions(Duration timeout) {
         return new AppendOptions(
-                Optional.empty(),
-                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
-                timeout,
-                true,
-                Map.of());
+                Optional.empty(), DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED, timeout, true, Map.of());
     }
 
     private static NereusException appendFailure(CompletableFuture<?> future) {
@@ -774,9 +783,7 @@ class DefaultStreamStorageAppendTest {
     }
 
     private static OxiaMetadataStore delayMethod(
-            OxiaMetadataStore delegate,
-            String methodName,
-            Runnable onDelayedInvocation) {
+            OxiaMetadataStore delegate, String methodName, Runnable onDelayedInvocation) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
@@ -928,10 +935,11 @@ class DefaultStreamStorageAppendTest {
             DefaultStreamStorage storage,
             FakeOxiaMetadataStore metadata,
             LocalFileObjectStore objectStore,
-            StorageProfile profile) implements AutoCloseable {
+            StorageProfile profile)
+            implements AutoCloseable {
         StreamMetadata createStream(String name) {
-            return storage.createOrGetStream(
-                    new StreamName(name), new StreamCreateOptions(profile, Map.of())).join();
+            return storage.createOrGetStream(new StreamName(name), new StreamCreateOptions(profile, Map.of()))
+                    .join();
         }
 
         @Override

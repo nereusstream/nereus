@@ -14,8 +14,9 @@
 
 package com.nereusstream.kop;
 
-/** Boundary for KoP/Kafka protocol projection. */
+/**
+ * Boundary for KoP/Kafka protocol projection.
+ */
 public final class KopAdapterModule {
-    private KopAdapterModule() {
-    }
+    private KopAdapterModule() {}
 }

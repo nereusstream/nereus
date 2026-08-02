@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadBatch;
@@ -11,7 +11,6 @@ import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.SemanticReadResult;
 import com.nereusstream.api.StreamId;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -33,13 +32,7 @@ class KafkaFetchAssemblerTest {
                         KafkaRecordBatchTestSupport.readBatch(new OffsetRange(12, 13), second, "second")),
                 13);
 
-        KafkaFetchAssembly result = assembler.assemble(
-                read,
-                first.length + second.length,
-                true,
-                10,
-                0,
-                List.of());
+        KafkaFetchAssembly result = assembler.assemble(read, first.length + second.length, true, 10, 0, List.of());
 
         assertThat(result.encodedRecords()).isEqualTo(KafkaRecordBatchTestSupport.concat(first, second));
         assertThat(result.actualFirstBatchBaseOffset()).hasValue(10);
@@ -50,11 +43,11 @@ class KafkaFetchAssemblerTest {
         assertThat(result.recordsBuffer().position()).isZero();
         MemoryRecords kafkaRecords = MemoryRecords.readableRecords(result.recordsBuffer());
         List<RecordBatchFacts> facts = new ArrayList<>();
-        kafkaRecords.batches().forEach(batch -> facts.add(new RecordBatchFacts(
-                batch.baseOffset(), batch.lastOffset(), batch.isValid())));
-        assertThat(facts).containsExactly(
-                new RecordBatchFacts(10, 11, true),
-                new RecordBatchFacts(12, 12, true));
+        kafkaRecords
+                .batches()
+                .forEach(batch ->
+                        facts.add(new RecordBatchFacts(batch.baseOffset(), batch.lastOffset(), batch.isValid())));
+        assertThat(facts).containsExactly(new RecordBatchFacts(10, 11, true), new RecordBatchFacts(12, 12, true));
 
         byte[] returned = result.encodedRecords();
         returned[0] = 99;
@@ -72,13 +65,8 @@ class KafkaFetchAssemblerTest {
         SemanticReadResult compacted = new SemanticReadResult(ReadView.TOPIC_COMPACTED, raw, 8);
         KafkaAbortedTransaction aborted = new KafkaAbortedTransaction(9, 1);
 
-        KafkaFetchAssembly result = assembler.assemble(
-                compacted,
-                first.length + second.length,
-                false,
-                0,
-                123,
-                List.of(aborted));
+        KafkaFetchAssembly result =
+                assembler.assemble(compacted, first.length + second.length, false, 0, 123, List.of(aborted));
 
         assertThat(result.nextLogicalOffset()).isEqualTo(6);
         assertThat(result.sourceCoverageEndOffset()).isEqualTo(8);
@@ -125,13 +113,8 @@ class KafkaFetchAssemblerTest {
     @Test
     void returnsAnEmptyOwnedResultWithoutInventingOffsets() {
         ReadResult raw = new ReadResult(new StreamId("kafka-stream"), 7, 7, List.of(), true);
-        KafkaFetchAssembly result = assembler.assemble(
-                new SemanticReadResult(ReadView.COMMITTED, raw, 7),
-                1,
-                false,
-                7,
-                0,
-                List.of());
+        KafkaFetchAssembly result =
+                assembler.assemble(new SemanticReadResult(ReadView.COMMITTED, raw, 7), 1, false, 7, 0, List.of());
 
         assertThat(result.encodedRecords()).isEmpty();
         assertThat(result.actualFirstBatchBaseOffset()).isEmpty();

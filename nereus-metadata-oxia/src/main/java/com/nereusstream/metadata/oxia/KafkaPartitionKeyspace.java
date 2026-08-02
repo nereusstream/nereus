@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.keys.KeyComponentCodec;
@@ -9,7 +10,9 @@ import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Objects;
 
-/** Strict durable key and partition routing for native Kafka metadata. */
+/**
+ * Strict durable key and partition routing for native Kafka metadata.
+ */
 public final class KafkaPartitionKeyspace {
     public static final int REGISTRY_SHARDS = 64;
 
@@ -20,16 +23,29 @@ public final class KafkaPartitionKeyspace {
     public KafkaPartitionKeyspace(String nereusCluster, String kafkaClusterId) {
         this.nereusCluster = text(nereusCluster, "nereusCluster");
         this.kafkaClusterId = text(kafkaClusterId, "kafkaClusterId");
-        this.prefix = new OxiaKeyspace(nereusCluster).prefix()
-                + "/kafka/" + KeyComponentCodec.encodeComponent(kafkaClusterId);
+        this.prefix = new OxiaKeyspace(nereusCluster).prefix() + "/kafka/"
+                + KeyComponentCodec.encodeComponent(kafkaClusterId);
     }
 
-    public String nereusCluster() { return nereusCluster; }
-    public String kafkaClusterId() { return kafkaClusterId; }
-    public String prefix() { return prefix; }
+    public String nereusCluster() {
+        return nereusCluster;
+    }
 
-    public String activationKey() { return prefix + "/activation"; }
-    public String readinessKey() { return prefix + "/readiness"; }
+    public String kafkaClusterId() {
+        return kafkaClusterId;
+    }
+
+    public String prefix() {
+        return prefix;
+    }
+
+    public String activationKey() {
+        return prefix + "/activation";
+    }
+
+    public String readinessKey() {
+        return prefix + "/readiness";
+    }
 
     public PartitionKey activationPartitionKey() {
         MessageDigest digest = sha256();
@@ -39,7 +55,9 @@ public final class KafkaPartitionKeyspace {
         return new PartitionKey("kafka-activation-v1-" + HexFormat.of().formatHex(digest.digest()));
     }
 
-    public String capabilityPrefix() { return prefix + "/capabilities"; }
+    public String capabilityPrefix() {
+        return prefix + "/capabilities";
+    }
 
     public String capabilityKey(int brokerId, long brokerEpoch) {
         KafkaBrokerIdentity identity = new KafkaBrokerIdentity(brokerId, brokerEpoch);
@@ -55,8 +73,7 @@ public final class KafkaPartitionKeyspace {
             throw new IllegalArgumentException("capability key has an unknown depth");
         }
         KafkaBrokerIdentity identity = new KafkaBrokerIdentity(
-                parsePartition(components[0]),
-                KeyComponentCodec.decodeNonNegativeLong(components[1]));
+                parsePartition(components[0]), KeyComponentCodec.decodeNonNegativeLong(components[1]));
         if (!capabilityKey(identity.brokerId(), identity.brokerEpoch()).equals(supplied)) {
             throw new IllegalArgumentException("capability key is not canonical");
         }
@@ -84,15 +101,13 @@ public final class KafkaPartitionKeyspace {
                 + KeyComponentCodec.encodeNonNegativeLong(partitionIncarnation);
     }
 
-    public String checkpointFailureKey(
-            KafkaPartitionId id, long partitionIncarnation, String objectId) {
+    public String checkpointFailureKey(KafkaPartitionId id, long partitionIncarnation, String objectId) {
         return checkpointFailurePrefix(id, partitionIncarnation)
                 + "/"
                 + KeyComponentCodec.encodeComponent(text(objectId, "objectId"));
     }
 
-    public CheckpointFailureKeyIdentity parseCheckpointFailureKey(
-            KafkaPartitionId expected, String key) {
+    public CheckpointFailureKeyIdentity parseCheckpointFailureKey(KafkaPartitionId expected, String key) {
         KafkaPartitionId exact = requireIdentity(expected);
         String family = partitionPrefix(exact) + "/checkpoint-failures/";
         String supplied = scoped(key, family, "checkpoint failure");
@@ -102,8 +117,7 @@ public final class KafkaPartitionKeyspace {
         }
         long incarnation = KeyComponentCodec.decodeNonNegativeLong(components[0]);
         String objectId = KeyComponentCodec.decodeComponent(components[1]);
-        CheckpointFailureKeyIdentity identity =
-                new CheckpointFailureKeyIdentity(exact, incarnation, objectId);
+        CheckpointFailureKeyIdentity identity = new CheckpointFailureKeyIdentity(exact, incarnation, objectId);
         if (!checkpointFailureKey(exact, incarnation, objectId).equals(supplied)) {
             throw new IllegalArgumentException("checkpoint failure key is not canonical");
         }
@@ -161,9 +175,7 @@ public final class KafkaPartitionKeyspace {
             throw new IllegalArgumentException("binding root key has an unknown depth");
         }
         KafkaPartitionId id = new KafkaPartitionId(
-                kafkaClusterId,
-                KeyComponentCodec.decodeComponent(components[0]),
-                parsePartition(components[1]));
+                kafkaClusterId, KeyComponentCodec.decodeComponent(components[0]), parsePartition(components[1]));
         if (!bindingRootKey(id).equals(supplied)) {
             throw new IllegalArgumentException("binding root key is not canonical");
         }
@@ -180,9 +192,7 @@ public final class KafkaPartitionKeyspace {
             throw new IllegalArgumentException("registry key has an unknown depth");
         }
         KafkaPartitionId id = new KafkaPartitionId(
-                kafkaClusterId,
-                KeyComponentCodec.decodeComponent(components[0]),
-                parsePartition(components[1]));
+                kafkaClusterId, KeyComponentCodec.decodeComponent(components[0]), parsePartition(components[1]));
         if (registryShard(id) != expectedShard || !registryKey(id).equals(supplied)) {
             throw new IllegalArgumentException("registry key is not canonical for its shard");
         }
@@ -194,12 +204,10 @@ public final class KafkaPartitionKeyspace {
     }
 
     public String bindingRootKeySha256(KafkaPartitionId id) {
-        return HexFormat.of().formatHex(sha256().digest(
-                bindingRootKey(id).getBytes(StandardCharsets.UTF_8)));
+        return HexFormat.of().formatHex(sha256().digest(bindingRootKey(id).getBytes(StandardCharsets.UTF_8)));
     }
 
-    public record CheckpointFailureKeyIdentity(
-            KafkaPartitionId partition, long partitionIncarnation, String objectId) {
+    public record CheckpointFailureKeyIdentity(KafkaPartitionId partition, long partitionIncarnation, String objectId) {
         public CheckpointFailureKeyIdentity {
             Objects.requireNonNull(partition, "partition");
             text(objectId, "objectId");
@@ -219,8 +227,8 @@ public final class KafkaPartitionKeyspace {
 
     private String partitionPrefix(KafkaPartitionId id) {
         KafkaPartitionId exact = requireIdentity(id);
-        return prefix + "/partitions/" + KeyComponentCodec.encodeComponent(exact.topicId())
-                + "/" + partitionDigits(exact.partitionId());
+        return prefix + "/partitions/" + KeyComponentCodec.encodeComponent(exact.topicId()) + "/"
+                + partitionDigits(exact.partitionId());
     }
 
     private byte[] identityDigest(KafkaPartitionId id) {
@@ -242,7 +250,9 @@ public final class KafkaPartitionKeyspace {
     }
 
     private static int parsePartition(String encoded) {
-        if (encoded.length() != 10) throw new IllegalArgumentException("partition has wrong width");
+        if (encoded.length() != 10) {
+            throw new IllegalArgumentException("partition has wrong width");
+        }
         for (int index = 0; index < encoded.length(); index++) {
             if (encoded.charAt(index) < '0' || encoded.charAt(index) > '9') {
                 throw new IllegalArgumentException("partition is not decimal");
@@ -260,7 +270,9 @@ public final class KafkaPartitionKeyspace {
     }
 
     private static String partitionDigits(int value) {
-        if (value < 0) throw new IllegalArgumentException("partition must be non-negative");
+        if (value < 0) {
+            throw new IllegalArgumentException("partition must be non-negative");
+        }
         return String.format(Locale.ROOT, "%010d", value);
     }
 
@@ -280,7 +292,9 @@ public final class KafkaPartitionKeyspace {
 
     private static String text(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 
@@ -291,10 +305,8 @@ public final class KafkaPartitionKeyspace {
         }
         for (int index = 5; index < exact.length(); index++) {
             char character = exact.charAt(index);
-            if (!((character >= 'a' && character <= 'z')
-                    || (character >= '2' && character <= '7'))) {
-                throw new IllegalArgumentException(
-                        "materializationTaskId is not canonical base32lower");
+            if (!((character >= 'a' && character <= 'z') || (character >= '2' && character <= '7'))) {
+                throw new IllegalArgumentException("materializationTaskId is not canonical base32lower");
             }
         }
         return exact;

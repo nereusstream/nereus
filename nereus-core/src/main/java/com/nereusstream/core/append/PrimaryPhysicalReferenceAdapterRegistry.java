@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.append;
 
 import com.nereusstream.api.ErrorCode;
@@ -10,21 +11,20 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 
-/** Immutable exact-type registry for provider physical-reference adapters. */
+/**
+ * Immutable exact-type registry for provider physical-reference adapters.
+ */
 public final class PrimaryPhysicalReferenceAdapterRegistry {
     private final Map<ReadTargetType, PrimaryPhysicalReferenceAdapter<?>> adapters;
 
-    public PrimaryPhysicalReferenceAdapterRegistry(
-            Collection<? extends PrimaryPhysicalReferenceAdapter<?>> adapters) {
+    public PrimaryPhysicalReferenceAdapterRegistry(Collection<? extends PrimaryPhysicalReferenceAdapter<?>> adapters) {
         Objects.requireNonNull(adapters, "adapters");
-        EnumMap<ReadTargetType, PrimaryPhysicalReferenceAdapter<?>> values =
-                new EnumMap<>(ReadTargetType.class);
+        EnumMap<ReadTargetType, PrimaryPhysicalReferenceAdapter<?>> values = new EnumMap<>(ReadTargetType.class);
         for (PrimaryPhysicalReferenceAdapter<?> adapter : adapters) {
             PrimaryPhysicalReferenceAdapter<?> exact = Objects.requireNonNull(adapter, "adapter");
             PrimaryPhysicalReferenceAdapter<?> previous = values.putIfAbsent(exact.targetType(), exact);
             if (previous != null) {
-                throw new IllegalArgumentException(
-                        "duplicate physical-reference adapter for " + exact.targetType());
+                throw new IllegalArgumentException("duplicate physical-reference adapter for " + exact.targetType());
             }
         }
         this.adapters = Map.copyOf(values);

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -14,7 +15,9 @@ import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Focused single-key/CAS metadata surface for generation publication and materialization workflow. */
+/**
+ * Focused single-key/CAS metadata surface for generation publication and materialization workflow.
+ */
 public interface GenerationMetadataStore extends AutoCloseable {
     CompletableFuture<Optional<VersionedGenerationSequence>> getSequence(
             String cluster, StreamId streamId, ReadView view);
@@ -25,34 +28,23 @@ public interface GenerationMetadataStore extends AutoCloseable {
     CompletableFuture<AllocatedGeneration> allocateGeneration(
             String cluster, StreamId streamId, ReadView view, PublicationId publicationId);
 
-    CompletableFuture<Void> deleteSequence(
-            String cluster, StreamId streamId, ReadView view, long expectedVersion);
+    CompletableFuture<Void> deleteSequence(String cluster, StreamId streamId, ReadView view, long expectedVersion);
 
     CompletableFuture<VersionedGenerationIndex> createPrepared(String cluster, GenerationIndexRecord record);
 
     CompletableFuture<VersionedGenerationIndex> restoreCommittedFromCheckpoint(
-            String cluster,
-            GenerationIndexRecord record,
-            Checksum canonicalRecordSha256);
+            String cluster, GenerationIndexRecord record, Checksum canonicalRecordSha256);
 
     CompletableFuture<VersionedGenerationIndex> compareAndSetIndex(
             String cluster, GenerationIndexRecord replacement, long expectedVersion);
 
-    CompletableFuture<Optional<VersionedGenerationIndex>> getIndex(
-            String cluster, GenerationIndexIdentity identity);
+    CompletableFuture<Optional<VersionedGenerationIndex>> getIndex(String cluster, GenerationIndexIdentity identity);
 
     CompletableFuture<Optional<VersionedGenerationCandidate>> getCandidate(
-            String cluster,
-            StreamId streamId,
-            ReadView view,
-            long offsetEnd,
-            long generation);
+            String cluster, StreamId streamId, ReadView view, long offsetEnd, long generation);
 
     CompletableFuture<Optional<VersionedGenerationCandidate>> getCandidateByKey(
-            String cluster,
-            StreamId streamId,
-            ReadView view,
-            String indexKey);
+            String cluster, StreamId streamId, ReadView view, String indexKey);
 
     CompletableFuture<GenerationScanPage> scanIndex(
             String cluster,
@@ -63,13 +55,11 @@ public interface GenerationMetadataStore extends AutoCloseable {
             Optional<F4ScanToken> continuation,
             int limit);
 
-    CompletableFuture<Void> deleteIndex(
-            String cluster, GenerationIndexIdentity identity, long expectedVersion);
+    CompletableFuture<Void> deleteIndex(String cluster, GenerationIndexIdentity identity, long expectedVersion);
 
     CompletableFuture<VersionedMaterializationTask> createTask(String cluster, MaterializationTaskRecord task);
 
-    CompletableFuture<Optional<VersionedMaterializationTask>> getTask(
-            String cluster, StreamId streamId, String taskId);
+    CompletableFuture<Optional<VersionedMaterializationTask>> getTask(String cluster, StreamId streamId, String taskId);
 
     CompletableFuture<VersionedMaterializationTask> compareAndSetTask(
             String cluster, MaterializationTaskRecord task, long expectedVersion);
@@ -77,27 +67,19 @@ public interface GenerationMetadataStore extends AutoCloseable {
     CompletableFuture<TaskScanPage> scanTasks(
             String cluster, StreamId streamId, Optional<F4ScanToken> continuation, int limit);
 
-    CompletableFuture<Void> deleteTask(
-            String cluster, StreamId streamId, String taskId, long expectedVersion);
+    CompletableFuture<Void> deleteTask(String cluster, StreamId streamId, String taskId, long expectedVersion);
 
     CompletableFuture<Optional<VersionedMaterializationCheckpoint>> getMaterializationCheckpoint(
             String cluster, StreamId streamId, String policyId, long policyVersion);
 
     CompletableFuture<VersionedMaterializationCheckpoint> getOrCreateMaterializationCheckpoint(
-            String cluster,
-            StreamId streamId,
-            String policyId,
-            long policyVersion,
-            Checksum policySha256);
+            String cluster, StreamId streamId, String policyId, long policyVersion, Checksum policySha256);
 
     CompletableFuture<VersionedMaterializationCheckpoint> compareAndSetMaterializationCheckpoint(
             String cluster, MaterializationCheckpointRecord checkpoint, long expectedVersion);
 
     CompletableFuture<MaterializationCheckpointScanPage> scanMaterializationCheckpoints(
-            String cluster,
-            StreamId streamId,
-            Optional<F4ScanToken> continuation,
-            int limit);
+            String cluster, StreamId streamId, Optional<F4ScanToken> continuation, int limit);
 
     CompletableFuture<Void> deleteMaterializationCheckpoint(
             String cluster, StreamId streamId, String policyId, long policyVersion, long expectedVersion);
@@ -134,20 +116,16 @@ public interface GenerationMetadataStore extends AutoCloseable {
     CompletableFuture<StreamRegistrationScanPage> scanStreamRegistrations(
             String cluster, int shard, Optional<F4ScanToken> continuation, int limit);
 
-    CompletableFuture<Void> deleteStreamRegistration(
-            String cluster, StreamId streamId, long expectedVersion);
+    CompletableFuture<Void> deleteStreamRegistration(String cluster, StreamId streamId, long expectedVersion);
 
-    CompletableFuture<Optional<VersionedRecoveryCheckpointRoot>> getRecoveryRoot(
-            String cluster, StreamId streamId);
+    CompletableFuture<Optional<VersionedRecoveryCheckpointRoot>> getRecoveryRoot(String cluster, StreamId streamId);
 
-    CompletableFuture<VersionedRecoveryCheckpointRoot> getOrCreateRecoveryRoot(
-            String cluster, StreamId streamId);
+    CompletableFuture<VersionedRecoveryCheckpointRoot> getOrCreateRecoveryRoot(String cluster, StreamId streamId);
 
     CompletableFuture<VersionedRecoveryCheckpointRoot> compareAndSetRecoveryRoot(
             String cluster, RecoveryCheckpointRootRecord root, long expectedVersion);
 
-    CompletableFuture<Void> deleteRecoveryRoot(
-            String cluster, StreamId streamId, long expectedVersion);
+    CompletableFuture<Void> deleteRecoveryRoot(String cluster, StreamId streamId, long expectedVersion);
 
     @Override
     void close();

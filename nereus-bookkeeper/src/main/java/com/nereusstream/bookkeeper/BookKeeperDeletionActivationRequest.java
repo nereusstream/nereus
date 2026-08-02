@@ -1,15 +1,16 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import java.time.Duration;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-/** Operator request that names the observed activation version but never supplies its own proof digests. */
+/**
+ * Operator request that names the observed activation version but never supplies its own proof digests.
+ */
 public record BookKeeperDeletionActivationRequest(
-        String runId,
-        long expectedActivationMetadataVersion,
-        Duration timeout) {
+        String runId, long expectedActivationMetadataVersion, Duration timeout) {
     private static final Pattern RUN_ID = Pattern.compile("[A-Za-z0-9_-]{8,128}");
 
     public BookKeeperDeletionActivationRequest {

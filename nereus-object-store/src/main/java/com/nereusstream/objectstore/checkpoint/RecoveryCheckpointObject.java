@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -6,7 +7,9 @@ import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
 import java.util.Objects;
 
-/** Verified bounded NRC1 header/footer state used by exact range lookups. */
+/**
+ * Verified bounded NRC1 header/footer state used by exact range lookups.
+ */
 public record RecoveryCheckpointObject(
         RecoveryCheckpointWriteRequest header,
         ObjectId objectId,

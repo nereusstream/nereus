@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -12,7 +13,9 @@ import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Focused root/reader/protection metadata surface for physical deletion safety. */
+/**
+ * Focused root/reader/protection metadata surface for physical deletion safety.
+ */
 public interface PhysicalObjectMetadataStore extends AutoCloseable {
     CompletableFuture<Optional<VersionedPhysicalObjectRoot>> getRoot(String cluster, ObjectKeyHash object);
 
@@ -27,8 +30,7 @@ public interface PhysicalObjectMetadataStore extends AutoCloseable {
     CompletableFuture<PhysicalObjectRootScanPage> scanRoots(
             String cluster, int shard, Optional<F4ScanToken> continuation, int limit);
 
-    CompletableFuture<VersionedReaderLease> createOrCompareReaderLease(
-            String cluster, ObjectReaderLeaseRecord lease);
+    CompletableFuture<VersionedReaderLease> createOrCompareReaderLease(String cluster, ObjectReaderLeaseRecord lease);
 
     CompletableFuture<VersionedReaderLease> compareAndSetReaderLease(
             String cluster, ObjectReaderLeaseRecord lease, long expectedVersion);
@@ -39,14 +41,12 @@ public interface PhysicalObjectMetadataStore extends AutoCloseable {
     CompletableFuture<ReaderLeaseScanPage> scanReaderLeases(
             String cluster, ObjectKeyHash object, Optional<F4ScanToken> continuation, int limit);
 
-    CompletableFuture<VersionedObjectProtection> createProtection(
-            String cluster, ObjectProtectionRecord protection);
+    CompletableFuture<VersionedObjectProtection> createProtection(String cluster, ObjectProtectionRecord protection);
 
     CompletableFuture<VersionedObjectProtection> compareAndSetProtection(
             String cluster, ObjectProtectionRecord protection, long expectedVersion);
 
-    CompletableFuture<Void> deleteProtection(
-            String cluster, ObjectProtectionIdentity protection, long expectedVersion);
+    CompletableFuture<Void> deleteProtection(String cluster, ObjectProtectionIdentity protection, long expectedVersion);
 
     CompletableFuture<ObjectProtectionScanPage> scanProtections(
             String cluster, ObjectKeyHash object, Optional<F4ScanToken> continuation, int limit);
@@ -64,18 +64,10 @@ public interface PhysicalObjectMetadataStore extends AutoCloseable {
             String cluster, GcRetirementRemovalRecord removal);
 
     CompletableFuture<GcRetirementProtectionScanPage> scanRetirementProtections(
-            String cluster,
-            ObjectKeyHash object,
-            String gcAttemptId,
-            Optional<F4ScanToken> continuation,
-            int limit);
+            String cluster, ObjectKeyHash object, String gcAttemptId, Optional<F4ScanToken> continuation, int limit);
 
     CompletableFuture<GcRetirementRemovalScanPage> scanRetirementRemovals(
-            String cluster,
-            ObjectKeyHash object,
-            String gcAttemptId,
-            Optional<F4ScanToken> continuation,
-            int limit);
+            String cluster, ObjectKeyHash object, String gcAttemptId, Optional<F4ScanToken> continuation, int limit);
 
     @Override
     void close();

@@ -20,20 +20,17 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.zip.CRC32C;
 
-/** Versioned metadata value envelope shared by fake and future real Oxia adapters. */
+/**
+ * Versioned metadata value envelope shared by fake and future real Oxia adapters.
+ */
 public final class MetadataRecordEnvelope {
     public static final String MAGIC = "NRM1";
     public static final String PAYLOAD_ENCODING_BINARY_V1 = "binary-v1";
 
-    private MetadataRecordEnvelope() {
-    }
+    private MetadataRecordEnvelope() {}
 
     public static byte[] encode(
-            String recordType,
-            int schemaVersion,
-            int minReaderSchemaVersion,
-            String payloadEncoding,
-            byte[] payload) {
+            String recordType, int schemaVersion, int minReaderSchemaVersion, String payloadEncoding, byte[] payload) {
         byte[] magicBytes = MAGIC.getBytes(StandardCharsets.US_ASCII);
         byte[] recordTypeBytes = StrictUtf8.encode(requireNonBlank(recordType, "recordType"));
         byte[] payloadEncodingBytes = StrictUtf8.encode(requireNonBlank(payloadEncoding, "payloadEncoding"));
@@ -45,15 +42,16 @@ public final class MetadataRecordEnvelope {
             throw new IllegalArgumentException("envelope string field is too large");
         }
 
-        ByteBuffer buffer = ByteBuffer.allocate(
-                magicBytes.length
-                        + Short.BYTES + recordTypeBytes.length
-                        + Integer.BYTES
-                        + Integer.BYTES
-                        + Short.BYTES + payloadEncodingBytes.length
-                        + Integer.BYTES
-                        + Integer.BYTES
-                        + payload.length);
+        ByteBuffer buffer = ByteBuffer.allocate(magicBytes.length
+                + Short.BYTES
+                + recordTypeBytes.length
+                + Integer.BYTES
+                + Integer.BYTES
+                + Short.BYTES
+                + payloadEncodingBytes.length
+                + Integer.BYTES
+                + Integer.BYTES
+                + payload.length);
         buffer.put(magicBytes);
         putShortBytes(buffer, recordTypeBytes);
         buffer.putInt(schemaVersion);
@@ -92,12 +90,7 @@ public final class MetadataRecordEnvelope {
             if (actualChecksum != expectedChecksum) {
                 throw new MetadataCodecException("metadata payload checksum mismatch");
             }
-            return new DecodedEnvelope(
-                    recordType,
-                    schemaVersion,
-                    minReaderSchemaVersion,
-                    payloadEncoding,
-                    payload);
+            return new DecodedEnvelope(recordType, schemaVersion, minReaderSchemaVersion, payloadEncoding, payload);
         } catch (MetadataCodecException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -135,11 +128,7 @@ public final class MetadataRecordEnvelope {
     }
 
     public record DecodedEnvelope(
-            String recordType,
-            int schemaVersion,
-            int minReaderSchemaVersion,
-            String payloadEncoding,
-            byte[] payload) {
+            String recordType, int schemaVersion, int minReaderSchemaVersion, String payloadEncoding, byte[] payload) {
         public DecodedEnvelope {
             requireNonBlank(recordType, "recordType");
             requireNonBlank(payloadEncoding, "payloadEncoding");

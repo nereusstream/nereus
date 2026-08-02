@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
@@ -48,8 +48,7 @@ class DefaultKafkaPartitionStorageManagerTest {
         assertThat(opener.calls()).isEqualTo(1);
         assertThat(opener.plan().binding().streamId())
                 .isEqualTo(KafkaPartitionStorageTestSupport.binding(PROFILE).streamId());
-        assertThat(opener.plan().profilePolicy())
-                .isEqualTo(KafkaStorageProfilePolicy.forProfile(PROFILE));
+        assertThat(opener.plan().profilePolicy()).isEqualTo(KafkaStorageProfilePolicy.forProfile(PROFILE));
         FakeStorage storage = new FakeStorage(request.authority(), PROFILE);
         opener.complete(storage);
 
@@ -62,8 +61,8 @@ class DefaultKafkaPartitionStorageManagerTest {
     void composesTheRealDeterministicLifecycleIntoTheOpenPlan() {
         FakeKafkaPartitionMetadataStore metadata = new FakeKafkaPartitionMetadataStore("nereus", "kraft");
         TestStreamStorage streams = new TestStreamStorage();
-        KafkaPartitionLifecycleCoordinator lifecycle = new KafkaPartitionLifecycleCoordinator(
-                metadata, streams, metadata.keyspace(), CLOCK);
+        KafkaPartitionLifecycleCoordinator lifecycle =
+                new KafkaPartitionLifecycleCoordinator(metadata, streams, metadata.keyspace(), CLOCK);
         ControlledOpener opener = new ControlledOpener();
         DefaultKafkaPartitionStorageManager manager = new DefaultKafkaPartitionStorageManager(
                 lifecycle, opener, CLOCK, "broker-run", 7, Duration.ofSeconds(30));
@@ -72,8 +71,7 @@ class DefaultKafkaPartitionStorageManagerTest {
         CompletableFuture<KafkaPartitionStorage> opening = manager.openLeader(request);
 
         assertThat(opener.calls()).isEqualTo(1);
-        assertThat(opener.plan().binding().durableRoot().value().lifecycle())
-                .isEqualTo(KafkaPartitionLifecycle.ACTIVE);
+        assertThat(opener.plan().binding().durableRoot().value().lifecycle()).isEqualTo(KafkaPartitionLifecycle.ACTIVE);
         assertThat(opener.plan().binding().durableRoot().value().storageProfile())
                 .isEqualTo(PROFILE.name());
         assertThat(streams.streamCount()).isEqualTo(1);
@@ -172,26 +170,17 @@ class DefaultKafkaPartitionStorageManagerTest {
         assertThat(lifecycle.deleteCalls()).isEqualTo(1);
     }
 
-    private static DefaultKafkaPartitionStorageManager manager(
-            FakeLifecycle lifecycle, ControlledOpener opener) {
+    private static DefaultKafkaPartitionStorageManager manager(FakeLifecycle lifecycle, ControlledOpener opener) {
         return new DefaultKafkaPartitionStorageManager(
                 lifecycle, opener, CLOCK, "broker-run", 7, Duration.ofSeconds(30));
     }
 
-    private static KafkaPartitionLeaderOpenRequest request(
-            int leaderEpoch, StorageProfile profile) {
+    private static KafkaPartitionLeaderOpenRequest request(int leaderEpoch, StorageProfile profile) {
         return new KafkaPartitionLeaderOpenRequest(
-                KafkaPartitionStorageTestSupport.identity(),
-                1,
-                leaderEpoch,
-                9,
-                profile,
-                11,
-                Duration.ofSeconds(5));
+                KafkaPartitionStorageTestSupport.identity(), 1, leaderEpoch, 9, profile, 11, Duration.ofSeconds(5));
     }
 
-    private static void assertFailureCode(
-            CompletableFuture<?> completion, ErrorCode expected) {
+    private static void assertFailureCode(CompletableFuture<?> completion, ErrorCode expected) {
         assertThatThrownBy(completion::join)
                 .isInstanceOf(CompletionException.class)
                 .satisfies(failure -> {
@@ -318,8 +307,8 @@ class DefaultKafkaPartitionStorageManagerTest {
 
         @Override
         public CompletableFuture<KafkaStorageReadResult> read(KafkaStorageReadRequest request) {
-            return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.STORAGE_CLOSED, false, "manager test storage does not read"));
+            return CompletableFuture.failedFuture(
+                    new NereusException(ErrorCode.STORAGE_CLOSED, false, "manager test storage does not read"));
         }
 
         @Override

@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -15,8 +15,8 @@ import com.nereusstream.materialization.MaterializationDeadline;
 import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
-import com.nereusstream.metadata.oxia.VersionedGcRetirementProtection;
 import com.nereusstream.metadata.oxia.VersionedGcRetirementManifest;
+import com.nereusstream.metadata.oxia.VersionedGcRetirementProtection;
 import com.nereusstream.metadata.oxia.VersionedGcRetirementRemoval;
 import com.nereusstream.metadata.oxia.VersionedObjectProtection;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
@@ -53,8 +53,7 @@ class SourceRetirementCoordinatorTest {
     private static final String CLUSTER = "cluster-a";
     private static final String ATTEMPT_ID = "b".repeat(52);
     private static final ObjectKey OBJECT_KEY = new ObjectKey("objects/wal-a");
-    private static final Checksum STORAGE_CHECKSUM =
-            new Checksum(ChecksumType.CRC32C, "01020304");
+    private static final Checksum STORAGE_CHECKSUM = new Checksum(ChecksumType.CRC32C, "01020304");
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
@@ -66,19 +65,19 @@ class SourceRetirementCoordinatorTest {
     @Test
     void deletingRecoveryDeletesObjectCommitsRootAndReentersAsAlreadyDeleted() {
         Fixture fixture = fixture(true);
-        SourceRetirementCoordinator coordinator = coordinator(
-                fixture.store(), fixture.journal(), fixture.objectStore());
+        SourceRetirementCoordinator coordinator =
+                coordinator(fixture.store(), fixture.journal(), fixture.objectStore());
 
         PhysicalGcDeletionResult deleted = coordinator.resume(fixture.root()).join();
 
         assertThat(deleted.status()).isEqualTo(PhysicalGcDeletionStatus.DELETED);
         assertThat(deleted.objectStatus()).contains(DeleteObjectResult.Status.DELETED);
-        assertThat(deleted.root().orElseThrow().value().lifecycle())
-                .isEqualTo(PhysicalObjectLifecycle.DELETED);
+        assertThat(deleted.root().orElseThrow().value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
         assertThat(fixture.objectStore().exists).isFalse();
         assertThat(fixture.objectStore().deleteCalls).hasValue(1);
 
-        PhysicalGcDeletionResult restarted = coordinator.resume(deleted.root().orElseThrow()).join();
+        PhysicalGcDeletionResult restarted =
+                coordinator.resume(deleted.root().orElseThrow()).join();
 
         assertThat(restarted.status()).isEqualTo(PhysicalGcDeletionStatus.ALREADY_DELETED);
         assertThat(restarted.root()).isEqualTo(deleted.root());
@@ -89,15 +88,13 @@ class SourceRetirementCoordinatorTest {
     void alreadyAbsentObjectConvergesOnlyUnderExactDeletingRootAndJournal() {
         Fixture fixture = fixture(false);
 
-        PhysicalGcDeletionResult result = coordinator(
-                        fixture.store(), fixture.journal(), fixture.objectStore())
+        PhysicalGcDeletionResult result = coordinator(fixture.store(), fixture.journal(), fixture.objectStore())
                 .resume(fixture.root())
                 .join();
 
         assertThat(result.status()).isEqualTo(PhysicalGcDeletionStatus.DELETED);
         assertThat(result.objectStatus()).contains(DeleteObjectResult.Status.ALREADY_ABSENT);
-        assertThat(result.root().orElseThrow().value().lifecycle())
-                .isEqualTo(PhysicalObjectLifecycle.DELETED);
+        assertThat(result.root().orElseThrow().value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETED);
         assertThat(fixture.objectStore().deleteCalls).hasValue(0);
     }
 
@@ -106,10 +103,9 @@ class SourceRetirementCoordinatorTest {
         Fixture fixture = fixture(true);
         GcRetirementJournal missing = new StaticJournal(Optional.empty());
 
-        assertThatThrownBy(() -> coordinator(
-                        fixture.store(), missing, fixture.objectStore())
-                .resume(fixture.root())
-                .join())
+        assertThatThrownBy(() -> coordinator(fixture.store(), missing, fixture.objectStore())
+                        .resume(fixture.root())
+                        .join())
                 .hasRootCauseInstanceOf(NereusException.class)
                 .hasRootCauseMessage("DELETING root is missing its sealed retirement journal");
 
@@ -126,17 +122,15 @@ class SourceRetirementCoordinatorTest {
 
     @Test
     void unregisteredMetadataRemovalFailsBeforeObjectAccess() {
-        GcPlannedMetadataRemoval removal = new GcPlannedMetadataRemoval(
-                "generation-index", "/indexes/one", 7, sha('e'));
+        GcPlannedMetadataRemoval removal =
+                new GcPlannedMetadataRemoval("generation-index", "/indexes/one", 7, sha('e'));
         Fixture fixture = fixture(journalSnapshot(List.of(removal)), true);
 
-        assertThatThrownBy(() -> coordinator(
-                        fixture.store(), fixture.journal(), fixture.objectStore())
-                .resume(fixture.root())
-                .join())
+        assertThatThrownBy(() -> coordinator(fixture.store(), fixture.journal(), fixture.objectStore())
+                        .resume(fixture.root())
+                        .join())
                 .hasRootCauseInstanceOf(NereusException.class)
-                .hasRootCauseMessage(
-                        "no metadata-retirement handler is registered for generation-index");
+                .hasRootCauseMessage("no metadata-retirement handler is registered for generation-index");
 
         assertThat(fixture.objectStore().headCalls).hasValue(0);
         assertThat(fixture.objectStore().deleteCalls).hasValue(0);
@@ -151,10 +145,8 @@ class SourceRetirementCoordinatorTest {
 
     @Test
     void journalIsReauthenticatedBeforeEveryMetadataBatch() {
-        GcPlannedMetadataRemoval first = new GcPlannedMetadataRemoval(
-                "test-removal", "/indexes/a", 7, sha('e'));
-        GcPlannedMetadataRemoval second = new GcPlannedMetadataRemoval(
-                "test-removal", "/indexes/b", 8, sha('f'));
+        GcPlannedMetadataRemoval first = new GcPlannedMetadataRemoval("test-removal", "/indexes/a", 7, sha('e'));
+        GcPlannedMetadataRemoval second = new GcPlannedMetadataRemoval("test-removal", "/indexes/b", 8, sha('f'));
         GcRetirementJournalSnapshot snapshot = journalSnapshot(List.of(first, second));
         Fixture fixture = fixture(snapshot, true);
         DisappearingJournal journal = new DisappearingJournal(snapshot, 2);
@@ -171,21 +163,19 @@ class SourceRetirementCoordinatorTest {
                     GcPlannedMetadataRemoval removal,
                     MaterializationDeadline deadline) {
                 retireCalls.incrementAndGet();
-                return CompletableFuture.completedFuture(
-                        GcMetadataRetirementOutcome.RETIRED);
+                return CompletableFuture.completedFuture(GcMetadataRetirementOutcome.RETIRED);
             }
         };
 
         assertThatThrownBy(() -> coordinator(
-                        enabledConfig(1),
-                        fixture.store(),
-                        journal,
-                        new GcMetadataRetirementRegistry(List.of(handler)),
-                        fixture.objectStore())
-                .resume(fixture.root())
-                .join())
-                .hasRootCauseMessage(
-                        "DELETING root is missing its sealed retirement journal");
+                                enabledConfig(1),
+                                fixture.store(),
+                                journal,
+                                new GcMetadataRetirementRegistry(List.of(handler)),
+                                fixture.objectStore())
+                        .resume(fixture.root())
+                        .join())
+                .hasRootCauseMessage("DELETING root is missing its sealed retirement journal");
 
         assertThat(journal.loadCalls).hasValue(3);
         assertThat(retireCalls).hasValue(1);
@@ -200,15 +190,14 @@ class SourceRetirementCoordinatorTest {
         DisappearingJournal journal = new DisappearingJournal(snapshot, 3);
 
         assertThatThrownBy(() -> coordinator(
-                        enabledConfig(),
-                        fixture.store(),
-                        journal,
-                        new GcMetadataRetirementRegistry(List.of()),
-                        fixture.objectStore())
-                .resume(fixture.root())
-                .join())
-                .hasRootCauseMessage(
-                        "DELETING root is missing its sealed retirement journal");
+                                enabledConfig(),
+                                fixture.store(),
+                                journal,
+                                new GcMetadataRetirementRegistry(List.of()),
+                                fixture.objectStore())
+                        .resume(fixture.root())
+                        .join())
+                .hasRootCauseMessage("DELETING root is missing its sealed retirement journal");
 
         assertThat(journal.loadCalls).hasValue(4);
         assertThat(fixture.objectStore().headCalls).hasValue(0);
@@ -217,27 +206,19 @@ class SourceRetirementCoordinatorTest {
 
     @Test
     void restartAfterMetadataDeleteBeforeProtectionRetirementFinishesExactJournal() {
-        FailNextRootReadStore store = new FailNextRootReadStore(
-                "injected process loss after metadata deletion");
-        GcPlannedMetadataRemoval metadata = new GcPlannedMetadataRemoval(
-                "test-removal", "/indexes/source-a", 7, sha('e'));
+        FailNextRootReadStore store = new FailNextRootReadStore("injected process loss after metadata deletion");
+        GcPlannedMetadataRemoval metadata =
+                new GcPlannedMetadataRemoval("test-removal", "/indexes/source-a", 7, sha('e'));
         GcPlannedProtectionRemoval protection = createProtection(store);
-        GcRetirementJournalSnapshot snapshot = journalSnapshot(
-                List.of(metadata), List.of(protection));
+        GcRetirementJournalSnapshot snapshot = journalSnapshot(List.of(metadata), List.of(protection));
         Fixture fixture = fixture(store, snapshot, true);
-        RestartableMetadataHandler handler = new RestartableMetadataHandler(
-                metadata, store::failNextRootRead);
-        GcMetadataRetirementRegistry retirements =
-                new GcMetadataRetirementRegistry(List.of(handler));
+        RestartableMetadataHandler handler = new RestartableMetadataHandler(metadata, store::failNextRootRead);
+        GcMetadataRetirementRegistry retirements = new GcMetadataRetirementRegistry(List.of(handler));
 
-        assertThatThrownBy(() -> coordinator(
-                        enabledConfig(),
-                        store,
-                        fixture.journal(),
-                        retirements,
-                        fixture.objectStore())
-                .resume(fixture.root())
-                .join())
+        assertThatThrownBy(
+                        () -> coordinator(enabledConfig(), store, fixture.journal(), retirements, fixture.objectStore())
+                                .resume(fixture.root())
+                                .join())
                 .hasRootCauseMessage("injected process loss after metadata deletion");
 
         assertThat(handler.exists()).isFalse();
@@ -247,11 +228,7 @@ class SourceRetirementCoordinatorTest {
 
         VersionedPhysicalObjectRoot deleting = currentRoot(store);
         PhysicalGcDeletionResult recovered = coordinator(
-                        enabledConfig(),
-                        store,
-                        fixture.journal(),
-                        retirements,
-                        fixture.objectStore())
+                        enabledConfig(), store, fixture.journal(), retirements, fixture.objectStore())
                 .resume(deleting)
                 .join();
 
@@ -270,14 +247,12 @@ class SourceRetirementCoordinatorTest {
     void restartAfterProtectionDeleteBeforeObjectDeleteFinishesExactJournal() {
         CutAfterProtectionDeleteStore store = new CutAfterProtectionDeleteStore();
         GcPlannedProtectionRemoval protection = createProtection(store);
-        GcRetirementJournalSnapshot snapshot = journalSnapshot(
-                List.of(), List.of(protection));
+        GcRetirementJournalSnapshot snapshot = journalSnapshot(List.of(), List.of(protection));
         Fixture fixture = fixture(store, snapshot, true);
 
-        assertThatThrownBy(() -> coordinator(
-                        store, fixture.journal(), fixture.objectStore())
-                .resume(fixture.root())
-                .join())
+        assertThatThrownBy(() -> coordinator(store, fixture.journal(), fixture.objectStore())
+                        .resume(fixture.root())
+                        .join())
                 .hasRootCauseMessage("injected process loss after protection deletion");
 
         assertThat(store.deleteCalls()).isEqualTo(1);
@@ -285,8 +260,7 @@ class SourceRetirementCoordinatorTest {
         assertDeletingAndObjectPresent(fixture);
 
         VersionedPhysicalObjectRoot deleting = currentRoot(store);
-        PhysicalGcDeletionResult recovered = coordinator(
-                        store, fixture.journal(), fixture.objectStore())
+        PhysicalGcDeletionResult recovered = coordinator(store, fixture.journal(), fixture.objectStore())
                 .resume(deleting)
                 .join();
 
@@ -302,12 +276,10 @@ class SourceRetirementCoordinatorTest {
     void lostProtectionDeleteResponseProvesAbsenceBeforeDeletingObject() {
         LostProtectionDeleteResponseStore store = new LostProtectionDeleteResponseStore();
         GcPlannedProtectionRemoval protection = createProtection(store);
-        GcRetirementJournalSnapshot snapshot = journalSnapshot(
-                List.of(), List.of(protection));
+        GcRetirementJournalSnapshot snapshot = journalSnapshot(List.of(), List.of(protection));
         Fixture fixture = fixture(store, snapshot, true);
 
-        PhysicalGcDeletionResult result = coordinator(
-                        store, fixture.journal(), fixture.objectStore())
+        PhysicalGcDeletionResult result = coordinator(store, fixture.journal(), fixture.objectStore())
                 .resume(fixture.root())
                 .join();
 
@@ -321,15 +293,8 @@ class SourceRetirementCoordinatorTest {
     }
 
     private SourceRetirementCoordinator coordinator(
-            FakePhysicalObjectMetadataStore store,
-            GcRetirementJournal journal,
-            ExactObjectStore objectStore) {
-        return coordinator(
-                enabledConfig(),
-                store,
-                journal,
-                new GcMetadataRetirementRegistry(List.of()),
-                objectStore);
+            FakePhysicalObjectMetadataStore store, GcRetirementJournal journal, ExactObjectStore objectStore) {
+        return coordinator(enabledConfig(), store, journal, new GcMetadataRetirementRegistry(List.of()), objectStore);
     }
 
     private SourceRetirementCoordinator coordinator(
@@ -353,39 +318,26 @@ class SourceRetirementCoordinatorTest {
         return fixture(journalSnapshot(List.of()), objectExists);
     }
 
-    private static Fixture fixture(
-            GcRetirementJournalSnapshot snapshot,
-            boolean objectExists) {
+    private static Fixture fixture(GcRetirementJournalSnapshot snapshot, boolean objectExists) {
         return fixture(new FakePhysicalObjectMetadataStore(), snapshot, objectExists);
     }
 
     private static Fixture fixture(
-            FakePhysicalObjectMetadataStore store,
-            GcRetirementJournalSnapshot snapshot,
-            boolean objectExists) {
-        VersionedPhysicalObjectRoot root = store.createRoot(
-                        CLUSTER, deletingRoot(snapshot.referenceSetSha256()))
+            FakePhysicalObjectMetadataStore store, GcRetirementJournalSnapshot snapshot, boolean objectExists) {
+        VersionedPhysicalObjectRoot root = store.createRoot(CLUSTER, deletingRoot(snapshot.referenceSetSha256()))
                 .join();
-        return new Fixture(
-                store,
-                root,
-                new StaticJournal(Optional.of(snapshot)),
-                new ExactObjectStore(objectExists));
+        return new Fixture(store, root, new StaticJournal(Optional.of(snapshot)), new ExactObjectStore(objectExists));
     }
 
-    private static GcRetirementJournalSnapshot journalSnapshot(
-            List<GcPlannedMetadataRemoval> removals) {
+    private static GcRetirementJournalSnapshot journalSnapshot(List<GcPlannedMetadataRemoval> removals) {
         return journalSnapshot(removals, List.of());
     }
 
     private static GcRetirementJournalSnapshot journalSnapshot(
-            List<GcPlannedMetadataRemoval> removals,
-            List<GcPlannedProtectionRemoval> protections) {
+            List<GcPlannedMetadataRemoval> removals, List<GcPlannedProtectionRemoval> protections) {
         Checksum query = sha('a');
-        GcDomainSnapshotProof proof = new GcDomainSnapshotProof(
-                "generation-v1", 1, query, sha('c'));
-        Checksum referenceSet = GcPlanValidation.referenceSetSha256(
-                query, List.of(proof), protections, removals);
+        GcDomainSnapshotProof proof = new GcDomainSnapshotProof("generation-v1", 1, query, sha('c'));
+        Checksum referenceSet = GcPlanValidation.referenceSetSha256(query, List.of(proof), protections, removals);
         List<VersionedGcRetirementProtection> protectionEntries = protections.stream()
                 .map(removal -> {
                     VersionedObjectProtection protection = removal.protection();
@@ -399,10 +351,7 @@ class SourceRetirementCoordinatorTest {
                             protection.value(),
                             1);
                     return new VersionedGcRetirementProtection(
-                            "/journal/protection/" + protection.key(),
-                            value,
-                            1,
-                            sha('f'));
+                            "/journal/protection/" + protection.key(), value, 1, sha('f'));
                 })
                 .toList();
         List<VersionedGcRetirementRemoval> entries = removals.stream()
@@ -416,8 +365,7 @@ class SourceRetirementCoordinatorTest {
                             removal.metadataVersion(),
                             removal.durableValueSha256().value(),
                             1);
-                    return new VersionedGcRetirementRemoval(
-                            "/journal/removal/" + removal.key(), value, 1, sha('f'));
+                    return new VersionedGcRetirementRemoval("/journal/removal/" + removal.key(), value, 1, sha('f'));
                 })
                 .toList();
         GcRetirementManifestRecord value = new GcRetirementManifestRecord(
@@ -436,13 +384,12 @@ class SourceRetirementCoordinatorTest {
                 referenceSet.value(),
                 100,
                 1);
-        VersionedGcRetirementManifest manifest = new VersionedGcRetirementManifest(
-                "/journal/manifest", value, 1, sha('d'));
+        VersionedGcRetirementManifest manifest =
+                new VersionedGcRetirementManifest("/journal/manifest", value, 1, sha('d'));
         return new GcRetirementJournalSnapshot(manifest, protectionEntries, entries);
     }
 
-    private static GcPlannedProtectionRemoval createProtection(
-            FakePhysicalObjectMetadataStore store) {
+    private static GcPlannedProtectionRemoval createProtection(FakePhysicalObjectMetadataStore store) {
         ObjectProtectionRecord value = new ObjectProtectionRecord(
                 1,
                 ObjectKeyHash.from(OBJECT_KEY).value(),
@@ -459,27 +406,18 @@ class SourceRetirementCoordinatorTest {
                 store.createProtection(CLUSTER, value).join());
     }
 
-    private static List<VersionedObjectProtection> currentProtections(
-            FakePhysicalObjectMetadataStore store) {
-        return store.scanProtections(
-                        CLUSTER,
-                        ObjectKeyHash.from(OBJECT_KEY),
-                        Optional.<F4ScanToken>empty(),
-                        100)
+    private static List<VersionedObjectProtection> currentProtections(FakePhysicalObjectMetadataStore store) {
+        return store.scanProtections(CLUSTER, ObjectKeyHash.from(OBJECT_KEY), Optional.<F4ScanToken>empty(), 100)
                 .join()
                 .values();
     }
 
-    private static VersionedPhysicalObjectRoot currentRoot(
-            FakePhysicalObjectMetadataStore store) {
-        return store.getRoot(CLUSTER, ObjectKeyHash.from(OBJECT_KEY))
-                .join()
-                .orElseThrow();
+    private static VersionedPhysicalObjectRoot currentRoot(FakePhysicalObjectMetadataStore store) {
+        return store.getRoot(CLUSTER, ObjectKeyHash.from(OBJECT_KEY)).join().orElseThrow();
     }
 
     private static void assertDeletingAndObjectPresent(Fixture fixture) {
-        assertThat(currentRoot(fixture.store()).value().lifecycle())
-                .isEqualTo(PhysicalObjectLifecycle.DELETING);
+        assertThat(currentRoot(fixture.store()).value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.DELETING);
         assertThat(fixture.objectStore().exists).isTrue();
         assertThat(fixture.objectStore().headCalls).hasValue(0);
         assertThat(fixture.objectStore().deleteCalls).hasValue(0);
@@ -548,8 +486,7 @@ class SourceRetirementCoordinatorTest {
             FakePhysicalObjectMetadataStore store,
             VersionedPhysicalObjectRoot root,
             GcRetirementJournal journal,
-            ExactObjectStore objectStore) {
-    }
+            ExactObjectStore objectStore) {}
 
     private static final class StaticJournal implements GcRetirementJournal {
         private final Optional<GcRetirementJournalSnapshot> snapshot;
@@ -573,9 +510,7 @@ class SourceRetirementCoordinatorTest {
 
         @Override
         public CompletableFuture<Optional<GcRetirementJournalSnapshot>> load(
-                ObjectKeyHash object,
-                String gcAttemptId,
-                MaterializationDeadline deadline) {
+                ObjectKeyHash object, String gcAttemptId, MaterializationDeadline deadline) {
             return CompletableFuture.completedFuture(snapshot);
         }
     }
@@ -585,9 +520,7 @@ class SourceRetirementCoordinatorTest {
         private final int successfulLoads;
         private final AtomicInteger loadCalls = new AtomicInteger();
 
-        private DisappearingJournal(
-                GcRetirementJournalSnapshot snapshot,
-                int successfulLoads) {
+        private DisappearingJournal(GcRetirementJournalSnapshot snapshot, int successfulLoads) {
             this.snapshot = snapshot;
             this.successfulLoads = successfulLoads;
         }
@@ -607,26 +540,19 @@ class SourceRetirementCoordinatorTest {
 
         @Override
         public CompletableFuture<Optional<GcRetirementJournalSnapshot>> load(
-                ObjectKeyHash object,
-                String gcAttemptId,
-                MaterializationDeadline deadline) {
+                ObjectKeyHash object, String gcAttemptId, MaterializationDeadline deadline) {
             return CompletableFuture.completedFuture(
-                    loadCalls.incrementAndGet() <= successfulLoads
-                            ? Optional.of(snapshot)
-                            : Optional.empty());
+                    loadCalls.incrementAndGet() <= successfulLoads ? Optional.of(snapshot) : Optional.empty());
         }
     }
 
-    private static final class RestartableMetadataHandler
-            implements GcMetadataRetirementHandler {
+    private static final class RestartableMetadataHandler implements GcMetadataRetirementHandler {
         private final GcPlannedMetadataRemoval expected;
         private final Runnable afterDelete;
         private final AtomicBoolean exists = new AtomicBoolean(true);
         private final AtomicInteger deleteCalls = new AtomicInteger();
 
-        private RestartableMetadataHandler(
-                GcPlannedMetadataRemoval expected,
-                Runnable afterDelete) {
+        private RestartableMetadataHandler(GcPlannedMetadataRemoval expected, Runnable afterDelete) {
             this.expected = expected;
             this.afterDelete = afterDelete;
         }
@@ -642,12 +568,10 @@ class SourceRetirementCoordinatorTest {
                 GcPlannedMetadataRemoval removal,
                 MaterializationDeadline deadline) {
             if (!expected.equals(removal)) {
-                return CompletableFuture.failedFuture(
-                        new AssertionError("metadata removal changed across restart"));
+                return CompletableFuture.failedFuture(new AssertionError("metadata removal changed across restart"));
             }
             if (!exists.compareAndSet(true, false)) {
-                return CompletableFuture.completedFuture(
-                        GcMetadataRetirementOutcome.ALREADY_ABSENT);
+                return CompletableFuture.completedFuture(GcMetadataRetirementOutcome.ALREADY_ABSENT);
             }
             deleteCalls.incrementAndGet();
             afterDelete.run();
@@ -679,8 +603,7 @@ class SourceRetirementCoordinatorTest {
 
         @Override
         public synchronized CompletableFuture<Optional<VersionedPhysicalObjectRoot>> getRoot(
-                String cluster,
-                ObjectKeyHash object) {
+                String cluster, ObjectKeyHash object) {
             if (failNextRootRead.compareAndSet(true, false)) {
                 return CompletableFuture.failedFuture(new RuntimeException(failureMessage));
             }
@@ -688,8 +611,7 @@ class SourceRetirementCoordinatorTest {
         }
     }
 
-    private static final class CutAfterProtectionDeleteStore
-            extends FailNextRootReadStore {
+    private static final class CutAfterProtectionDeleteStore extends FailNextRootReadStore {
         private final AtomicInteger deleteCalls = new AtomicInteger();
 
         private CutAfterProtectionDeleteStore() {
@@ -698,14 +620,11 @@ class SourceRetirementCoordinatorTest {
 
         @Override
         public synchronized CompletableFuture<Void> deleteProtection(
-                String cluster,
-                ObjectProtectionIdentity protection,
-                long expectedVersion) {
-            return super.deleteProtection(cluster, protection, expectedVersion)
-                    .thenRun(() -> {
-                        deleteCalls.incrementAndGet();
-                        failNextRootRead();
-                    });
+                String cluster, ObjectProtectionIdentity protection, long expectedVersion) {
+            return super.deleteProtection(cluster, protection, expectedVersion).thenRun(() -> {
+                deleteCalls.incrementAndGet();
+                failNextRootRead();
+            });
         }
 
         private int deleteCalls() {
@@ -713,21 +632,16 @@ class SourceRetirementCoordinatorTest {
         }
     }
 
-    private static final class LostProtectionDeleteResponseStore
-            extends FakePhysicalObjectMetadataStore {
+    private static final class LostProtectionDeleteResponseStore extends FakePhysicalObjectMetadataStore {
         private final AtomicInteger deleteCalls = new AtomicInteger();
 
         @Override
         public synchronized CompletableFuture<Void> deleteProtection(
-                String cluster,
-                ObjectProtectionIdentity protection,
-                long expectedVersion) {
-            return super.deleteProtection(cluster, protection, expectedVersion)
-                    .thenCompose(ignored -> {
-                        deleteCalls.incrementAndGet();
-                        return CompletableFuture.failedFuture(
-                                new RuntimeException("injected protection delete response loss"));
-                    });
+                String cluster, ObjectProtectionIdentity protection, long expectedVersion) {
+            return super.deleteProtection(cluster, protection, expectedVersion).thenCompose(ignored -> {
+                deleteCalls.incrementAndGet();
+                return CompletableFuture.failedFuture(new RuntimeException("injected protection delete response loss"));
+            });
         }
 
         private int deleteCalls() {
@@ -746,30 +660,23 @@ class SourceRetirementCoordinatorTest {
 
         @Override
         public CompletableFuture<RangeReadResult> readRange(
-                ObjectKey key,
-                long offset,
-                long length,
-                RangeReadOptions options) {
+                ObjectKey key, long offset, long length, RangeReadOptions options) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         }
 
         @Override
-        public CompletableFuture<HeadObjectResult> headObject(
-                ObjectKey key,
-                HeadObjectOptions options) {
+        public CompletableFuture<HeadObjectResult> headObject(ObjectKey key, HeadObjectOptions options) {
             headCalls.incrementAndGet();
             if (!exists) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.OBJECT_NOT_FOUND, true, "object not found"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.OBJECT_NOT_FOUND, true, "object not found"));
             }
-            return CompletableFuture.completedFuture(new HeadObjectResult(
-                    OBJECT_KEY, 4, STORAGE_CHECKSUM, Optional.empty(), Map.of()));
+            return CompletableFuture.completedFuture(
+                    new HeadObjectResult(OBJECT_KEY, 4, STORAGE_CHECKSUM, Optional.empty(), Map.of()));
         }
 
         @Override
-        public CompletableFuture<DeleteObjectResult> deleteObject(
-                ObjectKey key,
-                DeleteObjectOptions options) {
+        public CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
             deleteCalls.incrementAndGet();
             if (!OBJECT_KEY.equals(key)
                     || options.expectedLength() != 4
@@ -778,15 +685,13 @@ class SourceRetirementCoordinatorTest {
                 return CompletableFuture.failedFuture(
                         new AssertionError("delete did not carry the exact root identity"));
             }
-            DeleteObjectResult.Status status = exists
-                    ? DeleteObjectResult.Status.DELETED
-                    : DeleteObjectResult.Status.ALREADY_ABSENT;
+            DeleteObjectResult.Status status =
+                    exists ? DeleteObjectResult.Status.DELETED : DeleteObjectResult.Status.ALREADY_ABSENT;
             exists = false;
             return CompletableFuture.completedFuture(new DeleteObjectResult(key, status));
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 }

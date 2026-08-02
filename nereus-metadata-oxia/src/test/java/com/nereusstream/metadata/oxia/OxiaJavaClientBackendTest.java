@@ -16,7 +16,6 @@ package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StorageProfile;
@@ -66,11 +65,11 @@ class OxiaJavaClientBackendTest {
         Executor direct = Runnable::run;
         OxiaJavaClientBackend backend = new OxiaJavaClientBackend(client, direct, direct);
 
-        List<PartitionedOxiaClient.VersionedValue> values = backend
-                .rangeScan("/range/0", "/range/z", 2, PARTITION_KEY)
-                .join();
+        List<PartitionedOxiaClient.VersionedValue> values =
+                backend.rangeScan("/range/0", "/range/z", 2, PARTITION_KEY).join();
 
-        assertThat(values).extracting(PartitionedOxiaClient.VersionedValue::key)
+        assertThat(values)
+                .extracting(PartitionedOxiaClient.VersionedValue::key)
                 .containsExactly("/range/1", "/range/2");
         assertThat(consumed).hasValue(2);
         assertThat(closed).isTrue();
@@ -79,9 +78,11 @@ class OxiaJavaClientBackendTest {
     @Test
     void notificationCallbackCanSynchronouslyReadWithoutStarvingRequestExecutor() throws Exception {
         AtomicReference<Consumer<Notification>> notifications = new AtomicReference<>();
-        SyncOxiaClient client = client(notifications, () -> iterable(List.of(), new AtomicInteger(), new AtomicBoolean()));
+        SyncOxiaClient client =
+                client(notifications, () -> iterable(List.of(), new AtomicInteger(), new AtomicBoolean()));
         ExecutorService requests = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "oxia-request"));
-        ExecutorService callbacks = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "oxia-notification"));
+        ExecutorService callbacks =
+                Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "oxia-notification"));
         try {
             OxiaJavaClientBackend backend = new OxiaJavaClientBackend(client, requests, callbacks);
             CountDownLatch delivered = new CountDownLatch(1);
@@ -109,12 +110,7 @@ class OxiaJavaClientBackendTest {
         SyncOxiaClient client = blockingClient(started, release);
         OxiaJavaClientMetadataStore store = new OxiaJavaClientMetadataStore(
                 new OxiaClientConfiguration(
-                        "unused:6648",
-                        "default",
-                        Duration.ofSeconds(5),
-                        Duration.ofSeconds(5),
-                        10,
-                        1),
+                        "unused:6648", "default", Duration.ofSeconds(5), Duration.ofSeconds(5), 10, 1),
                 client,
                 Clock.systemUTC());
         List<CompletableFuture<?>> admitted = new ArrayList<>();
@@ -127,12 +123,11 @@ class OxiaJavaClientBackendTest {
 
             CompletableFuture<?> rejected = store.getStream("cluster", new StreamId("rejected"));
 
-            assertThatThrownBy(rejected::join)
-                    .isInstanceOfSatisfying(CompletionException.class, error -> {
-                        NereusException failure = (NereusException) error.getCause();
-                        assertThat(failure.code()).isEqualTo(ErrorCode.BACKPRESSURE_REJECTED);
-                        assertThat(failure.retriable()).isTrue();
-                    });
+            assertThatThrownBy(rejected::join).isInstanceOfSatisfying(CompletionException.class, error -> {
+                NereusException failure = (NereusException) error.getCause();
+                assertThat(failure.code()).isEqualTo(ErrorCode.BACKPRESSURE_REJECTED);
+                assertThat(failure.retriable()).isTrue();
+            });
         } finally {
             release.countDown();
             admitted.forEach(future -> future.handle((value, error) -> null).join());
@@ -162,17 +157,14 @@ class OxiaJavaClientBackendTest {
                 0);
         byte[] encoded = Phase1MetadataCodecs.encodeEnvelope(wrongHead, StreamHeadRecord.class);
         OxiaJavaClientMetadataStore store = new OxiaJavaClientMetadataStore(
-                OxiaClientConfiguration.defaults("unused:6648"),
-                valueClient(encoded),
-                Clock.systemUTC());
+                OxiaClientConfiguration.defaults("unused:6648"), valueClient(encoded), Clock.systemUTC());
         try {
             CompletableFuture<?> result = store.getStream("cluster", new StreamId("expected-stream"));
 
-            assertThatThrownBy(result::join)
-                    .isInstanceOfSatisfying(CompletionException.class, error ->
-                            assertThat((NereusException) error.getCause())
-                                    .extracting(NereusException::code)
-                                    .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
+            assertThatThrownBy(result::join).isInstanceOfSatisfying(CompletionException.class, error -> assertThat(
+                            (NereusException) error.getCause())
+                    .extracting(NereusException::code)
+                    .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
         } finally {
             store.close();
         }
@@ -199,9 +191,7 @@ class OxiaJavaClientBackendTest {
                 });
     }
 
-    private static SyncOxiaClient blockingClient(
-            CountDownLatch started,
-            CountDownLatch release) {
+    private static SyncOxiaClient blockingClient(CountDownLatch started, CountDownLatch release) {
         return (SyncOxiaClient) Proxy.newProxyInstance(
                 SyncOxiaClient.class.getClassLoader(),
                 new Class<?>[] {SyncOxiaClient.class},
@@ -235,9 +225,7 @@ class OxiaJavaClientBackendTest {
     }
 
     private static CloseableIterable<GetResult> iterable(
-            List<GetResult> source,
-            AtomicInteger consumed,
-            AtomicBoolean closed) {
+            List<GetResult> source, AtomicInteger consumed, AtomicBoolean closed) {
         return new CloseableIterable<>() {
             @Override
             public Iterator<GetResult> iterator() {
@@ -264,10 +252,7 @@ class OxiaJavaClientBackendTest {
     }
 
     private static GetResult result(String key, long versionId) {
-        return new GetResult(
-                key,
-                new byte[] {(byte) versionId},
-                version(versionId));
+        return new GetResult(key, new byte[] {(byte) versionId}, version(versionId));
     }
 
     private static Version version(long versionId) {

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -8,11 +9,11 @@ import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
-import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ProjectionRef;
+import com.nereusstream.api.PublicationId;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
-import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
@@ -30,15 +31,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-/** Strict domain/durable mapper shared by publication and recovery. */
+/**
+ * Strict domain/durable mapper shared by publication and recovery.
+ */
 final class MaterializationRecordMapper {
-    private MaterializationRecordMapper() {
-    }
+    private MaterializationRecordMapper() {}
 
     static void requireTaskAndOutput(
-            VersionedMaterializationTask durable,
-            MaterializationTask task,
-            MaterializationOutput output) {
+            VersionedMaterializationTask durable, MaterializationTask task, MaterializationOutput output) {
         MaterializationTaskRecord value = durable.value();
         if (!output.taskId().equals(task.taskId())
                 || !output.streamId().equals(task.streamId())
@@ -52,9 +52,10 @@ final class MaterializationRecordMapper {
                 || value.taskKindId() != task.taskKind().wireId()
                 || value.offsetStart() != task.coverage().startOffset()
                 || value.offsetEnd() != task.coverage().endOffset()
-                || !value.sources().equals(task.sources().stream()
-                        .map(MaterializationRecordMapper::sourceRecord)
-                        .toList())
+                || !value.sources()
+                        .equals(task.sources().stream()
+                                .map(MaterializationRecordMapper::sourceRecord)
+                                .toList())
                 || !value.sourceSetSha256().equals(task.sourceSetSha256().value())
                 || !value.policyId().equals(task.policy().policyId())
                 || value.policyVersion() != task.policy().policyVersion()
@@ -80,7 +81,9 @@ final class MaterializationRecordMapper {
                 task.taskKind().wireId(),
                 task.coverage().startOffset(),
                 task.coverage().endOffset(),
-                task.sources().stream().map(MaterializationRecordMapper::sourceRecord).toList(),
+                task.sources().stream()
+                        .map(MaterializationRecordMapper::sourceRecord)
+                        .toList(),
                 task.sourceSetSha256().value(),
                 task.policy().policyId(),
                 task.policy().policyVersion(),
@@ -100,15 +103,12 @@ final class MaterializationRecordMapper {
                 0);
     }
 
-    static MaterializationTask domainTask(
-            VersionedMaterializationTask durable) {
+    static MaterializationTask domainTask(VersionedMaterializationTask durable) {
         Objects.requireNonNull(durable, "durable");
         return domainTask(durable, domainPolicy(durable.value().policy()));
     }
 
-    static MaterializationTask domainTask(
-            VersionedMaterializationTask durable,
-            MaterializationPolicy policy) {
+    static MaterializationTask domainTask(VersionedMaterializationTask durable, MaterializationPolicy policy) {
         Objects.requireNonNull(durable, "durable");
         Objects.requireNonNull(policy, "policy");
         MaterializationTaskRecord value = durable.value();
@@ -159,9 +159,7 @@ final class MaterializationRecordMapper {
         Optional<TopicCompactionSpec> topic = policy.topicStrategyId().isEmpty()
                 ? Optional.empty()
                 : Optional.of(new TopicCompactionSpec(
-                        policy.topicStrategyId(),
-                        policy.topicStrategyVersion(),
-                        policy.topicKeyCodecId()));
+                        policy.topicStrategyId(), policy.topicStrategyVersion(), policy.topicKeyCodecId()));
         return new MaterializationPolicy(
                 policy.policyId(),
                 policy.policyVersion(),
@@ -191,8 +189,7 @@ final class MaterializationRecordMapper {
                 new Checksum(ChecksumType.SHA256, source.targetIdentitySha256()),
                 source.materializationPolicySha256().isEmpty()
                         ? Optional.empty()
-                        : Optional.of(new Checksum(
-                                ChecksumType.SHA256, source.materializationPolicySha256())),
+                        : Optional.of(new Checksum(ChecksumType.SHA256, source.materializationPolicySha256())),
                 PayloadFormat.valueOf(source.payloadFormat()),
                 ProjectionIdentity.decode(source.projectionRef()),
                 source.recordCount(),
@@ -251,9 +248,7 @@ final class MaterializationRecordMapper {
                 projectionIdentity(output.projectionRef()));
     }
 
-    static MaterializationOutput domainOutput(
-            MaterializationTask task,
-            MaterializationOutputRecord output) {
+    static MaterializationOutput domainOutput(MaterializationTask task, MaterializationOutputRecord output) {
         Objects.requireNonNull(task, "task");
         Objects.requireNonNull(output, "output");
         var decoded = ReadTargetCodecRegistry.phase15().decode(output.readTarget());
@@ -295,8 +290,7 @@ final class MaterializationRecordMapper {
             String processRunId,
             long claimedAtMillis,
             long expiresAtMillis) {
-        if (current.lifecycle() != TaskLifecycle.PLANNED
-                && current.lifecycle() != TaskLifecycle.RETRY_WAIT) {
+        if (current.lifecycle() != TaskLifecycle.PLANNED && current.lifecycle() != TaskLifecycle.RETRY_WAIT) {
             throw new IllegalArgumentException("only PLANNED/RETRY_WAIT tasks may be claimed");
         }
         if (claimedAtMillis < 0 || expiresAtMillis <= claimedAtMillis) {
@@ -308,12 +302,7 @@ final class MaterializationRecordMapper {
                 current,
                 TaskLifecycle.CLAIMED,
                 attempt,
-                Optional.of(new WorkerClaimRecord(
-                        claimId,
-                        processRunId,
-                        attempt,
-                        claimedAtMillis,
-                        expiresAtMillis)),
+                Optional.of(new WorkerClaimRecord(claimId, processRunId, attempt, claimedAtMillis, expiresAtMillis)),
                 Optional.empty(),
                 TaskFailureClass.NONE,
                 "",
@@ -322,10 +311,9 @@ final class MaterializationRecordMapper {
     }
 
     static MaterializationTaskRecord heartbeat(
-            MaterializationTaskRecord current,
-            long expiresAtMillis,
-            long nowMillis) {
-        if (current.lifecycle() != TaskLifecycle.CLAIMED || current.workerClaim().isEmpty()) {
+            MaterializationTaskRecord current, long expiresAtMillis, long nowMillis) {
+        if (current.lifecycle() != TaskLifecycle.CLAIMED
+                || current.workerClaim().isEmpty()) {
             throw new IllegalArgumentException("only a claimed task may heartbeat");
         }
         WorkerClaimRecord claim = current.workerClaim().orElseThrow();
@@ -350,10 +338,9 @@ final class MaterializationRecordMapper {
     }
 
     static MaterializationTaskRecord outputReady(
-            MaterializationTaskRecord current,
-            MaterializationOutput output,
-            long nowMillis) {
-        if (current.lifecycle() != TaskLifecycle.CLAIMED || current.workerClaim().isEmpty()) {
+            MaterializationTaskRecord current, MaterializationOutput output, long nowMillis) {
+        if (current.lifecycle() != TaskLifecycle.CLAIMED
+                || current.workerClaim().isEmpty()) {
             throw new IllegalArgumentException("only a claimed task may persist worker output");
         }
         if (!current.workerClaim().orElseThrow().claimId().equals(output.outputAttemptId())) {
@@ -444,9 +431,7 @@ final class MaterializationRecordMapper {
                 0);
     }
 
-    static GenerationIndexRecord committedIndex(
-            GenerationIndexRecord prepared,
-            long nowMillis) {
+    static GenerationIndexRecord committedIndex(GenerationIndexRecord prepared, long nowMillis) {
         long committedAt = Math.max(nowMillis, prepared.createdAtMillis());
         return new GenerationIndexRecord(
                 prepared.schemaVersion(),
@@ -481,10 +466,7 @@ final class MaterializationRecordMapper {
                 0);
     }
 
-    static GenerationIndexRecord abortedIndex(
-            GenerationIndexRecord prepared,
-            String reason,
-            long nowMillis) {
+    static GenerationIndexRecord abortedIndex(GenerationIndexRecord prepared, String reason, long nowMillis) {
         if (prepared.lifecycle() != GenerationLifecycle.PREPARED) {
             throw new IllegalArgumentException("only a PREPARED generation can be aborted");
         }
@@ -524,65 +506,37 @@ final class MaterializationRecordMapper {
     }
 
     static MaterializationTaskRecord publishing(
-            MaterializationTaskRecord current,
-            PublicationId publicationId,
-            long nowMillis) {
-        return taskState(
-                current,
-                TaskLifecycle.PUBLISHING,
-                OptionalLong.empty(),
-                publicationId.value(),
-                nowMillis);
+            MaterializationTaskRecord current, PublicationId publicationId, long nowMillis) {
+        return taskState(current, TaskLifecycle.PUBLISHING, OptionalLong.empty(), publicationId.value(), nowMillis);
     }
 
     static MaterializationTaskRecord attachGeneration(
-            MaterializationTaskRecord current,
-            long generation,
-            long nowMillis) {
+            MaterializationTaskRecord current, long generation, long nowMillis) {
         if (generation <= 0 || current.publicationId().isEmpty()) {
             throw new IllegalArgumentException("publishing generation identity is invalid");
         }
         return taskState(
-                current,
-                TaskLifecycle.PUBLISHING,
-                OptionalLong.of(generation),
-                current.publicationId(),
-                nowMillis);
+                current, TaskLifecycle.PUBLISHING, OptionalLong.of(generation), current.publicationId(), nowMillis);
     }
 
-    static MaterializationTaskRecord published(
-            MaterializationTaskRecord current,
-            long nowMillis) {
+    static MaterializationTaskRecord published(MaterializationTaskRecord current, long nowMillis) {
         if (current.allocatedGeneration().isEmpty() || current.publicationId().isEmpty()) {
             throw new IllegalArgumentException("published task requires a frozen publication allocation");
         }
         return taskState(
-                current,
-                TaskLifecycle.PUBLISHED,
-                current.allocatedGeneration(),
-                current.publicationId(),
-                nowMillis);
+                current, TaskLifecycle.PUBLISHED, current.allocatedGeneration(), current.publicationId(), nowMillis);
     }
 
-    static MaterializationTaskRecord outputReadyAfterAbort(
-            MaterializationTaskRecord current,
-            long nowMillis) {
+    static MaterializationTaskRecord outputReadyAfterAbort(MaterializationTaskRecord current, long nowMillis) {
         if (current.lifecycle() != TaskLifecycle.PUBLISHING
                 || current.allocatedGeneration().isEmpty()
                 || current.publicationId().isEmpty()) {
             throw new IllegalArgumentException("only an allocated PUBLISHING task can clear an aborted publication");
         }
-        return taskState(
-                current,
-                TaskLifecycle.OUTPUT_READY,
-                OptionalLong.empty(),
-                "",
-                nowMillis);
+        return taskState(current, TaskLifecycle.OUTPUT_READY, OptionalLong.empty(), "", nowMillis);
     }
 
-    static boolean sameGenerationPublicationIdentity(
-            GenerationIndexRecord left,
-            GenerationIndexRecord right) {
+    static boolean sameGenerationPublicationIdentity(GenerationIndexRecord left, GenerationIndexRecord right) {
         return left.schemaVersion() == right.schemaVersion()
                 && left.streamId().equals(right.streamId())
                 && left.readViewId() == right.readViewId()

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.checkpoint;
 
 import com.nereusstream.api.AppendAuthority;
@@ -31,7 +32,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Cross-shard-safe NKC1 publication: pending protection -> PUT/verify -> binding CAS -> permanent protection. */
+/**
+ * Cross-shard-safe NKC1 publication: pending protection -> PUT/verify -> binding CAS -> permanent protection.
+ */
 public final class KafkaCheckpointPublicationCoordinator {
     private static final int MAX_CAS_RETRIES = 32;
     private static final String AUTHORITY_TYPE = "kafka-partition-leader-v1";
@@ -55,8 +58,7 @@ public final class KafkaCheckpointPublicationCoordinator {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    public CompletableFuture<KafkaCheckpointObject> publish(
-            KafkaCheckpointPublicationRequest request) {
+    public CompletableFuture<KafkaCheckpointObject> publish(KafkaCheckpointPublicationRequest request) {
         Objects.requireNonNull(request, "request");
         validateCapture(request);
         AtomicReference<ObjectProtection> pending = new AtomicReference<>();
@@ -75,20 +77,19 @@ public final class KafkaCheckpointPublicationCoordinator {
                             request.capturedBinding().value().payloadMappingId(),
                             request.capturedSource().trimOffset(),
                             request.capturedSource().endOffset());
-                    KafkaCheckpointReferenceRecord reference = reference(
-                            object, request.writerBuild(), clock.millis());
+                    KafkaCheckpointReferenceRecord reference = reference(object, request.writerBuild(), clock.millis());
                     return publishReference(request, reference, 0)
-                            .thenCompose(published -> acquirePermanent(
-                                    published, reference, exactPhysical))
-                            .thenCompose(permanent -> releasePublishedPending(
-                                    request.identity(), pending.get(), reference, permanent))
+                            .thenCompose(published -> acquirePermanent(published, reference, exactPhysical))
+                            .thenCompose(permanent ->
+                                    releasePublishedPending(request.identity(), pending.get(), reference, permanent))
                             .thenApply(ignored -> object);
                 });
-        return pipeline.exceptionallyCompose(failure -> cleanupFailedPending(
-                        request, pending.get(), physical.get())
+        return pipeline.exceptionallyCompose(failure -> cleanupFailedPending(request, pending.get(), physical.get())
                 .handle((ignored, cleanupFailure) -> {
                     Throwable exact = unwrap(failure);
-                    if (cleanupFailure != null) exact.addSuppressed(unwrap(cleanupFailure));
+                    if (cleanupFailure != null) {
+                        exact.addSuppressed(unwrap(cleanupFailure));
+                    }
                     throw new CompletionException(exact);
                 }));
     }
@@ -99,43 +100,46 @@ public final class KafkaCheckpointPublicationCoordinator {
             AtomicReference<ObjectProtection> pending,
             AtomicReference<PhysicalObjectIdentity> physical) {
         PhysicalObjectIdentity object = PhysicalObjectIdentity.create(
-                upload.objectKey(), Optional.of(upload.objectId()),
-                PhysicalObjectKind.KAFKA_PARTITION_CHECKPOINT, upload.objectLength(),
-                upload.storageCrc32c(), Optional.of(upload.objectSha256()), Optional.empty());
+                upload.objectKey(),
+                Optional.of(upload.objectId()),
+                PhysicalObjectKind.KAFKA_PARTITION_CHECKPOINT,
+                upload.objectLength(),
+                upload.storageCrc32c(),
+                Optional.of(upload.objectSha256()),
+                Optional.empty());
         physical.set(object);
         ObjectProtectionOwner owner = owner(request.capturedBinding());
         long expiry;
         try {
-            expiry = Math.addExact(clock.millis(), request.pendingProtectionTtl().toMillis());
+            expiry =
+                    Math.addExact(clock.millis(), request.pendingProtectionTtl().toMillis());
         } catch (ArithmeticException failure) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "Kafka checkpoint pending protection expiry overflows", failure));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("Kafka checkpoint pending protection expiry overflows", failure));
         }
         ObjectProtectionRequest protectionRequest = new ObjectProtectionRequest(
                 object,
                 ObjectProtectionType.KAFKA_CHECKPOINT_PENDING,
                 KafkaCheckpointFormatV1.attemptId(
-                        request.objectRequest().header(), request.objectRequest().contentPolicySha256()),
+                        request.objectRequest().header(),
+                        request.objectRequest().contentPolicySha256()),
                 owner,
                 expiry);
-        return protections.acquireOrTransfer(
-                        protectionRequest,
-                        actual -> requireExactRoot(request.capturedBinding(), owner, actual))
+        return protections
+                .acquireOrTransfer(
+                        protectionRequest, actual -> requireExactRoot(request.capturedBinding(), owner, actual))
                 .thenAccept(pending::set);
     }
 
     private CompletableFuture<VersionedKafkaPartitionBinding> publishReference(
-            KafkaCheckpointPublicationRequest request,
-            KafkaCheckpointReferenceRecord reference,
-            int attempt) {
+            KafkaCheckpointPublicationRequest request, KafkaCheckpointReferenceRecord reference, int attempt) {
         if (attempt >= MAX_CAS_RETRIES) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.METADATA_CONDITION_FAILED, true,
-                    "Kafka checkpoint root CAS retry budget exhausted"));
+                    ErrorCode.METADATA_CONDITION_FAILED, true, "Kafka checkpoint root CAS retry budget exhausted"));
         }
         return bindings.get(request.identity().durableId()).thenCompose(optional -> {
-            VersionedKafkaPartitionBinding current = optional.orElseThrow(() -> invariant(
-                    "Kafka binding disappeared during checkpoint publication"));
+            VersionedKafkaPartitionBinding current =
+                    optional.orElseThrow(() -> invariant("Kafka binding disappeared during checkpoint publication"));
             validateBinding(request, current);
             Optional<KafkaCheckpointReferenceRecord> existing = current.value().checkpointReferences().stream()
                     .filter(value -> value.objectId().equals(reference.objectId()))
@@ -155,8 +159,7 @@ public final class KafkaCheckpointPublicationCoordinator {
         });
     }
 
-    private CompletableFuture<KafkaCheckpointSourceState> revalidateSource(
-            KafkaCheckpointPublicationRequest request) {
+    private CompletableFuture<KafkaCheckpointSourceState> revalidateSource(KafkaCheckpointPublicationRequest request) {
         KafkaCheckpointHeader header = request.objectRequest().header();
         return request.sourceValidator().loadCurrent().thenCompose(current -> {
             KafkaCheckpointSourceState captured = request.capturedSource();
@@ -164,22 +167,23 @@ public final class KafkaCheckpointPublicationCoordinator {
                     || current.trimOffset() > header.checkpointOffset()
                     || current.endOffset() < header.checkpointOffset()
                     || current.commitVersion() < header.sourceCommitVersion()) {
-                return CompletableFuture.failedFuture(invariant(
-                        "Kafka checkpoint source authority or committed window changed unsafely"));
+                return CompletableFuture.failedFuture(
+                        invariant("Kafka checkpoint source authority or committed window changed unsafely"));
             }
             if (current.commitVersion() == header.sourceCommitVersion()) {
                 if (!current.lastCommitId().equals(header.sourceLastCommitId())
                         || current.endOffset() != header.stableEndOffset()) {
-                    return CompletableFuture.failedFuture(invariant(
-                            "Kafka checkpoint source commit anchor changed at the same commit version"));
+                    return CompletableFuture.failedFuture(
+                            invariant("Kafka checkpoint source commit anchor changed at the same commit version"));
                 }
                 return CompletableFuture.completedFuture(current);
             }
-            return request.sourceValidator().isSourceCommitReachable(header, current).thenCompose(reachable ->
-                    reachable
+            return request.sourceValidator()
+                    .isSourceCommitReachable(header, current)
+                    .thenCompose(reachable -> reachable
                             ? CompletableFuture.completedFuture(current)
-                            : CompletableFuture.failedFuture(invariant(
-                                    "Kafka checkpoint source commit is no longer reachable")));
+                            : CompletableFuture.failedFuture(
+                                    invariant("Kafka checkpoint source commit is no longer reachable")));
         });
     }
 
@@ -189,13 +193,8 @@ public final class KafkaCheckpointPublicationCoordinator {
             PhysicalObjectIdentity physical) {
         ObjectProtectionOwner owner = owner(published);
         ObjectProtectionRequest request = new ObjectProtectionRequest(
-                physical,
-                ObjectProtectionType.KAFKA_CHECKPOINT_ROOT,
-                reference.objectId(),
-                owner,
-                0);
-        return protections.acquireOrTransfer(
-                request, actual -> requireExactRoot(published, owner, actual));
+                physical, ObjectProtectionType.KAFKA_CHECKPOINT_ROOT, reference.objectId(), owner, 0);
+        return protections.acquireOrTransfer(request, actual -> requireExactRoot(published, owner, actual));
     }
 
     private CompletableFuture<Void> releasePublishedPending(
@@ -203,49 +202,57 @@ public final class KafkaCheckpointPublicationCoordinator {
             ObjectProtection pending,
             KafkaCheckpointReferenceRecord reference,
             ObjectProtection permanent) {
-        if (pending == null) return CompletableFuture.failedFuture(invariant(
-                "Kafka checkpoint upload completed without pending protection"));
-        return protections.revalidate(
-                        permanent,
-                        ignored -> requireReferenced(identity, reference))
-                .thenCompose(ignored -> protections.release(
-                        pending,
-                        actual -> requireReferenced(identity, reference)));
+        if (pending == null) {
+            return CompletableFuture.failedFuture(
+                    invariant("Kafka checkpoint upload completed without pending protection"));
+        }
+        return protections
+                .revalidate(permanent, ignored -> requireReferenced(identity, reference))
+                .thenCompose(ignored -> protections.release(pending, actual -> requireReferenced(identity, reference)));
     }
 
     private CompletableFuture<Void> cleanupFailedPending(
-            KafkaCheckpointPublicationRequest request,
-            ObjectProtection pending,
-            PhysicalObjectIdentity physical) {
-        if (pending == null || physical == null) return CompletableFuture.completedFuture(null);
+            KafkaCheckpointPublicationRequest request, ObjectProtection pending, PhysicalObjectIdentity physical) {
+        if (pending == null || physical == null) {
+            return CompletableFuture.completedFuture(null);
+        }
         return bindings.get(request.identity().durableId()).thenCompose(optional -> {
-            boolean referenced = optional.stream().flatMap(value -> value.value().checkpointReferences().stream())
-                    .anyMatch(reference -> reference.objectId().equals(
-                            physical.objectId().orElseThrow().value()));
-            if (referenced) return CompletableFuture.completedFuture(null);
-            return protections.release(pending, ignored -> bindings.get(request.identity().durableId())
-                    .thenAccept(latest -> {
+            boolean referenced = optional.stream()
+                    .flatMap(value -> value.value().checkpointReferences().stream())
+                    .anyMatch(reference -> reference
+                            .objectId()
+                            .equals(physical.objectId().orElseThrow().value()));
+            if (referenced) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return protections.release(
+                    pending,
+                    ignored -> bindings.get(request.identity().durableId()).thenAccept(latest -> {
                         boolean nowReferenced = latest.stream()
                                 .flatMap(value -> value.value().checkpointReferences().stream())
-                                .anyMatch(reference -> reference.objectId().equals(
-                                        physical.objectId().orElseThrow().value()));
-                        if (nowReferenced) throw new KafkaMetadataConditionFailedException(
-                                "Kafka checkpoint became referenced during pending cleanup");
+                                .anyMatch(reference -> reference
+                                        .objectId()
+                                        .equals(physical.objectId()
+                                                .orElseThrow()
+                                                .value()));
+                        if (nowReferenced) {
+                            throw new KafkaMetadataConditionFailedException(
+                                    "Kafka checkpoint became referenced during pending cleanup");
+                        }
                     }));
         });
     }
 
     private CompletableFuture<Void> requireReferenced(
-            com.nereusstream.kafka.partition.KafkaPartitionIdentity identity,
-            KafkaCheckpointReferenceRecord expected) {
+            com.nereusstream.kafka.partition.KafkaPartitionIdentity identity, KafkaCheckpointReferenceRecord expected) {
         return bindings.get(identity.durableId()).thenAccept(optional -> {
-            VersionedKafkaPartitionBinding current = optional.orElseThrow(() -> invariant(
-                    "Kafka checkpoint binding disappeared while revalidating protection"));
+            VersionedKafkaPartitionBinding current = optional.orElseThrow(
+                    () -> invariant("Kafka checkpoint binding disappeared while revalidating protection"));
             KafkaCheckpointReferenceRecord actual = current.value().checkpointReferences().stream()
                     .filter(reference -> reference.objectId().equals(expected.objectId()))
                     .findFirst()
-                    .orElseThrow(() -> new KafkaMetadataConditionFailedException(
-                            "Kafka checkpoint root reference changed"));
+                    .orElseThrow(
+                            () -> new KafkaMetadataConditionFailedException("Kafka checkpoint root reference changed"));
             requireSameReference(actual, expected);
         });
     }
@@ -259,8 +266,7 @@ public final class KafkaCheckpointPublicationCoordinator {
         }
         return bindings.get(expected.value().identity()).thenAccept(current -> {
             if (!current.equals(Optional.of(expected))) {
-                throw new KafkaMetadataConditionFailedException(
-                        "Kafka checkpoint protection owner root changed");
+                throw new KafkaMetadataConditionFailedException("Kafka checkpoint protection owner root changed");
             }
         });
     }
@@ -288,8 +294,7 @@ public final class KafkaCheckpointPublicationCoordinator {
     }
 
     private static void validateBinding(
-            KafkaCheckpointPublicationRequest request,
-            VersionedKafkaPartitionBinding binding) {
+            KafkaCheckpointPublicationRequest request, VersionedKafkaPartitionBinding binding) {
         KafkaCheckpointHeader header = request.objectRequest().header();
         var value = binding.value();
         if (!value.identity().equals(request.identity().durableId())
@@ -328,15 +333,16 @@ public final class KafkaCheckpointPublicationCoordinator {
                 || physical.objectId().filter(object.objectId()::equals).isEmpty()
                 || physical.objectLength() != object.objectLength()
                 || !physical.storageChecksum().equals(object.storageCrc32c())
-                || physical.contentSha256().filter(object.objectSha256()::equals).isEmpty()) {
+                || physical.contentSha256()
+                        .filter(object.objectSha256()::equals)
+                        .isEmpty()) {
             throw invariant("verified NKC1 differs from its pre-upload physical identity");
         }
         return physical;
     }
 
     private static void requireSameReference(
-            KafkaCheckpointReferenceRecord existing,
-            KafkaCheckpointReferenceRecord requested) {
+            KafkaCheckpointReferenceRecord existing, KafkaCheckpointReferenceRecord requested) {
         if (!existing.objectKey().equals(requested.objectKey())
                 || existing.objectLength() != requested.objectLength()
                 || !java.util.Arrays.equals(existing.objectSha256(), requested.objectSha256())
@@ -349,8 +355,7 @@ public final class KafkaCheckpointPublicationCoordinator {
     }
 
     private static ObjectProtectionOwner owner(VersionedKafkaPartitionBinding binding) {
-        return new ObjectProtectionOwner(
-                binding.key(), binding.metadataVersion(), binding.durableValueSha256());
+        return new ObjectProtectionOwner(binding.key(), binding.metadataVersion(), binding.durableValueSha256());
     }
 
     private static boolean conditionFailure(Throwable failure) {
@@ -359,7 +364,9 @@ public final class KafkaCheckpointPublicationCoordinator {
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while (current instanceof CompletionException && current.getCause() != null) current = current.getCause();
+        while (current instanceof CompletionException && current.getCause() != null) {
+            current = current.getCause();
+        }
         return current;
     }
 

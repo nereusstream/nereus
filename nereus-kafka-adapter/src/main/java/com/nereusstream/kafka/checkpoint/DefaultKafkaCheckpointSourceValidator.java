@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.checkpoint;
 
 import com.nereusstream.api.AcquiredAppendSession;
@@ -15,7 +16,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Exact stream-head loader and immutable commit-chain validator for one authority-bound Kafka leader open. */
+/**
+ * Exact stream-head loader and immutable commit-chain validator for one authority-bound Kafka leader open.
+ */
 public final class DefaultKafkaCheckpointSourceValidator implements KafkaCheckpointSourceValidator {
     private final StreamStorage streams;
     private final StreamId streamId;
@@ -23,9 +26,7 @@ public final class DefaultKafkaCheckpointSourceValidator implements KafkaCheckpo
     private final Optional<StorageProfile> expectedProfile;
 
     public DefaultKafkaCheckpointSourceValidator(
-            StreamStorage streams,
-            StreamId streamId,
-            AcquiredAppendSession acquiredSession) {
+            StreamStorage streams, StreamId streamId, AcquiredAppendSession acquiredSession) {
         this(streams, streamId, acquiredSession, Optional.empty());
     }
 
@@ -34,8 +35,11 @@ public final class DefaultKafkaCheckpointSourceValidator implements KafkaCheckpo
             StreamId streamId,
             AcquiredAppendSession acquiredSession,
             StorageProfile expectedProfile) {
-        this(streams, streamId, acquiredSession, Optional.of(
-                Objects.requireNonNull(expectedProfile, "expectedProfile")));
+        this(
+                streams,
+                streamId,
+                acquiredSession,
+                Optional.of(Objects.requireNonNull(expectedProfile, "expectedProfile")));
     }
 
     private DefaultKafkaCheckpointSourceValidator(
@@ -49,7 +53,8 @@ public final class DefaultKafkaCheckpointSourceValidator implements KafkaCheckpo
         this.expectedProfile = Objects.requireNonNull(expectedProfile, "expectedProfile");
         if (!acquiredSession.session().streamId().equals(streamId)
                 || acquiredSession.authority().isEmpty()) {
-            throw new IllegalArgumentException("Kafka source validation requires an authoritative session for its stream");
+            throw new IllegalArgumentException(
+                    "Kafka source validation requires an authoritative session for its stream");
         }
     }
 
@@ -60,35 +65,33 @@ public final class DefaultKafkaCheckpointSourceValidator implements KafkaCheckpo
 
     @Override
     public CompletableFuture<Boolean> isSourceCommitReachable(
-            KafkaCheckpointHeader captured,
-            KafkaCheckpointSourceState current) {
+            KafkaCheckpointHeader captured, KafkaCheckpointSourceState current) {
         Objects.requireNonNull(captured, "captured");
         Objects.requireNonNull(current, "current");
         if (!captured.streamId().equals(streamId)) {
-            return CompletableFuture.failedFuture(invariant(
-                    "Kafka checkpoint source belongs to another stream"));
+            return CompletableFuture.failedFuture(invariant("Kafka checkpoint source belongs to another stream"));
         }
         return streams.getStableHeadSnapshot(streamId).thenCompose(snapshot -> {
             KafkaCheckpointSourceState exact = sourceState(snapshot);
             if (!sameObservation(current, exact)) {
-                return CompletableFuture.failedFuture(fenced(
-                        "Kafka stream head or authority changed before commit reachability validation"));
+                return CompletableFuture.failedFuture(
+                        fenced("Kafka stream head or authority changed before commit reachability validation"));
             }
             return streams.isCommitReachable(
-                    snapshot.commitAnchor(),
-                    captured.sourceLastCommitId(),
-                    captured.sourceCommitVersion());
+                    snapshot.commitAnchor(), captured.sourceLastCommitId(), captured.sourceCommitVersion());
         });
     }
 
     private KafkaCheckpointSourceState sourceState(StableStreamHeadSnapshot snapshot) {
         if (!snapshot.streamId().equals(streamId)
                 || snapshot.state() != StreamState.ACTIVE
-                || expectedProfile.filter(profile -> profile != snapshot.storageProfile()).isPresent()) {
+                || expectedProfile
+                        .filter(profile -> profile != snapshot.storageProfile())
+                        .isPresent()) {
             throw fenced("Kafka stream is not the expected ACTIVE stream");
         }
-        AcquiredAppendSession current = snapshot.appendSession()
-                .orElseThrow(() -> fenced("Kafka stream has no active authoritative session"));
+        AcquiredAppendSession current =
+                snapshot.appendSession().orElseThrow(() -> fenced("Kafka stream has no active authoritative session"));
         AppendSession expectedSession = acquiredSession.session();
         AppendSession actualSession = current.session();
         if (!current.authority().equals(acquiredSession.authority())
@@ -113,9 +116,7 @@ public final class DefaultKafkaCheckpointSourceValidator implements KafkaCheckpo
                 snapshot.committedEndOffset());
     }
 
-    private static boolean sameObservation(
-            KafkaCheckpointSourceState expected,
-            KafkaCheckpointSourceState actual) {
+    private static boolean sameObservation(KafkaCheckpointSourceState expected, KafkaCheckpointSourceState actual) {
         return expected.authority().equals(actual.authority())
                 && expected.writerId().equals(actual.writerId())
                 && expected.sessionEpoch() == actual.sessionEpoch()

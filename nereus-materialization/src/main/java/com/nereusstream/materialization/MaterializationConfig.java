@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ReadView;
@@ -13,7 +14,9 @@ import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
 
-/** Complete process-level limits for lossless committed materialization. */
+/**
+ * Complete process-level limits for lossless committed materialization.
+ */
 public record MaterializationConfig(
         MaterializationPolicy committedPolicy,
         int registryScanPageSize,
@@ -56,9 +59,7 @@ public record MaterializationConfig(
     public static final long MAX_RECOVERY_CHECKPOINT_BYTES = 1L << 30;
 
     private static final Set<PosixFilePermission> OWNER_ONLY_DIRECTORY = EnumSet.of(
-            PosixFilePermission.OWNER_READ,
-            PosixFilePermission.OWNER_WRITE,
-            PosixFilePermission.OWNER_EXECUTE);
+            PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE);
 
     public MaterializationConfig {
         committedPolicy = requireCommittedPolicy(committedPolicy);
@@ -71,20 +72,15 @@ public record MaterializationConfig(
                 || maxConcurrentWorkersPerStream <= 0
                 || maxConcurrentWorkersPerStream > maxConcurrentWorkers) {
             throw new IllegalArgumentException(
-                    "worker concurrency must be positive and per-stream concurrency must not exceed global concurrency");
+                    "worker concurrency must be positive and per-stream concurrency must not exceed global "
+                            + "concurrency");
         }
-        requireInRange(
-                sourceReadPageRecords,
-                1,
-                MAX_SOURCE_READ_PAGE_RECORDS,
-                "sourceReadPageRecords");
-        if (sourceReadPageBytes < MIN_SOURCE_READ_PAGE_BYTES
-                || sourceReadPageBytes > MAX_SOURCE_READ_PAGE_BYTES) {
+        requireInRange(sourceReadPageRecords, 1, MAX_SOURCE_READ_PAGE_RECORDS, "sourceReadPageRecords");
+        if (sourceReadPageBytes < MIN_SOURCE_READ_PAGE_BYTES || sourceReadPageBytes > MAX_SOURCE_READ_PAGE_BYTES) {
             throw new IllegalArgumentException("sourceReadPageBytes must be in [64 KiB, 64 MiB]");
         }
         stagingDirectory = requirePrivateStagingPath(stagingDirectory);
-        if (maxStagingBytes < Math.max(
-                committedPolicy.targetObjectBytes(), recoveryCheckpointMaxBytes)) {
+        if (maxStagingBytes < Math.max(committedPolicy.targetObjectBytes(), recoveryCheckpointMaxBytes)) {
             throw new IllegalArgumentException(
                     "maxStagingBytes must cover the largest compacted or recovery-checkpoint object");
         }
@@ -93,8 +89,7 @@ public record MaterializationConfig(
             throw new IllegalArgumentException("uploadChunkBytes must be in [64 KiB, 8 MiB]");
         }
         workerClaimDuration = requirePositiveMillis(workerClaimDuration, "workerClaimDuration");
-        workerClaimRenewInterval = requirePositiveMillis(
-                workerClaimRenewInterval, "workerClaimRenewInterval");
+        workerClaimRenewInterval = requirePositiveMillis(workerClaimRenewInterval, "workerClaimRenewInterval");
         maximumClockSkew = requireNonNegativeMillis(maximumClockSkew, "maximumClockSkew");
         operationTimeout = requirePositiveMillis(operationTimeout, "operationTimeout");
         closeTimeout = requirePositiveMillis(closeTimeout, "closeTimeout");
@@ -122,25 +117,17 @@ public record MaterializationConfig(
         }
         requireThresholds(lagThrottleRecords, lagRejectRecords, "record lag");
         requireThresholds(lagThrottleBytes, lagRejectBytes, "byte lag");
-        lagRejectAge = requireNonNegativeMillis(
-                lagRejectAge, "lagRejectAge");
-        lagThrottleDelay = requirePositiveMillis(
-                lagThrottleDelay, "lagThrottleDelay");
-        sourceRetirementGrace = requirePositiveMillis(
-                sourceRetirementGrace, "sourceRetirementGrace");
+        lagRejectAge = requireNonNegativeMillis(lagRejectAge, "lagRejectAge");
+        lagThrottleDelay = requirePositiveMillis(lagThrottleDelay, "lagThrottleDelay");
+        sourceRetirementGrace = requirePositiveMillis(sourceRetirementGrace, "sourceRetirementGrace");
         appendReplayGrace = requirePositiveMillis(appendReplayGrace, "appendReplayGrace");
         metadataAuditGrace = requirePositiveMillis(metadataAuditGrace, "metadataAuditGrace");
         if (metadataAuditGrace.compareTo(sourceRetirementGrace) < 0) {
-            throw new IllegalArgumentException(
-                    "metadataAuditGrace must not be shorter than sourceRetirementGrace");
+            throw new IllegalArgumentException("metadataAuditGrace must not be shorter than sourceRetirementGrace");
         }
         requireInRange(
-                recoveryCheckpointMaxEntries,
-                1,
-                MAX_RECOVERY_CHECKPOINT_ENTRIES,
-                "recoveryCheckpointMaxEntries");
-        if (recoveryCheckpointMaxBytes <= 0
-                || recoveryCheckpointMaxBytes > MAX_RECOVERY_CHECKPOINT_BYTES) {
+                recoveryCheckpointMaxEntries, 1, MAX_RECOVERY_CHECKPOINT_ENTRIES, "recoveryCheckpointMaxEntries");
+        if (recoveryCheckpointMaxBytes <= 0 || recoveryCheckpointMaxBytes > MAX_RECOVERY_CHECKPOINT_BYTES) {
             throw new IllegalArgumentException("recoveryCheckpointMaxBytes must be in (0, 1 GiB]");
         }
     }
@@ -156,7 +143,9 @@ public record MaterializationConfig(
         return defaults(stagingDirectory, policy);
     }
 
-    /** Default bounded materialization limits with the closed Kafka NCP2 committed policy. */
+    /**
+     * Default bounded materialization limits with the closed Kafka NCP2 committed policy.
+     */
     public static MaterializationConfig kafkaDefaults(Path stagingDirectory) {
         MaterializationPolicy policy = MaterializationPolicyFactory.kafkaLosslessCommitted(
                 4,
@@ -168,9 +157,7 @@ public record MaterializationConfig(
         return defaults(stagingDirectory, policy);
     }
 
-    private static MaterializationConfig defaults(
-            Path stagingDirectory,
-            MaterializationPolicy policy) {
+    private static MaterializationConfig defaults(Path stagingDirectory, MaterializationPolicy policy) {
         return new MaterializationConfig(
                 policy,
                 256,
@@ -210,11 +197,9 @@ public record MaterializationConfig(
         Objects.requireNonNull(policy, "committedPolicy");
         if (policy.view() != ReadView.COMMITTED
                 || policy.taskKind() != TaskKind.LOSSLESS_REWRITE
-                || !MaterializationPolicy.isLosslessCommittedFormat(
-                        policy.targetPhysicalFormat())
+                || !MaterializationPolicy.isLosslessCommittedFormat(policy.targetPhysicalFormat())
                 || policy.topicCompaction().isPresent()) {
-            throw new IllegalArgumentException(
-                    "committedPolicy must be a lossless COMMITTED NCP1/NCP2 policy");
+            throw new IllegalArgumentException("committedPolicy must be a lossless COMMITTED NCP1/NCP2 policy");
         }
         return policy;
     }
@@ -227,20 +212,16 @@ public record MaterializationConfig(
         Path normalized = value.normalize();
         try {
             if (Files.exists(normalized, LinkOption.NOFOLLOW_LINKS)) {
-                if (Files.isSymbolicLink(normalized)
-                        || !Files.isDirectory(normalized, LinkOption.NOFOLLOW_LINKS)) {
-                    throw new IllegalArgumentException(
-                            "stagingDirectory must be a non-symlink directory");
+                if (Files.isSymbolicLink(normalized) || !Files.isDirectory(normalized, LinkOption.NOFOLLOW_LINKS)) {
+                    throw new IllegalArgumentException("stagingDirectory must be a non-symlink directory");
                 }
                 if (!Files.getPosixFilePermissions(normalized, LinkOption.NOFOLLOW_LINKS)
                         .equals(OWNER_ONLY_DIRECTORY)) {
-                    throw new IllegalArgumentException(
-                            "stagingDirectory permissions must be owner-only 0700");
+                    throw new IllegalArgumentException("stagingDirectory permissions must be owner-only 0700");
                 }
             }
         } catch (UnsupportedOperationException failure) {
-            throw new IllegalArgumentException(
-                    "stagingDirectory requires POSIX owner-only permissions", failure);
+            throw new IllegalArgumentException("stagingDirectory requires POSIX owner-only permissions", failure);
         } catch (IOException failure) {
             throw new IllegalArgumentException("cannot validate stagingDirectory", failure);
         }
@@ -248,21 +229,16 @@ public record MaterializationConfig(
     }
 
     private static void requireThresholds(long throttle, long reject, String field) {
-        if (throttle < 0
-                || reject < 0
-                || throttle > 0
-                        && reject > 0
-                        && reject <= throttle) {
-            throw new IllegalArgumentException(
-                    field
-                            + " thresholds must be non-negative and throttle must be below reject when both are enabled");
+        if (throttle < 0 || reject < 0 || throttle > 0 && reject > 0 && reject <= throttle) {
+            throw new IllegalArgumentException(field
+                    + " thresholds must be non-negative and throttle must be below reject when both are "
+                    + "enabled");
         }
     }
 
     private static void requireInRange(int value, int minimum, int maximum, String field) {
         if (value < minimum || value > maximum) {
-            throw new IllegalArgumentException(
-                    field + " must be in [" + minimum + ", " + maximum + "]");
+            throw new IllegalArgumentException(field + " must be in [" + minimum + ", " + maximum + "]");
         }
     }
 

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.append;
 
 import com.nereusstream.api.AppendOutcome;
@@ -6,8 +7,8 @@ import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ReadView;
-import com.nereusstream.api.target.ReadTarget;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.api.target.ReadTarget;
 import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectProtectionOwner;
@@ -18,8 +19,8 @@ import com.nereusstream.core.read.PhysicalObjectIdentityResolver;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.ObjectPhysicalReferenceProof;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
-import com.nereusstream.metadata.oxia.PhysicalReferencePurpose;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.PhysicalReferencePurpose;
 import com.nereusstream.metadata.oxia.PreparedStableAppend;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
@@ -32,9 +33,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Default exact-owner/root handshake for generation-zero append references. */
-public final class DefaultGenerationZeroPhysicalReferencePublisher
-        implements GenerationZeroPhysicalReferencePublisher {
+/**
+ * Default exact-owner/root handshake for generation-zero append references.
+ */
+public final class DefaultGenerationZeroPhysicalReferencePublisher implements GenerationZeroPhysicalReferencePublisher {
     private final String cluster;
     private final OxiaMetadataStore metadata;
     private final PhysicalObjectMetadataStore physicalStore;
@@ -50,7 +52,9 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
         this(cluster, metadata, physicalStore, protections, List.of());
     }
 
-    /** Installs additional provider adapters while retaining the exact Object-WAL implementation. */
+    /**
+     * Installs additional provider adapters while retaining the exact Object-WAL implementation.
+     */
     public DefaultGenerationZeroPhysicalReferencePublisher(
             String cluster,
             OxiaMetadataStore metadata,
@@ -61,10 +65,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.physicalStore = Objects.requireNonNull(physicalStore, "physicalStore");
         this.protections = Objects.requireNonNull(protections, "protections");
-        this.identityResolver = new MetadataPhysicalObjectIdentityResolver(
-                cluster,
-                metadata,
-                physicalStore);
+        this.identityResolver = new MetadataPhysicalObjectIdentityResolver(cluster, metadata, physicalStore);
         ArrayList<PrimaryPhysicalReferenceAdapter<?>> installed = new ArrayList<>();
         installed.add(new ObjectPhysicalReferenceAdapter());
         installed.addAll(Objects.requireNonNull(additionalAdapters, "additionalAdapters"));
@@ -73,9 +74,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
 
     @Override
     public CompletableFuture<Void> authorizeUpload(
-            AppendSession session,
-            PhysicalObjectIdentity object,
-            Duration timeout) {
+            AppendSession session, PhysicalObjectIdentity object, Duration timeout) {
         AppendSession expectedSession = Objects.requireNonNull(session, "session");
         PhysicalObjectIdentity expectedObject = Objects.requireNonNull(object, "object");
         AppendDeadline deadline = new AppendDeadline(timeout);
@@ -84,8 +83,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
                         AppendOutcome.KNOWN_NOT_COMMITTED,
                         "revalidate Object WAL append session before provider PUT")
                 .thenCompose(ignored -> deadline.bound(
-                        () -> physicalStore.getRoot(
-                                cluster, expectedObject.objectKeyHash()),
+                        () -> physicalStore.getRoot(cluster, expectedObject.objectKeyHash()),
                         AppendOutcome.KNOWN_NOT_COMMITTED,
                         "load Object WAL physical root before provider PUT"))
                 .thenApply(optional -> {
@@ -99,9 +97,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
     }
 
     @Override
-    public CompletableFuture<ProtectedStableAppend> protectBeforeHead(
-            PreparedStableAppend append,
-            Duration timeout) {
+    public CompletableFuture<ProtectedStableAppend> protectBeforeHead(PreparedStableAppend append, Duration timeout) {
         PreparedStableAppend exact = Objects.requireNonNull(append, "append");
         ReadTarget target = exact.request().readTarget();
         return protectBeforeHead(adapters.require(target), exact, target, timeout);
@@ -109,8 +105,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
 
     @Override
     public CompletableFuture<ProtectedGenerationZero> protectVisibleIndex(
-            MaterializedGenerationZero append,
-            Duration timeout) {
+            MaterializedGenerationZero append, Duration timeout) {
         MaterializedGenerationZero exact = Objects.requireNonNull(append, "append");
         ReadTarget target = exact.committedAppend().readTarget();
         return protectVisibleIndex(adapters.require(target), exact, target, timeout);
@@ -146,9 +141,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
 
         @Override
         public CompletableFuture<ProtectedStableAppend> protectBeforeHead(
-                PreparedStableAppend append,
-                ObjectSliceReadTarget target,
-                Duration timeout) {
+                PreparedStableAppend append, ObjectSliceReadTarget target, Duration timeout) {
             AppendDeadline deadline = new AppendDeadline(timeout);
             return deadline.bound(
                             () -> identityResolver.resolve(target, ReadView.COMMITTED),
@@ -159,9 +152,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
 
         @Override
         public CompletableFuture<ProtectedGenerationZero> protectVisibleIndex(
-                MaterializedGenerationZero append,
-                ObjectSliceReadTarget target,
-                Duration timeout) {
+                MaterializedGenerationZero append, ObjectSliceReadTarget target, Duration timeout) {
             AppendDeadline deadline = new AppendDeadline(timeout);
             return deadline.bound(
                             () -> identityResolver.resolve(target, ReadView.COMMITTED),
@@ -172,18 +163,14 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
     }
 
     private CompletableFuture<ProtectedStableAppend> protectPrepared(
-            PreparedStableAppend prepared,
-            PhysicalObjectIdentity object,
-            AppendDeadline deadline) {
+            PreparedStableAppend prepared, PhysicalObjectIdentity object, AppendDeadline deadline) {
         if (!object.objectKeyHash().equals(prepared.objectKeyHash())) {
             return failed(invariant(
                     "prepared append object hash conflicts with resolved whole-object identity",
                     AppendOutcome.KNOWN_NOT_COMMITTED));
         }
         ObjectProtectionOwner owner = new ObjectProtectionOwner(
-                prepared.commitKey(),
-                prepared.commitMetadataVersion(),
-                prepared.commitRecordSha256());
+                prepared.commitKey(), prepared.commitMetadataVersion(), prepared.commitRecordSha256());
         ObjectProtectionRequest request = new ObjectProtectionRequest(
                 object,
                 ObjectProtectionType.REACHABLE_APPEND,
@@ -203,30 +190,24 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
                         AppendOutcome.KNOWN_NOT_COMMITTED,
                         "revalidate REACHABLE_APPEND protection"))
                 .thenCompose(protection -> loadExactActiveRoot(
-                        object,
-                        deadline,
-                        AppendOutcome.KNOWN_NOT_COMMITTED,
-                        "reload Object WAL physical root").thenCompose(root -> deadline.bound(
-                                () -> revalidatePreparedOwner(prepared, owner, protection.owner()),
-                                AppendOutcome.KNOWN_NOT_COMMITTED,
-                                "reload stable append intent owner")
-                        .thenApply(ignored -> protectedStableAppend(prepared, object, protection, root))));
+                                object, deadline, AppendOutcome.KNOWN_NOT_COMMITTED, "reload Object WAL physical root")
+                        .thenCompose(root -> deadline.bound(
+                                        () -> revalidatePreparedOwner(prepared, owner, protection.owner()),
+                                        AppendOutcome.KNOWN_NOT_COMMITTED,
+                                        "reload stable append intent owner")
+                                .thenApply(ignored -> protectedStableAppend(prepared, object, protection, root))));
     }
 
     private CompletableFuture<ProtectedGenerationZero> protectMaterialized(
-            MaterializedGenerationZero materialized,
-            PhysicalObjectIdentity object,
-            AppendDeadline deadline) {
-        if (!object.objectKeyHash().equals(
-                GenerationZeroProtectionIdentities.objectKeyHash(materialized.committedAppend()))) {
+            MaterializedGenerationZero materialized, PhysicalObjectIdentity object, AppendDeadline deadline) {
+        if (!object.objectKeyHash()
+                .equals(GenerationZeroProtectionIdentities.objectKeyHash(materialized.committedAppend()))) {
             return failed(invariant(
                     "generation-zero index conflicts with resolved whole-object identity",
                     AppendOutcome.KNOWN_COMMITTED));
         }
         ObjectProtectionOwner owner = new ObjectProtectionOwner(
-                materialized.indexKey(),
-                materialized.indexMetadataVersion(),
-                materialized.indexRecordSha256());
+                materialized.indexKey(), materialized.indexMetadataVersion(), materialized.indexRecordSha256());
         ObjectProtectionRequest request = new ObjectProtectionRequest(
                 object,
                 ObjectProtectionType.VISIBLE_GENERATION,
@@ -246,33 +227,23 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
                         AppendOutcome.KNOWN_COMMITTED,
                         "revalidate generation-zero VISIBLE_GENERATION protection"))
                 .thenCompose(protection -> loadExactActiveRoot(
-                        object,
-                        deadline,
-                        AppendOutcome.KNOWN_COMMITTED,
-                        "reload generation-zero physical root").thenCompose(root -> deadline.bound(
-                                () -> revalidateMaterializedOwner(
-                                        materialized,
-                                        owner,
-                                        protection.owner()),
-                                AppendOutcome.KNOWN_COMMITTED,
-                                "reload generation-zero index owner")
-                        .thenApply(ignored -> protectedGenerationZero(materialized, protection, root))));
+                                object, deadline, AppendOutcome.KNOWN_COMMITTED, "reload generation-zero physical root")
+                        .thenCompose(root -> deadline.bound(
+                                        () -> revalidateMaterializedOwner(materialized, owner, protection.owner()),
+                                        AppendOutcome.KNOWN_COMMITTED,
+                                        "reload generation-zero index owner")
+                                .thenApply(ignored -> protectedGenerationZero(materialized, protection, root))));
     }
 
     private CompletableFuture<Void> revalidatePreparedOwner(
-            PreparedStableAppend expected,
-            ObjectProtectionOwner canonicalOwner,
-            ObjectProtectionOwner actualOwner) {
+            PreparedStableAppend expected, ObjectProtectionOwner canonicalOwner, ObjectProtectionOwner actualOwner) {
         if (!canonicalOwner.equals(actualOwner)) {
-            return failed(invariant(
-                    "REACHABLE_APPEND owner fields changed",
-                    AppendOutcome.KNOWN_NOT_COMMITTED));
+            return failed(invariant("REACHABLE_APPEND owner fields changed", AppendOutcome.KNOWN_NOT_COMMITTED));
         }
         return metadata.prepareStableAppend(cluster, expected.request()).thenApply(actual -> {
             if (!samePreparedIdentity(expected, actual)) {
                 throw invariant(
-                        "stable append intent changed during physical protection",
-                        AppendOutcome.KNOWN_NOT_COMMITTED);
+                        "stable append intent changed during physical protection", AppendOutcome.KNOWN_NOT_COMMITTED);
             }
             return null;
         });
@@ -284,31 +255,21 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
             ObjectProtectionOwner actualOwner) {
         if (!canonicalOwner.equals(actualOwner)) {
             return failed(invariant(
-                    "generation-zero VISIBLE_GENERATION owner fields changed",
-                    AppendOutcome.KNOWN_COMMITTED));
+                    "generation-zero VISIBLE_GENERATION owner fields changed", AppendOutcome.KNOWN_COMMITTED));
         }
         return metadata.revalidateMaterializedGenerationZero(cluster, materialized);
     }
 
     private CompletableFuture<VersionedPhysicalObjectRoot> loadExactActiveRoot(
-            PhysicalObjectIdentity object,
-            AppendDeadline deadline,
-            AppendOutcome outcome,
-            String operation) {
-        return deadline.bound(
-                        () -> physicalStore.getRoot(cluster, object.objectKeyHash()),
-                        outcome,
-                        operation)
+            PhysicalObjectIdentity object, AppendDeadline deadline, AppendOutcome outcome, String operation) {
+        return deadline.bound(() -> physicalStore.getRoot(cluster, object.objectKeyHash()), outcome, operation)
                 .thenApply(optional -> requireExactActiveRoot(object, optional, outcome));
     }
 
     private static VersionedPhysicalObjectRoot requireExactActiveRoot(
-            PhysicalObjectIdentity object,
-            Optional<VersionedPhysicalObjectRoot> optional,
-            AppendOutcome outcome) {
-        VersionedPhysicalObjectRoot root = optional.orElseThrow(() -> invariant(
-                "physical object root is absent after protection",
-                outcome));
+            PhysicalObjectIdentity object, Optional<VersionedPhysicalObjectRoot> optional, AppendOutcome outcome) {
+        VersionedPhysicalObjectRoot root =
+                optional.orElseThrow(() -> invariant("physical object root is absent after protection", outcome));
         if (root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
                 || !PhysicalObjectIdentity.from(root.value()).equals(object)) {
             throw invariant("physical object root changed after protection", outcome);
@@ -317,8 +278,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
     }
 
     private static void requireUploadRoot(
-            PhysicalObjectIdentity object,
-            Optional<VersionedPhysicalObjectRoot> optional) {
+            PhysicalObjectIdentity object, Optional<VersionedPhysicalObjectRoot> optional) {
         if (optional.isEmpty()) {
             return;
         }
@@ -339,9 +299,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
             ObjectProtection protection,
             VersionedPhysicalObjectRoot root) {
         if (root.value().lifecycleEpoch() != protection.rootLifecycleEpoch()) {
-            throw invariant(
-                    "REACHABLE_APPEND protection root epoch changed",
-                    AppendOutcome.KNOWN_NOT_COMMITTED);
+            throw invariant("REACHABLE_APPEND protection root epoch changed", AppendOutcome.KNOWN_NOT_COMMITTED);
         }
         return new ProtectedStableAppend(
                 prepared,
@@ -356,20 +314,15 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
     }
 
     private static ProtectedGenerationZero protectedGenerationZero(
-            MaterializedGenerationZero materialized,
-            ObjectProtection protection,
-            VersionedPhysicalObjectRoot root) {
+            MaterializedGenerationZero materialized, ObjectProtection protection, VersionedPhysicalObjectRoot root) {
         if (root.value().lifecycleEpoch() != protection.rootLifecycleEpoch()) {
-            throw invariant(
-                    "generation-zero VISIBLE_GENERATION root epoch changed",
-                    AppendOutcome.KNOWN_COMMITTED);
+            throw invariant("generation-zero VISIBLE_GENERATION root epoch changed", AppendOutcome.KNOWN_COMMITTED);
         }
         return new ProtectedGenerationZero(
                 materialized,
                 new ObjectPhysicalReferenceProof(
                         PhysicalReferencePurpose.VISIBLE_GENERATION,
-                        GenerationZeroProtectionIdentities.targetIdentity(
-                                materialized.committedAppend()),
+                        GenerationZeroProtectionIdentities.targetIdentity(materialized.committedAppend()),
                         protection.identity(),
                         root.metadataVersion(),
                         root.value().lifecycleEpoch(),
@@ -377,9 +330,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
                         protection.durableValueSha256()));
     }
 
-    private static boolean samePreparedIdentity(
-            PreparedStableAppend left,
-            PreparedStableAppend right) {
+    private static boolean samePreparedIdentity(PreparedStableAppend left, PreparedStableAppend right) {
         return left.request().equals(right.request())
                 && left.commitId().equals(right.commitId())
                 && left.commitKey().equals(right.commitKey())
@@ -389,11 +340,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
     }
 
     private static NereusException invariant(String message, AppendOutcome outcome) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message,
-                outcome);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, outcome);
     }
 
     private static <T> CompletableFuture<T> failed(Throwable failure) {

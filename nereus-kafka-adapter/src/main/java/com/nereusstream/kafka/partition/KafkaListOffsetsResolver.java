@@ -25,22 +25,24 @@ import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Resolves Kafka ListOffsets against one frozen stable partition boundary while delegating record iteration to the fork.
- * Timestamp scans are bounded by records, bytes, read operations, and the request deadline; exhaustion never returns an
+ * Resolves Kafka ListOffsets against one frozen stable partition boundary while delegating record iteration to the
+ * fork.
+ * Timestamp scans are bounded by records, bytes, read operations, and the request deadline; exhaustion never returns
+ * an
  * approximate offset.
  */
 public final class KafkaListOffsetsResolver {
     private final KafkaPartitionStorage storage;
     private final KafkaRecordTimestampInspector timestampInspector;
 
-    public KafkaListOffsetsResolver(
-            KafkaPartitionStorage storage,
-            KafkaRecordTimestampInspector timestampInspector) {
+    public KafkaListOffsetsResolver(KafkaPartitionStorage storage, KafkaRecordTimestampInspector timestampInspector) {
         this.storage = Objects.requireNonNull(storage, "storage");
         this.timestampInspector = Objects.requireNonNull(timestampInspector, "timestampInspector");
     }
 
-    /** Resolves one request, returning empty only when an exact timestamp/max-timestamp record does not exist. */
+    /**
+     * Resolves one request, returning empty only when an exact timestamp/max-timestamp record does not exist.
+     */
     public CompletableFuture<Optional<KafkaListOffsetResult>> resolve(KafkaListOffsetsRequest request) {
         Objects.requireNonNull(request, "request");
         Optional<NereusException> authorityFailure = authorityFailure(request);
@@ -54,12 +56,12 @@ public final class KafkaListOffsetsResolver {
             return CompletableFuture.failedFuture(authorityFailure.orElseThrow());
         }
         if (request.query() == KafkaListOffsetQuery.EARLIEST) {
-            return CompletableFuture.completedFuture(Optional.of(specialResult(
-                    request.query(), snapshot.logStartOffset(), snapshot)));
+            return CompletableFuture.completedFuture(
+                    Optional.of(specialResult(request.query(), snapshot.logStartOffset(), snapshot)));
         }
         if (request.query() == KafkaListOffsetQuery.LATEST) {
-            return CompletableFuture.completedFuture(Optional.of(specialResult(
-                    request.query(), snapshot.stableEndOffset(), snapshot)));
+            return CompletableFuture.completedFuture(
+                    Optional.of(specialResult(request.query(), snapshot.stableEndOffset(), snapshot)));
         }
         if (snapshot.logStartOffset() == snapshot.stableEndOffset()) {
             return CompletableFuture.completedFuture(Optional.empty());
@@ -125,19 +127,17 @@ public final class KafkaListOffsetsResolver {
     }
 
     private CompletableFuture<Optional<KafkaListOffsetResult>> processPage(
-            ScanState state,
-            KafkaStorageReadResult readResult) {
+            ScanState state, KafkaStorageReadResult readResult) {
         try {
             Optional<NereusException> authorityFailure = authorityFailure(state.request);
             if (authorityFailure.isPresent()) {
                 return CompletableFuture.failedFuture(authorityFailure.orElseThrow());
             }
-            KafkaFetchAssembly page = Objects.requireNonNull(readResult, "readResult").fetchAssembly();
+            KafkaFetchAssembly page =
+                    Objects.requireNonNull(readResult, "readResult").fetchAssembly();
             if (readResult.stableSnapshot().logStartOffset() > state.cursor) {
                 return failed(
-                        ErrorCode.OFFSET_TRIMMED,
-                        false,
-                        "Kafka ListOffsets source was trimmed during the lookup");
+                        ErrorCode.OFFSET_TRIMMED, false, "Kafka ListOffsets source was trimmed during the lookup");
             }
             if (page.sizeInBytes() == 0) {
                 return failed(
@@ -155,8 +155,7 @@ public final class KafkaListOffsetsResolver {
             long pageRecords = page.nextLogicalOffset() - state.cursor;
             long scannedRecords = Math.addExact(state.scannedRecords, pageRecords);
             long scannedBytes = Math.addExact(state.scannedBytes, page.sizeInBytes());
-            if (scannedRecords > state.request.maxScanRecords()
-                    || scannedBytes > state.request.maxScanBytes()) {
+            if (scannedRecords > state.request.maxScanRecords() || scannedBytes > state.request.maxScanBytes()) {
                 return scanLimit("Kafka ListOffsets page exceeded its remaining scan budget");
             }
 
@@ -210,10 +209,7 @@ public final class KafkaListOffsetsResolver {
         return timestampInspector.maximum(page.recordsBuffer(), state.cursor);
     }
 
-    private static void validateInspected(
-            ScanState state,
-            long pageEndOffset,
-            KafkaTimestampAndOffset exact) {
+    private static void validateInspected(ScanState state, long pageEndOffset, KafkaTimestampAndOffset exact) {
         if (exact.offset() < state.cursor || exact.offset() >= pageEndOffset) {
             throw new NereusException(
                     ErrorCode.METADATA_INVARIANT_VIOLATION,
@@ -221,7 +217,8 @@ public final class KafkaListOffsetsResolver {
                     "Kafka timestamp inspector returned an offset outside the loaded page");
         }
         if (state.request.query() == KafkaListOffsetQuery.TIMESTAMP
-                && exact.timestampMillis() < state.request.targetTimestampMillis().orElseThrow()) {
+                && exact.timestampMillis()
+                        < state.request.targetTimestampMillis().orElseThrow()) {
             throw new NereusException(
                     ErrorCode.METADATA_INVARIANT_VIOLATION,
                     false,
@@ -232,9 +229,7 @@ public final class KafkaListOffsetsResolver {
     private Optional<NereusException> authorityFailure(KafkaListOffsetsRequest request) {
         if (request.expectedLeaderEpoch() != storage.leaderEpoch()) {
             return Optional.of(new NereusException(
-                    ErrorCode.FENCED_APPEND,
-                    false,
-                    "Kafka ListOffsets request carries a stale leader epoch"));
+                    ErrorCode.FENCED_APPEND, false, "Kafka ListOffsets request carries a stale leader epoch"));
         }
         KafkaPartitionState currentState = storage.state();
         if (currentState != KafkaPartitionState.LEADER_WRITABLE) {
@@ -260,11 +255,8 @@ public final class KafkaListOffsetsResolver {
     }
 
     private static KafkaListOffsetResult specialResult(
-            KafkaListOffsetQuery query,
-            long offset,
-            KafkaStableSnapshot snapshot) {
-        return new KafkaListOffsetResult(
-                query, OptionalLong.empty(), offset, OptionalInt.empty(), snapshot);
+            KafkaListOffsetQuery query, long offset, KafkaStableSnapshot snapshot) {
+        return new KafkaListOffsetResult(query, OptionalLong.empty(), offset, OptionalInt.empty(), snapshot);
     }
 
     private static <T> CompletableFuture<T> scanLimit(String message) {
@@ -272,14 +264,10 @@ public final class KafkaListOffsetsResolver {
     }
 
     private static <T> CompletableFuture<T> invariant(String message, Throwable cause) {
-        return NereusException.failedFuture(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+        return NereusException.failedFuture(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
-    private static <T> CompletableFuture<T> failed(
-            ErrorCode code,
-            boolean retriable,
-            String message) {
+    private static <T> CompletableFuture<T> failed(ErrorCode code, boolean retriable, String message) {
         return NereusException.failedFuture(code, retriable, message);
     }
 
@@ -311,8 +299,7 @@ public final class KafkaListOffsetsResolver {
         private Duration remaining() {
             long remaining = timeoutNanos - (System.nanoTime() - startedNanos);
             if (remaining <= 0) {
-                throw new NereusException(
-                        ErrorCode.TIMEOUT, true, "Kafka ListOffsets committed-tail scan timed out");
+                throw new NereusException(ErrorCode.TIMEOUT, true, "Kafka ListOffsets committed-tail scan timed out");
             }
             return Duration.ofNanos(remaining);
         }

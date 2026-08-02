@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 abstract class AbstractF4RecordCodecV1<T> implements MetadataRecordCodec<T> {

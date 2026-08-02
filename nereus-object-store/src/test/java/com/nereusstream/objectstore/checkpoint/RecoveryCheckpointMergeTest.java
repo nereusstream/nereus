@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.objectstore.staging.StagingFileManager;
@@ -21,17 +21,11 @@ class RecoveryCheckpointMergeTest {
     Path temporaryDirectory;
 
     @Test
-    void mergesThirtyTwoActiveReferencesWithBoundedRemappingAndExactEntries()
-            throws Exception {
-        try (LocalFileObjectStore objectStore = new LocalFileObjectStore(
-                        temporaryDirectory.resolve("objects"));
-                StagingFileManager staging = RecoveryCheckpointTestSupport.staging(
-                        temporaryDirectory, 128L << 20)) {
+    void mergesThirtyTwoActiveReferencesWithBoundedRemappingAndExactEntries() throws Exception {
+        try (LocalFileObjectStore objectStore = new LocalFileObjectStore(temporaryDirectory.resolve("objects"));
+                StagingFileManager staging = RecoveryCheckpointTestSupport.staging(temporaryDirectory, 128L << 20)) {
             DefaultRecoveryCheckpointCodecV1 codec = new DefaultRecoveryCheckpointCodecV1(
-                    objectStore,
-                    staging,
-                    Runnable::run,
-                    RecoveryCheckpointTestSupport.verifier());
+                    objectStore, staging, Runnable::run, RecoveryCheckpointTestSupport.verifier());
             List<RecoveryCheckpointObject> sources = new ArrayList<>();
             List<RecoveryCheckpointEntry> expectedEntries = new ArrayList<>();
             for (int index = 0; index < 32; index++) {
@@ -40,16 +34,9 @@ class RecoveryCheckpointMergeTest {
                 long end = start + 2;
                 String commitId = "commit-" + version;
                 RecoveryCheckpointPublication publication =
-                        RecoveryCheckpointTestSupport.publication(
-                                version, publicationId(index), start, end);
+                        RecoveryCheckpointTestSupport.publication(version, publicationId(index), start, end);
                 RecoveryCheckpointEntry entry = RecoveryCheckpointTestSupport.entry(
-                        version,
-                        start,
-                        end,
-                        end,
-                        commitId,
-                        index == 0 ? "genesis" : "commit-" + index,
-                        List.of(0));
+                        version, start, end, end, commitId, index == 0 ? "genesis" : "commit-" + index, List.of(0));
                 RecoveryCheckpointWriteRequest request = new RecoveryCheckpointWriteRequest(
                         "test-cluster",
                         new StreamId("s-recovery-test"),
@@ -85,10 +72,7 @@ class RecoveryCheckpointMergeTest {
             assertThat(staging.reservedBytes()).isZero();
 
             try (RecoveryCheckpointMergeResult merged = codec.merge(
-                            sources,
-                            33,
-                            "z".repeat(26),
-                            RecoveryCheckpointTestSupport.TIMEOUT)
+                            sources, 33, "z".repeat(26), RecoveryCheckpointTestSupport.TIMEOUT)
                     .join()) {
                 assertThat(merged.sourceCount()).isEqualTo(32);
                 assertThat(merged.request().checkpointSequence()).isEqualTo(33);
@@ -106,48 +90,31 @@ class RecoveryCheckpointMergeTest {
                                 RecoveryCheckpointTestSupport.TIMEOUT)
                         .join();
                 assertThat(opened.header()).isEqualTo(merged.request());
-                assertThat(codec.findCommit(
-                                opened,
-                                1,
-                                "commit-1",
-                                RecoveryCheckpointTestSupport.TIMEOUT)
-                        .join())
+                assertThat(codec.findCommit(opened, 1, "commit-1", RecoveryCheckpointTestSupport.TIMEOUT)
+                                .join())
                         .contains(expectedEntries.get(0));
-                assertThat(codec.findCommit(
-                                opened,
-                                17,
-                                "commit-17",
-                                RecoveryCheckpointTestSupport.TIMEOUT)
-                        .join())
+                assertThat(codec.findCommit(opened, 17, "commit-17", RecoveryCheckpointTestSupport.TIMEOUT)
+                                .join())
                         .contains(rewritten(expectedEntries.get(16), 16));
-                assertThat(codec.findCommitCoveringOffset(
-                                opened,
-                                63,
-                                RecoveryCheckpointTestSupport.TIMEOUT)
-                        .join())
+                assertThat(codec.findCommitCoveringOffset(opened, 63, RecoveryCheckpointTestSupport.TIMEOUT)
+                                .join())
                         .contains(rewritten(expectedEntries.get(31), 31));
                 RecoveryCheckpointPublicationPage page = codec.scanPublications(
-                                opened,
-                                OptionalInt.empty(),
-                                1_000,
-                                RecoveryCheckpointTestSupport.TIMEOUT)
+                                opened, OptionalInt.empty(), 1_000, RecoveryCheckpointTestSupport.TIMEOUT)
                         .join();
                 assertThat(page.values()).hasSize(32);
                 assertThat(page.values())
                         .extracting(RecoveryCheckpointPublication::generation)
-                        .containsExactlyElementsOf(
-                                java.util.stream.LongStream.rangeClosed(1, 32)
-                                        .boxed()
-                                        .toList());
+                        .containsExactlyElementsOf(java.util.stream.LongStream.rangeClosed(1, 32)
+                                .boxed()
+                                .toList());
                 assertThat(page.continuation()).isEmpty();
             }
             assertThat(staging.reservedBytes()).isZero();
         }
     }
 
-    private static RecoveryCheckpointEntry rewritten(
-            RecoveryCheckpointEntry source,
-            int publicationIndex) {
+    private static RecoveryCheckpointEntry rewritten(RecoveryCheckpointEntry source, int publicationIndex) {
         return new RecoveryCheckpointEntry(
                 source.commitVersion(),
                 source.range(),
@@ -160,14 +127,10 @@ class RecoveryCheckpointMergeTest {
     }
 
     private static String attemptId(int index) {
-        return "a".repeat(24)
-                + BASE32.charAt(index / BASE32.length())
-                + BASE32.charAt(index % BASE32.length());
+        return "a".repeat(24) + BASE32.charAt(index / BASE32.length()) + BASE32.charAt(index % BASE32.length());
     }
 
     private static String publicationId(int index) {
-        return "b".repeat(24)
-                + BASE32.charAt(index / BASE32.length())
-                + BASE32.charAt(index % BASE32.length());
+        return "b".repeat(24) + BASE32.charAt(index / BASE32.length()) + BASE32.charAt(index % BASE32.length());
     }
 }

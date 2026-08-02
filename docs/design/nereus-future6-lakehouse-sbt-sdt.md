@@ -81,15 +81,15 @@ Future 6 不能做：
 
 ## 5. Concepts
 
-| Concept | Meaning |
-| --- | --- |
-| SBT | Stream-Backed Table，Nereus 管理的内建表视图 |
-| SDT | Stream-Delivered-to-Table，向用户外部 catalog/table 投递 stream range |
-| Source range | `[offsetStart, offsetEnd)` stream offset range |
-| Index generation | Oxia offset index generation used by a table snapshot |
-| Catalog snapshot | Iceberg/Delta/Hudi snapshot visible to query engine |
-| Delivery id | deterministic idempotence key for SDT |
-| Catalog lag | stream committed end offset minus latest table-visible offset |
+| Concept          | Meaning                                                       |
+|------------------|---------------------------------------------------------------|
+| SBT              | Stream-Backed Table，Nereus 管理的内建表视图                           |
+| SDT              | Stream-Delivered-to-Table，向用户外部 catalog/table 投递 stream range |
+| Source range     | `[offsetStart, offsetEnd)` stream offset range                |
+| Index generation | Oxia offset index generation used by a table snapshot         |
+| Catalog snapshot | Iceberg/Delta/Hudi snapshot visible to query engine           |
+| Delivery id      | deterministic idempotence key for SDT                         |
+| Catalog lag      | stream committed end offset minus latest table-visible offset |
 
 ## 6. Internal API
 
@@ -186,19 +186,19 @@ Future 6 consumes compacted objects from Future 4. The default table file format
 
 Required table columns:
 
-| Column | Meaning |
-| --- | --- |
-| `stream_id` | Nereus stream id |
-| `offset` | stream record offset |
-| `publish_time` | Pulsar/Kafka publish time |
-| `event_time` | event time if present |
-| `key` | message key |
-| `payload` | payload or normalized row field |
-| `schema_id` | schema reference |
-| `producer_name` | producer metadata |
-| `sequence_id` | producer sequence |
-| `txn_id` | transaction id if present |
-| `headers` | Pulsar properties / Kafka headers projection |
+| Column          | Meaning                                      |
+|-----------------|----------------------------------------------|
+| `stream_id`     | Nereus stream id                             |
+| `offset`        | stream record offset                         |
+| `publish_time`  | Pulsar/Kafka publish time                    |
+| `event_time`    | event time if present                        |
+| `key`           | message key                                  |
+| `payload`       | payload or normalized row field              |
+| `schema_id`     | schema reference                             |
+| `producer_name` | producer metadata                            |
+| `sequence_id`   | producer sequence                            |
+| `txn_id`        | transaction id if present                    |
+| `headers`       | Pulsar properties / Kafka headers projection |
 
 SBT table metadata must store:
 
@@ -242,13 +242,13 @@ SDT failure never rolls back stream visibility.
 
 Repair must handle partial commit:
 
-| State | Repair action |
-| --- | --- |
-| Oxia offset index has compacted object, catalog missing | Commit or recommit catalog snapshot |
-| Catalog snapshot exists, Oxia SBT state missing | Reconstruct SBT state from catalog snapshot metadata |
-| Oxia SBT state exists, catalog snapshot missing | Mark `NEEDS_REPAIR` and recommit catalog |
-| SDT external commit timeout | Query target catalog by delivery id |
-| SDT Oxia state missing after external success | Insert delivery state with same delivery id |
+| State                                                            | Repair action                                                  |
+|------------------------------------------------------------------|----------------------------------------------------------------|
+| Oxia offset index has compacted object, catalog missing          | Commit or recommit catalog snapshot                            |
+| Catalog snapshot exists, Oxia SBT state missing                  | Reconstruct SBT state from catalog snapshot metadata           |
+| Oxia SBT state exists, catalog snapshot missing                  | Mark `NEEDS_REPAIR` and recommit catalog                       |
+| SDT external commit timeout                                      | Query target catalog by delivery id                            |
+| SDT Oxia state missing after external success                    | Insert delivery state with same delivery id                    |
 | Catalog references object no longer active in highest generation | Keep reference until catalog snapshot expires or is superseded |
 
 Repair source order：
@@ -279,28 +279,28 @@ sdtLagRecords = stream.committedEndOffset - latestCommittedDelivery.offsetEnd
 
 Suggested metrics:
 
-| Metric | Meaning |
-| --- | --- |
+| Metric                                              | Meaning                    |
+|-----------------------------------------------------|----------------------------|
 | `pulsar_nereus_sbt_snapshot_commit_latency_seconds` | SBT catalog commit latency |
-| `pulsar_nereus_sbt_lag_records` | SBT lag by records |
-| `pulsar_nereus_sbt_lag_seconds` | SBT materialization lag |
-| `pulsar_nereus_sdt_delivery_latency_seconds` | SDT delivery latency |
-| `pulsar_nereus_sdt_lag_records` | SDT lag by target |
-| `pulsar_nereus_catalog_repair_total` | repair count |
-| `pulsar_nereus_catalog_commit_conflicts_total` | catalog commit conflicts |
+| `pulsar_nereus_sbt_lag_records`                     | SBT lag by records         |
+| `pulsar_nereus_sbt_lag_seconds`                     | SBT materialization lag    |
+| `pulsar_nereus_sdt_delivery_latency_seconds`        | SDT delivery latency       |
+| `pulsar_nereus_sdt_lag_records`                     | SDT lag by target          |
+| `pulsar_nereus_catalog_repair_total`                | repair count               |
+| `pulsar_nereus_catalog_commit_conflicts_total`      | catalog commit conflicts   |
 
 ## 12. Failure Model
 
-| Failure | Expected behavior |
-| --- | --- |
-| Catalog commit fails before visibility | Stream read unaffected; table lag increases |
-| Catalog commit succeeds but Oxia SBT state write fails | Repair reconstructs Oxia state |
-| Oxia SBT state succeeds but catalog commit missing | State becomes `NEEDS_REPAIR`; stream read unaffected |
-| SDT target catalog timeout | Delivery id used to determine success before retry |
-| Duplicate SDT retry | Same delivery id must be idempotent |
-| Schema evolves during range selection | Snapshot records schema version; next range may use new schema |
-| Object referenced by catalog is superseded | Catalog reference protects object until snapshot expiry |
-| External query engine reads stale snapshot | Allowed; stream-head committed end may be newer and catalog lag remains observable |
+| Failure                                                | Expected behavior                                                                  |
+|--------------------------------------------------------|------------------------------------------------------------------------------------|
+| Catalog commit fails before visibility                 | Stream read unaffected; table lag increases                                        |
+| Catalog commit succeeds but Oxia SBT state write fails | Repair reconstructs Oxia state                                                     |
+| Oxia SBT state succeeds but catalog commit missing     | State becomes `NEEDS_REPAIR`; stream read unaffected                               |
+| SDT target catalog timeout                             | Delivery id used to determine success before retry                                 |
+| Duplicate SDT retry                                    | Same delivery id must be idempotent                                                |
+| Schema evolves during range selection                  | Snapshot records schema version; next range may use new schema                     |
+| Object referenced by catalog is superseded             | Catalog reference protects object until snapshot expiry                            |
+| External query engine reads stale snapshot             | Allowed; stream-head committed end may be newer and catalog lag remains observable |
 
 ## 13. Compatibility Impact
 

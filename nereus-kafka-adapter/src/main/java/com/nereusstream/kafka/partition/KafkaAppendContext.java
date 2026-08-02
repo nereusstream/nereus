@@ -1,17 +1,16 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 
-/** Immutable Kafka request facts captured before one partition append is admitted. */
+/**
+ * Immutable Kafka request facts captured before one partition append is admitted.
+ */
 public record KafkaAppendContext(
-        long expectedStartOffset,
-        int leaderEpoch,
-        short requiredAcks,
-        Duration timeout,
-        Map<String, String> tags) {
+        long expectedStartOffset, int leaderEpoch, short requiredAcks, Duration timeout, Map<String, String> tags) {
     public KafkaAppendContext {
         Objects.requireNonNull(timeout, "timeout");
         tags = Map.copyOf(Objects.requireNonNull(tags, "tags"));

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.metadata;
 
 import com.nereusstream.api.StorageProfile;
@@ -15,11 +16,15 @@ public record KafkaBindingRequest(
         Duration operationTtl) {
     public KafkaBindingRequest {
         Objects.requireNonNull(identity, "identity");
-        storageProfile = Objects.requireNonNull(storageProfile, "storageProfile").canonical();
+        storageProfile =
+                Objects.requireNonNull(storageProfile, "storageProfile").canonical();
         Objects.requireNonNull(operationOwnerId, "operationOwnerId");
         operationTtl = Objects.requireNonNull(operationTtl, "operationTtl");
-        if (metadataOffset < 0 || operationOwnerId.isBlank() || operationOwnerEpoch <= 0
-                || operationTtl.isZero() || operationTtl.isNegative()) {
+        if (metadataOffset < 0
+                || operationOwnerId.isBlank()
+                || operationOwnerEpoch <= 0
+                || operationTtl.isZero()
+                || operationTtl.isNegative()) {
             throw new IllegalArgumentException("invalid Kafka binding request");
         }
     }

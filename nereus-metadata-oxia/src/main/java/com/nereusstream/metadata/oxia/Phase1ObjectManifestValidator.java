@@ -23,14 +23,15 @@ import com.nereusstream.metadata.oxia.records.StreamSliceManifestRecord;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Shared Phase 1 manifest validation used by fake and future real Oxia adapters. */
+/**
+ * Shared Phase 1 manifest validation used by fake and future real Oxia adapters.
+ */
 public final class Phase1ObjectManifestValidator {
     private static final Set<String> COMMIT_ELIGIBLE_MANIFEST_STATES =
             Set.of("UPLOADED", "PARTIALLY_VISIBLE", "VISIBLE");
     private static final Set<String> SLICE_STATES = Set.of("UPLOADED", "VISIBLE");
 
-    private Phase1ObjectManifestValidator() {
-    }
+    private Phase1ObjectManifestValidator() {}
 
     public static void validateStoredManifest(ObjectManifestRecord manifest) {
         validateStoredShape(manifest);
@@ -45,9 +46,7 @@ public final class Phase1ObjectManifestValidator {
     }
 
     public static StreamSliceManifestRecord validateCommitCandidate(
-            ObjectManifestRecord manifest,
-            CommitSliceRequest request,
-            boolean replay) {
+            ObjectManifestRecord manifest, CommitSliceRequest request, boolean replay) {
         validateStoredManifest(manifest);
         if (!COMMIT_ELIGIBLE_MANIFEST_STATES.contains(manifest.state())) {
             throw invariant("object manifest state is not commit eligible");
@@ -57,8 +56,10 @@ public final class Phase1ObjectManifestValidator {
                 || !manifest.writerId().equals(request.writerId())
                 || !manifest.writerRunIdHash().equals(request.writerRunIdHash())
                 || manifest.writerEpoch() != request.epoch()
-                || !manifest.objectChecksumType().equals(request.objectChecksum().type().name())
-                || !manifest.objectChecksumValue().equals(request.objectChecksum().value())) {
+                || !manifest.objectChecksumType()
+                        .equals(request.objectChecksum().type().name())
+                || !manifest.objectChecksumValue()
+                        .equals(request.objectChecksum().value())) {
             throw invariant("object manifest does not match commit request");
         }
 
@@ -79,7 +80,8 @@ public final class Phase1ObjectManifestValidator {
                 || !slice.payloadFormat().equals(request.payloadFormat().name())
                 || !slice.schemaRefs().equals(request.schemaRefs())
                 || !slice.entryIndexRef().equals(EntryIndexReferenceRecord.fromApi(request.entryIndexRef()))
-                || !slice.sliceChecksumType().equals(request.sliceChecksum().type().name())
+                || !slice.sliceChecksumType()
+                        .equals(request.sliceChecksum().type().name())
                 || !slice.sliceChecksumValue().equals(request.sliceChecksum().value())) {
             throw invariant("object manifest slice does not match commit request");
         }
@@ -107,7 +109,8 @@ public final class Phase1ObjectManifestValidator {
             return false;
         }
         for (int index = 0; index < left.slices().size(); index++) {
-            if (!sameImmutableSliceIdentity(left.slices().get(index), right.slices().get(index))) {
+            if (!sameImmutableSliceIdentity(
+                    left.slices().get(index), right.slices().get(index))) {
                 return false;
             }
         }
@@ -157,20 +160,20 @@ public final class Phase1ObjectManifestValidator {
             }
             previousRangeEnd = rangeEnd;
         }
-        boolean consistentState = switch (manifest.state()) {
-            case "UPLOADED" -> visibleSlices == 0;
-            case "PARTIALLY_VISIBLE" -> visibleSlices > 0 && visibleSlices < manifest.slices().size();
-            case "VISIBLE" -> visibleSlices == manifest.slices().size();
-            default -> false;
-        };
+        boolean consistentState =
+                switch (manifest.state()) {
+                    case "UPLOADED" -> visibleSlices == 0;
+                    case "PARTIALLY_VISIBLE" ->
+                        visibleSlices > 0 && visibleSlices < manifest.slices().size();
+                    case "VISIBLE" -> visibleSlices == manifest.slices().size();
+                    default -> false;
+                };
         if (!consistentState) {
             throw invariant("object manifest state does not match per-slice visibility");
         }
     }
 
-    private static boolean sameImmutableSliceIdentity(
-            StreamSliceManifestRecord left,
-            StreamSliceManifestRecord right) {
+    private static boolean sameImmutableSliceIdentity(StreamSliceManifestRecord left, StreamSliceManifestRecord right) {
         return left.sliceOrdinal() == right.sliceOrdinal()
                 && left.streamId().equals(right.streamId())
                 && left.sliceId().equals(right.sliceId())

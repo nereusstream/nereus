@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Applies one selected mutation, then loses only its response for deterministic recovery contracts. */
+/**
+ * Applies one selected mutation, then loses only its response for deterministic recovery contracts.
+ */
 public final class ResponseLossPartitionedOxiaBackend implements PartitionedOxiaClient.Backend {
     private final InMemoryPartitionedOxiaBackend delegate = new InMemoryPartitionedOxiaBackend();
     private Operation armed;
@@ -47,21 +50,17 @@ public final class ResponseLossPartitionedOxiaBackend implements PartitionedOxia
     public CompletableFuture<PartitionedOxiaClient.WriteResult> putIfVersion(
             String key, byte[] value, long expectedVersion, PartitionKey partitionKey) {
         return loseAfterApply(
-                Operation.PUT_IF_VERSION,
-                delegate.putIfVersion(key, value, expectedVersion, partitionKey));
+                Operation.PUT_IF_VERSION, delegate.putIfVersion(key, value, expectedVersion, partitionKey));
     }
 
     @Override
-    public CompletableFuture<Void> deleteIfVersion(
-            String key, long expectedVersion, PartitionKey partitionKey) {
+    public CompletableFuture<Void> deleteIfVersion(String key, long expectedVersion, PartitionKey partitionKey) {
         return loseAfterApply(
-                Operation.DELETE_IF_VERSION,
-                delegate.deleteIfVersion(key, expectedVersion, partitionKey));
+                Operation.DELETE_IF_VERSION, delegate.deleteIfVersion(key, expectedVersion, partitionKey));
     }
 
     @Override
-    public CompletableFuture<List<String>> list(
-            String fromInclusive, String toExclusive, PartitionKey partitionKey) {
+    public CompletableFuture<List<String>> list(String fromInclusive, String toExclusive, PartitionKey partitionKey) {
         return delegate.list(fromInclusive, toExclusive, partitionKey);
     }
 
@@ -72,13 +71,11 @@ public final class ResponseLossPartitionedOxiaBackend implements PartitionedOxia
     }
 
     @Override
-    public WatchRegistration watchPrefix(
-            String prefix, PartitionKey partitionKey, Runnable invalidationCallback) {
+    public WatchRegistration watchPrefix(String prefix, PartitionKey partitionKey, Runnable invalidationCallback) {
         return delegate.watchPrefix(prefix, partitionKey, invalidationCallback);
     }
 
-    private synchronized <T> CompletableFuture<T> loseAfterApply(
-            Operation operation, CompletableFuture<T> applied) {
+    private synchronized <T> CompletableFuture<T> loseAfterApply(Operation operation, CompletableFuture<T> applied) {
         if (armed != operation) {
             return applied;
         }

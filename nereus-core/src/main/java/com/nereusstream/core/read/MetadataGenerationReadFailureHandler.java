@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.ErrorCode;
@@ -14,18 +15,20 @@ import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
+import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
-import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
-import java.util.Optional;
 import java.time.Clock;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-/** Propagates immutable-object read corruption into physical-root and generation health metadata. */
+/**
+ * Propagates immutable-object read corruption into physical-root and generation health metadata.
+ */
 public final class MetadataGenerationReadFailureHandler implements GenerationReadFailureHandler {
     private static final int MAX_CAS_ATTEMPTS = 8;
     private static final int SCAN_PAGE_SIZE = 512;
@@ -48,10 +51,7 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
     }
 
     @Override
-    public CompletableFuture<Void> handle(
-            StreamId streamId,
-            GenerationReadCandidate candidate,
-            Throwable failure) {
+    public CompletableFuture<Void> handle(StreamId streamId, GenerationReadCandidate candidate, Throwable failure) {
         StreamId exactStream = Objects.requireNonNull(streamId, "streamId");
         GenerationReadCandidate exactCandidate = Objects.requireNonNull(candidate, "candidate");
         Throwable cause = unwrap(Objects.requireNonNull(failure, "failure"));
@@ -68,26 +68,18 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
                 ? "read-" + nereus.code().name().toLowerCase(java.util.Locale.ROOT)
                 : "immutable-object-read-corruption";
         return capture(quarantineRoot(target, reason, 0))
-                .thenCompose(rootFailure -> capture(quarantineIndex(
-                                exactStream, exactCandidate, reason, 0))
+                .thenCompose(rootFailure -> capture(quarantineIndex(exactStream, exactCandidate, reason, 0))
                         .thenCompose(indexFailure -> capture(quarantineReferenceDomain(
-                                        exactStream,
-                                        exactCandidate.view(),
-                                        target,
-                                        reason,
-                                        Optional.empty(),
-                                        0))
+                                        exactStream, exactCandidate.view(), target, reason, Optional.empty(), 0))
                                 .thenApply(domainFailure -> {
                                     throwIfAny(rootFailure, indexFailure, domainFailure);
                                     return null;
                                 })));
     }
 
-    private CompletableFuture<Void> quarantineRoot(
-            ObjectSliceReadTarget target,
-            String reason,
-            int attempt) {
-        return physicalStore.getRoot(cluster, com.nereusstream.api.ObjectKeyHash.from(target.objectKey()))
+    private CompletableFuture<Void> quarantineRoot(ObjectSliceReadTarget target, String reason, int attempt) {
+        return physicalStore
+                .getRoot(cluster, com.nereusstream.api.ObjectKeyHash.from(target.objectKey()))
                 .thenCompose(optional -> {
                     VersionedPhysicalObjectRoot current = optional.orElseThrow(() -> new NereusException(
                             ErrorCode.OBJECT_NOT_FOUND,
@@ -102,18 +94,15 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
                         return CompletableFuture.completedFuture(null);
                     }
                     PhysicalObjectRootRecord replacement = quarantinedRoot(current.value(), reason);
-                    return physicalStore.compareAndSetRoot(
-                                    cluster, replacement, current.metadataVersion())
+                    return physicalStore
+                            .compareAndSetRoot(cluster, replacement, current.metadataVersion())
                             .thenApply(ignored -> (Void) null)
                             .exceptionallyCompose(error -> retryRoot(target, reason, attempt, error));
                 });
     }
 
     private CompletableFuture<Void> retryRoot(
-            ObjectSliceReadTarget target,
-            String reason,
-            int attempt,
-            Throwable failure) {
+            ObjectSliceReadTarget target, String reason, int attempt, Throwable failure) {
         if (attempt + 1 >= MAX_CAS_ATTEMPTS || !isConditionFailure(failure)) {
             return CompletableFuture.failedFuture(unwrap(failure));
         }
@@ -121,10 +110,7 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
     }
 
     private CompletableFuture<Void> quarantineIndex(
-            StreamId streamId,
-            GenerationReadCandidate candidate,
-            String reason,
-            int attempt) {
+            StreamId streamId, GenerationReadCandidate candidate, String reason, int attempt) {
         if (candidate.generationZero()) {
             return CompletableFuture.completedFuture(null);
         }
@@ -156,19 +142,15 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
                         "only a committed generation can be quarantined after read corruption"));
             }
             GenerationIndexRecord replacement = quarantinedIndex(current, reason);
-            return generationStore.compareAndSetIndex(
-                            cluster, replacement, current.metadataVersion())
+            return generationStore
+                    .compareAndSetIndex(cluster, replacement, current.metadataVersion())
                     .thenApply(ignored -> (Void) null)
                     .exceptionallyCompose(error -> retryIndex(streamId, candidate, reason, attempt, error));
         });
     }
 
     private CompletableFuture<Void> retryIndex(
-            StreamId streamId,
-            GenerationReadCandidate candidate,
-            String reason,
-            int attempt,
-            Throwable failure) {
+            StreamId streamId, GenerationReadCandidate candidate, String reason, int attempt, Throwable failure) {
         if (attempt + 1 >= MAX_CAS_ATTEMPTS || !isConditionFailure(failure)) {
             return CompletableFuture.failedFuture(unwrap(failure));
         }
@@ -182,16 +164,10 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
             String reason,
             Optional<F4ScanToken> continuation,
             int scanned) {
-        return generationStore.scanIndex(
-                        cluster,
-                        streamId,
-                        view,
-                        0,
-                        Long.MAX_VALUE,
-                        continuation,
-                        SCAN_PAGE_SIZE)
-                .thenCompose(page -> quarantineReferenceDomainPage(
-                        streamId, view, corruptTarget, reason, page, scanned));
+        return generationStore
+                .scanIndex(cluster, streamId, view, 0, Long.MAX_VALUE, continuation, SCAN_PAGE_SIZE)
+                .thenCompose(
+                        page -> quarantineReferenceDomainPage(streamId, view, corruptTarget, reason, page, scanned));
     }
 
     private CompletableFuture<Void> quarantineReferenceDomainPage(
@@ -212,34 +188,22 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
         }
         CompletableFuture<Void> quarantines = CompletableFuture.completedFuture(null);
         for (VersionedGenerationCandidate candidate : page.values()) {
-            if (candidate instanceof VersionedGenerationIndex index
-                    && referencesObject(index, corruptTarget)) {
+            if (candidate instanceof VersionedGenerationIndex index && referencesObject(index, corruptTarget)) {
                 GenerationIndexIdentity identity = new GenerationIndexIdentity(
-                        streamId,
-                        view,
-                        index.value().offsetEnd(),
-                        index.value().generation());
-                quarantines = quarantines.thenCompose(ignored -> quarantineIndexIdentity(
-                        identity, index.key(), reason, 0));
+                        streamId, view, index.value().offsetEnd(), index.value().generation());
+                quarantines =
+                        quarantines.thenCompose(ignored -> quarantineIndexIdentity(identity, index.key(), reason, 0));
             }
         }
         if (page.continuation().isEmpty()) {
             return quarantines;
         }
-        return quarantines.thenCompose(ignored -> quarantineReferenceDomain(
-                streamId,
-                view,
-                corruptTarget,
-                reason,
-                page.continuation(),
-                total));
+        return quarantines.thenCompose(ignored ->
+                quarantineReferenceDomain(streamId, view, corruptTarget, reason, page.continuation(), total));
     }
 
     private CompletableFuture<Void> quarantineIndexIdentity(
-            GenerationIndexIdentity identity,
-            String expectedKey,
-            String reason,
-            int attempt) {
+            GenerationIndexIdentity identity, String expectedKey, String reason, int attempt) {
         return generationStore.getIndex(cluster, identity).thenCompose(optional -> {
             if (optional.isEmpty()) {
                 return CompletableFuture.completedFuture(null);
@@ -259,22 +223,19 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
                 return CompletableFuture.completedFuture(null);
             }
             GenerationIndexRecord replacement = quarantinedIndex(current, reason);
-            return generationStore.compareAndSetIndex(
-                            cluster, replacement, current.metadataVersion())
+            return generationStore
+                    .compareAndSetIndex(cluster, replacement, current.metadataVersion())
                     .thenApply(ignored -> (Void) null)
                     .exceptionallyCompose(failure -> {
                         if (attempt + 1 >= MAX_CAS_ATTEMPTS || !isConditionFailure(failure)) {
                             return CompletableFuture.failedFuture(unwrap(failure));
                         }
-                        return quarantineIndexIdentity(
-                                identity, expectedKey, reason, attempt + 1);
+                        return quarantineIndexIdentity(identity, expectedKey, reason, attempt + 1);
                     });
         });
     }
 
-    private static boolean referencesObject(
-            VersionedGenerationIndex index,
-            ObjectSliceReadTarget corruptTarget) {
+    private static boolean referencesObject(VersionedGenerationIndex index, ObjectSliceReadTarget corruptTarget) {
         var target = ReadTargetCodecRegistry.phase15().decode(index.value().readTarget());
         return target instanceof ObjectSliceReadTarget object
                 && object.objectKey().equals(corruptTarget.objectKey());
@@ -308,9 +269,7 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
                 "same-object generation quarantine reference domain exceeds the hard limit"));
     }
 
-    private PhysicalObjectRootRecord quarantinedRoot(
-            PhysicalObjectRootRecord current,
-            String reason) {
+    private PhysicalObjectRootRecord quarantinedRoot(PhysicalObjectRootRecord current, String reason) {
         return new PhysicalObjectRootRecord(
                 current.schemaVersion(),
                 current.objectKeyHash(),
@@ -338,9 +297,7 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
                 0);
     }
 
-    private GenerationIndexRecord quarantinedIndex(
-            VersionedGenerationIndex versioned,
-            String reason) {
+    private GenerationIndexRecord quarantinedIndex(VersionedGenerationIndex versioned, String reason) {
         GenerationIndexRecord current = versioned.value();
         long now = Math.max(clock.millis(), current.stateChangedAtMillis());
         String auditReason = reason
@@ -379,9 +336,7 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
                 0);
     }
 
-    private static void requireSameTargetIdentity(
-            ObjectSliceReadTarget target,
-            PhysicalObjectRootRecord root) {
+    private static void requireSameTargetIdentity(ObjectSliceReadTarget target, PhysicalObjectRootRecord root) {
         if (!root.objectKey().equals(target.objectKey().value())
                 || (!root.objectId().isEmpty()
                         && !root.objectId().equals(target.objectId().value()))) {
@@ -394,15 +349,13 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
 
     private static boolean isImmutableObjectCorruption(Throwable failure) {
         return failure instanceof NereusException nereus
-                && (nereus.code() == ErrorCode.OBJECT_NOT_FOUND
-                        || nereus.code() == ErrorCode.OBJECT_CHECKSUM_MISMATCH);
+                && (nereus.code() == ErrorCode.OBJECT_NOT_FOUND || nereus.code() == ErrorCode.OBJECT_CHECKSUM_MISMATCH);
     }
 
     private static boolean isConditionFailure(Throwable failure) {
         Throwable cause = unwrap(failure);
         return cause instanceof F4MetadataConditionFailedException
-                || cause instanceof NereusException nereus
-                        && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
+                || cause instanceof NereusException nereus && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
     }
 
     private static Throwable unwrap(Throwable failure) {

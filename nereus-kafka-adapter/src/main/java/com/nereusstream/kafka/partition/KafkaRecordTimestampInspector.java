@@ -22,14 +22,14 @@ import java.util.Optional;
  * Implementations must not mutate the supplied buffer and must ignore records below {@code minimumOffset}.
  */
 public interface KafkaRecordTimestampInspector {
-    /** Returns the first record in physical/logical scan order whose timestamp is at least the target. */
+    /**
+     * Returns the first record in physical/logical scan order whose timestamp is at least the target.
+     */
     Optional<KafkaTimestampAndOffset> firstAtOrAfter(
-            ByteBuffer exactRecords,
-            long minimumOffset,
-            long targetTimestampMillis);
+            ByteBuffer exactRecords, long minimumOffset, long targetTimestampMillis);
 
-    /** Returns the greatest record timestamp, breaking ties by the lowest logical offset. */
-    Optional<KafkaTimestampAndOffset> maximum(
-            ByteBuffer exactRecords,
-            long minimumOffset);
+    /**
+     * Returns the greatest record timestamp, breaking ties by the lowest logical offset.
+     */
+    Optional<KafkaTimestampAndOffset> maximum(ByteBuffer exactRecords, long minimumOffset);
 }

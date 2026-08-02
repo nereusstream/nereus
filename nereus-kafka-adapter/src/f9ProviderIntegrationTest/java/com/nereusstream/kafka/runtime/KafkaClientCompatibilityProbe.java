@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import java.nio.charset.StandardCharsets;
@@ -38,8 +39,7 @@ import org.apache.kafka.common.utils.AppInfoParser;
 public final class KafkaClientCompatibilityProbe {
     private static final Duration CLIENT_TIMEOUT = Duration.ofSeconds(60);
 
-    private KafkaClientCompatibilityProbe() {
-    }
+    private KafkaClientCompatibilityProbe() {}
 
     public static void main(String[] arguments) throws Exception {
         if (arguments.length != 3) {
@@ -52,10 +52,7 @@ public final class KafkaClientCompatibilityProbe {
         String actualVersion = AppInfoParser.getVersion();
         require(
                 expectedVersion.equals(actualVersion),
-                "selected classpath resolved kafka-clients "
-                        + actualVersion
-                        + " instead of "
-                        + expectedVersion);
+                "selected classpath resolved kafka-clients " + actualVersion + " instead of " + expectedVersion);
 
         String topic = "f9-compat-" + identity;
         String groupId = "f9-compat-group-" + identity;
@@ -78,9 +75,7 @@ public final class KafkaClientCompatibilityProbe {
             require(
                     description.partitions().get(0).replicas().size() == 1,
                     "Admin observed a non-singleton replica set");
-            require(
-                    description.partitions().get(0).isr().size() == 1,
-                    "Admin observed a non-singleton ISR");
+            require(description.partitions().get(0).isr().size() == 1, "Admin observed a non-singleton ISR");
 
             RecordMetadata plain = produce(
                     bootstrapServers,
@@ -90,26 +85,14 @@ public final class KafkaClientCompatibilityProbe {
             require(plain.partition() == 0, "plain Produce returned the wrong partition");
             require(plain.offset() == 0L, "plain Produce returned offset " + plain.offset());
 
-            ConsumerRecord<byte[], byte[]> fetched = fetch(
-                    bootstrapServers,
-                    partition,
-                    0L,
-                    "read_uncommitted");
+            ConsumerRecord<byte[], byte[]> fetched = fetch(bootstrapServers, partition, 0L, "read_uncommitted");
             require(fetched.offset() == 0L, "Fetch returned offset " + fetched.offset());
-            require(
-                    java.util.Arrays.equals(fetched.value(), plainValue),
-                    "Fetch returned different plain bytes");
+            require(java.util.Arrays.equals(fetched.value(), plainValue), "Fetch returned different plain bytes");
 
-            consumeAndCommitGroup(
-                    bootstrapServers,
-                    groupId,
-                    topic,
-                    partition,
-                    plainValue);
-            Map<TopicPartition, OffsetAndMetadata> committed =
-                    admin.listConsumerGroupOffsets(groupId)
-                            .partitionsToOffsetAndMetadata()
-                            .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            consumeAndCommitGroup(bootstrapServers, groupId, topic, partition, plainValue);
+            Map<TopicPartition, OffsetAndMetadata> committed = admin.listConsumerGroupOffsets(groupId)
+                    .partitionsToOffsetAndMetadata()
+                    .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
             require(
                     committed.containsKey(partition) && committed.get(partition).offset() == 1L,
                     "group offset did not converge to 1: " + committed);
@@ -137,14 +120,9 @@ public final class KafkaClientCompatibilityProbe {
                     ("aborted-key-" + expectedVersion).getBytes(StandardCharsets.UTF_8),
                     abortedValue,
                     false);
-            require(
-                    aborted.offset() == 3L,
-                    "aborted transactional Produce returned offset " + aborted.offset());
+            require(aborted.offset() == 3L, "aborted transactional Produce returned offset " + aborted.offset());
 
-            List<ConsumerRecord<byte[], byte[]>> visible = fetchReadCommitted(
-                    bootstrapServers,
-                    partition,
-                    5L);
+            List<ConsumerRecord<byte[], byte[]>> visible = fetchReadCommitted(bootstrapServers, partition, 5L);
             require(
                     visible.stream().map(ConsumerRecord::offset).toList().equals(List.of(0L, 1L)),
                     "READ_COMMITTED exposed unexpected offsets "
@@ -156,36 +134,30 @@ public final class KafkaClientCompatibilityProbe {
                     java.util.Arrays.equals(visible.get(1).value(), committedValue),
                     "READ_COMMITTED changed the committed transactional value");
             require(
-                    visible.stream()
-                            .noneMatch(record -> java.util.Arrays.equals(record.value(), abortedValue)),
+                    visible.stream().noneMatch(record -> java.util.Arrays.equals(record.value(), abortedValue)),
                     "READ_COMMITTED exposed aborted transactional data");
 
-            Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliest =
-                    admin.listOffsets(Map.of(partition, OffsetSpec.earliest()))
-                            .all()
-                            .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
-            Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latest =
-                    admin.listOffsets(Map.of(partition, OffsetSpec.latest()))
-                            .all()
-                            .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliest = admin.listOffsets(
+                            Map.of(partition, OffsetSpec.earliest()))
+                    .all()
+                    .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latest = admin.listOffsets(
+                            Map.of(partition, OffsetSpec.latest()))
+                    .all()
+                    .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
             require(earliest.get(partition).offset() == 0L, "earliest offset was not 0");
             require(latest.get(partition).offset() == 5L, "latest offset was not 5");
         }
 
-        System.out.println(
-                "COMPATIBILITY_PASS version="
-                        + actualVersion
-                        + " operations=admin,produce,fetch,group,transaction"
-                        + " earliest=0 latest=5 committedGroupOffset=1"
-                        + " visibleOffsets=0,1");
+        System.out.println("COMPATIBILITY_PASS version="
+                + actualVersion
+                + " operations=admin,produce,fetch,group,transaction"
+                + " earliest=0 latest=5 committedGroupOffset=1"
+                + " visibleOffsets=0,1");
     }
 
-    private static RecordMetadata produce(
-            String bootstrapServers,
-            String topic,
-            byte[] key,
-            byte[] value
-    ) throws Exception {
+    private static RecordMetadata produce(String bootstrapServers, String topic, byte[] key, byte[] value)
+            throws Exception {
         Properties properties = producerProperties(bootstrapServers);
         properties.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "f9-compat-plain");
         try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(properties)) {
@@ -195,18 +167,12 @@ public final class KafkaClientCompatibilityProbe {
     }
 
     private static RecordMetadata transactionalProduce(
-            String bootstrapServers,
-            String transactionalId,
-            String topic,
-            byte[] key,
-            byte[] value,
-            boolean commit
-    ) throws Exception {
+            String bootstrapServers, String transactionalId, String topic, byte[] key, byte[] value, boolean commit)
+            throws Exception {
         Properties properties = producerProperties(bootstrapServers);
         properties.setProperty(ProducerConfig.TRANSACTIONAL_ID_CONFIG, transactionalId);
         properties.setProperty(
-                ProducerConfig.CLIENT_ID_CONFIG,
-                "f9-compat-transaction-" + (commit ? "commit" : "abort"));
+                ProducerConfig.CLIENT_ID_CONFIG, "f9-compat-transaction-" + (commit ? "commit" : "abort"));
         try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(properties)) {
             producer.initTransactions();
             producer.beginTransaction();
@@ -222,12 +188,7 @@ public final class KafkaClientCompatibilityProbe {
     }
 
     private static void consumeAndCommitGroup(
-            String bootstrapServers,
-            String groupId,
-            String topic,
-            TopicPartition partition,
-            byte[] expectedValue
-    ) {
+            String bootstrapServers, String groupId, String topic, TopicPartition partition, byte[] expectedValue) {
         Properties properties = consumerProperties(bootstrapServers, groupId, "read_committed");
         try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
             consumer.subscribe(List.of(topic));
@@ -239,9 +200,7 @@ public final class KafkaClientCompatibilityProbe {
                         require(
                                 java.util.Arrays.equals(record.value(), expectedValue),
                                 "group Fetch returned different bytes");
-                        consumer.commitSync(
-                                Map.of(partition, new OffsetAndMetadata(1L)),
-                                CLIENT_TIMEOUT);
+                        consumer.commitSync(Map.of(partition, new OffsetAndMetadata(1L)), CLIENT_TIMEOUT);
                         return;
                     }
                 }
@@ -251,15 +210,9 @@ public final class KafkaClientCompatibilityProbe {
     }
 
     private static ConsumerRecord<byte[], byte[]> fetch(
-            String bootstrapServers,
-            TopicPartition partition,
-            long offset,
-            String isolationLevel
-    ) {
-        Properties properties = consumerProperties(
-                bootstrapServers,
-                "f9-compat-direct-" + System.nanoTime(),
-                isolationLevel);
+            String bootstrapServers, TopicPartition partition, long offset, String isolationLevel) {
+        Properties properties =
+                consumerProperties(bootstrapServers, "f9-compat-direct-" + System.nanoTime(), isolationLevel);
         try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
             consumer.assign(List.of(partition));
             consumer.seek(partition, offset);
@@ -275,14 +228,9 @@ public final class KafkaClientCompatibilityProbe {
     }
 
     private static List<ConsumerRecord<byte[], byte[]>> fetchReadCommitted(
-            String bootstrapServers,
-            TopicPartition partition,
-            long expectedEndOffset
-    ) {
-        Properties properties = consumerProperties(
-                bootstrapServers,
-                "f9-compat-read-committed-" + System.nanoTime(),
-                "read_committed");
+            String bootstrapServers, TopicPartition partition, long expectedEndOffset) {
+        Properties properties =
+                consumerProperties(bootstrapServers, "f9-compat-read-committed-" + System.nanoTime(), "read_committed");
         List<ConsumerRecord<byte[], byte[]>> visible = new ArrayList<>();
         Set<Long> observed = new LinkedHashSet<>();
         try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
@@ -296,28 +244,22 @@ public final class KafkaClientCompatibilityProbe {
                         visible.add(record);
                     }
                 }
-                long end = consumer.endOffsets(Set.of(partition), CLIENT_TIMEOUT).get(partition);
+                long end =
+                        consumer.endOffsets(Set.of(partition), CLIENT_TIMEOUT).get(partition);
                 if (end == expectedEndOffset && consumer.position(partition) >= expectedEndOffset) {
                     return visible;
                 }
             }
         }
         throw new AssertionError(
-                "READ_COMMITTED did not reach end offset "
-                        + expectedEndOffset
-                        + "; visible="
-                        + observed);
+                "READ_COMMITTED did not reach end offset " + expectedEndOffset + "; visible=" + observed);
     }
 
     private static Properties producerProperties(String bootstrapServers) {
         Properties properties = new Properties();
         properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        properties.setProperty(
-                ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
-                ByteArraySerializer.class.getName());
-        properties.setProperty(
-                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
-                ByteArraySerializer.class.getName());
+        properties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        properties.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
         properties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
         properties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
         properties.setProperty(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, "10000");
@@ -325,19 +267,11 @@ public final class KafkaClientCompatibilityProbe {
         return properties;
     }
 
-    private static Properties consumerProperties(
-            String bootstrapServers,
-            String groupId,
-            String isolationLevel
-    ) {
+    private static Properties consumerProperties(String bootstrapServers, String groupId, String isolationLevel) {
         Properties properties = new Properties();
         properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        properties.setProperty(
-                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-                ByteArrayDeserializer.class.getName());
-        properties.setProperty(
-                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                ByteArrayDeserializer.class.getName());
+        properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");

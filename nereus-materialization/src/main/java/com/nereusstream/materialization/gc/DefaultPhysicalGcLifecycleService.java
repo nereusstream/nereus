@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -13,9 +14,10 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-/** Fixed-delay, non-overlapping complete-pass loop that owns no injected store or executor. */
-public final class DefaultPhysicalGcLifecycleService
-        implements PhysicalGcLifecycleService {
+/**
+ * Fixed-delay, non-overlapping complete-pass loop that owns no injected store or executor.
+ */
+public final class DefaultPhysicalGcLifecycleService implements PhysicalGcLifecycleService {
     private enum State {
         NEW,
         RUNNING,
@@ -42,10 +44,7 @@ public final class DefaultPhysicalGcLifecycleService
             PhysicalGcConfig config,
             ScheduledExecutorService scheduler,
             Executor callbackExecutor) {
-        this(Objects.requireNonNull(pass, "pass")::scan,
-                config,
-                scheduler,
-                callbackExecutor);
+        this(Objects.requireNonNull(pass, "pass")::scan, config, scheduler, callbackExecutor);
     }
 
     DefaultPhysicalGcLifecycleService(
@@ -56,8 +55,7 @@ public final class DefaultPhysicalGcLifecycleService
         this.pass = Objects.requireNonNull(pass, "pass");
         this.config = Objects.requireNonNull(config, "config");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.callbackExecutor = Objects.requireNonNull(
-                callbackExecutor, "callbackExecutor");
+        this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
     }
 
     @Override
@@ -67,8 +65,8 @@ public final class DefaultPhysicalGcLifecycleService
                 return CompletableFuture.completedFuture(null);
             }
             if (state != State.NEW) {
-                return CompletableFuture.failedFuture(closed(
-                        "physical-GC lifecycle cannot start after close begins", null));
+                return CompletableFuture.failedFuture(
+                        closed("physical-GC lifecycle cannot start after close begins", null));
             }
             state = State.RUNNING;
             try {
@@ -86,12 +84,13 @@ public final class DefaultPhysicalGcLifecycleService
         CompletableFuture<PhysicalGcLifecyclePassResult> target;
         synchronized (monitor) {
             if (state != State.RUNNING) {
-                return CompletableFuture.failedFuture(state == State.NEW
-                        ? new NereusException(
-                                ErrorCode.METADATA_CONDITION_FAILED,
-                                true,
-                                "physical-GC lifecycle has not started")
-                        : closed("physical-GC lifecycle is closing", null));
+                return CompletableFuture.failedFuture(
+                        state == State.NEW
+                                ? new NereusException(
+                                        ErrorCode.METADATA_CONDITION_FAILED,
+                                        true,
+                                        "physical-GC lifecycle has not started")
+                                : closed("physical-GC lifecycle is closing", null));
             }
             if (activePass != null) {
                 rescanRequested = true;
@@ -127,11 +126,9 @@ public final class DefaultPhysicalGcLifecycleService
             source = activeSource;
         }
 
-        CompletableFuture<Void> drained = target == null
-                ? CompletableFuture.completedFuture(null)
-                : target.handle((ignored, failure) -> null);
-        drained.whenComplete((ignored, failure) ->
-                executeCallback(this::completeClose));
+        CompletableFuture<Void> drained =
+                target == null ? CompletableFuture.completedFuture(null) : target.handle((ignored, failure) -> null);
+        drained.whenComplete((ignored, failure) -> executeCallback(this::completeClose));
         try {
             ScheduledFuture<?> deadline = scheduler.schedule(
                     () -> {
@@ -196,8 +193,7 @@ public final class DefaultPhysicalGcLifecycleService
     private void launch(CompletableFuture<PhysicalGcLifecyclePassResult> target) {
         CompletableFuture<PhysicalGcLifecyclePassResult> source;
         try {
-            source = Objects.requireNonNull(
-                    pass.get(), "physical-GC lifecycle pass returned null");
+            source = Objects.requireNonNull(pass.get(), "physical-GC lifecycle pass returned null");
         } catch (Throwable failure) {
             source = CompletableFuture.failedFuture(failure);
         }
@@ -207,8 +203,7 @@ public final class DefaultPhysicalGcLifecycleService
             }
         }
         CompletableFuture<PhysicalGcLifecyclePassResult> admitted = source;
-        admitted.whenComplete((value, failure) ->
-                executeCallback(() -> finish(target, admitted, value, failure)));
+        admitted.whenComplete((value, failure) -> executeCallback(() -> finish(target, admitted, value, failure)));
         target.whenComplete((ignored, failure) -> {
             if (target.isCancelled()) {
                 admitted.cancel(true);
@@ -234,9 +229,7 @@ public final class DefaultPhysicalGcLifecycleService
                 activeSource = null;
             }
             if (state == State.RUNNING) {
-                Duration delay = rescanRequested
-                        ? Duration.ZERO
-                        : config.scanInterval();
+                Duration delay = rescanRequested ? Duration.ZERO : config.scanInterval();
                 rescanRequested = false;
                 try {
                     scheduleLocked(delay);
@@ -252,13 +245,9 @@ public final class DefaultPhysicalGcLifecycleService
             return;
         }
         try {
-            scheduledPass = scheduler.schedule(
-                    this::scheduledTrigger,
-                    toNanos(delay),
-                    TimeUnit.NANOSECONDS);
+            scheduledPass = scheduler.schedule(this::scheduledTrigger, toNanos(delay), TimeUnit.NANOSECONDS);
         } catch (RejectedExecutionException failure) {
-            throw closed(
-                    "physical-GC scheduler rejected a complete pass", failure);
+            throw closed("physical-GC scheduler rejected a complete pass", failure);
         }
     }
 

@@ -1,16 +1,58 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart、BookKeeper WAL-only/async/sync cold-restart、BookKeeper three-profile two-process post-handoff、BookKeeper provider-applied cut、real-Oxia two-runtime Object-WAL live takeover、three-voter ACTIVE controller failover、the complete six-way readiness/PREPARED/ACTIVE store-publication gates and four-way initial-proof gates 均通过；extended kill/chaos gates remain open
-> 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：fork `1cbe8b65a8` 与 product process gates 已通过 two-release-process Object-WAL/KRaft singleton live reassignment、already-dispatched Object/BookKeeper append cuts、three-profile post-handoff、multi-controller activation/store/proof/transport cuts；同一 published fork 又闭合 native DeleteRecords 的 durable log-start publication、broker-epoch-ready recovery 和 pre-trim NKC1 hydration，product `f9CheckpointTrimRecoveryProcessIntegrationTest` 证明 forced restart 后按当前 trim 重建 virtual segments 并继续 native IO；两个 trim-response-loss tasks 又在全部五种 profile 证明 provider-applied/caller-unobserved trim 的 fresh-process convergence 与同目标 no-op；remaining gaps are transaction/internal-topic coordinator migration、remaining DeleteRecords boundaries and broader chaos
-> 2026-07-29 coordinator migration 增量：product `7c25d2e` 在 fork `1cbe8b65a8` 上原子迁移 user、`__consumer_offsets-0`、`__transaction_state-0` 到 live broker 2，completed group/transaction coordinator state 恢复并继续提交；remaining coordinator gaps narrow to ongoing/aborted transaction takeover and mandatory internal-topic NTC2 failure
-> 2026-07-29 ongoing transaction migration 增量：product `efe782d` 在同一 fork 上让两个 OPEN transactions 分别跨 `[1] -> [2]` 与 `[2] -> [1]` user/transaction-state handoff COMMIT/ABORT，证明 LSO、same-ID continuation 与 READ_COMMITTED filtering；remaining gaps narrow to injected resolution failures、mandatory NTC2、profile expansion and final aggregate
-> 2026-07-29 mandatory NTC2 增量：fork `89b66ab03b` 将 group/transaction/share internal-topic `openLeader` completion 延后到 product `probeMandatoryCompactedRead` 成功；probe failure 清理 exact pending lookup、resign recovered storage，因而 `NereusTopicDeltaLifecycle` 不会发出 ready callback。Product `0ae8ca9` 的真实双 release broker gate 已闭合 activated `__consumer_offsets` NTC2 物理删除、byte corruption、两次 fail-closed election 与 exact physical repair/re-election；最终 published/source-locked fork head 是 `768924da60`
-> 2026-07-29 retention oracle 增量：fork `bd9963c980` 新增 `KafkaRetentionOracleTest`，用合法 stock `UnifiedLog`、显式 `roll()` 的四段布局与固定 `MockTime`，逐项比较 Nereus planner candidate/selected count 和 stock `deleteOldSegments()`/logStart；覆盖 time、size、combined、HW cap、strict time equality 与 compact-only。最终 published/source-locked fork head 是 `bd9963c980`
-> 2026-07-29 compaction oracle 增量：fork `c4a0a2d1fa` 新增真实 `KafkaCompactionOracleTest`/support，直接调用 stock `Cleaner.buildOffsetMap/cleanSegments` 并与当前 Nereus 两遍执行器比较 exact record/batch fingerprints；fork `bf8a2946e5` 又把隔离 `0.1.0-f9-dev` modules 标记 changing/zero-cache，保证产品门禁消费刚发布字节。当前 published/source-locked head 是 `bf8a2946e5`
-> 2026-07-29 transaction-marker retry 增量：fork `1e3783458b` 修复 stock `TransactionMarkerChannelManager` 对 existing-but-leaderless partition 的误判。`metadataCache.contains(topicPartition)` 为 true 但 leader endpoint 暂不可用时，marker 进入 `Node.noNode` unknown-broker queue 并随 metadata 更新重试；只有 partition 已不在 metadata 时才完成 skip。新增 focused unit test 与 product `f9TransactionResolutionCutProcessIntegrationTest` 均通过；当前 published/source-locked head 是 `1e3783458b`
-> 2026-07-29 transaction-marker profile 验证增量：product `2d7091d` 复用同一 published fork head，将 before/after-provider process cuts 扩展到 Object async 与全部三种 BookKeeper profile；连同 Object sync 共十个真实场景。该扩展不需要新的 Kafka fork patch，且 52-commit/126-file source lock 保持通过
-> 2026-07-29 mandatory NTC2 profile 验证增量：product `4676c12` 同样不需要新的 fork patch；它将 delete/corrupt/fail-closed/exact-repair/re-election 扩展到 Object async 与三种 BookKeeper profile，连同 fresh Object-sync gate 共五 profile、十个场景。当前 published/source-locked fork head 仍是 `1e3783458b`
-> 2026-07-30 leader-recovery/M6 aggregate 增量：fork `76f62f3b83` passes `ReplicaManager`'s leader-publication callback into `Partition.makeLeader` and invokes it after leader epoch/replica publication but before the same state write lock is released；`testLeaderPublicationFencesListOffsetsBeforeMakeLeaderReleasesStateLock` deterministically blocks a concurrent ListOffsets lookup at that lock and then observes `OffsetNotAvailableException` once pending is installed。Product `14fb643` locks 53 commits/126 files，the focused ongoing-transaction migration gate passes，and fresh M6 process aggregate passes 94/94 tasks in 34m21s
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork
+> record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle
+> seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable
+> feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client
+> ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution
+> combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart、BookKeeper WAL-only/async/sync
+> cold-restart、BookKeeper three-profile two-process post-handoff、BookKeeper provider-applied cut、real-Oxia two-runtime
+> Object-WAL live takeover、three-voter ACTIVE controller failover、the complete six-way readiness/PREPARED/ACTIVE
+> store-publication gates and four-way initial-proof gates 均通过；extended kill/chaos gates remain open
+> 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：fork `1cbe8b65a8` 与 product process gates 已通过
+> two-release-process Object-WAL/KRaft singleton live reassignment、already-dispatched Object/BookKeeper append
+> cuts、three-profile post-handoff、multi-controller activation/store/proof/transport cuts；同一 published fork 又闭合 native
+> DeleteRecords 的 durable log-start publication、broker-epoch-ready recovery 和 pre-trim NKC1 hydration，product
+`f9CheckpointTrimRecoveryProcessIntegrationTest` 证明 forced restart 后按当前 trim 重建 virtual segments 并继续 native
+> IO；两个 trim-response-loss tasks 又在全部五种 profile 证明 provider-applied/caller-unobserved trim 的 fresh-process
+> convergence 与同目标 no-op；remaining gaps are transaction/internal-topic coordinator migration、remaining DeleteRecords
+> boundaries and broader chaos
+> 2026-07-29 coordinator migration 增量：product `7c25d2e` 在 fork `1cbe8b65a8` 上原子迁移 user、`__consumer_offsets-0`、
+`__transaction_state-0` 到 live broker 2，completed group/transaction coordinator state 恢复并继续提交；remaining
+> coordinator gaps narrow to ongoing/aborted transaction takeover and mandatory internal-topic NTC2 failure
+> 2026-07-29 ongoing transaction migration 增量：product `efe782d` 在同一 fork 上让两个 OPEN transactions 分别跨
+`[1] -> [2]` 与 `[2] -> [1]` user/transaction-state handoff COMMIT/ABORT，证明 LSO、same-ID continuation 与 READ_COMMITTED
+> filtering；remaining gaps narrow to injected resolution failures、mandatory NTC2、profile expansion and final aggregate
+> 2026-07-29 mandatory NTC2 增量：fork `89b66ab03b` 将 group/transaction/share internal-topic `openLeader` completion 延后到
+> product `probeMandatoryCompactedRead` 成功；probe failure 清理 exact pending lookup、resign recovered storage，因而
+`NereusTopicDeltaLifecycle` 不会发出 ready callback。Product `0ae8ca9` 的真实双 release broker gate 已闭合 activated
+`__consumer_offsets` NTC2 物理删除、byte corruption、两次 fail-closed election 与 exact physical repair/re-election；最终
+> published/source-locked fork head 是 `768924da60`
+> 2026-07-29 retention oracle 增量：fork `bd9963c980` 新增 `KafkaRetentionOracleTest`，用合法 stock `UnifiedLog`、显式
+`roll()` 的四段布局与固定 `MockTime`，逐项比较 Nereus planner candidate/selected count 和 stock `deleteOldSegments()`
+> /logStart；覆盖 time、size、combined、HW cap、strict time equality 与 compact-only。最终 published/source-locked fork head 是
+`bd9963c980`
+> 2026-07-29 compaction oracle 增量：fork `c4a0a2d1fa` 新增真实 `KafkaCompactionOracleTest`/support，直接调用 stock
+`Cleaner.buildOffsetMap/cleanSegments` 并与当前 Nereus 两遍执行器比较 exact record/batch fingerprints；fork `bf8a2946e5`
+> 又把隔离 `0.1.0-f9-dev` modules 标记 changing/zero-cache，保证产品门禁消费刚发布字节。当前 published/source-locked head 是
+`bf8a2946e5`
+> 2026-07-29 transaction-marker retry 增量：fork `1e3783458b` 修复 stock `TransactionMarkerChannelManager` 对
+> existing-but-leaderless partition 的误判。`metadataCache.contains(topicPartition)` 为 true 但 leader endpoint
+> 暂不可用时，marker 进入 `Node.noNode` unknown-broker queue 并随 metadata 更新重试；只有 partition 已不在 metadata 时才完成
+> skip。新增 focused unit test 与 product `f9TransactionResolutionCutProcessIntegrationTest` 均通过；当前
+> published/source-locked head 是 `1e3783458b`
+> 2026-07-29 transaction-marker profile 验证增量：product `2d7091d` 复用同一 published fork head，将 before/after-provider
+> process cuts 扩展到 Object async 与全部三种 BookKeeper profile；连同 Object sync 共十个真实场景。该扩展不需要新的 Kafka
+> fork patch，且 52-commit/126-file source lock 保持通过
+> 2026-07-29 mandatory NTC2 profile 验证增量：product `4676c12` 同样不需要新的 fork patch；它将
+> delete/corrupt/fail-closed/exact-repair/re-election 扩展到 Object async 与三种 BookKeeper profile，连同 fresh Object-sync
+> gate 共五 profile、十个场景。当前 published/source-locked fork head 仍是 `1e3783458b`
+> 2026-07-30 leader-recovery/M6 aggregate 增量：fork `76f62f3b83` passes `ReplicaManager`'s leader-publication callback
+> into `Partition.makeLeader` and invokes it after leader epoch/replica publication but before the same state write lock
+> is released；`testLeaderPublicationFencesListOffsetsBeforeMakeLeaderReleasesStateLock` deterministically blocks a
+> concurrent ListOffsets lookup at that lock and then observes `OffsetNotAvailableException` once pending is
+> installed。Product `14fb643` locks 53 commits/126 files，the focused ongoing-transaction migration gate passes，and fresh
+> M6 process aggregate passes 94/94 tasks in 34m21s
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -55,52 +97,52 @@ Request handler
 
 目标 package 均位于 Kafka fork，不放入 Nereus core：
 
-| Class | Base/role | Correctness responsibility |
-| --- | --- | --- |
-| `kafka.log.UnifiedLogFactory` | stock per-broker construction seam | exact local fallback plus injected authoritative factory |
-| `kafka.log.nereus.NereusUnifiedLogFactory` | authoritative factory | select dedicated cache root；disable local scan/maintenance；require topicId |
-| `kafka.log.nereus.NereusUnifiedLog` | extends `UnifiedLog` | exact publication；stock-validated stable append；bounded adapter read/Fetch assembly |
-| `kafka.log.nereus.NereusLocalLog` | extends `LocalLog` | stable-append callback + ephemeral LEO/segment state；never writes record bytes |
-| `org.apache.kafka.storage.internals.log.BrokerStorageManagedLog` | stock inert maintenance seam | metadata-offset update、owned-leader enumeration 与 DeleteRecords hook，不链接 Nereus artifact |
-| `org.apache.kafka.storage.internals.log.PartitionLeaderAuthority` | stock inert partition-lock seam | generic capture/publish closure 必须在 `leaderIsrUpdateLock` 内执行 |
-| `org.apache.kafka.storage.internals.log.RequiredAcksAwareAppend` | optional stock inert seam | preserve exact protocol required-acks without changing ordinary UnifiedLog |
-| `kafka.log.nereus.NereusLogSegment` | extends `LogSegment` | virtual roll/size/index facade；no durable file |
-| `kafka.log.nereus.NereusCanonicalLogState` | partition-lock-owned state | stable-only virtual roll/config history/time-index/logical-position state；checkpoint + committed-tail rebuild |
-| `kafka.log.nereus.NereusLogRecords` | records facade | exact MemoryRecords encode/read and owned buffers |
-| `kafka.log.nereus.NereusProducerStateManager` | extends `ProducerStateManager` | in-memory stock semantics + checkpoint bridge |
-| `org.apache.kafka.storage.internals.log.ProducerStateEntry.fromBatchMetadata` | stock inert factory seam | exact five-batch queue import without overwriting marker-updated lastTimestamp |
-| `kafka.log.nereus.NereusTimeIndex` | Kafka `TimeIndex` facade | derived timestamp lookup/checkpoint state |
-| `kafka.log.nereus.NereusTransactionIndex` | Kafka `TransactionIndex` facade | derived aborted-txn lookup/checkpoint state |
-| `kafka.log.nereus.NereusLeaderEpochCache` | epoch cache facade/adapter | derived epoch ranges；no local checkpoint truth |
-| `kafka.server.storage.BrokerStorageAppendExecutor` | optional stock-owned seam | request prevalidation、owned submit、drain contract without Nereus types |
-| `kafka.server.nereus.NereusBrokerStorageAppendExecutor` | product-backed implementation | typed limits、exact capture、per-partition FIFO、Kafka error mapping |
-| `kafka.server.storage.BrokerStorageFetchExecutor` | implemented optional stock-owned seam | immutable whole-request submit、opaque stock read closure and drain without Nereus types |
-| `kafka.server.nereus.NereusBrokerStorageFetchExecutor` | implemented product-backed implementation | bounded logical admission、partition events、stock wave validation、Kafka error mapping |
-| `kafka.log.nereus.NereusKafkaExceptionMapper` | mapper | Nereus error/outcome → Kafka exception |
-| `kafka.log.nereus.NereusKafkaRecoveredState` | fresh derived state | hydrate full canonical checkpoint；replay exact stock RecordBatch producer/transaction/offset/index state |
-| `kafka.log.nereus.NereusKafkaRecoveryStateCodec` | adapter recovery codec | one fresh state per leader open；all seven NKC1 sections hydrate before exact committed-tail replay |
-| `kafka.server.nereus.NereusKafkaRecoveryStateFactory` | exact Partition publisher | validate topicId/name/partition/leader epoch and install frozen provisional state |
-| `org.apache.kafka.storage.internals.log.LeaderEpochAwareRecoveryState` | stock inert seam | keep `Partition` compilable without unpublished Nereus artifacts |
-| `kafka.server.nereus.NereusBrokerStorageRuntime` | runtime bridge | exact ReplicaManager binding、boot/readiness/drain/shutdown delegation |
-| `kafka.server.nereus.NereusBrokerStorageRuntimeFactory` | typed factory | disabled isolation、explicit runtime/scan-limit creators、failure rollback |
-| `kafka.server.nereus.NereusKafka` | artifact-only launcher | select a fresh production runtime factory and delegate the unchanged lifecycle to `Kafka.run` |
+| Class                                                                         | Base/role                                 | Correctness responsibility                                                                                    |
+|-------------------------------------------------------------------------------|-------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| `kafka.log.UnifiedLogFactory`                                                 | stock per-broker construction seam        | exact local fallback plus injected authoritative factory                                                      |
+| `kafka.log.nereus.NereusUnifiedLogFactory`                                    | authoritative factory                     | select dedicated cache root；disable local scan/maintenance；require topicId                                    |
+| `kafka.log.nereus.NereusUnifiedLog`                                           | extends `UnifiedLog`                      | exact publication；stock-validated stable append；bounded adapter read/Fetch assembly                           |
+| `kafka.log.nereus.NereusLocalLog`                                             | extends `LocalLog`                        | stable-append callback + ephemeral LEO/segment state；never writes record bytes                                |
+| `org.apache.kafka.storage.internals.log.BrokerStorageManagedLog`              | stock inert maintenance seam              | metadata-offset update、owned-leader enumeration 与 DeleteRecords hook，不链接 Nereus artifact                      |
+| `org.apache.kafka.storage.internals.log.PartitionLeaderAuthority`             | stock inert partition-lock seam           | generic capture/publish closure 必须在 `leaderIsrUpdateLock` 内执行                                                 |
+| `org.apache.kafka.storage.internals.log.RequiredAcksAwareAppend`              | optional stock inert seam                 | preserve exact protocol required-acks without changing ordinary UnifiedLog                                    |
+| `kafka.log.nereus.NereusLogSegment`                                           | extends `LogSegment`                      | virtual roll/size/index facade；no durable file                                                                |
+| `kafka.log.nereus.NereusCanonicalLogState`                                    | partition-lock-owned state                | stable-only virtual roll/config history/time-index/logical-position state；checkpoint + committed-tail rebuild |
+| `kafka.log.nereus.NereusLogRecords`                                           | records facade                            | exact MemoryRecords encode/read and owned buffers                                                             |
+| `kafka.log.nereus.NereusProducerStateManager`                                 | extends `ProducerStateManager`            | in-memory stock semantics + checkpoint bridge                                                                 |
+| `org.apache.kafka.storage.internals.log.ProducerStateEntry.fromBatchMetadata` | stock inert factory seam                  | exact five-batch queue import without overwriting marker-updated lastTimestamp                                |
+| `kafka.log.nereus.NereusTimeIndex`                                            | Kafka `TimeIndex` facade                  | derived timestamp lookup/checkpoint state                                                                     |
+| `kafka.log.nereus.NereusTransactionIndex`                                     | Kafka `TransactionIndex` facade           | derived aborted-txn lookup/checkpoint state                                                                   |
+| `kafka.log.nereus.NereusLeaderEpochCache`                                     | epoch cache facade/adapter                | derived epoch ranges；no local checkpoint truth                                                                |
+| `kafka.server.storage.BrokerStorageAppendExecutor`                            | optional stock-owned seam                 | request prevalidation、owned submit、drain contract without Nereus types                                        |
+| `kafka.server.nereus.NereusBrokerStorageAppendExecutor`                       | product-backed implementation             | typed limits、exact capture、per-partition FIFO、Kafka error mapping                                             |
+| `kafka.server.storage.BrokerStorageFetchExecutor`                             | implemented optional stock-owned seam     | immutable whole-request submit、opaque stock read closure and drain without Nereus types                       |
+| `kafka.server.nereus.NereusBrokerStorageFetchExecutor`                        | implemented product-backed implementation | bounded logical admission、partition events、stock wave validation、Kafka error mapping                          |
+| `kafka.log.nereus.NereusKafkaExceptionMapper`                                 | mapper                                    | Nereus error/outcome → Kafka exception                                                                        |
+| `kafka.log.nereus.NereusKafkaRecoveredState`                                  | fresh derived state                       | hydrate full canonical checkpoint；replay exact stock RecordBatch producer/transaction/offset/index state      |
+| `kafka.log.nereus.NereusKafkaRecoveryStateCodec`                              | adapter recovery codec                    | one fresh state per leader open；all seven NKC1 sections hydrate before exact committed-tail replay            |
+| `kafka.server.nereus.NereusKafkaRecoveryStateFactory`                         | exact Partition publisher                 | validate topicId/name/partition/leader epoch and install frozen provisional state                             |
+| `org.apache.kafka.storage.internals.log.LeaderEpochAwareRecoveryState`        | stock inert seam                          | keep `Partition` compilable without unpublished Nereus artifacts                                              |
+| `kafka.server.nereus.NereusBrokerStorageRuntime`                              | runtime bridge                            | exact ReplicaManager binding、boot/readiness/drain/shutdown delegation                                         |
+| `kafka.server.nereus.NereusBrokerStorageRuntimeFactory`                       | typed factory                             | disabled isolation、explicit runtime/scan-limit creators、failure rollback                                      |
+| `kafka.server.nereus.NereusKafka`                                             | artifact-only launcher                    | select a fresh production runtime factory and delegate the unchanged lifecycle to `Kafka.run`                 |
 
 Adapter-side counterpart：
 
-| Class | Key target methods |
-| --- | --- |
-| `NereusKafkaRuntime` | `start()`、`admission()`、`partitionStorageManager()`、`close()` |
-| `KafkaPartitionStorageManager` | `openLeader`、`resign`、`delete`、`reconcile` |
-| `KafkaPartitionStorage` | `append`、`recoverAppend`、`read`、`trim`、`stableSnapshot`、`close` |
-| `KafkaProduceBufferSnapshot` / `KafkaBoundedAppendExecutor` | exact owned bytes、keyed bounded submit、drain |
-| `KafkaFetchOperation` | multi-partition minBytes/maxWait/event/re-read/callback-once |
-| `KafkaFetchWaveOperation<T>` | stock-compatible opaque whole-request read wave、event/deadline/callback-once |
-| `KafkaAppendBatchEncoder` | exact `MemoryRecords` → ranged `AppendBatch` |
-| `KafkaFetchAssembler` | `ReadBatch` list → exact `MemoryRecords`/fetch facts |
-| `KafkaRecordBatchCodec` | batch syntax/CRC/offset/producer facts validation |
-| `DefaultKafkaPartitionRecoveryLauncher` | checkpoint/read-pin orchestration + bounded COMMITTED replay |
-| `DefaultKafkaRecoveryBatchSource` | exact dense `StreamStorage.read` page mapping |
-| `KafkaRecoveryStateFactory` | fork-supplied fresh derived-state codec + short publisher pair |
+| Class                                                       | Key target methods                                                           |
+|-------------------------------------------------------------|------------------------------------------------------------------------------|
+| `NereusKafkaRuntime`                                        | `start()`、`admission()`、`partitionStorageManager()`、`close()`                |
+| `KafkaPartitionStorageManager`                              | `openLeader`、`resign`、`delete`、`reconcile`                                   |
+| `KafkaPartitionStorage`                                     | `append`、`recoverAppend`、`read`、`trim`、`stableSnapshot`、`close`              |
+| `KafkaProduceBufferSnapshot` / `KafkaBoundedAppendExecutor` | exact owned bytes、keyed bounded submit、drain                                 |
+| `KafkaFetchOperation`                                       | multi-partition minBytes/maxWait/event/re-read/callback-once                 |
+| `KafkaFetchWaveOperation<T>`                                | stock-compatible opaque whole-request read wave、event/deadline/callback-once |
+| `KafkaAppendBatchEncoder`                                   | exact `MemoryRecords` → ranged `AppendBatch`                                 |
+| `KafkaFetchAssembler`                                       | `ReadBatch` list → exact `MemoryRecords`/fetch facts                         |
+| `KafkaRecordBatchCodec`                                     | batch syntax/CRC/offset/producer facts validation                            |
+| `DefaultKafkaPartitionRecoveryLauncher`                     | checkpoint/read-pin orchestration + bounded COMMITTED replay                 |
+| `DefaultKafkaRecoveryBatchSource`                           | exact dense `StreamStorage.read` page mapping                                |
+| `KafkaRecoveryStateFactory`                                 | fork-supplied fresh derived-state codec + short publisher pair               |
 
 ## 3. Exact stock-file modification map
 
@@ -142,7 +184,8 @@ mapper；`c27305a7ad955ebc876de20da0fd045e97beba55` 增加 deferred activation-b
 
 - `KafkaRaftServer`/`BrokerServer` 通过显式 constructor 参数接收 `BrokerStorageRuntimeFactory`，默认 factory 仅允许
   disabled mode 并返回 no-op；enabled 且未安装 concrete factory 在 LogManager 创建前抛 `ConfigException`；
-- context 显式交付 config/cluster ID/broker-epoch supplier/metadata cache/Time/Metrics/KafkaScheduler borrowed dependencies，
+- context 显式交付 config/cluster ID/broker-epoch supplier/metadata cache/Time/Metrics/KafkaScheduler borrowed
+  dependencies，
   不使用 reflection、service loader 或 process-global singleton；
 - runtime create 位于 LogManager 前；`start` 在 lifecycle manager 启动后异步发起，initial metadata publish 后、broker
   unfence/request processing 前等待 ready future；
@@ -172,12 +215,14 @@ mapper；`c27305a7ad955ebc876de20da0fd045e97beba55` 增加 deferred activation-b
   post-registration broker epoch，并在 readiness timeout 内才调用 `NereusKafkaProductRuntimeCreator.create(...)`；
 - product creator 显式构造 `S3CompatibleObjectStoreProvider`、借入 Kafka scheduler/Time、以当前 immutable KRaft image
   加 conservative local-log scan 形成 activation snapshot，再调用 public
-  `NereusKafkaObjectWalRuntimeFactory.createActivated(...)`；任何 durable binding fact 仍由 product 侧 64-shard wrapper 补齐；
+  `NereusKafkaObjectWalRuntimeFactory.createActivated(...)`；任何 durable binding fact 仍由 product 侧 64-shard wrapper
+  补齐；
 - deferred manager 在 runtime ready 前保持 future pending，ready 后每次 dispatch 都再次调用真实 runtime
   `admission().requireReady(...)`；epoch wait、startup failure、drain 与 close 都取消 owned poll 并阻止 late creation；
 - `NereusKafkaRecoveryStateFactoryBridge` 只允许 exact factory one-time bind；binding 发生在同一 runtime 第一次
   `asyncTopicDeltaLifecycle(exactReplicaManager)`，在此之前 recovery 返回 retriable `METADATA_UNAVAILABLE`；
-  `NereusListOffsetsLifecycle.beginDrain` 只负责 admission/revocation，standalone `shutdown` 仍 deduplicate manager shutdown；
+  `NereusListOffsetsLifecycle.beginDrain` 只负责 admission/revocation，standalone `shutdown` 仍 deduplicate manager
+  shutdown；
 - stock/no-artifact factory tests 和 single-node KRaft start→shutdown→restart 已通过。
 - `faaffc8a75` 新增 stock-only `BrokerStorageManagedLog` 与 `PartitionLeaderAuthority`。`Partition` 只构造
   JDK `Supplier`/`Runnable` closure 并在 `leaderIsrUpdateLock` 内执行；`LogManager`/`ReplicaManager` 只匹配
@@ -228,7 +273,8 @@ metadata publishers 后执行 `factory.create(context)` 和 bounded `start()`，
 artifact-only `NereusControllerStorageRuntimeFactory` 先调用
 `NereusKafkaRuntimeConfigurationMapper.mapController(storageConfig, clusterId)`；mapping 只冻结
 Nereus/Kafka cluster ID、Oxia config、`KafkaStorageActivationPolicy` 和 retry interval，不创建 client、thread 或文件。
-runtime `start()` 才通过 `NereusKafkaControllerActivationCreator` 创建 daemon single-thread scheduler、shared Oxia client、
+runtime `start()` 才通过 `NereusKafkaControllerActivationCreator` 创建 daemon single-thread scheduler、shared Oxia
+client、
 `KafkaPartitionMetadataStore`、`KafkaStorageActivationMetadataStore`、binding-aware cluster snapshot 和既有
 `KafkaStorageFirstActivationCoordinator`，并按构造逆序 close。
 
@@ -262,7 +308,8 @@ controller takeover/failover；下述三 voter process gate 提供 ACTIVE 稳态
 
 Fork `df238bb387` adds one process-visible success boundary without changing the durable protocol：
 `NereusControllerStorageRuntime.completeAttempt` records a local `reconciledControllerEpoch` only after
-`NereusKafkaControllerActivation.activate()` completes successfully。`recordReconciledControllerEpoch()` returns the exact
+`NereusKafkaControllerActivation.activate()` completes successfully。`recordReconciledControllerEpoch()` returns the
+exact
 current epoch only once，then `logReconciledControllerEpoch(...)` emits
 `Nereus Kafka storage activation reconciled by controller <nodeId> at epoch <epoch>` outside the synchronized block。
 Repeated metadata callbacks、coalesced pending work or retries in the same epoch do not duplicate the marker；becoming
@@ -293,7 +340,8 @@ consumer 的统一判断。
 
 product adapter 已实现 `NereusKafkaRuntimeFactory`，并让 concrete
 `NereusKafkaObjectWalRuntimeFactory` 支持纯 Object 模式，或显式安装
-`OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT`，并可额外安装 `BOOKKEEPER_WAL_ONLY`：它组装 Object provider、shared Oxia、L0/physical/binding stores、protection、
+`OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT`，并可额外安装 `BOOKKEEPER_WAL_ONLY`：它组装 Object provider、shared
+Oxia、L0/physical/binding stores、protection、
 callback executor、durable checkpoint read pins、checkpoint reader/verifier/recovery coordinator、bounded COMMITTED page
 source、concrete recovery launcher 和同一 manager/runtime graph；real Oxia + local-file provider 的 leader
 open/Produce/Fetch gate 已通过。Fork 不再承担 ObjectStore/Oxia/read-pin orchestration，只在 exact ReplicaManager
@@ -317,16 +365,21 @@ fresh-JVM 恢复并继续追加；sync gate 写入一个 batch，并以 append �
 live takeover。后续 fork `fe308359b6` / `bb7e8937c5` / `df238bb387` 与 product release-process gates 又闭合了真实
 two-process KRaft singleton takeover、already-dispatched old Object-WAL append fencing，以及 BookKeeper 三
 profile 的 two-process post-handoff recovery/continuation。The product-only fault-agent gate additionally closes the
-common BookKeeper provider-applied/pre-publication C boundary without a fork hook；three combined release nodes additionally
+common BookKeeper provider-applied/pre-publication C boundary without a fork hook；three combined release nodes
+additionally
 close ACTIVE-state controller kill/re-election/reconciliation while retaining native IO；three dedicated controllers plus
 one broker further close the complete before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS
-store-publication matrix；an Oxia-proxied controller/broker gate further closes actual transport reset and same-epoch retry；
+store-publication matrix；an Oxia-proxied controller/broker gate further closes actual transport reset and same-epoch
+retry；
 the same role-separated controller topology now also closes all four initial snapshot-proof/capability-aggregation cuts；
 its test-only agent targets `KafkaStorageFirstActivationCoordinator.currentSnapshot()` and `loadCapabilities(...)`。
 Before-provider returns an incomplete stage without invoking the method；after-provider forwards exceptional attempts but
-atomically withholds the first successful completion。The latter proves the complete fork KRaft/local-log + 64 binding-shard
-snapshot result or broker `[4]` identity/expiry/profile/provider-scope capability aggregate existed before the exact active
-controller was killed。A different higher-epoch controller must repeat the proof、publish ACTIVE/readiness and pass native IO。
+atomically withholds the first successful completion。The latter proves the complete fork KRaft/local-log + 64
+binding-shard
+snapshot result or broker `[4]` identity/expiry/profile/provider-scope capability aggregate existed before the exact
+active
+controller was killed。A different higher-epoch controller must repeat the proof、publish ACTIVE/readiness and pass native
+IO。
 尚未实现的是 coordinator/checkpoint cuts 和
 更广 kill-cut process tests。显式
 launcher/KafkaRaftServer broker/controller factory selection 已实现；`phase9M6KafkaProcessCheck` 现使用真实 release
@@ -354,16 +407,21 @@ checkpoint/virtual-segment transaction cut、completed coordinator migration 或
 因此不足以宣称 production rollout ready。
 
 `f9CoordinatorMigrationProcessIntegrationTest` independently closes that completed coordinator-migration gap using the
-same shipped release and no new fork hook。Node 1 owns the user partition and the one-partition group/transaction internal
+same shipped release and no new fork hook。Node 1 owns the user partition and the one-partition group/transaction
+internal
 topics，then persists user offsets 0/1/2、group committed offset 2 and a completed transactional ID。After node 2 joins，
-one `alterPartitionReassignments` request moves the user、`__consumer_offsets-0` and `__transaction_state-0` partitions to
-singleton `[2]`。The harness waits for all three exact `leader=2, replicas=[2], ISR=[2]` states and an empty reassignment map
+one `alterPartitionReassignments` request moves the user、`__consumer_offsets-0` and `__transaction_state-0` partitions
+to
+singleton `[2]`。The harness waits for all three exact `leader=2, replicas=[2], ISR=[2]` states and an empty reassignment
+map
 while node 1 remains alive；this makes the storage-ready-before-coordinator-election ordering observable through actual
 client recovery rather than a mock callback。
 
 The post-handoff group lookup must return offset 2。Initializing the same transactional ID on broker 2 must recover its
-completed state and commit data/marker offsets 3/4，not restart at offset 1 or expose a stale producer epoch。READ_COMMITTED
-then reads the pre-handoff transactional record at offset 1 and the post-handoff record at offset 3；the same group resumes
+completed state and commit data/marker offsets 3/4，not restart at offset 1 or expose a stale producer
+epoch。READ_COMMITTED
+then reads the pre-handoff transactional record at offset 1 and the post-handoff record at offset 3；the same group
+resumes
 at visible offset 3 and commits offset 4，with final earliest/latest `0/5`。Fresh task execution passes 73/73 actionable
 tasks in 1m07s，and the unchanged cold-restart plus ordinary data-takeover gates pass 74/74 tasks in 1m50s。The task is
 aggregated by `phase9M6KafkaProcessCheck`；ongoing/aborted transaction coordinator takeover is covered by the following
@@ -375,29 +433,42 @@ requirements。
 
 `f9OngoingTransactionMigrationProcessIntegrationTest` closes the adjacent live OPEN-state slice without a fork change。
 The first producer keeps data offset 0 uncommitted while one Admin request moves the user partition and
-`__transaction_state-0` from `[1]` to `[2]`；LSO must remain 0 until that original producer commits through the new coordinator and marker offset 1
-becomes visible。Reinitializing the same ID then commits data/marker 2/3。The reverse half opens data offset 4 on broker 2，
-moves both partitions back to `[1]` while both processes remain alive，and aborts through broker 1's recovered coordinator。
-Because Kafka completes EndTxn before all marker appends necessarily become visible，the gate waits under the shared client
+`__transaction_state-0` from `[1]` to `[2]`；LSO must remain 0 until that original producer commits through the new
+coordinator and marker offset 1
+becomes visible。Reinitializing the same ID then commits data/marker 2/3。The reverse half opens data offset 4 on broker
+2，
+moves both partitions back to `[1]` while both processes remain alive，and aborts through broker 1's recovered
+coordinator。
+Because Kafka completes EndTxn before all marker appends necessarily become visible，the gate waits under the shared
+client
 deadline for READ_COMMITTED end to converge from 4 to 6；it then reuses the aborted ID for data/marker 6/7 and requires a
 READ_COMMITTED fetch from 4 to skip to 6。Every handoff requires exact leader/replicas/ISR and no ongoing reassignment；
 final earliest/latest is `0/8`。The task passes 64/64 actionable tasks in 47s and is part of the M6 process aggregate。
 
-`f9BookKeeperProfileTakeoverProcessIntegrationTest` supplies the independent BookKeeper post-handoff matrix without a new
+`f9BookKeeperProfileTakeoverProcessIntegrationTest` supplies the independent BookKeeper post-handoff matrix without a
+new
 fork seam。One stock ZooKeeper long-hierarchical metadata service and two real Bookies host three isolated authorities，
-one for each BookKeeper profile。Each authority starts node 1 combined controller/broker and node 2 broker-only concurrently，
-commits/fetches offset 0 on singleton `[1]`，atomically reassigns to `[2]` with exact leader/replicas/ISR and no transitional
+one for each BookKeeper profile。Each authority starts node 1 combined controller/broker and node 2 broker-only
+concurrently，
+commits/fetches offset 0 on singleton `[1]`，atomically reassigns to `[2]` with exact leader/replicas/ISR and no
+transitional
 reassignment，keeps node 1 alive，then recovers offset 0 and commits/fetches offset 1 on node 2。WAL-only requires zero
-bucket objects before and after the handoff；async/sync require a real NCP2 object at both points。The async activation digest
-uses the same one-entry rollover/physical-deletion configuration as the broker mapping，so configuration drift is rejected
+bucket objects before and after the handoff；async/sync require a real NCP2 object at both points。The async activation
+digest
+uses the same one-entry rollover/physical-deletion configuration as the broker mapping，so configuration drift is
+rejected
 before BookKeeper I/O。Fresh execution passes 64/64 actionable tasks in 2m17s。This proves P-tier resign/open/recovery/
 continuation for all three profiles。
 
-`f9BookKeeperInFlightTakeoverProcessIntegrationTest` supplies the complementary C-tier boundary without changing the Kafka
-fork or production Nereus classes。Gradle builds `f9BookKeeperFaultAgent` as a dedicated fat Java-agent JAR and passes it only
+`f9BookKeeperInFlightTakeoverProcessIntegrationTest` supplies the complementary C-tier boundary without changing the
+Kafka
+fork or production Nereus classes。Gradle builds `f9BookKeeperFaultAgent` as a dedicated fat Java-agent JAR and passes it
+only
 to broker 1 through `KAFKA_OPTS`。The advice intercepts the common
-`DefaultBookKeeperClientOperations.write(...)` return future after the real `WriteAdvHandle.writeAsync` completes；it writes
-an applied marker but does not complete the future observed by `BookKeeperPrimaryWalAppender` until a release marker exists。
+`DefaultBookKeeperClientOperations.write(...)` return future after the real `WriteAdvHandle.writeAsync` completes；it
+writes
+an applied marker but does not complete the future observed by `BookKeeperPrimaryWalAppender` until a release marker
+exists。
 The harness accepts the cut only when all of these facts agree：`jcmd` shows
 `NereusUnifiedLog.appendStable -> CompletableFuture.get`、the exact Oxia reservation is `WRITING`、and an independent
 BookKeeper client reads the exact physical entry unconfirmed。
@@ -406,10 +477,12 @@ Broker 1 is then `SIGSTOP`ped while node 3 keeps KRaft live。The shared takeove
 Admin clients until KRaft no longer advertises broker 1 as live or selects it as the forwarding target，and proves the
 surviving forwarding path with `listPartitionReassignments` before exact `[1] -> [2]` reassignment。Broker 2's offset-1
 Produce lazily opens the writer and runs `BookKeeperLedgerRecovery`；the gate requires the captured reservation to become
-`ABANDONED` and its old root `SEALED` before that Produce can return offset 1。Only then does the harness release the agent
+`ABANDONED` and its old root `SEALED` before that Produce can return offset 1。Only then does the harness release the
+agent
 future and `SIGCONT` broker 1。The old completion must fail at stale metadata authority、must not kill the JVM or move
 earliest/latest away from `0/2`，and the WAL-only bucket must remain empty。The fault-held Produce uses
-`request.timeout.ms=120000` and `delivery.timeout.ms=130000`，must still be incomplete after handoff and must not end in a
+`request.timeout.ms=120000` and `delivery.timeout.ms=130000`，must still be incomplete after handoff and must not end in
+a
 Kafka client timeout。Fresh exact execution passes 66/66 actionable tasks in 1m32s；the hardened Object/BookKeeper pair
 passes 76/76 in 2m40s。The cut is before `WRITING -> DURABLE`，so it is shared by all three
 BookKeeper profiles；the profile-specific materialization behavior remains covered by the preceding P matrix。
@@ -578,17 +651,17 @@ deadline-race、146/146 scenarios、real provider recovery、stock KRaft restart
 
 精确 method intent：
 
-| Method | Target behavior in Nereus mode |
-| --- | --- |
-| `createLogIfNotExists` | pass exact topicId/partition/leader epoch to factory；no name-only open |
-| `makeLeader` | wait for `openLeader` recovery publication before accepting writes |
-| `makeFollower` | close admission/fence current leader instance；RF1 means no follower data append |
-| `appendRecordsToLeader` | optional `RequiredAcksAwareAppend` preserves exact `-1/0/1`；ordinary logs retain stock call |
-| `appendRecordsToFollowerOrFutureReplica` | defensive `UnsupportedOperationException`/storage error；controller should make unreachable |
-| `maybeIncrementLeaderHW` | candidate is `NereusUnifiedLog.stableEndOffset`，never speculative LEO |
-| `readRecords`/`fetchRecords` | use stock isolation bounds over Nereus log；IO runs on fetch executor |
-| `deleteRecordsOnLeader` | validate requested offset with stock rules，then durable Nereus trim before success |
-| `delete` | metadata-first partition lifecycle，idempotent close/delete |
+| Method                                   | Target behavior in Nereus mode                                                              |
+|------------------------------------------|---------------------------------------------------------------------------------------------|
+| `createLogIfNotExists`                   | pass exact topicId/partition/leader epoch to factory；no name-only open                      |
+| `makeLeader`                             | wait for `openLeader` recovery publication before accepting writes                          |
+| `makeFollower`                           | close admission/fence current leader instance；RF1 means no follower data append             |
+| `appendRecordsToLeader`                  | optional `RequiredAcksAwareAppend` preserves exact `-1/0/1`；ordinary logs retain stock call |
+| `appendRecordsToFollowerOrFutureReplica` | defensive `UnsupportedOperationException`/storage error；controller should make unreachable  |
+| `maybeIncrementLeaderHW`                 | candidate is `NereusUnifiedLog.stableEndOffset`，never speculative LEO                       |
+| `readRecords`/`fetchRecords`             | use stock isolation bounds over Nereus log；IO runs on fetch executor                        |
+| `deleteRecordsOnLeader`                  | validate requested offset with stock rules，then durable Nereus trim before success          |
+| `delete`                                 | metadata-first partition lifecycle，idempotent close/delete                                  |
 
 `makeLeader` 不能在 Kafka partition lock 内等待一个需要同一 lock 的 recovery callback。open 流程在 lifecycle
 executor 完成 replay，final publication 才以短 critical section 安装 log/state。
@@ -841,7 +914,8 @@ public interface KafkaPartitionStorageManager extends AutoCloseable {
 ```
 
 `KafkaPartitionLeaderOpenRequest` carries exact `identity/leaderId/leaderEpoch/brokerEpoch/storageProfile/metadataOffset/
-timeout` facts。M6 metadata-image reconciliation remains a higher-level runtime method and is not silently represented by the
+timeout` facts。M6 metadata-image reconciliation remains a higher-level runtime method and is not silently represented by
+the
 M3 manager interface。
 
 `observedTopicName` 只用于 logs/metrics；key、CAS 和 stream name 使用 topicId。
@@ -907,7 +981,8 @@ partition 下一次 storage append 不 dispatch，`STABLE_APPEND` 事件也不�
   durable ACTIVE → DELETING → DELETED；shutdown 后 binding 的迟到完成不会启动 opener；
 - manager/open result 是 operation-owned future，caller cancel/complete/obtrude 不能取消或伪造底层 binding/recovery。
 
-`DefaultKafkaPartitionStorageManagerTest` 覆盖 real deterministic lifecycle-to-plan composition、exact open dedupe、profile
+`DefaultKafkaPartitionStorageManagerTest` 覆盖 real deterministic lifecycle-to-plan composition、exact open
+dedupe、profile
 mismatch、stale resign、drain-before-delete 和 shutdown-during-binding。`DefaultKafkaPartitionOpener` 现已实现 authority
 session acquire、exact profile/head/source freeze、checkpoint/replay launcher 和 storage construction 的 deadline-bound
 composition；`DefaultKafkaCheckpointSourceValidator` owns re-read fencing and immutable commit-ancestor proof。Kafka fork
@@ -1133,14 +1208,17 @@ response-loss restart 和 multi-broker takeover 仍需后续 process gate，
 当前不能把这条 R-tier evidence 等同于完整 KF-RET-009。
 An independent Object-WAL gate now starts two product runtime ownership graphs against the same real Oxia and provider
 root。Both broker capability records participate in ACTIVE readiness。Broker B's higher leader epoch preempts broker A's
-still-live durable session，replays A's exact committed batch and continues at the recovered end；A's next old-token append
+still-live durable session，replays A's exact committed batch and continues at the recovered end；A's next old-token
+append
 is rejected and the local storage enters `WRITE_FENCED_RECOVERY_REQUIRED`。The companion deterministic regression ensures
 the known-not-committed outcome cannot override an authority/session/head fence。This gate is
 `:nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest` and is included in `phase9M3ProviderCheck`。The
 separate `f9InFlightTakeoverProcessIntegrationTest` supplies the release-process already-dispatched Object-WAL cut；
-the BookKeeper three-profile post-handoff matrix and common provider-applied C cut also pass；ACTIVE-state multi-controller
+the BookKeeper three-profile post-handoff matrix and common provider-applied C cut also pass；ACTIVE-state
+multi-controller
 kill failover、the complete six-way readiness-create/PREPARED-create/ACTIVE-CAS store-publication takeover、the four-way
-initial snapshot-proof/capability-aggregation takeover and actual Oxia transport-reset recovery now pass separately，while
+initial snapshot-proof/capability-aggregation takeover and actual Oxia transport-reset recovery now pass
+separately，while
 completed and live OPEN Object-WAL coordinator migration plus checkpoint/trim recovery now pass separately；injected
 transaction-resolution、profile and broader checkpoint/chaos variants remain open。
 真实 combined-node
@@ -1231,12 +1309,12 @@ Produce response eligibility
 
 ### 6.5 Acknowledgement semantics
 
-| required acks | F9 behavior |
-| --- | --- |
-| `0` | no protocol response，but append still waits stable on executor and updates state only on success |
-| `1` | success after stable append + stock state update |
-| `-1` | RF/minISR=1；same stable append then HW gate completes |
-| other | stock `INVALID_REQUIRED_ACKS` |
+| required acks | F9 behavior                                                                                      |
+|---------------|--------------------------------------------------------------------------------------------------|
+| `0`           | no protocol response，but append still waits stable on executor and updates state only on success |
+| `1`           | success after stable append + stock state update                                                 |
+| `-1`          | RF/minISR=1；same stable append then HW gate completes                                            |
+| other         | stock `INVALID_REQUIRED_ACKS`                                                                    |
 
 F9 不提供比 selected Nereus profile completion policy 更弱的 Kafka success。profile 若要求 sync Object evidence，
 Produce 也等待；profile immutable，不能按 request acks 改写。
@@ -1300,7 +1378,8 @@ live preemption/replay/old-token fencing；two-release-process singleton reassig
 Object-WAL old in-flight append cut，以及 BookKeeper three-profile two-release-process post-handoff matrix 也已通过。
 The common BookKeeper `WRITING` C cut also passes through the test-only agent gate。真实 ACTIVE-state controller kill
 failover also passes。The dedicated activation fault-agent process test additionally covers before-provider and
-after-provider readiness-create、PREPARED-create and ACTIVE-CAS cuts；the Oxia-proxied process gate additionally closes actual
+after-provider readiness-create、PREPARED-create and ACTIVE-CAS cuts；the Oxia-proxied process gate additionally closes
+actual
 transport reset/retry；the four initial snapshot-proof/capability-aggregation process cuts also pass；
 coordinator/checkpoint cuts 尚未实现。
 
@@ -1360,14 +1439,14 @@ admission 后返回，不再同步等待 Nereus storage。disabled `None` branch
 
 read request mapping：
 
-| Kafka fact | Nereus fact |
-| --- | --- |
-| fetch offset | `ReadRequest.startOffset` |
-| `minOneMessage` | `ALLOW_FIRST_ENTRY_OVERFLOW` or legacy strict |
-| max partition bytes | `ReadOptions.maxBytes` |
-| max response bytes | shared assembler budget |
-| LOG_END/HW/TXN_COMMITTED | upper bound LEO/HW/LSO in adapter request |
-| compact policy | TOPIC_COMPACTED prefix + COMMITTED tail composition |
+| Kafka fact               | Nereus fact                                         |
+|--------------------------|-----------------------------------------------------|
+| fetch offset             | `ReadRequest.startOffset`                           |
+| `minOneMessage`          | `ALLOW_FIRST_ENTRY_OVERFLOW` or legacy strict       |
+| max partition bytes      | `ReadOptions.maxBytes`                              |
+| max response bytes       | shared assembler budget                             |
+| LOG_END/HW/TXN_COMMITTED | upper bound LEO/HW/LSO in adapter request           |
+| compact policy           | TOPIC_COMPACTED prefix + COMMITTED tail composition |
 
 Storage reader不得越过 upper bound；若一个 containing batch 与 upper bound 相交但 last offset >= upper bound，
 assembler 只在 Kafka isolation 允许整个 batch 时返回，否则停止。transaction filtering uses exact aborted-txn facts。
@@ -1521,7 +1600,8 @@ timeout 的 Kafka protocol 语义。Kafka-only `LeaderEpochAwareOffsetLookup` �
 `ReplicaManager.fetchOffset` 把 callback 接到现有 delayed ListOffsets purgatory。三个 bridge test classes 的 12 tests、
 `NereusListOffsetsLifecycleTest` 的 7 tests、`NereusTopicDeltaLifecycleTest` 的 7 tests、四个 stock `Partition`
 seam tests、一个 `ReplicaManager` publication test、七个完整 `BrokerMetadataPublisherTest`、core/storage checkstyle、
-SpotBugs、Spotless 与无 Nereus artifact 的 stock-from-scratch tests 均通过。runtime lifecycle 对 open 做 topic ID/name/partition、
+SpotBugs、Spotless 与无 Nereus artifact 的 stock-from-scratch tests 均通过。runtime lifecycle 对 open 做 topic
+ID/name/partition、
 stock leader state/epoch 和 manager-result identity/epoch/profile/writable-state 双重校验；only-after-recovery install，
 resign/delete/shutdown 先撤销 lookup 再委托 manager，安装失败先 resign recovered storage 再失败 open，late old open
 按旧 epoch 清理且不能移除新 lookup。topic-delta composer 还验证 old-image delete identity、new-image follower/leader
@@ -1535,23 +1615,24 @@ leader-epoch cache、`KafkaVirtualPositionIndex`、`NereusTimeIndex` section cod
 `NereusKafkaExceptionMapper` 同时看 `ErrorCode`、`AppendOutcome`、partition authority state；不能只看
 `retriable` boolean。
 
-| Nereus condition | Kafka exception/error | Partition action |
-| --- | --- | --- |
-| invalid Kafka bytes/CRC before append | `CorruptRecordException` | remain writable；no IO |
-| `OFFSET_CONFLICT` | `KafkaStorageException` | write-fence，full reopen/replay |
-| `FENCED_APPEND` / `APPEND_SESSION_EXPIRED` | `FencedLeaderEpochException` or `NotLeaderOrFollowerException` | fence/close current instance |
-| `BACKPRESSURE_REJECTED` before IO | `ThrottlingQuotaExceededException` | remain writable |
-| timeout + `KNOWN_NOT_COMMITTED` | `TimeoutException` / `REQUEST_TIMED_OUT` | remain/retry only after lane confirms no attempt |
-| any `MAY_HAVE_COMMITTED` | `KafkaStorageException` response | `WRITE_FENCED_RECOVERY_REQUIRED` |
-| `KNOWN_COMMITTED` response lost | `KafkaStorageException` until recovery publishes | fence then exact recover/replay |
-| object/primary checksum mismatch | `CorruptRecordException`/`KafkaStorageException` | offline partition，repair/fallback audit |
-| `OFFSET_TRIMMED` | `OffsetOutOfRangeException` | remain readable at new log start |
-| unsupported activated format/profile | `KafkaStorageException` | broker/partition not ready |
-| metadata unavailable | `KafkaStorageException` | fence if authority cannot be proven |
-| executor queue reject | `ThrottlingQuotaExceededException` | no side effect |
-| broker shutdown | `NotLeaderOrFollowerException` | drain/fence |
+| Nereus condition                           | Kafka exception/error                                          | Partition action                                 |
+|--------------------------------------------|----------------------------------------------------------------|--------------------------------------------------|
+| invalid Kafka bytes/CRC before append      | `CorruptRecordException`                                       | remain writable；no IO                            |
+| `OFFSET_CONFLICT`                          | `KafkaStorageException`                                        | write-fence，full reopen/replay                   |
+| `FENCED_APPEND` / `APPEND_SESSION_EXPIRED` | `FencedLeaderEpochException` or `NotLeaderOrFollowerException` | fence/close current instance                     |
+| `BACKPRESSURE_REJECTED` before IO          | `ThrottlingQuotaExceededException`                             | remain writable                                  |
+| timeout + `KNOWN_NOT_COMMITTED`            | `TimeoutException` / `REQUEST_TIMED_OUT`                       | remain/retry only after lane confirms no attempt |
+| any `MAY_HAVE_COMMITTED`                   | `KafkaStorageException` response                               | `WRITE_FENCED_RECOVERY_REQUIRED`                 |
+| `KNOWN_COMMITTED` response lost            | `KafkaStorageException` until recovery publishes               | fence then exact recover/replay                  |
+| object/primary checksum mismatch           | `CorruptRecordException`/`KafkaStorageException`               | offline partition，repair/fallback audit          |
+| `OFFSET_TRIMMED`                           | `OffsetOutOfRangeException`                                    | remain readable at new log start                 |
+| unsupported activated format/profile       | `KafkaStorageException`                                        | broker/partition not ready                       |
+| metadata unavailable                       | `KafkaStorageException`                                        | fence if authority cannot be proven              |
+| executor queue reject                      | `ThrottlingQuotaExceededException`                             | no side effect                                   |
+| broker shutdown                            | `NotLeaderOrFollowerException`                                 | drain/fence                                      |
 
-unknown append completion **never** maps to an ordinary retriable client error while accepting later writes。client may retry
+unknown append completion **never** maps to an ordinary retriable client error while accepting later writes。client may
+retry
 to a new/current leader after partition recovery；idempotent producer logic deduplicates committed retry bytes。
 
 当前 `KafkaAppendFailureClassifier` 已把这个表的 partition action 固化为不依赖 Kafka artifact 的
@@ -1567,11 +1648,13 @@ epoch and checks it before local publication。state transitions详见文档 04�
 
 - `LEADER_OPENING`：Produce returns not-leader，Fetch may wait or read only after snapshot published；
 - `LEADER_WRITABLE`：normal；
-- `WRITE_FENCED_RECOVERY_REQUIRED`：all Produce rejected，new Fetch may serve last published stable snapshot if integrity known；
+- `WRITE_FENCED_RECOVERY_REQUIRED`：all Produce rejected，new Fetch may serve last published stable snapshot if integrity
+  known；
 - `RESIGNING`/`CLOSED`：all new IO rejected；
 - `CORRUPT_OFFLINE`：reads/writes storage error until operator/repair resolves。
 
-closing log first unregisters append/fetch listeners，then waits bounded in-flight operations，then releases session。timeout
+closing log first unregisters append/fetch listeners，then waits bounded in-flight operations，then releases
+session。timeout
 does not “force success”；authority epoch prevents late writer commit from becoming current leader state。
 
 ## 12. Local filesystem contract
@@ -1603,7 +1686,8 @@ BrokerServer construction/shutdown order
 ReplicationControlManager create/alter/reassign/ISR methods
 ```
 
-Build fails when marker pairs unbalanced or source signature digest differs from reviewed lock。No reflection、method handles
+Build fails when marker pairs unbalanced or source signature digest differs from reviewed lock。No reflection、method
+handles
 or package-private hacks may hide drift。
 
 ## 14. Planned tests

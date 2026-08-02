@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -49,7 +50,9 @@ import org.apache.parquet.io.PositionOutputStream;
 import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.MessageType;
 
-/** Shared bounded transport for the two closed V2 schemas; row codecs retain separate semantic validation. */
+/**
+ * Shared bounded transport for the two closed V2 schemas; row codecs retain separate semantic validation.
+ */
 final class ParquetV2WriterSupport {
     private static final int COLUMN_INDEX_TRUNCATE_LENGTH = 64;
 
@@ -61,9 +64,7 @@ final class ParquetV2WriterSupport {
         this.writerExecutor = Objects.requireNonNull(writerExecutor, "writerExecutor");
     }
 
-    <R> CompletableFuture<RangedCompactedObjectWriteResult> write(
-            WriteSpec<R> spec,
-            Flow.Publisher<R> rows) {
+    <R> CompletableFuture<RangedCompactedObjectWriteResult> write(WriteSpec<R> spec, Flow.Publisher<R> rows) {
         CompletableFuture<RangedCompactedObjectWriteResult> result = new CompletableFuture<>();
         if (rows == null) {
             result.completeExceptionally(invalid("V2 compacted row publisher is required", null));
@@ -86,10 +87,7 @@ final class ParquetV2WriterSupport {
             });
         } catch (RejectedExecutionException failure) {
             result.completeExceptionally(new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    "V2 compacted writer executor rejected the operation",
-                    failure));
+                    ErrorCode.STORAGE_CLOSED, false, "V2 compacted writer executor rejected the operation", failure));
         }
         result.whenComplete((ignored, failure) -> {
             if (result.isCancelled()) {
@@ -107,9 +105,8 @@ final class ParquetV2WriterSupport {
             Objects.requireNonNull(row, "row");
             byte[] payload = payload(row.exactPayload());
             requirePayloadCrc(payload, row.payloadCrc32c());
-            long expectedStart = state.rowCount() == 0
-                    ? request.sourceCoverage().startOffset()
-                    : state.previousEndOffset();
+            long expectedStart =
+                    state.rowCount() == 0 ? request.sourceCoverage().startOffset() : state.previousEndOffset();
             if (row.entryOrdinal() != state.rowCount()
                     || row.streamOffsetStart() != expectedStart
                     || row.endOffset() > request.sourceCoverage().endOffset()) {
@@ -126,13 +123,12 @@ final class ParquetV2WriterSupport {
         };
     }
 
-    static RowCodec<KafkaTopicCompactedObjectRow> ntc2Codec(
-            KafkaTopicCompactedObjectWriteRequest request) {
+    static RowCodec<KafkaTopicCompactedObjectRow> ntc2Codec(KafkaTopicCompactedObjectWriteRequest request) {
         return (row, factory, state) -> {
             Objects.requireNonNull(row, "row");
             byte[] payload = payload(row.exactPayload());
-            byte[] compactionKey = bytes(
-                    row.compactionKey(), KafkaCompactionKeyEncodingV2.MAX_ENCODED_KEY_BYTES, "compaction key");
+            byte[] compactionKey =
+                    bytes(row.compactionKey(), KafkaCompactionKeyEncodingV2.MAX_ENCODED_KEY_BYTES, "compaction key");
             requirePayloadCrc(payload, row.payloadCrc32c());
             long sourceOffset = Math.addExact(row.sourceBatchBaseOffset(), row.sourceRecordIndex());
             if (!request.sourceCoverage().contains(row.streamOffsetStart())
@@ -141,7 +137,8 @@ final class ParquetV2WriterSupport {
                     || sourceOffset != row.streamOffsetStart()) {
                 throw new CompactedObjectFormatException("NTC2 row ordering/source identity is inconsistent");
             }
-            byte[] sourceSha = java.util.HexFormat.of().parseHex(row.sourceBatchSha256().value());
+            byte[] sourceSha =
+                    java.util.HexFormat.of().parseHex(row.sourceBatchSha256().value());
             if (sourceSha.length != 32) {
                 throw new CompactedObjectFormatException("NTC2 source batch digest must be 32 bytes");
             }
@@ -193,11 +190,9 @@ final class ParquetV2WriterSupport {
         EncodedRow encode(R row, SimpleGroupFactory factory, RowState state);
     }
 
-    record RowState(int rowCount, long previousEndOffset, long records, long logicalBytes) {
-    }
+    record RowState(int rowCount, long previousEndOffset, long records, long logicalBytes) {}
 
-    private record EncodedRow(Group group, long startOffset, long endOffset, int recordCount, int payloadBytes) {
-    }
+    private record EncodedRow(Group group, long startOffset, long endOffset, int recordCount, int payloadBytes) {}
 
     private final class WritingSubscriber<R> implements Flow.Subscriber<R> {
         private final CompletableFuture<RangedCompactedObjectWriteResult> result;
@@ -208,9 +203,8 @@ final class ParquetV2WriterSupport {
         private volatile Flow.Subscription subscription;
 
         private WritingSubscriber(
-                WriteSpec<R> spec,
-                CompletableFuture<RangedCompactedObjectWriteResult> result,
-                SerialExecutor serial) throws IOException {
+                WriteSpec<R> spec, CompletableFuture<RangedCompactedObjectWriteResult> result, SerialExecutor serial)
+                throws IOException {
             this.result = result;
             this.serial = serial;
             sink = new ParquetSink<>(spec, stagingFiles.create("compacted-v2"));
@@ -347,9 +341,8 @@ final class ParquetV2WriterSupport {
             Configuration configuration = new Configuration(false);
             configuration.setInt("io.compression.codec.zstd.level", CompactedObjectFormatV2.ZSTD_LEVEL);
             codecFactory = new CodecFactory(configuration, CompactedObjectFormatV2.DATA_PAGE_BYTES);
-            CompressionCodecName codec = spec.compression().equals("ZSTD")
-                    ? CompressionCodecName.ZSTD
-                    : CompressionCodecName.UNCOMPRESSED;
+            CompressionCodecName codec =
+                    spec.compression().equals("ZSTD") ? CompressionCodecName.ZSTD : CompressionCodecName.UNCOMPRESSED;
             compressor = codecFactory.getCompressor(codec);
             properties = ParquetProperties.builder()
                     .withPageSize(CompactedObjectFormatV2.DATA_PAGE_BYTES)
@@ -417,8 +410,12 @@ final class ParquetV2WriterSupport {
             }
             PrivateStagedObjectFile sealed = stagingFile.seal();
             ObjectKey objectKey = CompactedObjectFormatV2.objectKey(
-                    spec.cluster(), spec.view(), spec.streamId(), spec.sourceCoverage(),
-                    sealed.contentSha256(), spec.outputAttemptId());
+                    spec.cluster(),
+                    spec.view(),
+                    spec.streamId(),
+                    spec.sourceCoverage(),
+                    sealed.contentSha256(),
+                    spec.outputAttemptId());
             ObjectId objectId = CompactedObjectFormatV2.objectId(objectKey);
             Checksum footerCrc32c = Crc32cChecksums.checksum(footer);
             EntryIndexRef footerRef = new EntryIndexRef(
@@ -694,17 +691,15 @@ final class ParquetV2WriterSupport {
                 || endBytes[end - 1] != '1') {
             throw new CompactedObjectFormatException("V2 Parquet footer magic is missing");
         }
-        long metadataLength = Integer.toUnsignedLong(
-                (endBytes[end - 8] & 0xff)
-                        | ((endBytes[end - 7] & 0xff) << 8)
-                        | ((endBytes[end - 6] & 0xff) << 16)
-                        | ((endBytes[end - 5] & 0xff) << 24));
+        long metadataLength = Integer.toUnsignedLong((endBytes[end - 8] & 0xff)
+                | ((endBytes[end - 7] & 0xff) << 8)
+                | ((endBytes[end - 6] & 0xff) << 16)
+                | ((endBytes[end - 5] & 0xff) << 24));
         long footerLength = Math.addExact(metadataLength, 8);
         if (footerLength > CompactedObjectFormatV2.MAX_FOOTER_BYTES || footerLength > endBytes.length) {
             throw new CompactedObjectFormatException("V2 Parquet footer trailer is inconsistent");
         }
-        return java.util.Arrays.copyOfRange(
-                endBytes, Math.toIntExact(endBytes.length - footerLength), endBytes.length);
+        return java.util.Arrays.copyOfRange(endBytes, Math.toIntExact(endBytes.length - footerLength), endBytes.length);
     }
 
     private static NereusException invalid(String message, Throwable cause) {

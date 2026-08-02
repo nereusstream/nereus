@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -37,8 +37,7 @@ class ExactSourceSetCodecV1Test {
         assertThat(codec.encode(decoded)).isEqualTo(first);
         assertThat(decoded.sources().get(1).projectionRef())
                 .contains(new ProjectionRef(ProjectionType.PROTOCOL_HINT, "kafka-v2"));
-        assertThat(decoded.sources().get(1).schemaRefs())
-                .containsExactly(new SchemaRef("kafka", "record-batch", 2));
+        assertThat(decoded.sources().get(1).schemaRefs()).containsExactly(new SchemaRef("kafka", "record-batch", 2));
     }
 
     @Test
@@ -62,43 +61,31 @@ class ExactSourceSetCodecV1Test {
 
     static ExactSourceSet sourceSet() {
         SourceGeneration first = source(0, 2, 0, 1, Optional.empty());
-        SourceGeneration second =
-                source(
-                        2,
-                        5,
-                        1,
-                        2,
-                        Optional.of(new Checksum(ChecksumType.SHA256, "c".repeat(64))));
-        return ExactSourceSet.create(
-                ReadView.COMMITTED, new OffsetRange(0, 5), List.of(first, second));
+        SourceGeneration second = source(2, 5, 1, 2, Optional.of(new Checksum(ChecksumType.SHA256, "c".repeat(64))));
+        return ExactSourceSet.create(ReadView.COMMITTED, new OffsetRange(0, 5), List.of(first, second));
     }
 
     private static SourceGeneration source(
-            long start,
-            long end,
-            long generation,
-            long commitVersion,
-            Optional<Checksum> materializationPolicy) {
-        ObjectSliceReadTarget target =
-                new ObjectSliceReadTarget(
-                        1,
-                        new ObjectId("o-" + start),
-                        new ObjectKey("compacted/source-" + start),
-                        ObjectType.STREAM_COMPACTED_OBJECT,
-                        "NEREUS_COMPACTED_PARQUET_V2",
-                        PayloadFormat.KAFKA_RECORD_BATCH.name(),
-                        start + "-" + end,
-                        0,
-                        1_024,
-                        new Checksum(ChecksumType.CRC32C, "a".repeat(8)),
-                        new EntryIndexRef(
-                                EntryIndexLocation.OBJECT_FOOTER,
-                                Optional.empty(),
-                                Optional.empty(),
-                                Optional.empty(),
-                                992,
-                                32,
-                                new Checksum(ChecksumType.CRC32C, "d".repeat(8))));
+            long start, long end, long generation, long commitVersion, Optional<Checksum> materializationPolicy) {
+        ObjectSliceReadTarget target = new ObjectSliceReadTarget(
+                1,
+                new ObjectId("o-" + start),
+                new ObjectKey("compacted/source-" + start),
+                ObjectType.STREAM_COMPACTED_OBJECT,
+                "NEREUS_COMPACTED_PARQUET_V2",
+                PayloadFormat.KAFKA_RECORD_BATCH.name(),
+                start + "-" + end,
+                0,
+                1_024,
+                new Checksum(ChecksumType.CRC32C, "a".repeat(8)),
+                new EntryIndexRef(
+                        EntryIndexLocation.OBJECT_FOOTER,
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty(),
+                        992,
+                        32,
+                        new Checksum(ChecksumType.CRC32C, "d".repeat(8))));
         long logicalBytes = (end - start) * 100;
         return new SourceGeneration(
                 ReadView.COMMITTED,
@@ -114,14 +101,11 @@ class ExactSourceSetCodecV1Test {
                 PayloadFormat.KAFKA_RECORD_BATCH,
                 start == 0
                         ? Optional.empty()
-                        : Optional.of(
-                                new ProjectionRef(ProjectionType.PROTOCOL_HINT, "kafka-v2")),
+                        : Optional.of(new ProjectionRef(ProjectionType.PROTOCOL_HINT, "kafka-v2")),
                 Math.toIntExact(end - start),
                 1,
                 logicalBytes,
-                start == 0
-                        ? List.of()
-                        : List.of(new SchemaRef("kafka", "record-batch", 2)),
+                start == 0 ? List.of() : List.of(new SchemaRef("kafka", "record-batch", 2)),
                 start * 100,
                 end * 100);
     }

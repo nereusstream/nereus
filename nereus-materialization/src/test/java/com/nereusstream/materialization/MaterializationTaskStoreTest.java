@@ -1,11 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.CLUSTER;
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.STREAM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStoreTestFactory;
@@ -26,23 +26,18 @@ class MaterializationTaskStoreTest {
                 MaterializationPlannerTestSupport.zero("/index/z-2", 0, 2, 0, 100, 2),
                 MaterializationPlannerTestSupport.zero("/index/z-4", 2, 4, 100, 100, 4));
         MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
-        MaterializationTask task = MaterializationPlannerTestSupport.planner(
-                        candidates, List.of(), 0, 4)
+        MaterializationTask task = MaterializationPlannerTestSupport.planner(candidates, List.of(), 0, 4)
                 .plan(STREAM, new OffsetRange(0, 4), policy, 1)
                 .join()
                 .get(0);
-        GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(
-                Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
-        GenerationMetadataStore exactSources = MaterializationPlannerTestSupport.generationStore(
-                candidates, List.of(), durable);
+        GenerationMetadataStore durable =
+                GenerationMetadataStoreTestFactory.inMemory(Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
+        GenerationMetadataStore exactSources =
+                MaterializationPlannerTestSupport.generationStore(candidates, List.of(), durable);
         MaterializationTaskStore first = new MaterializationTaskStore(
-                CLUSTER,
-                exactSources,
-                Clock.fixed(Instant.ofEpochMilli(2_000), ZoneOffset.UTC));
+                CLUSTER, exactSources, Clock.fixed(Instant.ofEpochMilli(2_000), ZoneOffset.UTC));
         MaterializationTaskStore second = new MaterializationTaskStore(
-                CLUSTER,
-                exactSources,
-                Clock.fixed(Instant.ofEpochMilli(9_000), ZoneOffset.UTC));
+                CLUSTER, exactSources, Clock.fixed(Instant.ofEpochMilli(9_000), ZoneOffset.UTC));
 
         VersionedMaterializationTask created = first.create(task).join();
         VersionedMaterializationTask recovered = second.create(task).join();
@@ -54,8 +49,7 @@ class MaterializationTaskStoreTest {
         first.delete(created).join();
         assertThat(first.get(STREAM, task.taskId()).join()).isEmpty();
         assertThatThrownBy(() -> first.delete(created).join())
-                .hasRootCauseInstanceOf(
-                        com.nereusstream.metadata.oxia.F4MetadataConditionFailedException.class);
+                .hasRootCauseInstanceOf(com.nereusstream.metadata.oxia.F4MetadataConditionFailedException.class);
     }
 
     @Test
@@ -64,17 +58,15 @@ class MaterializationTaskStoreTest {
                 MaterializationPlannerTestSupport.zero("/index/z-2", 0, 2, 0, 100, 2),
                 MaterializationPlannerTestSupport.zero("/index/z-4", 2, 4, 100, 100, 4));
         MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
-        MaterializationTask task = MaterializationPlannerTestSupport.planner(
-                        candidates, List.of(), 0, 4)
+        MaterializationTask task = MaterializationPlannerTestSupport.planner(candidates, List.of(), 0, 4)
                 .plan(STREAM, new OffsetRange(0, 4), policy, 1)
                 .join()
                 .get(0);
-        GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(
-                Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
+        GenerationMetadataStore durable =
+                GenerationMetadataStoreTestFactory.inMemory(Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
         MaterializationTaskStore changed = new MaterializationTaskStore(
                 CLUSTER,
-                MaterializationPlannerTestSupport.generationStore(
-                        candidates.subList(0, 1), List.of(), durable),
+                MaterializationPlannerTestSupport.generationStore(candidates.subList(0, 1), List.of(), durable),
                 Clock.fixed(Instant.ofEpochMilli(2_000), ZoneOffset.UTC));
 
         assertThatThrownBy(() -> changed.create(task).join())
@@ -90,18 +82,14 @@ class MaterializationTaskStoreTest {
                 MaterializationPlannerTestSupport.zero("/index/z-2", 0, 2, 0, 100, 2),
                 MaterializationPlannerTestSupport.zero("/index/z-4", 2, 4, 100, 100, 4));
         MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
-        MaterializationTask task = MaterializationPlannerTestSupport.planner(
-                        candidates, List.of(), 0, 4)
+        MaterializationTask task = MaterializationPlannerTestSupport.planner(candidates, List.of(), 0, 4)
                 .plan(STREAM, new OffsetRange(0, 4), policy, 1)
                 .join()
                 .get(0);
         Clock clock = Clock.fixed(Instant.ofEpochMilli(2_000), ZoneOffset.UTC);
         GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(clock);
         MaterializationTaskStore store = new MaterializationTaskStore(
-                CLUSTER,
-                MaterializationPlannerTestSupport.generationStore(
-                        candidates, List.of(), durable),
-                clock);
+                CLUSTER, MaterializationPlannerTestSupport.generationStore(candidates, List.of(), durable), clock);
         VersionedMaterializationTask planned = store.create(task).join();
         VersionedMaterializationTask claimed =
                 store.claim(planned, "a".repeat(26), "b".repeat(26), 10_000).join();
@@ -116,18 +104,12 @@ class MaterializationTaskStoreTest {
 
         assertThat(retry.value().lifecycle()).isEqualTo(TaskLifecycle.RETRY_WAIT);
         assertThat(retry.value().workerClaim()).isEmpty();
-        assertThat(retry.value().failureClassId())
-                .isEqualTo(TaskFailureClass.RETRYABLE_METADATA.wireId());
+        assertThat(retry.value().failureClassId()).isEqualTo(TaskFailureClass.RETRYABLE_METADATA.wireId());
         assertThat(retry.value().failureMessage()).isEqualTo("metadata unavailable");
         assertThat(retry.value().retryNotBeforeMillis()).isEqualTo(3_000);
         assertThatThrownBy(() -> store.failClaim(
-                                claimed,
-                                TaskLifecycle.TERMINAL_FAILED,
-                                TaskFailureClass.OUTPUT_INVARIANT,
-                                "stale",
-                                0)
+                                claimed, TaskLifecycle.TERMINAL_FAILED, TaskFailureClass.OUTPUT_INVARIANT, "stale", 0)
                         .join())
-                .hasRootCauseInstanceOf(
-                        com.nereusstream.metadata.oxia.F4MetadataConditionFailedException.class);
+                .hasRootCauseInstanceOf(com.nereusstream.metadata.oxia.F4MetadataConditionFailedException.class);
     }
 }

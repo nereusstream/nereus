@@ -1,9 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Cluster-wide exact allocation slot state. */
+/**
+ * Cluster-wide exact allocation slot state.
+ */
 public enum AllocationSlotLifecycle {
-    CLAIMED(1), CREATE_STARTED(2), CREATE_UNCERTAIN(3);
+    CLAIMED(1),
+    CREATE_STARTED(2),
+    CREATE_UNCERTAIN(3);
 
     private final int wireId;
 

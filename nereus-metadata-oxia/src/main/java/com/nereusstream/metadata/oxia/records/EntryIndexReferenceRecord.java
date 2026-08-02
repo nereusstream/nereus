@@ -64,12 +64,7 @@ public record EntryIndexReferenceRecord(
     }
 
     private static void validateLocation(
-            String location,
-            String objectId,
-            String objectKey,
-            byte[] inlineData,
-            long offset,
-            long length) {
+            String location, String objectId, String objectKey, byte[] inlineData, long offset, long length) {
         EntryIndexLocation parsedLocation;
         try {
             parsedLocation = EntryIndexLocation.valueOf(location);
@@ -100,7 +95,8 @@ public record EntryIndexReferenceRecord(
                     throw new IllegalArgumentException("OBJECT_FOOTER entry index cannot contain inlineData");
                 }
                 if (hasObjectId != hasObjectKey) {
-                    throw new IllegalArgumentException("OBJECT_FOOTER entry index objectId/objectKey must both be present or both empty");
+                    throw new IllegalArgumentException(
+                            "OBJECT_FOOTER entry index objectId/objectKey must both be present or both empty");
                 }
                 if (length <= 0) {
                     throw new IllegalArgumentException("OBJECT_FOOTER entry index length must be positive");

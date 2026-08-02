@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.append;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
@@ -35,36 +35,26 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 class GenericPrimaryAppendContractTest {
-    private static final Checksum RANGE_SHA = new Checksum(
-            ChecksumType.SHA256,
-            "1111111111111111111111111111111111111111111111111111111111111111");
-    private static final Checksum INDEX_SHA = new Checksum(
-            ChecksumType.SHA256,
-            "2222222222222222222222222222222222222222222222222222222222222222");
+    private static final Checksum RANGE_SHA =
+            new Checksum(ChecksumType.SHA256, "1111111111111111111111111111111111111111111111111111111111111111");
+    private static final Checksum INDEX_SHA =
+            new Checksum(ChecksumType.SHA256, "2222222222222222222222222222222222222222222222222222222222222222");
 
     @Test
     void commitsTaggedBookKeeperTarget() {
         String cluster = "generic-bk";
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(() -> 1_000L);
         StreamId streamId = new StreamId(metadata.createOrGetStream(
-                cluster,
-                new StreamName("events"),
-                new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                        cluster,
+                        new StreamName("events"),
+                        new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                 .join()
                 .streamId());
         AppendSessionRecord session = metadata.acquireAppendSession(
-                cluster,
-                streamId,
-                new AppendSessionOptions("writer", Duration.ofSeconds(30), false))
+                        cluster, streamId, new AppendSessionOptions("writer", Duration.ofSeconds(30), false))
                 .join();
         BookKeeperEntryRangeReadTarget target = new BookKeeperEntryRangeReadTarget(
-                1,
-                "bk-a",
-                17,
-                9,
-                1,
-                BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
-                RANGE_SHA);
+                1, "bk-a", 17, 9, 1, BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY, RANGE_SHA);
         CommitAppendRequest request = new CommitAppendRequest(
                 streamId,
                 "writer",
@@ -82,31 +72,21 @@ class GenericPrimaryAppendContractTest {
                 1,
                 Optional.empty());
 
-        PreparedStableAppend prepared = metadata.prepareStableAppend(cluster, request).join();
+        PreparedStableAppend prepared =
+                metadata.prepareStableAppend(cluster, request).join();
         assertThat(prepared.primaryTargetIdentitySha256()).isEqualTo(ReadTargetIdentities.sha256(target));
         assertThatThrownBy(prepared::objectKeyHash).isInstanceOf(IllegalStateException.class);
 
         PrimaryPhysicalReferenceAdapter<BookKeeperEntryRangeReadTarget> adapter =
                 new SyntheticBookKeeperReferenceAdapter();
         DefaultObjectProtectionManager objectProtections = new DefaultObjectProtectionManager(
-                cluster,
-                metadata,
-                Duration.ofMinutes(10),
-                Duration.ZERO,
-                Duration.ofHours(24),
-                Clock.systemUTC());
-        DefaultGenerationZeroPhysicalReferencePublisher publisher =
-                new DefaultGenerationZeroPhysicalReferencePublisher(
-                        cluster,
-                        metadata,
-                        metadata,
-                        objectProtections,
-                        List.of(adapter));
+                cluster, metadata, Duration.ofMinutes(10), Duration.ZERO, Duration.ofHours(24), Clock.systemUTC());
+        DefaultGenerationZeroPhysicalReferencePublisher publisher = new DefaultGenerationZeroPhysicalReferencePublisher(
+                cluster, metadata, metadata, objectProtections, List.of(adapter));
 
-        ProtectedStableAppend protectedAppend = publisher.protectBeforeHead(
-                prepared, Duration.ofSeconds(1)).join();
-        assertThat(protectedAppend.proof().targetType())
-                .isEqualTo(ReadTargetType.BOOKKEEPER_ENTRY_RANGE);
+        ProtectedStableAppend protectedAppend =
+                publisher.protectBeforeHead(prepared, Duration.ofSeconds(1)).join();
+        assertThat(protectedAppend.proof().targetType()).isEqualTo(ReadTargetType.BOOKKEEPER_ENTRY_RANGE);
 
         CommittedAppend committed = new CommittedAppend(
                 streamId,
@@ -125,21 +105,16 @@ class GenericPrimaryAppendContractTest {
                 Optional.empty(),
                 1,
                 1);
-        MaterializedGenerationZero materialized = new MaterializedGenerationZero(
-                committed,
-                "/index/0",
-                1,
-                INDEX_SHA);
-        ProtectedGenerationZero protectedGeneration = publisher.protectVisibleIndex(
-                materialized, Duration.ofSeconds(1)).join();
-        assertThat(protectedGeneration.proof().targetIdentitySha256())
-                .isEqualTo(ReadTargetIdentities.sha256(target));
+        MaterializedGenerationZero materialized = new MaterializedGenerationZero(committed, "/index/0", 1, INDEX_SHA);
+        ProtectedGenerationZero protectedGeneration = publisher
+                .protectVisibleIndex(materialized, Duration.ofSeconds(1))
+                .join();
+        assertThat(protectedGeneration.proof().targetIdentitySha256()).isEqualTo(ReadTargetIdentities.sha256(target));
     }
 
     private record SyntheticBookKeeperProof(
-            PhysicalReferencePurpose purpose,
-            Checksum targetIdentitySha256,
-            String referenceId) implements PhysicalReferenceProof {
+            PhysicalReferencePurpose purpose, Checksum targetIdentitySha256, String referenceId)
+            implements PhysicalReferenceProof {
         @Override
         public ReadTargetType targetType() {
             return ReadTargetType.BOOKKEEPER_ENTRY_RANGE;
@@ -160,9 +135,7 @@ class GenericPrimaryAppendContractTest {
 
         @Override
         public CompletableFuture<ProtectedStableAppend> protectBeforeHead(
-                PreparedStableAppend append,
-                BookKeeperEntryRangeReadTarget target,
-                Duration timeout) {
+                PreparedStableAppend append, BookKeeperEntryRangeReadTarget target, Duration timeout) {
             return CompletableFuture.completedFuture(new ProtectedStableAppend(
                     append,
                     new SyntheticBookKeeperProof(
@@ -173,9 +146,7 @@ class GenericPrimaryAppendContractTest {
 
         @Override
         public CompletableFuture<ProtectedGenerationZero> protectVisibleIndex(
-                MaterializedGenerationZero append,
-                BookKeeperEntryRangeReadTarget target,
-                Duration timeout) {
+                MaterializedGenerationZero append, BookKeeperEntryRangeReadTarget target, Duration timeout) {
             return CompletableFuture.completedFuture(new ProtectedGenerationZero(
                     append,
                     new SyntheticBookKeeperProof(

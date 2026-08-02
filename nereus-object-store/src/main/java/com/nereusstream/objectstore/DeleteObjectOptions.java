@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import com.nereusstream.api.Checksum;
@@ -7,10 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 public record DeleteObjectOptions(
-        long expectedLength,
-        Checksum expectedStorageChecksum,
-        Optional<String> expectedEtag,
-        Duration timeout) {
+        long expectedLength, Checksum expectedStorageChecksum, Optional<String> expectedEtag, Duration timeout) {
     public DeleteObjectOptions {
         if (expectedLength < 0) {
             throw new IllegalArgumentException("expectedLength must be non-negative");

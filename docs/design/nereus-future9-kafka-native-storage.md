@@ -63,8 +63,10 @@
 > 2026-07-30 F9-M7 leader-chaos slice：product `main@d9f8ccf` adds canonical
 > `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl006` behind `phase9ChaosCheck`。Three live release brokers run
 > six RF1 transitions `1→2→3→1→2→3→1`；each round requires a higher KRaft leader epoch、higher Oxia binding epoch、
-> preempted Nereus append-session epoch/token、empty reassignment state and a durable head whose external authority is the
-> new broker。A Produce bootstrapped only through the still-live stale broker must extend the new authority by exactly one
+> preempted Nereus append-session epoch/token、empty reassignment state and a durable head whose external authority is
+> the
+> new broker。A Produce bootstrapped only through the still-live stale broker must extend the new authority by exactly
+> one
 > offset。Fresh root rerun passes 75/75 tasks in 59s。SCL006 is `IMPLEMENTED_NOT_RUN`；provider/network chaos and
 > SCL007–010 remain open
 
@@ -79,9 +81,27 @@
 > 状态：Implemented / final-gated for the exact source tuple in the final receipt above；F9-M1–M7 and all 146
 > scenario rows are closed for those sources。The dated milestone notes below remain audit history，not current open
 > status；newer product source must rerun the clean final gate before claiming `PASSED_CURRENT_SOURCE`
-> 2026-07-29 增量：two-release-process Object-WAL singleton handoff、three-release-process Object-WAL already-in-flight fencing、真实 ZooKeeper/two-bookie/two-release-process BookKeeper WAL-only/async/sync post-handoff matrix，以及 Bookie-acked/metadata-`WRITING` BookKeeper stale append takeover cut 均通过；three-voter/three-combined-node ACTIVE controller kill/re-election/reconciliation and native IO continuation also pass；three dedicated controllers plus one broker now additionally pass all six before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS failover cuts and all four initial snapshot-proof/capability-aggregation cuts；a dedicated-controller/broker Toxiproxy gate further proves actual Oxia transport reset normalization and same-controller-epoch recovery；remaining open items are coordinator migration、checkpoint/virtual-segment cuts and broader chaos
-> 2026-07-29 mandatory NTC2 五 profile 增量：product `4676c12` + unchanged fork `1e3783458b` now pass delete/corrupt/fail-closed/exact-repair/re-election for Object sync/async and BookKeeper WAL-only/async/sync。The code-level contract is frozen in phase-9 documents 04/05/07/08：WAL-only compaction has projection-free L0 authority without an F4 registration；extended KCP1 decision sets preserve historical logical plan IDs and legacy raw bytes while enforcing 60 KiB stored、1 MiB decoded and 4096-source limits
-> 2026-07-30 F9-M6 process aggregate 增量（覆盖上文的 M6 final-aggregate open wording）：fork `76f62f3b83` moves new-leader lookup fencing into `Partition.makeLeader` under the partition state write lock，so ListOffsets cannot observe a transient empty-cache LSO before recovered state is installed；product source lock `14fb643` pins 53 commits/126 files。Product test harness commits `3293d76`、`c76a466` and `4a0ec22` make timed readiness probes close with `Duration.ZERO`、reserve activation ports until process launch and give long Admin control-plane calls a 30-second internal deadline without weakening data assertions。Focused ongoing-transaction、activation、Object/BK in-flight gates pass，and fresh `phase9M6KafkaProcessCheck --rerun-tasks` passes 94/94 tasks in 34m21s。This closes the M6 real-process aggregate only；M7 scale/chaos/compatibility and `phase9FinalCheck` remain open
+> 2026-07-29 增量：two-release-process Object-WAL singleton handoff、three-release-process Object-WAL already-in-flight
+> fencing、真实 ZooKeeper/two-bookie/two-release-process BookKeeper WAL-only/async/sync post-handoff matrix，以及
+> Bookie-acked/metadata-`WRITING` BookKeeper stale append takeover cut 均通过；three-voter/three-combined-node ACTIVE
+> controller kill/re-election/reconciliation and native IO continuation also pass；three dedicated controllers plus one
+> broker now additionally pass all six before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS failover
+> cuts and all four initial snapshot-proof/capability-aggregation cuts；a dedicated-controller/broker Toxiproxy gate
+> further proves actual Oxia transport reset normalization and same-controller-epoch recovery；remaining open items are
+> coordinator migration、checkpoint/virtual-segment cuts and broader chaos
+> 2026-07-29 mandatory NTC2 五 profile 增量：product `4676c12` + unchanged fork `1e3783458b` now pass
+> delete/corrupt/fail-closed/exact-repair/re-election for Object sync/async and BookKeeper WAL-only/async/sync。The
+> code-level contract is frozen in phase-9 documents 04/05/07/08：WAL-only compaction has projection-free L0 authority
+> without an F4 registration；extended KCP1 decision sets preserve historical logical plan IDs and legacy raw bytes while
+> enforcing 60 KiB stored、1 MiB decoded and 4096-source limits
+> 2026-07-30 F9-M6 process aggregate 增量（覆盖上文的 M6 final-aggregate open wording）：fork `76f62f3b83` moves new-leader
+> lookup fencing into `Partition.makeLeader` under the partition state write lock，so ListOffsets cannot observe a
+> transient empty-cache LSO before recovered state is installed；product source lock `14fb643` pins 53 commits/126
+> files。Product test harness commits `3293d76`、`c76a466` and `4a0ec22` make timed readiness probes close with
+`Duration.ZERO`、reserve activation ports until process launch and give long Admin control-plane calls a 30-second
+> internal deadline without weakening data assertions。Focused ongoing-transaction、activation、Object/BK in-flight gates
+> pass，and fresh `phase9M6KafkaProcessCheck --rerun-tasks` passes 94/94 tasks in 34m21s。This closes the M6 real-process
+> aggregate only；M7 scale/chaos/compatibility and `phase9FinalCheck` remain open
 > 代码级合同：`../phase-9-kafka-native-storage/README.md`
 > 参考源码：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`，`3.9.0-SNAPSHOT`
 > 设计基线日期：2026-07-23
@@ -93,14 +113,14 @@ producer/transaction coordinator 语义；Nereus 成为每个 Kafka partition �
 
 F9 不复用 Future 5 的 KoP 边界：
 
-| 维度 | F5 KoP/Kafka projection | F9 native Kafka |
-| --- | --- | --- |
-| Kafka server | KoP/Pulsar broker 内的 Kafka 协议投影 | Kafka broker fork |
-| partition log | ManagedLedger facade 上的投影 | 直接映射到 `StreamStorage` |
-| payload mapping | canonical record-per-offset mapping | exact Kafka `RecordBatch` bytes + ranged entry |
-| group/transaction truth | F5 定义的 Oxia projection | 原生 Kafka internal compacted topics |
-| leader truth | KoP/Pulsar ownership projection | KRaft partition/leader epoch |
-| compatibility target | KoP client compatibility | native Kafka broker/client compatibility |
+| 维度                      | F5 KoP/Kafka projection             | F9 native Kafka                                |
+|-------------------------|-------------------------------------|------------------------------------------------|
+| Kafka server            | KoP/Pulsar broker 内的 Kafka 协议投影     | Kafka broker fork                              |
+| partition log           | ManagedLedger facade 上的投影           | 直接映射到 `StreamStorage`                          |
+| payload mapping         | canonical record-per-offset mapping | exact Kafka `RecordBatch` bytes + ranged entry |
+| group/transaction truth | F5 定义的 Oxia projection              | 原生 Kafka internal compacted topics             |
+| leader truth            | KoP/Pulsar ownership projection     | KRaft partition/leader epoch                   |
+| compatibility target    | KoP client compatibility            | native Kafka broker/client compatibility       |
 
 两者可以消费相同的 Nereus protocol-neutral primitives，但不得共享一份含义不同的 durable binding 或
 把一种 payload mapping 当成另一种读取。
@@ -146,16 +166,16 @@ Kafka client
 
 唯一真相分工：
 
-| Truth | Authoritative owner | Derived/cache only |
-| --- | --- | --- |
-| topic、partition、leader、leader epoch | KRaft metadata log | broker metadata image |
-| partition-to-stream identity/lifecycle | one Oxia `KafkaPartitionBindingRecord` | broker cache |
-| committed offset/bytes | Nereus stream head + reachable commit chain | Kafka LEO/HW fields |
-| exact Kafka batch | committed Nereus entry payload | decoded records/indexes |
-| producer/transaction replay state | committed Kafka bytes | checkpoint object + broker memory |
-| group/transaction coordinator state | `__consumer_offsets` / `__transaction_state` | coordinator cache |
-| compacted read generation | F4 committed generation record | planner/task/checkpoint hints |
-| routing/readiness | KRaft + activation/capability records | local routing cache |
+| Truth                                  | Authoritative owner                          | Derived/cache only                |
+|----------------------------------------|----------------------------------------------|-----------------------------------|
+| topic、partition、leader、leader epoch    | KRaft metadata log                           | broker metadata image             |
+| partition-to-stream identity/lifecycle | one Oxia `KafkaPartitionBindingRecord`       | broker cache                      |
+| committed offset/bytes                 | Nereus stream head + reachable commit chain  | Kafka LEO/HW fields               |
+| exact Kafka batch                      | committed Nereus entry payload               | decoded records/indexes           |
+| producer/transaction replay state      | committed Kafka bytes                        | checkpoint object + broker memory |
+| group/transaction coordinator state    | `__consumer_offsets` / `__transaction_state` | coordinator cache                 |
+| compacted read generation              | F4 committed generation record               | planner/task/checkpoint hints     |
+| routing/readiness                      | KRaft + activation/capability records        | local routing cache               |
 
 对象列表、本地 segment 文件、checkpoint root、broker 内存都不能独立证明一次 append 已提交。
 
@@ -367,16 +387,16 @@ publication。ACTIVE 至少冻结：
 
 ## 15. 交付顺序
 
-| Milestone | Scope | Exit condition |
-| --- | --- | --- |
-| F9-M0 | source lock + code-level design | all target docs、hashes、method map、scenario traceability reviewed |
-| F9-M1 | ranged-entry API + NCP2/NTC2 foundation | legacy exact-start and Pulsar gates unchanged；range property/golden tests pass |
-| F9-M2 | binding、authority session、checkpoint | real Oxia/Object-store response-loss and leader-preemption gates pass |
-| F9-M3 | native log Produce/Fetch | exact bytes/offsets/acks/HW across restart and broker takeover pass |
-| F9-M4 | producer/transaction/internal topics | idempotence、transaction、LSO、coordinator recovery pass |
-| F9-M5 | retention/DeleteRecords/compaction | native policies and compacted internal/user topics pass |
-| F9-M6 | activation/controller/runtime rollout | RF=1 enforcement、mixed-version exclusion、shutdown/rejoin pass |
-| F9-M7 | scale/chaos/compatibility aggregate | full scenario matrix and upstream Kafka compatibility suites pass |
+| Milestone | Scope                                   | Exit condition                                                                 |
+|-----------|-----------------------------------------|--------------------------------------------------------------------------------|
+| F9-M0     | source lock + code-level design         | all target docs、hashes、method map、scenario traceability reviewed               |
+| F9-M1     | ranged-entry API + NCP2/NTC2 foundation | legacy exact-start and Pulsar gates unchanged；range property/golden tests pass |
+| F9-M2     | binding、authority session、checkpoint    | real Oxia/Object-store response-loss and leader-preemption gates pass          |
+| F9-M3     | native log Produce/Fetch                | exact bytes/offsets/acks/HW across restart and broker takeover pass            |
+| F9-M4     | producer/transaction/internal topics    | idempotence、transaction、LSO、coordinator recovery pass                          |
+| F9-M5     | retention/DeleteRecords/compaction      | native policies and compacted internal/user topics pass                        |
+| F9-M6     | activation/controller/runtime rollout   | RF=1 enforcement、mixed-version exclusion、shutdown/rejoin pass                  |
+| F9-M7     | scale/chaos/compatibility aggregate     | full scenario matrix and upstream Kafka compatibility suites pass              |
 
 文档完成不代表任何 milestone 已实现。
 
@@ -402,7 +422,8 @@ publication。ACTIVE 至少冻结：
 - ranged entry/API/格式：`../phase-9-kafka-native-storage/02-ranged-entry-api-and-object-format.md`
 - Kafka fork 接入：`../phase-9-kafka-native-storage/03-kafka-fork-log-and-broker-integration.md`
 - Oxia/lifecycle/checkpoint：`../phase-9-kafka-native-storage/04-oxia-binding-session-checkpoint-and-lifecycle.md`
-- producer/transaction/compaction/retention：`../phase-9-kafka-native-storage/05-producer-state-transactions-compaction-and-retention.md`
+- producer/transaction/compaction/retention：
+  `../phase-9-kafka-native-storage/05-producer-state-transactions-compaction-and-retention.md`
 - 配置/rollout/运维：`../phase-9-kafka-native-storage/06-runtime-configuration-rollout-and-observability.md`
 - 实施计划与 gates：`../phase-9-kafka-native-storage/07-implementation-plan-and-gates.md`
 - 场景证据矩阵：`../phase-9-kafka-native-storage/08-scenario-evidence-matrix.md`

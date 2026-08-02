@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.codec;
 
 import com.nereusstream.api.Checksum;
@@ -32,9 +33,7 @@ public final class KafkaRecordBatchTestSupport {
             records[index] = new SimpleRecord(timestamp + index, values[index].getBytes());
         }
         return bytes(MemoryRecords.withRecords(
-                baseOffset,
-                Compression.of(compressionType).build(),
-                records));
+                baseOffset, Compression.of(compressionType).build(), records));
     }
 
     public static byte[] bytes(MemoryRecords records) {
@@ -65,13 +64,7 @@ public final class KafkaRecordBatchTestSupport {
     public static ReadBatch readBatch(OffsetRange range, byte[] payload, String suffix) {
         Checksum checksum = new Checksum(ChecksumType.CRC32C, "00000000");
         EntryIndexRef index = new EntryIndexRef(
-                EntryIndexLocation.OBJECT_FOOTER,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                0,
-                1,
-                checksum);
+                EntryIndexLocation.OBJECT_FOOTER, Optional.empty(), Optional.empty(), Optional.empty(), 0, 1, checksum);
         ObjectSliceReadTarget target = new ObjectSliceReadTarget(
                 1,
                 new ObjectId("kafka-batch-" + suffix),
@@ -84,18 +77,7 @@ public final class KafkaRecordBatchTestSupport {
                 payload.length,
                 checksum,
                 index);
-        ReadSourceRef source = new ReadSourceRef(
-                range,
-                0,
-                1,
-                target,
-                ReadTargetIdentities.sha256(target));
-        return new ReadBatch(
-                range,
-                PayloadFormat.KAFKA_RECORD_BATCH,
-                payload,
-                List.of(),
-                Optional.empty(),
-                source);
+        ReadSourceRef source = new ReadSourceRef(range, 0, 1, target, ReadTargetIdentities.sha256(target));
+        return new ReadBatch(range, PayloadFormat.KAFKA_RECORD_BATCH, payload, List.of(), Optional.empty(), source);
     }
 }

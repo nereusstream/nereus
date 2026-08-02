@@ -195,15 +195,15 @@ Validation:
 
 For mapping version 1:
 
-| State | Position |
-| --- | --- |
-| Empty stream LAC | `(virtualLedgerId, -1)` |
-| Non-empty stream LAC | `(virtualLedgerId, committedEndOffset - 1)` |
-| First available entry when data exists | `(virtualLedgerId, trimOffset)` |
-| Position before first available | `(virtualLedgerId, trimOffset - 1)` |
-| One-past-tail read position | `(virtualLedgerId, committedEndOffset)` |
-| Read EOF boundary | `entryId >= committedEndOffset` |
-| Trimmed position | `0 <= entryId < trimOffset` |
+| State                                  | Position                                    |
+|----------------------------------------|---------------------------------------------|
+| Empty stream LAC                       | `(virtualLedgerId, -1)`                     |
+| Non-empty stream LAC                   | `(virtualLedgerId, committedEndOffset - 1)` |
+| First available entry when data exists | `(virtualLedgerId, trimOffset)`             |
+| Position before first available        | `(virtualLedgerId, trimOffset - 1)`         |
+| One-past-tail read position            | `(virtualLedgerId, committedEndOffset)`     |
+| Read EOF boundary                      | `entryId >= committedEndOffset`             |
+| Trimmed position                       | `0 <= entryId < trimOffset`                 |
 
 `trimOffset - 1` is safe because `trimOffset` is non-negative; when it is zero the result is the
 legal `-1` sentinel. Trimming never renumbers an entry and never changes the ledger ID.
@@ -220,13 +220,13 @@ method-specific:
 
 The exact non-durable creation matrix is:
 
-| Input | Read offset | Local mark-delete Position |
-| --- | --- | --- |
-| `EARLIEST` | `trimOffset` | `trimOffset - 1` |
-| null or `LATEST` | trim/tail selected by `InitialPosition` | `readOffset - 1` |
-| concrete current-ledger `P <= LAC` | `max(trimOffset, P.entryId + 1)` | `readOffset - 1` |
-| concrete current-ledger `P > LAC` | trim/tail selected by `InitialPosition` | `readOffset - 1` |
-| non-sentinel wrong-ledger Position | fail | none |
+| Input                              | Read offset                             | Local mark-delete Position |
+|------------------------------------|-----------------------------------------|----------------------------|
+| `EARLIEST`                         | `trimOffset`                            | `trimOffset - 1`           |
+| null or `LATEST`                   | trim/tail selected by `InitialPosition` | `readOffset - 1`           |
+| concrete current-ledger `P <= LAC` | `max(trimOffset, P.entryId + 1)`        | `readOffset - 1`           |
+| concrete current-ledger `P > LAC`  | trim/tail selected by `InitialPosition` | `readOffset - 1`           |
+| non-sentinel wrong-ledger Position | fail                                    | none                       |
 
 This mirrors stock `NonDurableCursorImpl`: `startCursorPosition` is a mark-delete coordinate. It also composes with
 `PersistentTopic`, which steps back one entry before creating a non-durable subscription so the client can apply
@@ -310,11 +310,11 @@ Encoding rules:
 2. Copy exactly `readableBytes()` starting at `readerIndex()`; do not mutate reader/writer indices.
 3. Do not decode, recompress, reframe or checksum-strip Pulsar bytes.
 4. Produce one `AppendEntry` with:
-   - copied payload;
-   - `recordCount=1`;
-   - event time `0` unless a later explicit parser contract supplies it;
-   - attributes `pulsar.numberOfMessages=<decimal>` and
-     `pulsar.entryFormatVersion=1`.
+    - copied payload;
+    - `recordCount=1`;
+    - event time `0` unless a later explicit parser contract supplies it;
+    - attributes `pulsar.numberOfMessages=<decimal>` and
+      `pulsar.entryFormatVersion=1`.
 5. Produce one-entry `AppendBatch` with `PayloadFormat.OPAQUE_RECORD_BATCH`,
    `recordCount=1`, `entryCount=1`, `minEventTimeMillis=maxEventTimeMillis=0`, empty schema refs/projection hints and
    a present CRC32C checksum over the exact copied entry bytes。The checksum value is eight lowercase hex digits,

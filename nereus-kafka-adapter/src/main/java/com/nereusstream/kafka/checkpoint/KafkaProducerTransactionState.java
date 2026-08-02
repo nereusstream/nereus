@@ -52,8 +52,7 @@ public record KafkaProducerTransactionState(
 
     public void requireCheckpointOffset(long checkpointOffset) {
         if (checkpointOffset < 0 || mapEndOffset != checkpointOffset) {
-            throw new IllegalArgumentException(
-                    "Kafka producer map end offset must equal the NKC1 checkpoint offset");
+            throw new IllegalArgumentException("Kafka producer map end offset must equal the NKC1 checkpoint offset");
         }
     }
 
@@ -67,14 +66,12 @@ public record KafkaProducerTransactionState(
             previousProducerId = producer.producerId();
             if (producer.currentTransactionFirstOffset().isPresent()
                     && producer.currentTransactionFirstOffset().getAsLong() >= mapEndOffset) {
-                throw new IllegalArgumentException(
-                        "Kafka producer current transaction must start before map end");
+                throw new IllegalArgumentException("Kafka producer current transaction must start before map end");
             }
             BatchMetadata previous = null;
             for (BatchMetadata batch : producer.batches()) {
                 if (batch.lastOffset() >= mapEndOffset) {
-                    throw new IllegalArgumentException(
-                            "Kafka producer retained batch must end before map end");
+                    throw new IllegalArgumentException("Kafka producer retained batch must end before map end");
                 }
                 if (previous != null) {
                     if (batch.firstOffset() <= previous.lastOffset()) {
@@ -92,9 +89,7 @@ public record KafkaProducerTransactionState(
     }
 
     private static void validateOpenTransactions(
-            List<ProducerState> producers,
-            List<OpenTransaction> openTransactions,
-            long mapEndOffset) {
+            List<ProducerState> producers, List<OpenTransaction> openTransactions, long mapEndOffset) {
         Map<Long, ProducerState> byProducer = new HashMap<>();
         for (ProducerState producer : producers) {
             byProducer.put(producer.producerId(), producer);
@@ -106,13 +101,12 @@ public record KafkaProducerTransactionState(
             Objects.requireNonNull(transaction, "openTransaction");
             if (transaction.firstOffset() < previousFirstOffset
                     || (transaction.firstOffset() == previousFirstOffset
-                    && transaction.producerId() <= previousProducerId)) {
+                            && transaction.producerId() <= previousProducerId)) {
                 throw new IllegalArgumentException(
                         "Kafka open transactions must be strictly sorted by first offset and producer");
             }
             if (transaction.firstOffset() >= mapEndOffset) {
-                throw new IllegalArgumentException(
-                        "Kafka open transaction must start before map end");
+                throw new IllegalArgumentException("Kafka open transaction must start before map end");
             }
             if (transaction.lastOffset().isPresent()) {
                 throw new IllegalArgumentException(
@@ -121,8 +115,7 @@ public record KafkaProducerTransactionState(
             ProducerState producer = byProducer.get(transaction.producerId());
             if (producer == null
                     || producer.currentTransactionFirstOffset().isEmpty()
-                    || producer.currentTransactionFirstOffset().getAsLong()
-                    != transaction.firstOffset()
+                    || producer.currentTransactionFirstOffset().getAsLong() != transaction.firstOffset()
                     || openByProducer.put(transaction.producerId(), transaction) != null) {
                 throw new IllegalArgumentException(
                         "Kafka open transaction does not match exactly one producer state entry");
@@ -133,24 +126,19 @@ public record KafkaProducerTransactionState(
         for (ProducerState producer : producers) {
             if (producer.currentTransactionFirstOffset().isPresent()
                     != openByProducer.containsKey(producer.producerId())) {
-                throw new IllegalArgumentException(
-                        "Kafka producer/open-transaction sections are not equivalent");
+                throw new IllegalArgumentException("Kafka producer/open-transaction sections are not equivalent");
             }
         }
     }
 
-    private static void validateAbortedTransactions(
-            List<AbortedTransaction> abortedTransactions, long mapEndOffset) {
+    private static void validateAbortedTransactions(List<AbortedTransaction> abortedTransactions, long mapEndOffset) {
         AbortedTransaction previous = null;
         for (AbortedTransaction transaction : abortedTransactions) {
             Objects.requireNonNull(transaction, "abortedTransaction");
-            if (transaction.lastOffset() >= mapEndOffset
-                    || transaction.lastStableOffset() > mapEndOffset) {
-                throw new IllegalArgumentException(
-                        "Kafka aborted transaction extends beyond the checkpoint");
+            if (transaction.lastOffset() >= mapEndOffset || transaction.lastStableOffset() > mapEndOffset) {
+                throw new IllegalArgumentException("Kafka aborted transaction extends beyond the checkpoint");
             }
-            if (previous != null
-                    && previous.lastOffset() >= transaction.lastOffset()) {
+            if (previous != null && previous.lastOffset() >= transaction.lastOffset()) {
                 throw new IllegalArgumentException(
                         "Kafka aborted transaction marker offsets must be strictly increasing");
             }
@@ -164,13 +152,14 @@ public record KafkaProducerTransactionState(
 
     private static int decrementSequence(int sequence, int decrement) {
         if (decrement > sequence) {
-            return Math.toIntExact(
-                    sequence - (long) decrement + Integer.MAX_VALUE + 1L);
+            return Math.toIntExact(sequence - (long) decrement + Integer.MAX_VALUE + 1L);
         }
         return sequence - decrement;
     }
 
-    /** One stock ProducerStateEntry image. */
+    /**
+     * One stock ProducerStateEntry image.
+     */
     public record ProducerState(
             long producerId,
             short producerEpoch,
@@ -186,26 +175,22 @@ public record KafkaProducerTransactionState(
                     || producerEpoch < NO_PRODUCER_EPOCH
                     || coordinatorEpoch < NO_COORDINATOR_EPOCH
                     || lastTimestamp < NO_TIMESTAMP
-                    || (currentTransactionFirstOffset.isPresent()
-                    && currentTransactionFirstOffset.getAsLong() < 0)
+                    || (currentTransactionFirstOffset.isPresent() && currentTransactionFirstOffset.getAsLong() < 0)
                     || batches.size() > RETAINED_BATCH_LIMIT) {
                 throw new IllegalArgumentException("invalid Kafka producer state");
             }
             if (producerEpoch == NO_PRODUCER_EPOCH
                     && (!batches.isEmpty() || currentTransactionFirstOffset.isPresent())) {
-                throw new IllegalArgumentException(
-                        "empty Kafka producer epoch cannot retain batches or a transaction");
+                throw new IllegalArgumentException("empty Kafka producer epoch cannot retain batches or a transaction");
             }
             batches.forEach(batch -> Objects.requireNonNull(batch, "batch"));
         }
     }
 
-    /** Stock BatchMetadata fields in oldest-to-newest order. */
-    public record BatchMetadata(
-            int lastSequence,
-            long lastOffset,
-            int offsetDelta,
-            long timestamp) {
+    /**
+     * Stock BatchMetadata fields in oldest-to-newest order.
+     */
+    public record BatchMetadata(int lastSequence, long lastOffset, int offsetDelta, long timestamp) {
         public BatchMetadata {
             if (lastSequence < 0
                     || lastOffset < 0
@@ -225,28 +210,23 @@ public record KafkaProducerTransactionState(
         }
     }
 
-    /** Ordered first-unstable state. Completed entries are reserved for a future explicitly flagged capture mode. */
-    public record OpenTransaction(
-            long producerId,
-            long firstOffset,
-            OptionalLong lastOffset) {
+    /**
+     * Ordered first-unstable state. Completed entries are reserved for a future explicitly flagged capture mode.
+     */
+    public record OpenTransaction(long producerId, long firstOffset, OptionalLong lastOffset) {
         public OpenTransaction {
             lastOffset = Objects.requireNonNull(lastOffset, "lastOffset");
-            if (producerId < 0
-                    || firstOffset < 0
-                    || (lastOffset.isPresent() && lastOffset.getAsLong() < firstOffset)) {
+            if (producerId < 0 || firstOffset < 0 || (lastOffset.isPresent() && lastOffset.getAsLong() < firstOffset)) {
                 throw new IllegalArgumentException("invalid Kafka open transaction");
             }
         }
     }
 
-    /** Canonical stock AbortedTxn fields, independent of its ByteBuffer layout. */
+    /**
+     * Canonical stock AbortedTxn fields, independent of its ByteBuffer layout.
+     */
     public record AbortedTransaction(
-            short version,
-            long producerId,
-            long firstOffset,
-            long lastOffset,
-            long lastStableOffset) {
+            short version, long producerId, long firstOffset, long lastOffset, long lastStableOffset) {
         public AbortedTransaction {
             if (version != ABORTED_TRANSACTION_VERSION
                     || producerId < 0

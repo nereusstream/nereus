@@ -24,8 +24,10 @@
 > `bookKeeperPrimaryWalM2AllocationAuthorityCheck` / `bookKeeperPrimaryWalM2Check` /
 > `bookKeeperPrimaryWalM2FinalCheck`。`BookKeeperWalRuntime` can execute
 > BK_ONLY through `DefaultStreamStorage` and the ManagedLedger facade，including three-ledger rollover、unload/reopen、
-> historical seek and durable F3 cursor hydration over stable virtual Positions；the pinned local Pulsar broker passes the exact
-> borrowed stock-client boundary。BK-M3 completed/final-gated on 2026-07-20：task V2 preserves exact tagged BK sources，F4 exact-source
+> historical seek and durable F3 cursor hydration over stable virtual Positions；the pinned local Pulsar broker passes
+> the exact
+> borrowed stock-client boundary。BK-M3 completed/final-gated on 2026-07-20：task V2 preserves exact tagged BK sources，F4
+> exact-source
 > reads and source protection are provider-registered，BK `MATERIALIZATION_SOURCE` uses bounded durable dynamic slots
 > with restart-safe owner transfer，the shared F4 runtime accepts the matched BK reader/protection provider，the async
 > profile freezes `BOOKKEEPER_ENTRY_RANGE + ASYNCHRONOUS + STABLE_HEAD`，and the existing F4 lag authority admits the
@@ -251,17 +253,17 @@ stream metadata 保持不可变。修改 namespace/topic policy 不得原地改�
 
 ## 4. Document map
 
-| Document | Frozen boundary |
-| --- | --- |
-| [01-current-contract-and-source-audit.md](01-current-contract-and-source-audit.md) | current Nereus/Pulsar/BK source locks、call paths、blocking gaps |
-| [02-domain-api-module-and-target-contract.md](02-domain-api-module-and-target-contract.md) | module DAG、provider-neutral SPI/read result、BK API、target/offset mapping |
-| [03-oxia-metadata-ledger-lifecycle-and-codecs.md](03-oxia-metadata-ledger-lifecycle-and-codecs.md) | exact keys/records/codecs/CAS、allocation/segment/protection/delete state |
-| [04-append-read-recovery-and-fencing.md](04-append-read-recovery-and-fencing.md) | append/read state machines、rollover、fencing、response-loss recovery |
-| [05-retention-materialization-and-completion.md](05-retention-materialization-and-completion.md) | BK_ONLY GC、F4 source adapter、async/sync completion、lag and source release |
-| [06-pulsar-runtime-rollout-and-compatibility.md](06-pulsar-runtime-rollout-and-compatibility.md) | broker wiring、first-create admission、capability、ownership transfer、operations |
-| [07-implementation-plan-and-gates.md](07-implementation-plan-and-gates.md) | BK-M0–M6 file-level implementation order、mandatory review stops、Gradle gates |
-| [08-scenario-evidence-matrix.md](08-scenario-evidence-matrix.md) | deterministic/real-service/two-broker/scale/chaos traceability |
-| [09-m6-executable-evidence-matrix.md](09-m6-executable-evidence-matrix.md) | BK-87–BK-96 exact method/gate manifest、fresh M6/final results and source lock |
+| Document                                                                                           | Frozen boundary                                                               |
+|----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
+| [01-current-contract-and-source-audit.md](01-current-contract-and-source-audit.md)                 | current Nereus/Pulsar/BK source locks、call paths、blocking gaps                |
+| [02-domain-api-module-and-target-contract.md](02-domain-api-module-and-target-contract.md)         | module DAG、provider-neutral SPI/read result、BK API、target/offset mapping      |
+| [03-oxia-metadata-ledger-lifecycle-and-codecs.md](03-oxia-metadata-ledger-lifecycle-and-codecs.md) | exact keys/records/codecs/CAS、allocation/segment/protection/delete state      |
+| [04-append-read-recovery-and-fencing.md](04-append-read-recovery-and-fencing.md)                   | append/read state machines、rollover、fencing、response-loss recovery            |
+| [05-retention-materialization-and-completion.md](05-retention-materialization-and-completion.md)   | BK_ONLY GC、F4 source adapter、async/sync completion、lag and source release     |
+| [06-pulsar-runtime-rollout-and-compatibility.md](06-pulsar-runtime-rollout-and-compatibility.md)   | broker wiring、first-create admission、capability、ownership transfer、operations |
+| [07-implementation-plan-and-gates.md](07-implementation-plan-and-gates.md)                         | BK-M0–M6 file-level implementation order、mandatory review stops、Gradle gates  |
+| [08-scenario-evidence-matrix.md](08-scenario-evidence-matrix.md)                                   | deterministic/real-service/two-broker/scale/chaos traceability                |
+| [09-m6-executable-evidence-matrix.md](09-m6-executable-evidence-matrix.md)                         | BK-87–BK-96 exact method/gate manifest、fresh M6/final results and source lock |
 
 Documents `03`–`09` are part of the same required design. All ten documents and their global links pass
 `./gradlew bookKeeperPrimaryWalDocumentationCheck --console=plain`。BK-M1 additionally passed
@@ -285,11 +287,11 @@ Projection、task、cache、ledger handle 与 metrics 都只能解释以上 dura
 
 ## 6. Success predicates
 
-| Profile | Producer success predicate | Read before higher generation | BK source release |
-| --- | --- | --- | --- |
-| `BOOKKEEPER_WAL_ONLY` | BK durable + recoverable intent/target + reachable head commit；strict callers may also require gen0 index | exact BK range | only durable logical trim + whole-ledger proof |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | same stable-head boundary, after pre-IO profile/lag admission | exact BK range; later highest admitted Object generation | trim or healthy exact Object replacement, then whole-ledger proof |
-| `BOOKKEEPER_WAL_SYNC_OBJECT` | stable head + gen0 + exact required Object generation COMMITTED and resolvable/read-admitted | consumers may see committed BK bytes while producer is awaiting Object completion | same as async |
+| Profile                       | Producer success predicate                                                                                | Read before higher generation                                                     | BK source release                                                 |
+|-------------------------------|-----------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|-------------------------------------------------------------------|
+| `BOOKKEEPER_WAL_ONLY`         | BK durable + recoverable intent/target + reachable head commit；strict callers may also require gen0 index | exact BK range                                                                    | only durable logical trim + whole-ledger proof                    |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | same stable-head boundary, after pre-IO profile/lag admission                                             | exact BK range; later highest admitted Object generation                          | trim or healthy exact Object replacement, then whole-ledger proof |
+| `BOOKKEEPER_WAL_SYNC_OBJECT`  | stable head + gen0 + exact required Object generation COMMITTED and resolvable/read-admitted              | consumers may see committed BK bytes while producer is awaiting Object completion | same as async                                                     |
 
 “sync” controls producer completion, not logical visibility. Moving visibility after Object publication would create a
 second commit protocol and is forbidden.

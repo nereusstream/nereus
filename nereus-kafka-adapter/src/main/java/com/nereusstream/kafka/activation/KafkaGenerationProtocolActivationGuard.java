@@ -32,7 +32,6 @@ import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.VersionedMaterializationStreamRegistration;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -54,10 +53,8 @@ import java.util.concurrent.CompletableFuture;
  * partition-lock/KRaft guard separately to {@code GenerationCommitter.publish}; both authorities
  * are revalidated before the Generation COMMITTED CAS.
  */
-public final class KafkaGenerationProtocolActivationGuard
-        implements GenerationProtocolActivationGuard {
-    private static final Checksum REFERENCE_DOMAIN_SHA256 =
-            sha256("nereus-kafka-direct-stream-publication-domain-v1");
+public final class KafkaGenerationProtocolActivationGuard implements GenerationProtocolActivationGuard {
+    private static final Checksum REFERENCE_DOMAIN_SHA256 = sha256("nereus-kafka-direct-stream-publication-domain-v1");
 
     private final String cluster;
     private final F4Keyspace keyspace;
@@ -114,26 +111,18 @@ public final class KafkaGenerationProtocolActivationGuard
             return CompletableFuture.failedFuture(failure);
         }
         return loadAuthority(operation, live)
-                .thenCompose(
-                        authority ->
-                                activationVerifier
-                                        .verifyCurrent()
-                                        .thenApply(
-                                                active ->
-                                                        GenerationActivationProof.create(
-                                                                operation,
-                                                                live,
-                                                                authority
-                                                                        .validationVersion(),
-                                                                active.activation()
-                                                                        .metadataVersion(),
-                                                                active.readiness()
-                                                                        .value()
-                                                                        .readinessEpoch(),
-                                                                REFERENCE_DOMAIN_SHA256,
-                                                                true,
-                                                                false,
-                                                                Math.max(0, clock.millis()))))
+                .thenCompose(authority -> activationVerifier
+                        .verifyCurrent()
+                        .thenApply(active -> GenerationActivationProof.create(
+                                operation,
+                                live,
+                                authority.validationVersion(),
+                                active.activation().metadataVersion(),
+                                active.readiness().value().readinessEpoch(),
+                                REFERENCE_DOMAIN_SHA256,
+                                true,
+                                false,
+                                Math.max(0, clock.millis()))))
                 .toCompletableFuture();
     }
 
@@ -153,114 +142,75 @@ public final class KafkaGenerationProtocolActivationGuard
             return CompletableFuture.failedFuture(failure);
         }
         return loadAuthority(exact.operation(), live)
-                .thenCompose(
-                        authority -> {
-                            if (authority.validationVersion()
-                                    != exact.subjectValidationVersion()) {
-                                return CompletableFuture.failedFuture(
-                                        condition(
-                                                "Kafka direct-stream authority changed after"
-                                                    + " activation proof"));
-                            }
-                            return activationVerifier
-                                    .verifyCurrent()
-                                    .thenAccept(
-                                            active -> {
-                                                if (active.activation().metadataVersion()
-                                                                != exact
-                                                                        .clusterActivationMetadataVersion()
-                                                        || active.readiness()
-                                                                        .value()
-                                                                        .readinessEpoch()
-                                                                != exact
-                                                                        .brokerCapabilityReadinessEpoch()) {
-                                                    throw condition(
-                                                            "Kafka ACTIVE/readiness authority"
-                                                                + " changed after activation"
-                                                                + " proof");
-                                                }
-                                            });
-                        })
+                .thenCompose(authority -> {
+                    if (authority.validationVersion() != exact.subjectValidationVersion()) {
+                        return CompletableFuture.failedFuture(
+                                condition("Kafka direct-stream authority changed after" + " activation proof"));
+                    }
+                    return activationVerifier.verifyCurrent().thenAccept(active -> {
+                        if (active.activation().metadataVersion() != exact.clusterActivationMetadataVersion()
+                                || active.readiness().value().readinessEpoch()
+                                        != exact.brokerCapabilityReadinessEpoch()) {
+                            throw condition(
+                                    "Kafka ACTIVE/readiness authority" + " changed after activation" + " proof");
+                        }
+                    });
+                })
                 .toCompletableFuture();
     }
 
     private CompletableFuture<SubjectAuthority> loadAuthority(
             GenerationOperation operation, LiveStreamSubject subject) {
-        return generations
-                .getStreamRegistration(cluster, subject.streamId())
-                .thenCompose(
-                        optional -> {
-                            if (optional.isPresent()) {
-                                return CompletableFuture.completedFuture(
-                                        registrationAuthority(
-                                                subject, optional.orElseThrow()));
-                            }
-                            if (operation == GenerationOperation.TOPIC_COMPACTED_PUBLISH
-                                    && l0Metadata.isPresent()) {
-                                return l0Metadata
-                                        .orElseThrow()
-                                        .getStreamSnapshot(cluster, subject.streamId())
-                                        .thenApply(
-                                                snapshot ->
-                                                        walOnlyCompactionAuthority(
-                                                                subject, snapshot));
-                            }
-                            return CompletableFuture.failedFuture(
-                                    condition(
-                                            "Kafka direct-stream registration is absent"));
-                        });
+        return generations.getStreamRegistration(cluster, subject.streamId()).thenCompose(optional -> {
+            if (optional.isPresent()) {
+                return CompletableFuture.completedFuture(registrationAuthority(subject, optional.orElseThrow()));
+            }
+            if (operation == GenerationOperation.TOPIC_COMPACTED_PUBLISH && l0Metadata.isPresent()) {
+                return l0Metadata
+                        .orElseThrow()
+                        .getStreamSnapshot(cluster, subject.streamId())
+                        .thenApply(snapshot -> walOnlyCompactionAuthority(subject, snapshot));
+            }
+            return CompletableFuture.failedFuture(condition("Kafka direct-stream registration is absent"));
+        });
     }
 
     private SubjectAuthority registrationAuthority(
-            LiveStreamSubject subject,
-            VersionedMaterializationStreamRegistration registration) {
+            LiveStreamSubject subject, VersionedMaterializationStreamRegistration registration) {
         MaterializationStreamRegistrationRecord value = registration.value();
         StorageProfile profile;
         try {
             profile = StorageProfile.valueOf(value.storageProfile()).canonical();
         } catch (IllegalArgumentException failure) {
-            throw invariant(
-                    "Kafka direct-stream registration contains an unknown profile", failure);
+            throw invariant("Kafka direct-stream registration contains an unknown profile", failure);
         }
-        Checksum expected =
-                DirectMaterializationStreamAuthority.identitySha256(
-                        subject.streamId(), profile);
-        if (!registration
-                        .key()
-                        .equals(keyspace.materializationRegistryKey(subject.streamId()))
+        Checksum expected = DirectMaterializationStreamAuthority.identitySha256(subject.streamId(), profile);
+        if (!registration.key().equals(keyspace.materializationRegistryKey(subject.streamId()))
                 || !value.streamId().equals(subject.streamId().value())
                 || !profile.objectMaterializationEnabled()
-                || !value.projectionRef()
-                        .equals(DirectMaterializationStreamAuthority.encodedProjectionRef())
+                || !value.projectionRef().equals(DirectMaterializationStreamAuthority.encodedProjectionRef())
                 || !value.projectionIdentitySha256().equals(expected.value())
                 || !subject.streamIdentitySha256().equals(expected)) {
-            throw condition(
-                    "Kafka direct-stream registration no longer matches publication authority");
+            throw condition("Kafka direct-stream registration no longer matches publication authority");
         }
         return new SubjectAuthority(registration.metadataVersion());
     }
 
-    private SubjectAuthority walOnlyCompactionAuthority(
-            LiveStreamSubject subject, StreamMetadataSnapshot snapshot) {
+    private SubjectAuthority walOnlyCompactionAuthority(LiveStreamSubject subject, StreamMetadataSnapshot snapshot) {
         StorageProfile profile;
         StreamState state;
         try {
             profile = StorageProfile.valueOf(snapshot.metadata().profile()).canonical();
             state = StreamState.valueOf(snapshot.metadata().state());
         } catch (IllegalArgumentException failure) {
-            throw invariant(
-                    "Kafka WAL-only compaction authority contains an unknown state/profile",
-                    failure);
+            throw invariant("Kafka WAL-only compaction authority contains an unknown state/profile", failure);
         }
-        Checksum expected =
-                DirectMaterializationStreamAuthority.identitySha256(
-                        subject.streamId(), profile);
+        Checksum expected = DirectMaterializationStreamAuthority.identitySha256(subject.streamId(), profile);
         if (!snapshot.metadata().streamId().equals(subject.streamId().value())
                 || profile != StorageProfile.BOOKKEEPER_WAL_ONLY
                 || (state != StreamState.ACTIVE && state != StreamState.SEALED)
                 || !subject.streamIdentitySha256().equals(expected)) {
-            throw condition(
-                    "Kafka WAL-only compaction stream no longer matches publication authority");
+            throw condition("Kafka WAL-only compaction stream no longer matches publication authority");
         }
         return new SubjectAuthority(snapshot.metadata().policyVersion());
     }
@@ -271,12 +221,8 @@ public final class KafkaGenerationProtocolActivationGuard
             boolean activateLiveProjectionIfAbsent) {
         GenerationOperation exactOperation = Objects.requireNonNull(operation, "operation");
         GenerationActivationSubject exactSubject = Objects.requireNonNull(subject, "subject");
-        if ((exactOperation
-                        != GenerationOperation
-                                .TOPIC_COMPACTED_PUBLISH
-                        && exactOperation
-                                != GenerationOperation
-                                        .GENERATION_PUBLISH)
+        if ((exactOperation != GenerationOperation.TOPIC_COMPACTED_PUBLISH
+                        && exactOperation != GenerationOperation.GENERATION_PUBLISH)
                 || activateLiveProjectionIfAbsent
                 || !(exactSubject instanceof LiveStreamSubject live)) {
             throw new IllegalArgumentException(
@@ -290,8 +236,7 @@ public final class KafkaGenerationProtocolActivationGuard
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of()
-                            .formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8))));
+                    HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8))));
         } catch (NoSuchAlgorithmException failure) {
             throw new ExceptionInInitializerError(failure);
         }
@@ -320,8 +265,7 @@ public final class KafkaGenerationProtocolActivationGuard
     private record SubjectAuthority(long validationVersion) {
         private SubjectAuthority {
             if (validationVersion < 0) {
-                throw new IllegalArgumentException(
-                        "subject authority validation version must be non-negative");
+                throw new IllegalArgumentException("subject authority validation version must be non-negative");
             }
         }
     }

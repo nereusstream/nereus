@@ -1,12 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
-package com.nereusstream.kafka.runtime;
 
-import java.util.ArrayList;
-import java.util.List;
-import org.junit.jupiter.api.Test;
+package com.nereusstream.kafka.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 
 class KafkaRuntimeResourcesTest {
     @Test
@@ -29,11 +29,11 @@ class KafkaRuntimeResourcesTest {
 
     @Test
     void duplicateIdentityAndMixedOwnershipAreRejected() {
-        AutoCloseable shared = () -> { };
+        AutoCloseable shared = () -> {};
 
         assertThatThrownBy(() -> new KafkaRuntimeResources(List.of(
-                KafkaRuntimeResources.Resource.owned("owned", shared),
-                KafkaRuntimeResources.Resource.borrowed("borrowed", shared))))
+                        KafkaRuntimeResources.Resource.owned("owned", shared),
+                        KafkaRuntimeResources.Resource.borrowed("borrowed", shared))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("OWNED/BORROWED");
     }

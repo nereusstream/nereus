@@ -1,11 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.retirement;
 
 import static com.nereusstream.metadata.oxia.retirement.RetirementMetadataStoreTestSupport.CLUSTER;
 import static com.nereusstream.metadata.oxia.retirement.RetirementMetadataStoreTestSupport.OBJECT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -36,31 +36,24 @@ class ObjectAuditRetirementStoreContractTest {
         client.put(referencesKey, partition, references, ObjectReferenceRecord.class, 81);
         client.put(manifestKey, partition, manifest, ObjectManifestRecord.class, 83);
 
-        VersionedObjectReferencesAudit capturedReferences = store.getReferences(
-                CLUSTER, OBJECT).join().orElseThrow();
-        VersionedObjectManifestAudit capturedManifest = store.getManifest(
-                CLUSTER, OBJECT).join().orElseThrow();
+        VersionedObjectReferencesAudit capturedReferences =
+                store.getReferences(CLUSTER, OBJECT).join().orElseThrow();
+        VersionedObjectManifestAudit capturedManifest =
+                store.getManifest(CLUSTER, OBJECT).join().orElseThrow();
         assertThat(capturedReferences.value().metadataVersion()).isEqualTo(81);
         assertThat(capturedManifest.value().metadataVersion()).isEqualTo(83);
         assertThat(capturedReferences.durableValueSha256())
-                .isEqualTo(RetirementMetadataStoreTestSupport.digest(
-                        references, ObjectReferenceRecord.class));
+                .isEqualTo(RetirementMetadataStoreTestSupport.digest(references, ObjectReferenceRecord.class));
         assertThat(capturedManifest.durableValueSha256())
-                .isEqualTo(RetirementMetadataStoreTestSupport.digest(
-                        manifest, ObjectManifestRecord.class));
+                .isEqualTo(RetirementMetadataStoreTestSupport.digest(manifest, ObjectManifestRecord.class));
 
         store.deleteReferences(
-                CLUSTER,
-                OBJECT,
-                capturedReferences.metadataVersion(),
-                capturedReferences.durableValueSha256()).join();
+                        CLUSTER, OBJECT, capturedReferences.metadataVersion(), capturedReferences.durableValueSha256())
+                .join();
         assertThat(client.contains(referencesKey, partition)).isFalse();
         assertThat(client.contains(manifestKey, partition)).isTrue();
-        store.deleteManifest(
-                CLUSTER,
-                OBJECT,
-                capturedManifest.metadataVersion(),
-                capturedManifest.durableValueSha256()).join();
+        store.deleteManifest(CLUSTER, OBJECT, capturedManifest.metadataVersion(), capturedManifest.durableValueSha256())
+                .join();
         assertThat(client.contains(manifestKey, partition)).isFalse();
     }
 
@@ -74,15 +67,15 @@ class ObjectAuditRetirementStoreContractTest {
         ObjectReferenceRecord references = RetirementMetadataStoreTestSupport.references(OBJECT_ID);
         client.put(referencesKey, partition, references, ObjectReferenceRecord.class, 91);
 
-        assertThatThrownBy(() -> store.deleteReferences(
-                        CLUSTER, OBJECT, 91, WRONG_DIGEST).join())
+        assertThatThrownBy(() -> store.deleteReferences(CLUSTER, OBJECT, 91, WRONG_DIGEST)
+                        .join())
                 .hasCauseInstanceOf(F4MetadataConditionFailedException.class);
         assertThatThrownBy(() -> store.deleteReferences(
-                        CLUSTER,
-                        OBJECT,
-                        92,
-                        RetirementMetadataStoreTestSupport.digest(
-                                references, ObjectReferenceRecord.class)).join())
+                                CLUSTER,
+                                OBJECT,
+                                92,
+                                RetirementMetadataStoreTestSupport.digest(references, ObjectReferenceRecord.class))
+                        .join())
                 .hasCauseInstanceOf(F4MetadataConditionFailedException.class);
         assertThat(client.contains(referencesKey, partition)).isTrue();
 
@@ -90,9 +83,8 @@ class ObjectAuditRetirementStoreContractTest {
         client.put(referencesKey, partition, contradictory, ObjectReferenceRecord.class, 93);
         assertThatThrownBy(() -> store.getReferences(CLUSTER, OBJECT).join())
                 .satisfies(error -> assertThat(unwrap(error))
-                        .isInstanceOfSatisfying(NereusException.class, nereus ->
-                                assertThat(nereus.code()).isEqualTo(
-                                        ErrorCode.METADATA_INVARIANT_VIOLATION)));
+                        .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                                .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION)));
         assertThat(client.contains(referencesKey, partition)).isTrue();
     }
 
@@ -108,26 +100,26 @@ class ObjectAuditRetirementStoreContractTest {
         client.loseNextDeleteResponse();
 
         assertThatThrownBy(() -> store.deleteManifest(
-                        CLUSTER,
-                        OBJECT,
-                        101,
-                        RetirementMetadataStoreTestSupport.digest(
-                                manifest, ObjectManifestRecord.class)).join())
+                                CLUSTER,
+                                OBJECT,
+                                101,
+                                RetirementMetadataStoreTestSupport.digest(manifest, ObjectManifestRecord.class))
+                        .join())
                 .hasCauseInstanceOf(IllegalStateException.class);
         assertThat(client.contains(manifestKey, partition)).isFalse();
         assertThat(store.getManifest(CLUSTER, OBJECT).join()).isEmpty();
         assertThatThrownBy(() -> store.deleteManifest(
-                        CLUSTER,
-                        OBJECT,
-                        101,
-                        RetirementMetadataStoreTestSupport.digest(
-                                manifest, ObjectManifestRecord.class)).join())
+                                CLUSTER,
+                                OBJECT,
+                                101,
+                                RetirementMetadataStoreTestSupport.digest(manifest, ObjectManifestRecord.class))
+                        .join())
                 .hasCauseInstanceOf(F4MetadataConditionFailedException.class);
 
         store.close();
         assertThatThrownBy(() -> store.getManifest(CLUSTER, OBJECT))
-                .isInstanceOfSatisfying(NereusException.class, nereus ->
-                        assertThat(nereus.code()).isEqualTo(ErrorCode.STORAGE_CLOSED));
+                .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                        .isEqualTo(ErrorCode.STORAGE_CLOSED));
     }
 
     private static Throwable unwrap(Throwable supplied) {

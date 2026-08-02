@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -7,7 +8,9 @@ import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-/** Minimal exact F4 authority identity persisted into a provider-specific source-retirement proof. */
+/**
+ * Minimal exact F4 authority identity persisted into a provider-specific source-retirement proof.
+ */
 public record CommittedGenerationRetirementProof(
         StreamId streamId,
         OffsetRange sourceRange,

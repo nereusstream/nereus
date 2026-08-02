@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.snapshot;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
@@ -49,20 +49,43 @@ class TailPollCoordinatorTest {
 
     private static PendingReadWaiter waiter(CountDownLatch signalled) {
         return new PendingReadWaiter() {
-            @Override public long nextOffset() { return 0; }
-            @Override public OptionalLong inclusiveMaxOffset() { return OptionalLong.empty(); }
-            @Override public boolean trySignal(StreamMetadata metadata) {
-                if (metadata.committedEndOffset() == 0) return false;
+            @Override
+            public long nextOffset() {
+                return 0;
+            }
+
+            @Override
+            public OptionalLong inclusiveMaxOffset() {
+                return OptionalLong.empty();
+            }
+
+            @Override
+            public boolean trySignal(StreamMetadata metadata) {
+                if (metadata.committedEndOffset() == 0) {
+                    return false;
+                }
                 signalled.countDown();
                 return true;
             }
-            @Override public boolean tryFail(ManagedLedgerException error) { return true; }
+
+            @Override
+            public boolean tryFail(ManagedLedgerException error) {
+                return true;
+            }
         };
     }
 
     private static StreamMetadata metadata(long end) {
         return new StreamMetadata(
-                new StreamId("stream"), new StreamName("stream"), StreamState.ACTIVE,
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of(), 1, end, end, end, 0);
+                new StreamId("stream"),
+                new StreamName("stream"),
+                StreamState.ACTIVE,
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                Map.of(),
+                1,
+                end,
+                end,
+                end,
+                0);
     }
 }

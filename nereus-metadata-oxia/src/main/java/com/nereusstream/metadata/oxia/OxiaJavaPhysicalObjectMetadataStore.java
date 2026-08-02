@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -18,14 +19,14 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
-/** Production Phase 4 physical-root/lease/protection adapter over the shared Oxia runtime. */
+/**
+ * Production Phase 4 physical-root/lease/protection adapter over the shared Oxia runtime.
+ */
 public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObjectMetadataStore {
     private final F4MetadataStoreSupport support;
 
     public static OxiaJavaPhysicalObjectMetadataStore usingSharedRuntime(
-            OxiaClientConfiguration clientConfig,
-            SharedOxiaClientRuntime runtime,
-            Clock clock) {
+            OxiaClientConfiguration clientConfig, SharedOxiaClientRuntime runtime, Clock clock) {
         Objects.requireNonNull(clientConfig, "clientConfig");
         Objects.requireNonNull(runtime, "runtime");
         runtime.requireCompatible(clientConfig);
@@ -37,8 +38,7 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
     }
 
     @Override
-    public CompletableFuture<Optional<VersionedPhysicalObjectRoot>> getRoot(
-            String cluster, ObjectKeyHash object) {
+    public CompletableFuture<Optional<VersionedPhysicalObjectRoot>> getRoot(String cluster, ObjectKeyHash object) {
         F4Keyspace keys = new F4Keyspace(cluster);
         ObjectKeyHash exact = Objects.requireNonNull(object, "object");
         return support.get(
@@ -49,8 +49,7 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
     }
 
     @Override
-    public CompletableFuture<VersionedPhysicalObjectRoot> createRoot(
-            String cluster, PhysicalObjectRootRecord root) {
+    public CompletableFuture<VersionedPhysicalObjectRoot> createRoot(String cluster, PhysicalObjectRootRecord root) {
         PhysicalObjectRootRecord value = Objects.requireNonNull(root, "root");
         ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
         F4Keyspace keys = new F4Keyspace(cluster);
@@ -61,22 +60,23 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
                         PhysicalObjectRootRecord.class)
                 .thenApply(item -> root(keys, item));
         return create.handle((created, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(created);
-            }
-            if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
-                return F4MetadataStoreSupport.<VersionedPhysicalObjectRoot>failed(
-                        F4MetadataStoreSupport.unwrap(failure));
-            }
-            return getRoot(cluster, object).thenApply(existing -> {
-                VersionedPhysicalObjectRoot result = existing.orElseThrow(
-                        () -> F4MetadataStoreSupport.invariant("physical root disappeared after create conflict"));
-                if (!PhysicalObjectRootTransitions.sameImmutableIdentity(value, result.value())) {
-                    throw F4MetadataStoreSupport.invariant("physical root immutable identity conflict");
-                }
-                return result;
-            });
-        }).thenCompose(Function.identity());
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(created);
+                    }
+                    if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
+                        return F4MetadataStoreSupport.<VersionedPhysicalObjectRoot>failed(
+                                F4MetadataStoreSupport.unwrap(failure));
+                    }
+                    return getRoot(cluster, object).thenApply(existing -> {
+                        VersionedPhysicalObjectRoot result = existing.orElseThrow(() ->
+                                F4MetadataStoreSupport.invariant("physical root disappeared after create conflict"));
+                        if (!PhysicalObjectRootTransitions.sameImmutableIdentity(value, result.value())) {
+                            throw F4MetadataStoreSupport.invariant("physical root immutable identity conflict");
+                        }
+                        return result;
+                    });
+                })
+                .thenCompose(Function.identity());
     }
 
     @Override
@@ -105,14 +105,11 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
 
     @Override
     public CompletableFuture<Void> deleteRoot(
-            String cluster,
-            ObjectKeyHash object,
-            long expectedVersion,
-            Checksum expectedRootSha256) {
+            String cluster, ObjectKeyHash object, long expectedVersion, Checksum expectedRootSha256) {
         Objects.requireNonNull(expectedRootSha256, "expectedRootSha256");
         return getRoot(cluster, object).thenCompose(optional -> {
-            VersionedPhysicalObjectRoot current = optional.orElseThrow(
-                    () -> new F4MetadataConditionFailedException("physical root is absent"));
+            VersionedPhysicalObjectRoot current =
+                    optional.orElseThrow(() -> new F4MetadataConditionFailedException("physical root is absent"));
             if (current.metadataVersion() != expectedVersion
                     || !current.durableValueSha256().equals(expectedRootSha256)
                     || current.value().lifecycle() != PhysicalObjectLifecycle.DELETED
@@ -134,20 +131,23 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
         String base = keys.physicalRootShardPrefix(shard);
         String prefix = F4MetadataStoreSupport.prefixStart(base);
         String scope = support.scopeSha256("physical-root\0" + shard);
-        F4ScanToken token = support.validateToken(
-                continuation, keys.cluster(), F4ScanKind.PHYSICAL_ROOT, scope, prefix);
+        F4ScanToken token =
+                support.validateToken(continuation, keys.cluster(), F4ScanKind.PHYSICAL_ROOT, scope, prefix);
         String from = token == null ? prefix : token.resumeFromInclusive();
         String to = F4MetadataStoreSupport.prefixEnd(base);
         ObjectKeyHash partitionHash = hashForShard(shard);
-        return support.client().rangeScan(
-                        from, to, limit, keys.physicalObjectPartitionKey(partitionHash))
+        return support.client()
+                .rangeScan(from, to, limit, keys.physicalObjectPartitionKey(partitionHash))
                 .thenApply(stored -> {
                     List<VersionedPhysicalObjectRoot> values = stored.stream()
                             .map(item -> root(keys, support.decode(item, PhysicalObjectRootRecord.class)))
                             .toList();
                     Optional<F4ScanToken> next = stored.size() == limit
                             ? Optional.of(new F4ScanToken(
-                                    keys.cluster(), F4ScanKind.PHYSICAL_ROOT, scope, prefix,
+                                    keys.cluster(),
+                                    F4ScanKind.PHYSICAL_ROOT,
+                                    scope,
+                                    prefix,
                                     stored.get(stored.size() - 1).key()))
                             : Optional.empty();
                     return new PhysicalObjectRootScanPage(values, next);
@@ -165,22 +165,23 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
                         key, keys.physicalObjectPartitionKey(object), value, ObjectReaderLeaseRecord.class)
                 .thenApply(item -> lease(keys, item));
         return create.handle((created, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(created);
-            }
-            if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
-                return F4MetadataStoreSupport.<VersionedReaderLease>failed(
-                        F4MetadataStoreSupport.unwrap(failure));
-            }
-            return readLease(keys, object, value.processRunId()).thenApply(existing -> {
-                VersionedReaderLease result = existing.orElseThrow(
-                        () -> F4MetadataStoreSupport.invariant("reader lease disappeared after create conflict"));
-                if (!result.value().withMetadataVersion(0).equals(value)) {
-                    throw F4MetadataStoreSupport.invariant("reader lease identity conflict");
-                }
-                return result;
-            });
-        }).thenCompose(Function.identity());
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(created);
+                    }
+                    if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
+                        return F4MetadataStoreSupport.<VersionedReaderLease>failed(
+                                F4MetadataStoreSupport.unwrap(failure));
+                    }
+                    return readLease(keys, object, value.processRunId()).thenApply(existing -> {
+                        VersionedReaderLease result = existing.orElseThrow(() ->
+                                F4MetadataStoreSupport.invariant("reader lease disappeared after create conflict"));
+                        if (!result.value().withMetadataVersion(0).equals(value)) {
+                            throw F4MetadataStoreSupport.invariant("reader lease identity conflict");
+                        }
+                        return result;
+                    });
+                })
+                .thenCompose(Function.identity());
     }
 
     @Override
@@ -203,17 +204,12 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
             String cluster, ObjectKeyHash object, String processRunId, long expectedVersion) {
         F4Keyspace keys = new F4Keyspace(cluster);
         return support.delete(
-                keys.readerLeaseKey(object, processRunId),
-                keys.physicalObjectPartitionKey(object),
-                expectedVersion);
+                keys.readerLeaseKey(object, processRunId), keys.physicalObjectPartitionKey(object), expectedVersion);
     }
 
     @Override
     public CompletableFuture<ReaderLeaseScanPage> scanReaderLeases(
-            String cluster,
-            ObjectKeyHash object,
-            Optional<F4ScanToken> continuation,
-            int limit) {
+            String cluster, ObjectKeyHash object, Optional<F4ScanToken> continuation, int limit) {
         F4Keyspace keys = new F4Keyspace(cluster);
         String base = keys.readerPrefix(object);
         return scanObjectPrefix(
@@ -241,22 +237,25 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
                         key, keys.physicalObjectPartitionKey(object), value, ObjectProtectionRecord.class)
                 .thenApply(item -> protection(keys, item));
         return create.handle((created, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(created);
-            }
-            if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
-                return F4MetadataStoreSupport.<VersionedObjectProtection>failed(
-                        F4MetadataStoreSupport.unwrap(failure));
-            }
-            return readProtection(keys, object, type, value.referenceId()).thenApply(existing -> {
-                VersionedObjectProtection result = existing.orElseThrow(
-                        () -> F4MetadataStoreSupport.invariant("protection disappeared after create conflict"));
-                if (!result.value().withMetadataVersion(0).equals(value)) {
-                    throw F4MetadataStoreSupport.invariant("protection identity conflict");
-                }
-                return result;
-            });
-        }).thenCompose(Function.identity());
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(created);
+                    }
+                    if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
+                        return F4MetadataStoreSupport.<VersionedObjectProtection>failed(
+                                F4MetadataStoreSupport.unwrap(failure));
+                    }
+                    return readProtection(keys, object, type, value.referenceId())
+                            .thenApply(existing -> {
+                                VersionedObjectProtection result =
+                                        existing.orElseThrow(() -> F4MetadataStoreSupport.invariant(
+                                                "protection disappeared after create conflict"));
+                                if (!result.value().withMetadataVersion(0).equals(value)) {
+                                    throw F4MetadataStoreSupport.invariant("protection identity conflict");
+                                }
+                                return result;
+                            });
+                })
+                .thenCompose(Function.identity());
     }
 
     @Override
@@ -288,10 +287,7 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
 
     @Override
     public CompletableFuture<ObjectProtectionScanPage> scanProtections(
-            String cluster,
-            ObjectKeyHash object,
-            Optional<F4ScanToken> continuation,
-            int limit) {
+            String cluster, ObjectKeyHash object, Optional<F4ScanToken> continuation, int limit) {
         F4Keyspace keys = new F4Keyspace(cluster);
         String base = keys.protectionPrefix(object);
         return scanObjectPrefix(
@@ -332,25 +328,25 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
                         GcRetirementManifestRecord.class)
                 .thenApply(item -> retirementManifest(keys, item));
         return create.handle((created, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(created);
-            }
-            if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
-                return F4MetadataStoreSupport.<VersionedGcRetirementManifest>failed(
-                        F4MetadataStoreSupport.unwrap(failure));
-            }
-            return getRetirementManifest(cluster, object, value.gcAttemptId())
-                    .thenApply(existing -> {
-                        VersionedGcRetirementManifest result = existing.orElseThrow(
-                                () -> F4MetadataStoreSupport.invariant(
-                                        "GC retirement manifest disappeared after create conflict"));
-                        if (!result.value().withMetadataVersion(0).equals(value)) {
-                            throw F4MetadataStoreSupport.invariant(
-                                    "GC retirement manifest identity conflict");
-                        }
-                        return result;
-                    });
-        }).thenCompose(Function.identity());
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(created);
+                    }
+                    if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
+                        return F4MetadataStoreSupport.<VersionedGcRetirementManifest>failed(
+                                F4MetadataStoreSupport.unwrap(failure));
+                    }
+                    return getRetirementManifest(cluster, object, value.gcAttemptId())
+                            .thenApply(existing -> {
+                                VersionedGcRetirementManifest result =
+                                        existing.orElseThrow(() -> F4MetadataStoreSupport.invariant(
+                                                "GC retirement manifest disappeared after create conflict"));
+                                if (!result.value().withMetadataVersion(0).equals(value)) {
+                                    throw F4MetadataStoreSupport.invariant("GC retirement manifest identity conflict");
+                                }
+                                return result;
+                            });
+                })
+                .thenCompose(Function.identity());
     }
 
     @Override
@@ -359,34 +355,29 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
         GcRetirementProtectionRecord value = Objects.requireNonNull(protection, "protection");
         ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
         F4Keyspace keys = new F4Keyspace(cluster);
-        String key = keys.gcRetirementProtectionKey(
-                object, value.gcAttemptId(), value.protectionKey());
+        String key = keys.gcRetirementProtectionKey(object, value.gcAttemptId(), value.protectionKey());
         CompletableFuture<VersionedGcRetirementProtection> create = support.create(
-                        key,
-                        keys.physicalObjectPartitionKey(object),
-                        value,
-                        GcRetirementProtectionRecord.class)
+                        key, keys.physicalObjectPartitionKey(object), value, GcRetirementProtectionRecord.class)
                 .thenApply(item -> retirementProtection(keys, item));
         return create.handle((created, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(created);
-            }
-            if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
-                return F4MetadataStoreSupport.<VersionedGcRetirementProtection>failed(
-                        F4MetadataStoreSupport.unwrap(failure));
-            }
-            return readRetirementProtection(keys, object, value)
-                    .thenApply(existing -> {
-                        VersionedGcRetirementProtection result = existing.orElseThrow(
-                                () -> F4MetadataStoreSupport.invariant(
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(created);
+                    }
+                    if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
+                        return F4MetadataStoreSupport.<VersionedGcRetirementProtection>failed(
+                                F4MetadataStoreSupport.unwrap(failure));
+                    }
+                    return readRetirementProtection(keys, object, value).thenApply(existing -> {
+                        VersionedGcRetirementProtection result =
+                                existing.orElseThrow(() -> F4MetadataStoreSupport.invariant(
                                         "GC retirement protection disappeared after create conflict"));
                         if (!result.value().withMetadataVersion(0).equals(value)) {
-                            throw F4MetadataStoreSupport.invariant(
-                                    "GC retirement protection identity conflict");
+                            throw F4MetadataStoreSupport.invariant("GC retirement protection identity conflict");
                         }
                         return result;
                     });
-        }).thenCompose(Function.identity());
+                })
+                .thenCompose(Function.identity());
     }
 
     @Override
@@ -397,40 +388,32 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
         F4Keyspace keys = new F4Keyspace(cluster);
         String key = keys.gcRetirementRemovalKey(object, value.gcAttemptId(), value.removalKey());
         CompletableFuture<VersionedGcRetirementRemoval> create = support.create(
-                        key,
-                        keys.physicalObjectPartitionKey(object),
-                        value,
-                        GcRetirementRemovalRecord.class)
+                        key, keys.physicalObjectPartitionKey(object), value, GcRetirementRemovalRecord.class)
                 .thenApply(item -> retirementRemoval(keys, item));
         return create.handle((created, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(created);
-            }
-            if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
-                return F4MetadataStoreSupport.<VersionedGcRetirementRemoval>failed(
-                        F4MetadataStoreSupport.unwrap(failure));
-            }
-            return readRetirementRemoval(keys, object, value)
-                    .thenApply(existing -> {
-                        VersionedGcRetirementRemoval result = existing.orElseThrow(
-                                () -> F4MetadataStoreSupport.invariant(
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(created);
+                    }
+                    if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
+                        return F4MetadataStoreSupport.<VersionedGcRetirementRemoval>failed(
+                                F4MetadataStoreSupport.unwrap(failure));
+                    }
+                    return readRetirementRemoval(keys, object, value).thenApply(existing -> {
+                        VersionedGcRetirementRemoval result =
+                                existing.orElseThrow(() -> F4MetadataStoreSupport.invariant(
                                         "GC retirement removal disappeared after create conflict"));
                         if (!result.value().withMetadataVersion(0).equals(value)) {
-                            throw F4MetadataStoreSupport.invariant(
-                                    "GC retirement removal identity conflict");
+                            throw F4MetadataStoreSupport.invariant("GC retirement removal identity conflict");
                         }
                         return result;
                     });
-        }).thenCompose(Function.identity());
+                })
+                .thenCompose(Function.identity());
     }
 
     @Override
     public CompletableFuture<GcRetirementProtectionScanPage> scanRetirementProtections(
-            String cluster,
-            ObjectKeyHash object,
-            String gcAttemptId,
-            Optional<F4ScanToken> continuation,
-            int limit) {
+            String cluster, ObjectKeyHash object, String gcAttemptId, Optional<F4ScanToken> continuation, int limit) {
         F4Keyspace keys = new F4Keyspace(cluster);
         return scanObjectPrefix(
                 keys,
@@ -447,11 +430,7 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
 
     @Override
     public CompletableFuture<GcRetirementRemovalScanPage> scanRetirementRemovals(
-            String cluster,
-            ObjectKeyHash object,
-            String gcAttemptId,
-            Optional<F4ScanToken> continuation,
-            int limit) {
+            String cluster, ObjectKeyHash object, String gcAttemptId, Optional<F4ScanToken> continuation, int limit) {
         F4Keyspace keys = new F4Keyspace(cluster);
         return scanObjectPrefix(
                 keys,
@@ -481,10 +460,7 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
     }
 
     private CompletableFuture<Optional<VersionedObjectProtection>> readProtection(
-            F4Keyspace keys,
-            ObjectKeyHash object,
-            ObjectProtectionType type,
-            String referenceId) {
+            F4Keyspace keys, ObjectKeyHash object, ObjectProtectionType type, String referenceId) {
         return support.get(
                         keys.protectionKey(object, type, referenceId),
                         keys.physicalObjectPartitionKey(object),
@@ -493,30 +469,24 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
     }
 
     private CompletableFuture<Optional<VersionedGcRetirementProtection>> readRetirementProtection(
-            F4Keyspace keys,
-            ObjectKeyHash object,
-            GcRetirementProtectionRecord protection) {
+            F4Keyspace keys, ObjectKeyHash object, GcRetirementProtectionRecord protection) {
         return support.get(
-                        keys.gcRetirementProtectionKey(
-                                object, protection.gcAttemptId(), protection.protectionKey()),
+                        keys.gcRetirementProtectionKey(object, protection.gcAttemptId(), protection.protectionKey()),
                         keys.physicalObjectPartitionKey(object),
                         GcRetirementProtectionRecord.class)
                 .thenApply(value -> value.map(item -> retirementProtection(keys, item)));
     }
 
     private CompletableFuture<Optional<VersionedGcRetirementRemoval>> readRetirementRemoval(
-            F4Keyspace keys,
-            ObjectKeyHash object,
-            GcRetirementRemovalRecord removal) {
+            F4Keyspace keys, ObjectKeyHash object, GcRetirementRemovalRecord removal) {
         return support.get(
-                        keys.gcRetirementRemovalKey(
-                                object, removal.gcAttemptId(), removal.removalKey()),
+                        keys.gcRetirementRemovalKey(object, removal.gcAttemptId(), removal.removalKey()),
                         keys.physicalObjectPartitionKey(object),
                         GcRetirementRemovalRecord.class)
                 .thenApply(value -> value.map(item -> retirementRemoval(keys, item)));
     }
 
-    private <R, V, P> CompletableFuture<P> scanObjectPrefix(
+    private <R, V, PageT> CompletableFuture<PageT> scanObjectPrefix(
             F4Keyspace keys,
             ObjectKeyHash object,
             F4ScanKind kind,
@@ -526,7 +496,7 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
             int limit,
             Class<R> recordType,
             Function<F4MetadataStoreSupport.Decoded<R>, V> wrapper,
-            java.util.function.BiFunction<List<V>, Optional<F4ScanToken>, P> pageFactory) {
+            java.util.function.BiFunction<List<V>, Optional<F4ScanToken>, PageT> pageFactory) {
         F4MetadataStoreSupport.requirePageLimit(limit);
         String prefix = F4MetadataStoreSupport.prefixStart(base);
         String scope = support.scopeSha256(kind.name() + "\0" + object.value() + "\0" + base);
@@ -535,15 +505,18 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
                 ? F4MetadataStoreSupport.fixedDepthStart(base, descendantSegments)
                 : token.resumeFromInclusive();
         String to = F4MetadataStoreSupport.fixedDepthEnd(base, descendantSegments);
-        return support.client().rangeScan(
-                        from, to, limit, keys.physicalObjectPartitionKey(object))
+        return support.client()
+                .rangeScan(from, to, limit, keys.physicalObjectPartitionKey(object))
                 .thenApply(stored -> {
                     List<V> values = stored.stream()
                             .map(item -> wrapper.apply(support.decode(item, recordType)))
                             .toList();
                     Optional<F4ScanToken> next = stored.size() == limit
                             ? Optional.of(new F4ScanToken(
-                                    keys.cluster(), kind, scope, prefix,
+                                    keys.cluster(),
+                                    kind,
+                                    scope,
+                                    prefix,
                                     stored.get(stored.size() - 1).key()))
                             : Optional.empty();
                     return pageFactory.apply(values, next);
@@ -582,44 +555,33 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
     }
 
     private static VersionedGcRetirementManifest retirementManifest(
-            F4Keyspace keys,
-            F4MetadataStoreSupport.Decoded<GcRetirementManifestRecord> item) {
+            F4Keyspace keys, F4MetadataStoreSupport.Decoded<GcRetirementManifestRecord> item) {
         GcRetirementManifestRecord value = item.value();
         ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
         if (!item.key().equals(keys.gcRetirementManifestKey(object, value.gcAttemptId()))) {
-            throw F4MetadataStoreSupport.invariant(
-                    "GC retirement manifest key/value identity mismatch");
+            throw F4MetadataStoreSupport.invariant("GC retirement manifest key/value identity mismatch");
         }
-        return new VersionedGcRetirementManifest(
-                item.key(), value, item.version(), item.durableSha256());
+        return new VersionedGcRetirementManifest(item.key(), value, item.version(), item.durableSha256());
     }
 
     private static VersionedGcRetirementProtection retirementProtection(
-            F4Keyspace keys,
-            F4MetadataStoreSupport.Decoded<GcRetirementProtectionRecord> item) {
+            F4Keyspace keys, F4MetadataStoreSupport.Decoded<GcRetirementProtectionRecord> item) {
         GcRetirementProtectionRecord value = item.value();
         ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
-        if (!item.key().equals(keys.gcRetirementProtectionKey(
-                object, value.gcAttemptId(), value.protectionKey()))) {
-            throw F4MetadataStoreSupport.invariant(
-                    "GC retirement protection key/value identity mismatch");
+        if (!item.key().equals(keys.gcRetirementProtectionKey(object, value.gcAttemptId(), value.protectionKey()))) {
+            throw F4MetadataStoreSupport.invariant("GC retirement protection key/value identity mismatch");
         }
-        return new VersionedGcRetirementProtection(
-                item.key(), value, item.version(), item.durableSha256());
+        return new VersionedGcRetirementProtection(item.key(), value, item.version(), item.durableSha256());
     }
 
     private static VersionedGcRetirementRemoval retirementRemoval(
-            F4Keyspace keys,
-            F4MetadataStoreSupport.Decoded<GcRetirementRemovalRecord> item) {
+            F4Keyspace keys, F4MetadataStoreSupport.Decoded<GcRetirementRemovalRecord> item) {
         GcRetirementRemovalRecord value = item.value();
         ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
-        if (!item.key().equals(keys.gcRetirementRemovalKey(
-                object, value.gcAttemptId(), value.removalKey()))) {
-            throw F4MetadataStoreSupport.invariant(
-                    "GC retirement removal key/value identity mismatch");
+        if (!item.key().equals(keys.gcRetirementRemovalKey(object, value.gcAttemptId(), value.removalKey()))) {
+            throw F4MetadataStoreSupport.invariant("GC retirement removal key/value identity mismatch");
         }
-        return new VersionedGcRetirementRemoval(
-                item.key(), value, item.version(), item.durableSha256());
+        return new VersionedGcRetirementRemoval(item.key(), value, item.version(), item.durableSha256());
     }
 
     private static ObjectKeyHash hashForShard(int shard) {
@@ -629,7 +591,6 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
         String alphabet = "abcdefghijklmnopqrstuvwxyz234567";
         int first = shard >>> 3;
         int secondHigh = (shard & 7) << 2;
-        return new ObjectKeyHash(
-                "" + alphabet.charAt(first) + alphabet.charAt(secondHigh) + "a".repeat(50));
+        return new ObjectKeyHash("" + alphabet.charAt(first) + alphabet.charAt(secondHigh) + "a".repeat(50));
     }
 }

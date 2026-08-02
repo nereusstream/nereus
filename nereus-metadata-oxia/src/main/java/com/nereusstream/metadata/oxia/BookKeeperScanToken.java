@@ -1,9 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import java.util.Objects;
 
-/** Opaque, scope- and page-size-bound continuation for BK metadata scans. */
+/**
+ * Opaque, scope- and page-size-bound continuation for BK metadata scans.
+ */
 public final class BookKeeperScanToken {
     private final String cluster;
     private final BookKeeperScanKind kind;
@@ -59,7 +62,9 @@ public final class BookKeeperScanToken {
 
     private static String text(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 

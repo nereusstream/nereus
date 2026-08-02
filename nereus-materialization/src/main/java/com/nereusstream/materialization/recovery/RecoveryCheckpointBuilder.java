@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.recovery;
 
 import com.nereusstream.api.Checksum;
@@ -6,8 +7,8 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
-import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ProjectionRef;
+import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
@@ -18,8 +19,8 @@ import com.nereusstream.core.recovery.AnchorAwareCommitWalker;
 import com.nereusstream.materialization.MaterializationConfig;
 import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.F4ScanToken;
-import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
+import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.ProjectionIdentity;
@@ -55,7 +56,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Builds one exact checkpointable commit prefix without mutating metadata or object storage. */
+/**
+ * Builds one exact checkpointable commit prefix without mutating metadata or object storage.
+ */
 public final class RecoveryCheckpointBuilder {
     private static final int MAX_GENERATION_CANDIDATES = 4_096;
     private static final int MAX_ROOT_REFERENCES = 32;
@@ -94,15 +97,17 @@ public final class RecoveryCheckpointBuilder {
         String attemptId = requireText(checkpointAttemptId, "checkpointAttemptId");
         validateStableInputs(streamId, baseRoot, registration);
         int pageSize = Math.min(config.plannerPageSize(), 1_000);
-        CompletableFuture<AnchorAwareCommitWalk> walk = commitWalker.walk(
-                streamId, config.recoveryCheckpointMaxEntries(), pageSize);
+        CompletableFuture<AnchorAwareCommitWalk> walk =
+                commitWalker.walk(streamId, config.recoveryCheckpointMaxEntries(), pageSize);
         CompletableFuture<StreamMetadataSnapshot> snapshot = l0Store.getStreamSnapshot(cluster, streamId);
         return walk.thenCombine(snapshot, BuildObservation::new)
-                .thenCompose(observation -> buildFromObservation(
-                        streamId, baseRoot, registration, attemptId, observation));
+                .thenCompose(
+                        observation -> buildFromObservation(streamId, baseRoot, registration, attemptId, observation));
     }
 
-    /** Re-proves the exact selected prefix/index facts immediately before root publication. */
+    /**
+     * Re-proves the exact selected prefix/index facts immediately before root publication.
+     */
     public CompletableFuture<Void> revalidate(RecoveryCheckpointPlan plan) {
         Objects.requireNonNull(plan, "plan");
         StreamId streamId = plan.writeRequest().streamId();
@@ -111,22 +116,21 @@ public final class RecoveryCheckpointBuilder {
                 generationStore.getRecoveryRoot(cluster, streamId);
         CompletableFuture<Optional<VersionedMaterializationStreamRegistration>> registration =
                 generationStore.getStreamRegistration(cluster, streamId);
-        CompletableFuture<AnchorAwareCommitWalk> walk = commitWalker.walk(
-                streamId, config.recoveryCheckpointMaxEntries(), pageSize);
-        return CompletableFuture.allOf(root, registration, walk)
-                .thenCompose(ignored -> {
-                    if (!root.join().equals(Optional.of(plan.baseRoot()))
-                            || !registration.join().equals(Optional.of(plan.registration()))) {
-                        return CompletableFuture.failedFuture(condition(
-                                "recovery checkpoint root/registration changed before publication"));
-                    }
-                    AnchorAwareCommitWalk current = walk.join();
-                    requireSelectedCommitsUnchanged(plan, current);
-                    List<CompletableFuture<Void>> indexChecks = plan.targets().stream()
-                            .map(target -> revalidateIndex(target.index()))
-                            .toList();
-                    return CompletableFuture.allOf(indexChecks.toArray(CompletableFuture[]::new));
-                });
+        CompletableFuture<AnchorAwareCommitWalk> walk =
+                commitWalker.walk(streamId, config.recoveryCheckpointMaxEntries(), pageSize);
+        return CompletableFuture.allOf(root, registration, walk).thenCompose(ignored -> {
+            if (!root.join().equals(Optional.of(plan.baseRoot()))
+                    || !registration.join().equals(Optional.of(plan.registration()))) {
+                return CompletableFuture.failedFuture(
+                        condition("recovery checkpoint root/registration changed before publication"));
+            }
+            AnchorAwareCommitWalk current = walk.join();
+            requireSelectedCommitsUnchanged(plan, current);
+            List<CompletableFuture<Void>> indexChecks = plan.targets().stream()
+                    .map(target -> revalidateIndex(target.index()))
+                    .toList();
+            return CompletableFuture.allOf(indexChecks.toArray(CompletableFuture[]::new));
+        });
     }
 
     private CompletableFuture<Void> revalidateIndex(VersionedGenerationIndex expected) {
@@ -144,11 +148,8 @@ public final class RecoveryCheckpointBuilder {
         });
     }
 
-    private static void requireSelectedCommitsUnchanged(
-            RecoveryCheckpointPlan plan,
-            AnchorAwareCommitWalk current) {
-        if (!current.recoveryRoot().equals(Optional.of(plan.baseRoot()))
-                || !current.anchorReached()) {
+    private static void requireSelectedCommitsUnchanged(RecoveryCheckpointPlan plan, AnchorAwareCommitWalk current) {
+        if (!current.recoveryRoot().equals(Optional.of(plan.baseRoot())) || !current.anchorReached()) {
             throw condition("recovery root/live tail changed before checkpoint publication");
         }
         Map<String, com.nereusstream.metadata.oxia.AppendRecoveryCommit> expected = new HashMap<>();
@@ -205,31 +206,19 @@ public final class RecoveryCheckpointBuilder {
             return completed(RecoveryCheckpointBuildStatus.REFERENCE_LIMIT);
         }
 
-        List<com.nereusstream.metadata.oxia.AppendRecoveryCommit> oldestFirst = new ArrayList<>(
-                walk.commitsNewestFirst());
+        List<com.nereusstream.metadata.oxia.AppendRecoveryCommit> oldestFirst =
+                new ArrayList<>(walk.commitsNewestFirst());
         java.util.Collections.reverse(oldestFirst);
-        List<com.nereusstream.metadata.oxia.AppendRecoveryCommit> eligible = eligiblePrefix(
-                oldestFirst, retained.nextCoverageOffset());
+        List<com.nereusstream.metadata.oxia.AppendRecoveryCommit> eligible =
+                eligiblePrefix(oldestFirst, retained.nextCoverageOffset());
         if (eligible.isEmpty()) {
             return completed(RecoveryCheckpointBuildStatus.NO_ELIGIBLE_PREFIX);
         }
         long maxOffsetEnd = eligible.get(eligible.size() - 1).canonicalCommit().offsetEnd();
         long minOffsetEnd = Math.addExact(retained.nextCoverageOffset(), 1);
-        return scanGenerationCandidates(
-                        streamId,
-                        minOffsetEnd,
-                        maxOffsetEnd,
-                        Optional.empty(),
-                        new ArrayList<>(),
-                        0)
-                .thenApply(candidates -> assemble(
-                        baseRoot,
-                        registration,
-                        walk,
-                        attemptId,
-                        retained.references(),
-                        eligible,
-                        candidates));
+        return scanGenerationCandidates(streamId, minOffsetEnd, maxOffsetEnd, Optional.empty(), new ArrayList<>(), 0)
+                .thenApply(candidates ->
+                        assemble(baseRoot, registration, walk, attemptId, retained.references(), eligible, candidates));
     }
 
     private CompletableFuture<List<VersionedGenerationIndex>> scanGenerationCandidates(
@@ -241,25 +230,14 @@ public final class RecoveryCheckpointBuilder {
             int scannedCandidates) {
         int remaining = MAX_GENERATION_CANDIDATES - scannedCandidates;
         if (remaining <= 0) {
-            return CompletableFuture.failedFuture(invariant(
-                    "recovery checkpoint generation scan exceeded 4096 candidates"));
+            return CompletableFuture.failedFuture(
+                    invariant("recovery checkpoint generation scan exceeded 4096 candidates"));
         }
         int limit = Math.min(config.plannerPageSize(), remaining);
-        return generationStore.scanIndex(
-                        cluster,
-                        streamId,
-                        ReadView.COMMITTED,
-                        minOffsetEnd,
-                        maxOffsetEnd,
-                        continuation,
-                        limit)
+        return generationStore
+                .scanIndex(cluster, streamId, ReadView.COMMITTED, minOffsetEnd, maxOffsetEnd, continuation, limit)
                 .thenCompose(page -> appendCandidatePage(
-                        streamId,
-                        minOffsetEnd,
-                        maxOffsetEnd,
-                        page,
-                        accumulator,
-                        scannedCandidates));
+                        streamId, minOffsetEnd, maxOffsetEnd, page, accumulator, scannedCandidates));
     }
 
     private CompletableFuture<List<VersionedGenerationIndex>> appendCandidatePage(
@@ -279,16 +257,11 @@ public final class RecoveryCheckpointBuilder {
             return CompletableFuture.completedFuture(List.copyOf(accumulator));
         }
         if (observed >= MAX_GENERATION_CANDIDATES) {
-            return CompletableFuture.failedFuture(invariant(
-                    "recovery checkpoint generation scan has more than 4096 candidates"));
+            return CompletableFuture.failedFuture(
+                    invariant("recovery checkpoint generation scan has more than 4096 candidates"));
         }
         return scanGenerationCandidates(
-                streamId,
-                minOffsetEnd,
-                maxOffsetEnd,
-                page.continuation(),
-                accumulator,
-                observed);
+                streamId, minOffsetEnd, maxOffsetEnd, page.continuation(), accumulator, observed);
     }
 
     private RecoveryCheckpointBuildResult assemble(
@@ -317,42 +290,45 @@ public final class RecoveryCheckpointBuilder {
             selectedTargets.putIfAbsent(covering.orElseThrow().key(), covering.orElseThrow());
         }
         if (selectedEntries.isEmpty()) {
-            return RecoveryCheckpointBuildResult.skipped(
-                    RecoveryCheckpointBuildStatus.NO_ELIGIBLE_PREFIX);
+            return RecoveryCheckpointBuildResult.skipped(RecoveryCheckpointBuildStatus.NO_ELIGIBLE_PREFIX);
         }
 
-        long selectedEnd = selectedEntries.get(selectedEntries.size() - 1)
-                .canonicalCommit().offsetEnd();
+        long selectedEnd = selectedEntries
+                .get(selectedEntries.size() - 1)
+                .canonicalCommit()
+                .offsetEnd();
         long initialSelectedEnd = selectedEnd;
         selectedTargets.values().removeIf(index -> index.value().offsetEnd() > initialSelectedEnd);
-        boolean everySelectedEntryCovered = selectedEntries.stream().allMatch(commit ->
-                selectedTargets.values().stream().anyMatch(index ->
-                        covers(index.value(), commit.canonicalCommit())));
+        boolean everySelectedEntryCovered = selectedEntries.stream()
+                .allMatch(commit -> selectedTargets.values().stream()
+                        .anyMatch(index -> covers(index.value(), commit.canonicalCommit())));
         if (!everySelectedEntryCovered) {
             int safeCount = 0;
             for (com.nereusstream.metadata.oxia.AppendRecoveryCommit commit : selectedEntries) {
-                if (selectedTargets.values().stream().noneMatch(index ->
-                        covers(index.value(), commit.canonicalCommit()))) {
+                if (selectedTargets.values().stream()
+                        .noneMatch(index -> covers(index.value(), commit.canonicalCommit()))) {
                     break;
                 }
                 safeCount++;
             }
             selectedEntries = new ArrayList<>(selectedEntries.subList(0, safeCount));
             if (selectedEntries.isEmpty()) {
-                return RecoveryCheckpointBuildResult.skipped(
-                        RecoveryCheckpointBuildStatus.NO_ELIGIBLE_PREFIX);
+                return RecoveryCheckpointBuildResult.skipped(RecoveryCheckpointBuildStatus.NO_ELIGIBLE_PREFIX);
             }
-            selectedEnd = selectedEntries.get(selectedEntries.size() - 1)
-                    .canonicalCommit().offsetEnd();
+            selectedEnd = selectedEntries
+                    .get(selectedEntries.size() - 1)
+                    .canonicalCommit()
+                    .offsetEnd();
             long finalSelectedEnd = selectedEnd;
             selectedTargets.values().removeIf(index -> index.value().offsetEnd() > finalSelectedEnd);
         }
 
         List<RecoveryCheckpointTarget> targets = selectedTargets.values().stream()
                 .map(this::target)
-                .sorted(Comparator
-                        .comparingLong((RecoveryCheckpointTarget value) -> value.publication().generation())
-                        .thenComparing(value -> value.publication().publicationId().value()))
+                .sorted(Comparator.comparingLong((RecoveryCheckpointTarget value) ->
+                                value.publication().generation())
+                        .thenComparing(
+                                value -> value.publication().publicationId().value()))
                 .toList();
         Map<String, Integer> targetIndexes = new HashMap<>();
         for (int index = 0; index < targets.size(); index++) {
@@ -383,7 +359,8 @@ public final class RecoveryCheckpointBuilder {
         }
 
         StreamCommitTargetRecord first = selectedEntries.get(0).canonicalCommit();
-        StreamCommitTargetRecord last = selectedEntries.get(selectedEntries.size() - 1).canonicalCommit();
+        StreamCommitTargetRecord last =
+                selectedEntries.get(selectedEntries.size() - 1).canonicalCommit();
         long cumulativeStart = Math.subtractExact(first.cumulativeSize(), first.logicalBytes());
         long sequence = Math.addExact(baseRoot.value().checkpointSequence(), 1);
         MaterializationStreamRegistrationRecord registrationValue = registration.value();
@@ -416,8 +393,7 @@ public final class RecoveryCheckpointBuilder {
     }
 
     private List<com.nereusstream.metadata.oxia.AppendRecoveryCommit> eligiblePrefix(
-            List<com.nereusstream.metadata.oxia.AppendRecoveryCommit> oldestFirst,
-            long coverageStart) {
+            List<com.nereusstream.metadata.oxia.AppendRecoveryCommit> oldestFirst, long coverageStart) {
         int start = 0;
         while (start < oldestFirst.size()
                 && oldestFirst.get(start).canonicalCommit().offsetEnd() <= coverageStart) {
@@ -448,9 +424,7 @@ public final class RecoveryCheckpointBuilder {
         return List.copyOf(result);
     }
 
-    private RetainedRoot retainedRoot(
-            VersionedRecoveryCheckpointRoot baseRoot,
-            long trimOffset) {
+    private RetainedRoot retainedRoot(VersionedRecoveryCheckpointRoot baseRoot, long trimOffset) {
         var root = baseRoot.value();
         if (root.checkpoints().isEmpty()) {
             return new RetainedRoot(List.of(), trimOffset, Optional.empty());
@@ -461,10 +435,7 @@ public final class RecoveryCheckpointBuilder {
         if (trimOffset >= root.coveredEndOffset()) {
             return new RetainedRoot(List.of(), trimOffset, Optional.empty());
         }
-        return new RetainedRoot(
-                List.of(),
-                trimOffset,
-                Optional.of(RecoveryCheckpointBuildStatus.MERGE_REQUIRED));
+        return new RetainedRoot(List.of(), trimOffset, Optional.of(RecoveryCheckpointBuildStatus.MERGE_REQUIRED));
     }
 
     private boolean validCandidate(
@@ -490,12 +461,10 @@ public final class RecoveryCheckpointBuilder {
         int last = -1;
         for (int indexValue = 0; indexValue < commits.size(); indexValue++) {
             StreamCommitTargetRecord commit = commits.get(indexValue).canonicalCommit();
-            if (commit.offsetStart() == value.offsetStart()
-                    && commit.commitVersion() == value.firstCommitVersion()) {
+            if (commit.offsetStart() == value.offsetStart() && commit.commitVersion() == value.firstCommitVersion()) {
                 first = indexValue;
             }
-            if (commit.offsetEnd() == value.offsetEnd()
-                    && commit.commitVersion() == value.lastCommitVersion()) {
+            if (commit.offsetEnd() == value.offsetEnd() && commit.commitVersion() == value.lastCommitVersion()) {
                 last = indexValue;
             }
         }
@@ -526,24 +495,21 @@ public final class RecoveryCheckpointBuilder {
                 index);
     }
 
-    private static boolean covers(
-            GenerationIndexRecord index,
-            StreamCommitTargetRecord commit) {
+    private static boolean covers(GenerationIndexRecord index, StreamCommitTargetRecord commit) {
         return index.offsetStart() <= commit.offsetStart()
                 && index.offsetEnd() >= commit.offsetEnd()
                 && index.firstCommitVersion() <= commit.commitVersion()
                 && index.lastCommitVersion() >= commit.commitVersion()
-                && index.cumulativeSizeAtStart()
-                        <= Math.subtractExact(commit.cumulativeSize(), commit.logicalBytes())
+                && index.cumulativeSizeAtStart() <= Math.subtractExact(commit.cumulativeSize(), commit.logicalBytes())
                 && index.cumulativeSizeAtEnd() >= commit.cumulativeSize();
     }
 
     private static Comparator<VersionedGenerationIndex> candidatePreference() {
-        return Comparator
-                .comparingLong((VersionedGenerationIndex value) -> value.value().generation())
+        return Comparator.comparingLong(
+                        (VersionedGenerationIndex value) -> value.value().generation())
                 .reversed()
-                .thenComparingLong(value ->
-                        Math.subtractExact(value.value().offsetEnd(), value.value().offsetStart()))
+                .thenComparingLong(value -> Math.subtractExact(
+                        value.value().offsetEnd(), value.value().offsetStart()))
                 .thenComparing(VersionedGenerationIndex::key);
     }
 
@@ -573,7 +539,8 @@ public final class RecoveryCheckpointBuilder {
                 || !snapshot.metadata().streamId().equals(streamId.value())
                 || walk.observedHead().commitVersion() > snapshot.committedEnd().commitVersion()
                 || walk.observedHead().offsetEnd() > snapshot.committedEnd().committedEndOffset()
-                || walk.observedHead().cumulativeSize() > snapshot.committedEnd().cumulativeSize()) {
+                || walk.observedHead().cumulativeSize()
+                        > snapshot.committedEnd().cumulativeSize()) {
             throw condition("recovery checkpoint observation changed its root/head identity");
         }
         StreamState state;
@@ -582,7 +549,8 @@ public final class RecoveryCheckpointBuilder {
         try {
             state = StreamState.valueOf(snapshot.metadata().state());
             profile = StorageProfile.valueOf(snapshot.metadata().profile()).canonical();
-            registered = StorageProfile.valueOf(registration.value().storageProfile()).canonical();
+            registered = StorageProfile.valueOf(registration.value().storageProfile())
+                    .canonical();
         } catch (IllegalArgumentException failure) {
             throw invariant("recovery checkpoint stream state/profile is unsupported", failure);
         }
@@ -592,24 +560,20 @@ public final class RecoveryCheckpointBuilder {
             throw condition("stream is not eligible for object-generation recovery checkpointing");
         }
         Optional<ProjectionRef> registeredProjection = decodeProjection(
-                registration.value().projectionRef(),
-                "recovery registration projection cannot be decoded");
+                registration.value().projectionRef(), "recovery registration projection cannot be decoded");
         if (registeredProjection.isEmpty()) {
             throw invariant("recovery registration has no live projection identity");
         }
         for (var commit : walk.commitsNewestFirst()) {
             Optional<ProjectionRef> sourceProjection = decodeProjection(
-                    commit.canonicalCommit().projectionRef(),
-                    "live commit projection cannot be decoded");
-            if (sourceProjection.isPresent()
-                    && !sourceProjection.equals(registeredProjection)) {
+                    commit.canonicalCommit().projectionRef(), "live commit projection cannot be decoded");
+            if (sourceProjection.isPresent() && !sourceProjection.equals(registeredProjection)) {
                 throw invariant("live commit projection differs from the recovery registration");
             }
         }
     }
 
-    private static Optional<ProjectionRef> decodeProjection(
-            String encoded, String failureMessage) {
+    private static Optional<ProjectionRef> decodeProjection(String encoded, String failureMessage) {
         try {
             return ProjectionIdentity.decode(encoded);
         } catch (RuntimeException failure) {
@@ -618,12 +582,11 @@ public final class RecoveryCheckpointBuilder {
     }
 
     private Checksum durableIndexSha256(GenerationIndexRecord value) {
-        return sha256(MetadataRecordCodecFactory.encodeEnvelope(
-                value.withMetadataVersion(0), GenerationIndexRecord.class));
+        return sha256(
+                MetadataRecordCodecFactory.encodeEnvelope(value.withMetadataVersion(0), GenerationIndexRecord.class));
     }
 
-    private static CompletableFuture<RecoveryCheckpointBuildResult> completed(
-            RecoveryCheckpointBuildStatus status) {
+    private static CompletableFuture<RecoveryCheckpointBuildResult> completed(RecoveryCheckpointBuildStatus status) {
         return CompletableFuture.completedFuture(RecoveryCheckpointBuildResult.skipped(status));
     }
 
@@ -631,7 +594,8 @@ public final class RecoveryCheckpointBuilder {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }
@@ -642,8 +606,7 @@ public final class RecoveryCheckpointBuilder {
     }
 
     private static NereusException invariant(String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static NereusException condition(String message) {
@@ -658,10 +621,7 @@ public final class RecoveryCheckpointBuilder {
         return value;
     }
 
-    private record BuildObservation(
-            AnchorAwareCommitWalk walk,
-            StreamMetadataSnapshot snapshot) {
-    }
+    private record BuildObservation(AnchorAwareCommitWalk walk, StreamMetadataSnapshot snapshot) {}
 
     private record RetainedRoot(
             List<RecoveryCheckpointReferenceRecord> references,

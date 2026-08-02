@@ -1,15 +1,15 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.KafkaPartitionKeyspaceTest;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureRecord;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
-import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import com.nereusstream.metadata.oxia.records.KafkaCompactionCoverageRecord;
+import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionOperationType;
@@ -34,10 +34,17 @@ public class KafkaMetadataCodecTest {
         assertThat(sha256(first)).isEqualTo("c196685df742d8ff9528bfa5eb4fa7e3c7a9ec8b7077818a19d100a4050ba578");
 
         KafkaPartitionRegistryRecord registry = new KafkaPartitionRegistryRecord(
-                1, "kraft", KafkaPartitionKeyspaceTest.topicId(1), 3,
-                "/nereus/root", bytes(3), KafkaPartitionLifecycle.ACTIVE.wireId(), 7, 2_000, 0);
-        byte[] registryBytes = KafkaMetadataCodecs.encodeEnvelope(
-                registry, KafkaPartitionRegistryRecord.class);
+                1,
+                "kraft",
+                KafkaPartitionKeyspaceTest.topicId(1),
+                3,
+                "/nereus/root",
+                bytes(3),
+                KafkaPartitionLifecycle.ACTIVE.wireId(),
+                7,
+                2_000,
+                0);
+        byte[] registryBytes = KafkaMetadataCodecs.encodeEnvelope(registry, KafkaPartitionRegistryRecord.class);
         assertThat(KafkaMetadataCodecs.decodeEnvelope(registryBytes, KafkaPartitionRegistryRecord.class))
                 .isEqualTo(registry);
         assertThat(sha256(registryBytes)).isEqualTo("8919c79ce1e19e4128ef905b78d18e45ec49d1df4a2f2a582e2e183f249a3b55");
@@ -47,19 +54,16 @@ public class KafkaMetadataCodecTest {
     void corruptionUnknownIdsAndCheckpointBoundsFailClosed() {
         byte[] encoded = KafkaMetadataCodecs.encodeEnvelope(fullBinding(), KafkaPartitionBindingRecord.class);
         encoded[encoded.length - 1] ^= 1;
-        assertThatThrownBy(() -> KafkaMetadataCodecs.decodeEnvelope(
-                encoded, KafkaPartitionBindingRecord.class)).isInstanceOf(MetadataCodecException.class);
-        assertThatThrownBy(() -> KafkaPartitionLifecycle.fromWireId(99))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> KafkaPayloadMapping.fromWireId(99))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> KafkaMetadataCodecs.decodeEnvelope(encoded, KafkaPartitionBindingRecord.class))
+                .isInstanceOf(MetadataCodecException.class);
+        assertThatThrownBy(() -> KafkaPartitionLifecycle.fromWireId(99)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> KafkaPayloadMapping.fromWireId(99)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> KafkaPartitionOperationType.fromWireId(99))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> bindingWithCheckpoints(List.of(
-                checkpoint(10, "a"), checkpoint(11, "b"))))
+        assertThatThrownBy(() -> bindingWithCheckpoints(List.of(checkpoint(10, "a"), checkpoint(11, "b"))))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> bindingWithCheckpoints(List.of(
-                checkpoint(12, "a"), checkpoint(11, "b"), checkpoint(10, "c"), checkpoint(9, "d"))))
+        assertThatThrownBy(() -> bindingWithCheckpoints(
+                        List.of(checkpoint(12, "a"), checkpoint(11, "b"), checkpoint(10, "c"), checkpoint(9, "d"))))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -67,30 +71,70 @@ public class KafkaMetadataCodecTest {
     void boundedKafkaCompactionPlanAttachmentRoundTripsAndRejectsShaDrift() {
         byte[] planBytes = "canonical-kcp1".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         KafkaCompactionPlanRecord plan = new KafkaCompactionPlanRecord(
-                1, "kraft", KafkaPartitionKeyspaceTest.topicId(5), 2,
-                "stream-5", "kcp1-" + "a".repeat(52), "mat1-" + "b".repeat(52),
-                10, 20, 30, sha256Bytes(planBytes), planBytes, 1_000, 0);
+                1,
+                "kraft",
+                KafkaPartitionKeyspaceTest.topicId(5),
+                2,
+                "stream-5",
+                "kcp1-" + "a".repeat(52),
+                "mat1-" + "b".repeat(52),
+                10,
+                20,
+                30,
+                sha256Bytes(planBytes),
+                planBytes,
+                1_000,
+                0);
 
-        byte[] first = KafkaMetadataCodecs.encodeEnvelope(
-                plan, KafkaCompactionPlanRecord.class);
-        byte[] second = KafkaMetadataCodecs.encodeEnvelope(
-                plan, KafkaCompactionPlanRecord.class);
+        byte[] first = KafkaMetadataCodecs.encodeEnvelope(plan, KafkaCompactionPlanRecord.class);
+        byte[] second = KafkaMetadataCodecs.encodeEnvelope(plan, KafkaCompactionPlanRecord.class);
 
         assertThat(second).isEqualTo(first);
-        assertThat(KafkaMetadataCodecs.decodeEnvelope(
-                first, KafkaCompactionPlanRecord.class)).isEqualTo(plan);
+        assertThat(KafkaMetadataCodecs.decodeEnvelope(first, KafkaCompactionPlanRecord.class))
+                .isEqualTo(plan);
         assertThatThrownBy(() -> new KafkaCompactionPlanRecord(
-                1, "kraft", KafkaPartitionKeyspaceTest.topicId(5), 2,
-                "stream-5", plan.planId(), plan.materializationTaskId(),
-                10, 20, 30, bytes(9), planBytes, 1_000, 0))
+                        1,
+                        "kraft",
+                        KafkaPartitionKeyspaceTest.topicId(5),
+                        2,
+                        "stream-5",
+                        plan.planId(),
+                        plan.materializationTaskId(),
+                        10,
+                        20,
+                        30,
+                        bytes(9),
+                        planBytes,
+                        1_000,
+                        0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("SHA");
     }
 
     @Test
     void checkpointFailureAuditRoundTripsWithoutRawFailureText() {
-        KafkaCheckpointFailureRecord failure =
-                new KafkaCheckpointFailureRecord(
+        KafkaCheckpointFailureRecord failure = new KafkaCheckpointFailureRecord(
+                1,
+                "kraft",
+                KafkaPartitionKeyspaceTest.topicId(7),
+                2,
+                4,
+                "checkpoint-object",
+                bytes(1),
+                KafkaCheckpointFailureSource.RECOVERY.wireId(),
+                "OBJECT_CHECKSUM_MISMATCH",
+                bytes(2),
+                3_000,
+                0);
+
+        byte[] first = KafkaMetadataCodecs.encodeEnvelope(failure, KafkaCheckpointFailureRecord.class);
+        byte[] second = KafkaMetadataCodecs.encodeEnvelope(failure, KafkaCheckpointFailureRecord.class);
+
+        assertThat(second).isEqualTo(first);
+        assertThat(KafkaMetadataCodecs.decodeEnvelope(first, KafkaCheckpointFailureRecord.class))
+                .isEqualTo(failure);
+        assertThat(new String(first, java.nio.charset.StandardCharsets.UTF_8)).doesNotContain("raw failure message");
+        assertThatThrownBy(() -> new KafkaCheckpointFailureRecord(
                         1,
                         "kraft",
                         KafkaPartitionKeyspaceTest.topicId(7),
@@ -98,72 +142,93 @@ public class KafkaMetadataCodecTest {
                         4,
                         "checkpoint-object",
                         bytes(1),
-                        KafkaCheckpointFailureSource.RECOVERY.wireId(),
+                        99,
                         "OBJECT_CHECKSUM_MISMATCH",
                         bytes(2),
                         3_000,
-                        0);
-
-        byte[] first =
-                KafkaMetadataCodecs.encodeEnvelope(failure, KafkaCheckpointFailureRecord.class);
-        byte[] second =
-                KafkaMetadataCodecs.encodeEnvelope(failure, KafkaCheckpointFailureRecord.class);
-
-        assertThat(second).isEqualTo(first);
-        assertThat(KafkaMetadataCodecs.decodeEnvelope(first, KafkaCheckpointFailureRecord.class))
-                .isEqualTo(failure);
-        assertThat(new String(first, java.nio.charset.StandardCharsets.UTF_8))
-                .doesNotContain("raw failure message");
-        assertThatThrownBy(
-                        () ->
-                                new KafkaCheckpointFailureRecord(
-                                        1,
-                                        "kraft",
-                                        KafkaPartitionKeyspaceTest.topicId(7),
-                                        2,
-                                        4,
-                                        "checkpoint-object",
-                                        bytes(1),
-                                        99,
-                                        "OBJECT_CHECKSUM_MISMATCH",
-                                        bytes(2),
-                                        3_000,
-                                        0))
+                        0))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     public static KafkaPartitionBindingRecord fullBinding() {
         return new KafkaPartitionBindingRecord(
-                1, "kraft", KafkaPartitionKeyspaceTest.topicId(1), 3, "orders", 1,
-                "kafka/kraft/topic/3/incarnation-1", "stream-id",
-                KafkaPayloadMapping.KAFKA_RECORD_BATCH_V1.wireId(), "BOOKKEEPER_WAL_ASYNC_OBJECT",
-                KafkaPartitionLifecycle.ACTIVE.wireId(), 7, 20, 25, 4, 8, 11, 5, 12,
+                1,
+                "kraft",
+                KafkaPartitionKeyspaceTest.topicId(1),
+                3,
+                "orders",
+                1,
+                "kafka/kraft/topic/3/incarnation-1",
+                "stream-id",
+                KafkaPayloadMapping.KAFKA_RECORD_BATCH_V1.wireId(),
+                "BOOKKEEPER_WAL_ASYNC_OBJECT",
+                KafkaPartitionLifecycle.ACTIVE.wireId(),
+                7,
+                20,
+                25,
+                4,
+                8,
+                11,
+                5,
+                12,
                 new KafkaCompactionCoverageRecord(1, 5, 10, 2, bytes(1), bytes(2), 1_900),
                 List.of(checkpoint(12, "new"), checkpoint(8, "old")),
-                KafkaPartitionPendingOperationRecord.EMPTY, 1_000, 2_000, 0);
+                KafkaPartitionPendingOperationRecord.EMPTY,
+                1_000,
+                2_000,
+                0);
     }
 
     public static KafkaPartitionBindingRecord bindingWithCheckpoints(List<KafkaCheckpointReferenceRecord> refs) {
         KafkaPartitionBindingRecord current = fullBinding();
         return new KafkaPartitionBindingRecord(
-                current.formatVersion(), current.kafkaClusterId(), current.topicId(), current.partitionId(),
-                current.observedTopicName(), current.incarnation(), current.streamName(), current.streamId(),
-                current.payloadMappingId(), current.storageProfile(), current.lifecycleId(), current.bindingEpoch(),
-                current.createdMetadataOffset(), current.lastAppliedMetadataOffset(), current.observedLeaderId(),
-                current.observedLeaderEpoch(), current.observedBrokerEpoch(), current.observedLogStartOffset(),
-                current.observedStableEndOffset(), current.compactionCoverage(), refs,
-                current.pendingOperation(), current.createdAtMillis(), current.updatedAtMillis(), 0);
+                current.formatVersion(),
+                current.kafkaClusterId(),
+                current.topicId(),
+                current.partitionId(),
+                current.observedTopicName(),
+                current.incarnation(),
+                current.streamName(),
+                current.streamId(),
+                current.payloadMappingId(),
+                current.storageProfile(),
+                current.lifecycleId(),
+                current.bindingEpoch(),
+                current.createdMetadataOffset(),
+                current.lastAppliedMetadataOffset(),
+                current.observedLeaderId(),
+                current.observedLeaderEpoch(),
+                current.observedBrokerEpoch(),
+                current.observedLogStartOffset(),
+                current.observedStableEndOffset(),
+                current.compactionCoverage(),
+                refs,
+                current.pendingOperation(),
+                current.createdAtMillis(),
+                current.updatedAtMillis(),
+                0);
     }
 
     public static KafkaCheckpointReferenceRecord checkpoint(long offset, String id) {
         return new KafkaCheckpointReferenceRecord(
-                1, id, "checkpoints/" + id, 100, bytes(id.hashCode()), offset, 0,
-                offset, bytes(id.hashCode() + 1), "build", 1_500 + offset);
+                1,
+                id,
+                "checkpoints/" + id,
+                100,
+                bytes(id.hashCode()),
+                offset,
+                0,
+                offset,
+                bytes(id.hashCode() + 1),
+                "build",
+                1_500 + offset);
     }
 
     public static byte[] bytes(int seed) {
         byte[] value = new byte[32];
-        for (int index = 0; index < value.length; index++) value[index] = (byte) (seed + index);
+        for (int index = 0; index < value.length; index++) {
+            value[index] = (byte) (seed + index);
+        }
         return value;
     }
 

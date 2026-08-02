@@ -14,8 +14,9 @@
 
 package com.nereusstream.metadata.oxia;
 
-/** Boundary for the Oxia metadata and coordination adapter. */
+/**
+ * Boundary for the Oxia metadata and coordination adapter.
+ */
 public final class OxiaMetadataModule {
-    private OxiaMetadataModule() {
-    }
+    private OxiaMetadataModule() {}
 }

@@ -16,7 +16,6 @@ package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import org.junit.jupiter.api.Test;
 
 class F4ScanTokenTest {
@@ -24,12 +23,8 @@ class F4ScanTokenTest {
 
     @Test
     void tokenIsScopeBoundAndResumesStrictlyAfterLastKey() {
-        F4ScanToken token = new F4ScanToken(
-                "cluster",
-                F4ScanKind.PHYSICAL_ROOT,
-                SHA256,
-                "/roots/001/",
-                "/roots/001/key");
+        F4ScanToken token =
+                new F4ScanToken("cluster", F4ScanKind.PHYSICAL_ROOT, SHA256, "/roots/001/", "/roots/001/key");
 
         assertThat(token.cluster()).isEqualTo("cluster");
         assertThat(token.kind()).isEqualTo(F4ScanKind.PHYSICAL_ROOT);
@@ -40,10 +35,10 @@ class F4ScanTokenTest {
     @Test
     void rejectsMalformedScopeAndOutOfPrefixCursor() {
         assertThatThrownBy(() -> new F4ScanToken(
-                "cluster", F4ScanKind.PHYSICAL_ROOT, "not-a-digest", "/roots/001/", "/roots/001/key"))
+                        "cluster", F4ScanKind.PHYSICAL_ROOT, "not-a-digest", "/roots/001/", "/roots/001/key"))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new F4ScanToken(
-                "cluster", F4ScanKind.PHYSICAL_ROOT, SHA256, "/roots/001/", "/roots/002/key"))
+        assertThatThrownBy(() ->
+                        new F4ScanToken("cluster", F4ScanKind.PHYSICAL_ROOT, SHA256, "/roots/001/", "/roots/002/key"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

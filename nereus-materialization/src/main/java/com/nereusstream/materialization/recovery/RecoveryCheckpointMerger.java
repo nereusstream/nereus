@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.recovery;
 
 import com.nereusstream.api.Checksum;
@@ -38,7 +39,9 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Pins and strictly opens the current 32-object NRC1 chain before one root-replacement merge. */
+/**
+ * Pins and strictly opens the current 32-object NRC1 chain before one root-replacement merge.
+ */
 public final class RecoveryCheckpointMerger {
     public static final int MERGE_REFERENCE_COUNT = 32;
 
@@ -74,29 +77,18 @@ public final class RecoveryCheckpointMerger {
         final long maximumReadDeadlineMillis;
         try {
             validateInputs(root, registration);
-            exactAttempt = new PublicationId(requireText(
-                            checkpointAttemptId, "checkpointAttemptId"))
-                    .value();
-            checkpointSequence = Math.addExact(
-                    root.value().checkpointSequence(), 1);
+            exactAttempt = new PublicationId(requireText(checkpointAttemptId, "checkpointAttemptId")).value();
+            checkpointSequence = Math.addExact(root.value().checkpointSequence(), 1);
             maximumReadDeadlineMillis = maximumReadDeadlineMillis(deadline);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
 
-        List<RecoveryCheckpointObject> sources = new ArrayList<>(
-                MERGE_REFERENCE_COUNT);
+        List<RecoveryCheckpointObject> sources = new ArrayList<>(MERGE_REFERENCE_COUNT);
         List<ObjectReadLease> leases = new ArrayList<>(MERGE_REFERENCE_COUNT);
         AtomicBoolean cancelled = new AtomicBoolean();
         CompletableFuture<PreparedMerge> prepared = loadSource(
-                        root,
-                        registration,
-                        deadline,
-                        maximumReadDeadlineMillis,
-                        sources,
-                        leases,
-                        cancelled,
-                        0)
+                        root, registration, deadline, maximumReadDeadlineMillis, sources, leases, cancelled, 0)
                 .thenCompose(ignored -> requireExactSelection(root, registration))
                 .thenApply(ignored -> new PreparedMerge(
                         root,
@@ -144,12 +136,10 @@ public final class RecoveryCheckpointMerger {
         if (index == root.value().checkpoints().size()) {
             return CompletableFuture.completedFuture(null);
         }
-        RecoveryCheckpointReferenceRecord reference =
-                root.value().checkpoints().get(index);
+        RecoveryCheckpointReferenceRecord reference = root.value().checkpoints().get(index);
         ObjectKey key = new ObjectKey(reference.objectKey());
         CompletableFuture<HeadObjectResult> headed = deadline.bound(
-                () -> objectStore.headObject(
-                        key, new HeadObjectOptions(deadline.remaining())),
+                () -> objectStore.headObject(key, new HeadObjectOptions(deadline.remaining())),
                 "HEAD recovery checkpoint merge source");
         return headed.thenApply(head -> checkpointIdentity(root, reference, head))
                 .thenCompose(identity -> cancelled.get()
@@ -158,8 +148,7 @@ public final class RecoveryCheckpointMerger {
                                 () -> readPins.acquire(
                                         identity,
                                         maximumReadDeadlineMillis,
-                                        () -> requireExactSelection(
-                                                root, registration)),
+                                        () -> requireExactSelection(root, registration)),
                                 "pin recovery checkpoint merge source"))
                 .thenCompose(lease -> {
                     if (cancelled.get()) {
@@ -170,9 +159,7 @@ public final class RecoveryCheckpointMerger {
                                     () -> codec.openAndVerify(
                                             key,
                                             reference.objectLength(),
-                                            new Checksum(
-                                                    ChecksumType.SHA256,
-                                                    reference.contentSha256()),
+                                            new Checksum(ChecksumType.SHA256, reference.contentSha256()),
                                             deadline.remaining()),
                                     "open recovery checkpoint merge source")
                             .thenApply(object -> {
@@ -192,13 +179,11 @@ public final class RecoveryCheckpointMerger {
                         index + 1));
     }
 
-    private static CompletableFuture<Void> releaseCancelled(
-            ObjectReadLease lease) {
+    private static CompletableFuture<Void> releaseCancelled(ObjectReadLease lease) {
         CancellationException cancelled = cancelled();
         CompletableFuture<Void> release;
         try {
-            release = Objects.requireNonNull(
-                    lease.release(), "cancelled reader lease release future");
+            release = Objects.requireNonNull(lease.release(), "cancelled reader lease release future");
         } catch (Throwable failure) {
             cancelled.addSuppressed(unwrap(failure));
             return CompletableFuture.failedFuture(cancelled);
@@ -213,14 +198,12 @@ public final class RecoveryCheckpointMerger {
     }
 
     private CompletableFuture<Void> requireExactSelection(
-            VersionedRecoveryCheckpointRoot root,
-            VersionedMaterializationStreamRegistration registration) {
+            VersionedRecoveryCheckpointRoot root, VersionedMaterializationStreamRegistration registration) {
         StreamId streamId = new StreamId(root.value().streamId());
         CompletableFuture<Optional<VersionedRecoveryCheckpointRoot>> currentRoot =
                 generationStore.getRecoveryRoot(cluster, streamId);
-        CompletableFuture<Optional<VersionedMaterializationStreamRegistration>>
-                currentRegistration = generationStore.getStreamRegistration(
-                        cluster, streamId);
+        CompletableFuture<Optional<VersionedMaterializationStreamRegistration>> currentRegistration =
+                generationStore.getStreamRegistration(cluster, streamId);
         return currentRoot.thenCombine(currentRegistration, (actualRoot, actualRegistration) -> {
             if (!actualRoot.equals(Optional.of(root))) {
                 throw condition("recovery checkpoint root changed during merge pinning");
@@ -233,58 +216,47 @@ public final class RecoveryCheckpointMerger {
     }
 
     private void validateInputs(
-            VersionedRecoveryCheckpointRoot root,
-            VersionedMaterializationStreamRegistration registration) {
+            VersionedRecoveryCheckpointRoot root, VersionedMaterializationStreamRegistration registration) {
         Objects.requireNonNull(root, "root");
         Objects.requireNonNull(registration, "registration");
         StreamId streamId = new StreamId(root.value().streamId());
         F4Keyspace keys = new F4Keyspace(cluster);
         if (!root.key().equals(keys.recoveryRootKey(streamId))
-                || !registration.key().equals(
-                        keys.materializationRegistryKey(streamId))
+                || !registration.key().equals(keys.materializationRegistryKey(streamId))
                 || !registration.value().streamId().equals(streamId.value())) {
             throw invariant("recovery checkpoint merge root/registration identity is non-canonical");
         }
-        List<RecoveryCheckpointReferenceRecord> references =
-                root.value().checkpoints();
+        List<RecoveryCheckpointReferenceRecord> references = root.value().checkpoints();
         if (references.size() != MERGE_REFERENCE_COUNT) {
-            throw new IllegalArgumentException(
-                    "recovery checkpoint merge requires exactly 32 current references");
+            throw new IllegalArgumentException("recovery checkpoint merge requires exactly 32 current references");
         }
         RecoveryCheckpointReferenceRecord previous = null;
         for (RecoveryCheckpointReferenceRecord reference : references) {
-            if (!reference.projectionIdentitySha256().equals(
-                    registration.value().projectionIdentitySha256())) {
+            if (!reference
+                    .projectionIdentitySha256()
+                    .equals(registration.value().projectionIdentitySha256())) {
                 throw invariant("recovery checkpoint reference projection differs from registration");
             }
-            if (reference.checkpointSequence()
-                    > root.value().checkpointSequence()) {
+            if (reference.checkpointSequence() > root.value().checkpointSequence()) {
                 throw invariant("recovery checkpoint reference sequence exceeds root sequence");
             }
-            if (previous != null
-                    && reference.checkpointSequence()
-                            <= previous.checkpointSequence()) {
+            if (previous != null && reference.checkpointSequence() <= previous.checkpointSequence()) {
                 throw invariant("recovery checkpoint reference sequences are not strictly ordered");
             }
             previous = reference;
         }
         RecoveryCheckpointReferenceRecord last = Objects.requireNonNull(previous);
         if (!last.sourceHeadCommitId().equals(root.value().sourceHeadCommitId())
-                || last.sourceHeadCommitVersion()
-                        != root.value().sourceHeadCommitVersion()) {
+                || last.sourceHeadCommitVersion() != root.value().sourceHeadCommitVersion()) {
             throw invariant("recovery checkpoint root source-head summary differs from its last reference");
         }
     }
 
     private PhysicalObjectIdentity checkpointIdentity(
-            VersionedRecoveryCheckpointRoot root,
-            RecoveryCheckpointReferenceRecord reference,
-            HeadObjectResult head) {
+            VersionedRecoveryCheckpointRoot root, RecoveryCheckpointReferenceRecord reference, HeadObjectResult head) {
         ObjectKey key = new ObjectKey(reference.objectKey());
-        Checksum storage = new Checksum(
-                ChecksumType.CRC32C, reference.storageCrc32c());
-        Checksum content = new Checksum(
-                ChecksumType.SHA256, reference.contentSha256());
+        Checksum storage = new Checksum(ChecksumType.CRC32C, reference.storageCrc32c());
+        Checksum content = new Checksum(ChecksumType.SHA256, reference.contentSha256());
         if (!head.key().equals(key)
                 || head.objectLength() != reference.objectLength()
                 || !head.checksum().equals(storage)
@@ -299,29 +271,23 @@ public final class RecoveryCheckpointMerger {
                 storage,
                 Optional.of(content),
                 head.etag());
-        if (!identity.objectKeyHash().equals(
-                new ObjectKeyHash(reference.objectKeyHash()))) {
+        if (!identity.objectKeyHash().equals(new ObjectKeyHash(reference.objectKeyHash()))) {
             throw invariant("recovery checkpoint reference has a wrong object-key hash");
         }
         return identity;
     }
 
     private static boolean headMetadataMatches(
-            VersionedRecoveryCheckpointRoot root,
-            RecoveryCheckpointReferenceRecord reference,
-            HeadObjectResult head) {
+            VersionedRecoveryCheckpointRoot root, RecoveryCheckpointReferenceRecord reference, HeadObjectResult head) {
         if (head.metadata().isEmpty()) {
             return true;
         }
         return "NRC1".equals(head.metadata().get("nereus-format"))
-                && reference.contentSha256().equals(
-                        head.metadata().get("nereus-content-sha256"))
-                && root.value().streamId().equals(
-                        head.metadata().get("nereus-stream-id"))
-                && Long.toString(reference.checkpointSequence()).equals(
-                        head.metadata().get("nereus-checkpoint-sequence"))
-                && reference.checkpointAttemptId().equals(
-                        head.metadata().get("nereus-checkpoint-attempt-id"));
+                && reference.contentSha256().equals(head.metadata().get("nereus-content-sha256"))
+                && root.value().streamId().equals(head.metadata().get("nereus-stream-id"))
+                && Long.toString(reference.checkpointSequence())
+                        .equals(head.metadata().get("nereus-checkpoint-sequence"))
+                && reference.checkpointAttemptId().equals(head.metadata().get("nereus-checkpoint-attempt-id"));
     }
 
     private void requireExactReference(
@@ -332,43 +298,29 @@ public final class RecoveryCheckpointMerger {
         var header = object.header();
         if (!header.cluster().equals(cluster)
                 || !header.streamId().value().equals(root.value().streamId())
-                || !header.streamId().value().equals(
-                        registration.value().streamId())
-                || header.checkpointSequence()
-                        != reference.checkpointSequence()
-                || !header.checkpointAttemptId().equals(
-                        reference.checkpointAttemptId())
-                || header.coverage().startOffset()
-                        != reference.coveredStartOffset()
-                || header.coverage().endOffset()
-                        != reference.coveredEndOffset()
-                || header.firstCommitVersion()
-                        != reference.firstCommitVersion()
-                || header.lastCommitVersion()
-                        != reference.lastCommitVersion()
-                || header.cumulativeSizeAtStart()
-                        != reference.cumulativeSizeAtStart()
-                || header.cumulativeSizeAtEnd()
-                        != reference.cumulativeSizeAtEnd()
+                || !header.streamId().value().equals(registration.value().streamId())
+                || header.checkpointSequence() != reference.checkpointSequence()
+                || !header.checkpointAttemptId().equals(reference.checkpointAttemptId())
+                || header.coverage().startOffset() != reference.coveredStartOffset()
+                || header.coverage().endOffset() != reference.coveredEndOffset()
+                || header.firstCommitVersion() != reference.firstCommitVersion()
+                || header.lastCommitVersion() != reference.lastCommitVersion()
+                || header.cumulativeSizeAtStart() != reference.cumulativeSizeAtStart()
+                || header.cumulativeSizeAtEnd() != reference.cumulativeSizeAtEnd()
                 || !header.firstCommitId().equals(reference.firstCommitId())
                 || !header.lastCommitId().equals(reference.lastCommitId())
-                || !header.sourceHeadCommitId().equals(
-                        reference.sourceHeadCommitId())
-                || header.sourceHeadCommitVersion()
-                        != reference.sourceHeadCommitVersion()
-                || !header.projectionIdentitySha256().value().equals(
-                        registration.value().projectionIdentitySha256())
-                || !header.projectionIdentitySha256().value().equals(
-                        reference.projectionIdentitySha256())
-                || header.expectedEntryCount()
-                        != reference.commitEntryCount()
-                || header.expectedPublicationCount()
-                        != reference.publicationCount()
+                || !header.sourceHeadCommitId().equals(reference.sourceHeadCommitId())
+                || header.sourceHeadCommitVersion() != reference.sourceHeadCommitVersion()
+                || !header.projectionIdentitySha256()
+                        .value()
+                        .equals(registration.value().projectionIdentitySha256())
+                || !header.projectionIdentitySha256().value().equals(reference.projectionIdentitySha256())
+                || header.expectedEntryCount() != reference.commitEntryCount()
+                || header.expectedPublicationCount() != reference.publicationCount()
                 || !object.objectId().value().equals(reference.objectId())
                 || !object.objectKey().value().equals(reference.objectKey())
                 || object.objectLength() != reference.objectLength()
-                || !object.contentSha256().value().equals(
-                        reference.contentSha256())) {
+                || !object.contentSha256().value().equals(reference.contentSha256())) {
             throw invariant("verified NRC1 object differs from recovery-root merge reference");
         }
     }
@@ -387,18 +339,14 @@ public final class RecoveryCheckpointMerger {
         }
     }
 
-    private static CompletableFuture<Void> releaseAll(
-            List<ObjectReadLease> leases) {
+    private static CompletableFuture<Void> releaseAll(List<ObjectReadLease> leases) {
         CompletableFuture<Void> result = new CompletableFuture<>();
         releaseAt(List.copyOf(leases), 0, null, result);
         return result;
     }
 
     private static void releaseAt(
-            List<ObjectReadLease> leases,
-            int index,
-            Throwable firstFailure,
-            CompletableFuture<Void> result) {
+            List<ObjectReadLease> leases, int index, Throwable firstFailure, CompletableFuture<Void> result) {
         if (index == leases.size()) {
             if (firstFailure == null) {
                 result.complete(null);
@@ -409,8 +357,7 @@ public final class RecoveryCheckpointMerger {
         }
         CompletableFuture<Void> release;
         try {
-            release = Objects.requireNonNull(
-                    leases.get(index).release(), "reader lease release future");
+            release = Objects.requireNonNull(leases.get(index).release(), "reader lease release future");
         } catch (Throwable failure) {
             Throwable exact = unwrap(failure);
             if (firstFailure != null) {
@@ -437,8 +384,7 @@ public final class RecoveryCheckpointMerger {
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = Objects.requireNonNull(failure, "failure");
-        while ((current instanceof CompletionException
-                        || current instanceof ExecutionException)
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -454,29 +400,24 @@ public final class RecoveryCheckpointMerger {
     }
 
     private static NereusException condition(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_CONDITION_FAILED, true, message);
+        return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
 
     private static CancellationException cancelled() {
-        return new CancellationException(
-                "recovery checkpoint merge preparation was cancelled");
+        return new CancellationException("recovery checkpoint merge preparation was cancelled");
     }
 
     private static NereusException invariant(String message) {
         return invariant(message, null);
     }
 
-    private static NereusException invariant(
-            String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message,
-                cause);
+    private static NereusException invariant(String message, Throwable cause) {
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
-    /** Close-owned source leases remain live until root publication and protection reconciliation finish. */
+    /**
+     * Close-owned source leases remain live until root publication and protection reconciliation finish.
+     */
     public final class PreparedMerge {
         private final VersionedRecoveryCheckpointRoot baseRoot;
         private final VersionedMaterializationStreamRegistration registration;
@@ -522,23 +463,18 @@ public final class RecoveryCheckpointMerger {
             return checkpointAttemptId;
         }
 
-        public CompletableFuture<RecoveryCheckpointMergeResult> write(
-                Duration timeout) {
+        public CompletableFuture<RecoveryCheckpointMergeResult> write(Duration timeout) {
             if (!writeStarted.compareAndSet(false, true)) {
-                return CompletableFuture.failedFuture(invariant(
-                        "recovery checkpoint merge plan was written more than once"));
+                return CompletableFuture.failedFuture(
+                        invariant("recovery checkpoint merge plan was written more than once"));
             }
             synchronized (this) {
                 if (release != null) {
-                    return CompletableFuture.failedFuture(invariant(
-                            "recovery checkpoint merge plan was released before write"));
+                    return CompletableFuture.failedFuture(
+                            invariant("recovery checkpoint merge plan was released before write"));
                 }
             }
-            return codec.merge(
-                    sources,
-                    checkpointSequence,
-                    checkpointAttemptId,
-                    timeout);
+            return codec.merge(sources, checkpointSequence, checkpointAttemptId, timeout);
         }
 
         public CompletableFuture<Void> revalidate() {

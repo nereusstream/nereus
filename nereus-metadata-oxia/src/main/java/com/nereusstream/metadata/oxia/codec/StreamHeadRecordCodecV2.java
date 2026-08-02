@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import java.nio.ByteBuffer;
@@ -10,7 +11,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Explicit authority-capable StreamHead codec with byte-exact V1 compatibility. */
+/**
+ * Explicit authority-capable StreamHead codec with byte-exact V1 compatibility.
+ */
 public final class StreamHeadRecordCodecV2
         implements MetadataRecordCodec<com.nereusstream.metadata.oxia.records.StreamHeadRecord> {
     private static final int LEGACY_VERSION = 1;
@@ -36,9 +39,7 @@ public final class StreamHeadRecordCodecV2
 
     @Override
     public int schemaVersion(com.nereusstream.metadata.oxia.records.StreamHeadRecord value) {
-        return Objects.requireNonNull(value, "value").appendSession().hasAuthority()
-                ? VERSION
-                : LEGACY_VERSION;
+        return Objects.requireNonNull(value, "value").appendSession().hasAuthority() ? VERSION : LEGACY_VERSION;
     }
 
     @Override
@@ -153,28 +154,53 @@ public final class StreamHeadRecordCodecV2
         return values;
     }
 
-    private static StreamHeadRecord toLegacy(
-            com.nereusstream.metadata.oxia.records.StreamHeadRecord value) {
+    private static StreamHeadRecord toLegacy(com.nereusstream.metadata.oxia.records.StreamHeadRecord value) {
         var session = value.appendSession();
         return new StreamHeadRecord(
-                value.streamId(), value.streamName(), value.streamNameHash(), value.state(), value.profile(),
-                value.attributes(), value.createdAtMillis(), value.policyVersion(), value.committedEndOffset(),
-                value.cumulativeSize(), value.commitVersion(), value.trimOffset(), value.lastCommitId(),
+                value.streamId(),
+                value.streamName(),
+                value.streamNameHash(),
+                value.state(),
+                value.profile(),
+                value.attributes(),
+                value.createdAtMillis(),
+                value.policyVersion(),
+                value.committedEndOffset(),
+                value.cumulativeSize(),
+                value.commitVersion(),
+                value.trimOffset(),
+                value.lastCommitId(),
                 new AppendSessionSnapshotRecord(
-                        session.writerId(), session.epoch(), session.fencingToken(),
-                        session.leaseVersion(), session.expiresAtMillis()),
+                        session.writerId(),
+                        session.epoch(),
+                        session.fencingToken(),
+                        session.leaseVersion(),
+                        session.expiresAtMillis()),
                 value.metadataVersion());
     }
 
     private static com.nereusstream.metadata.oxia.records.StreamHeadRecord fromLegacy(StreamHeadRecord value) {
         AppendSessionSnapshotRecord session = value.appendSession();
         return new com.nereusstream.metadata.oxia.records.StreamHeadRecord(
-                value.streamId(), value.streamName(), value.streamNameHash(), value.state(), value.profile(),
-                value.attributes(), value.createdAtMillis(), value.policyVersion(), value.committedEndOffset(),
-                value.cumulativeSize(), value.commitVersion(), value.trimOffset(), value.lastCommitId(),
+                value.streamId(),
+                value.streamName(),
+                value.streamNameHash(),
+                value.state(),
+                value.profile(),
+                value.attributes(),
+                value.createdAtMillis(),
+                value.policyVersion(),
+                value.committedEndOffset(),
+                value.cumulativeSize(),
+                value.commitVersion(),
+                value.trimOffset(),
+                value.lastCommitId(),
                 new com.nereusstream.metadata.oxia.records.AppendSessionSnapshotRecord(
-                        session.writerId(), session.epoch(), session.fencingToken(),
-                        session.leaseVersion(), session.expiresAtMillis()),
+                        session.writerId(),
+                        session.epoch(),
+                        session.fencingToken(),
+                        session.leaseVersion(),
+                        session.expiresAtMillis()),
                 value.metadataVersion());
     }
 
@@ -192,12 +218,7 @@ public final class StreamHeadRecordCodecV2
     };
 
     record AppendSessionSnapshotRecord(
-            String writerId,
-            long epoch,
-            String fencingToken,
-            long leaseVersion,
-            long expiresAtMillis) {
-    }
+            String writerId, long epoch, String fencingToken, long leaseVersion, long expiresAtMillis) {}
 
     record StreamHeadRecord(
             String streamId,
@@ -214,6 +235,5 @@ public final class StreamHeadRecordCodecV2
             long trimOffset,
             String lastCommitId,
             AppendSessionSnapshotRecord appendSession,
-            long metadataVersion) {
-    }
+            long metadataVersion) {}
 }

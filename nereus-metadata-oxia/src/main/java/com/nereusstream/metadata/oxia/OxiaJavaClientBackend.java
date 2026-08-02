@@ -16,8 +16,8 @@ package com.nereusstream.metadata.oxia;
 
 import io.oxia.client.api.GetResult;
 import io.oxia.client.api.SyncOxiaClient;
-import io.oxia.client.api.options.GetOption;
 import io.oxia.client.api.options.DeleteOption;
+import io.oxia.client.api.options.GetOption;
 import io.oxia.client.api.options.ListOption;
 import io.oxia.client.api.options.PutOption;
 import io.oxia.client.api.options.RangeScanOption;
@@ -35,10 +35,7 @@ final class OxiaJavaClientBackend implements PartitionedOxiaClient.Backend {
     private final java.util.concurrent.CopyOnWriteArrayList<PrefixWatch> watches =
             new java.util.concurrent.CopyOnWriteArrayList<>();
 
-    OxiaJavaClientBackend(
-            SyncOxiaClient client,
-            Executor requestExecutor,
-            Executor notificationExecutor) {
+    OxiaJavaClientBackend(SyncOxiaClient client, Executor requestExecutor, Executor notificationExecutor) {
         this.client = java.util.Objects.requireNonNull(client, "client");
         this.requestExecutor = java.util.Objects.requireNonNull(requestExecutor, "requestExecutor");
         this.notificationExecutor = java.util.Objects.requireNonNull(notificationExecutor, "notificationExecutor");
@@ -55,45 +52,37 @@ final class OxiaJavaClientBackend implements PartitionedOxiaClient.Backend {
 
     @Override
     public CompletableFuture<Optional<PartitionedOxiaClient.VersionedValue>> get(
-            String key,
-            PartitionKey partitionKey) {
-        return supply(() -> Optional.ofNullable(client.get(
-                        key, Set.of(GetOption.PartitionKey(partitionKey.value()))))
+            String key, PartitionKey partitionKey) {
+        return supply(() -> Optional.ofNullable(client.get(key, Set.of(GetOption.PartitionKey(partitionKey.value()))))
                 .map(OxiaJavaClientBackend::versioned));
     }
 
     @Override
     public CompletableFuture<PartitionedOxiaClient.WriteResult> putIfAbsent(
-            String key,
-            byte[] value,
-            PartitionKey partitionKey) {
+            String key, byte[] value, PartitionKey partitionKey) {
         return supply(() -> new PartitionedOxiaClient.WriteResult(client.put(
                         key,
                         value,
                         Set.of(PutOption.PartitionKey(partitionKey.value()), PutOption.IfRecordDoesNotExist))
-                .version().versionId()));
+                .version()
+                .versionId()));
     }
 
     @Override
     public CompletableFuture<PartitionedOxiaClient.WriteResult> putIfVersion(
-            String key,
-            byte[] value,
-            long expectedVersion,
-            PartitionKey partitionKey) {
+            String key, byte[] value, long expectedVersion, PartitionKey partitionKey) {
         return supply(() -> new PartitionedOxiaClient.WriteResult(client.put(
                         key,
                         value,
                         Set.of(
                                 PutOption.PartitionKey(partitionKey.value()),
                                 PutOption.IfVersionIdEquals(expectedVersion)))
-                .version().versionId()));
+                .version()
+                .versionId()));
     }
 
     @Override
-    public CompletableFuture<Void> deleteIfVersion(
-            String key,
-            long expectedVersion,
-            PartitionKey partitionKey) {
+    public CompletableFuture<Void> deleteIfVersion(String key, long expectedVersion, PartitionKey partitionKey) {
         return supply(() -> {
             boolean deleted;
             try {
@@ -113,28 +102,18 @@ final class OxiaJavaClientBackend implements PartitionedOxiaClient.Backend {
     }
 
     @Override
-    public CompletableFuture<List<String>> list(
-            String fromInclusive,
-            String toExclusive,
-            PartitionKey partitionKey) {
-        return supply(() -> client.list(
-                fromInclusive,
-                toExclusive,
-                Set.of(ListOption.PartitionKey(partitionKey.value()))));
+    public CompletableFuture<List<String>> list(String fromInclusive, String toExclusive, PartitionKey partitionKey) {
+        return supply(
+                () -> client.list(fromInclusive, toExclusive, Set.of(ListOption.PartitionKey(partitionKey.value()))));
     }
 
     @Override
     public CompletableFuture<List<PartitionedOxiaClient.VersionedValue>> rangeScan(
-            String fromInclusive,
-            String toExclusive,
-            int limit,
-            PartitionKey partitionKey) {
+            String fromInclusive, String toExclusive, int limit, PartitionKey partitionKey) {
         return supply(() -> {
             List<PartitionedOxiaClient.VersionedValue> values = new ArrayList<>();
             try (var scan = client.rangeScan(
-                    fromInclusive,
-                    toExclusive,
-                    Set.of(RangeScanOption.PartitionKey(partitionKey.value())))) {
+                    fromInclusive, toExclusive, Set.of(RangeScanOption.PartitionKey(partitionKey.value())))) {
                 for (GetResult value : scan) {
                     values.add(versioned(value));
                     if (values.size() == limit) {
@@ -147,10 +126,7 @@ final class OxiaJavaClientBackend implements PartitionedOxiaClient.Backend {
     }
 
     @Override
-    public WatchRegistration watchPrefix(
-            String prefix,
-            PartitionKey partitionKey,
-            Runnable invalidationCallback) {
+    public WatchRegistration watchPrefix(String prefix, PartitionKey partitionKey, Runnable invalidationCallback) {
         var active = new java.util.concurrent.atomic.AtomicBoolean(true);
         PrefixWatch watch = new PrefixWatch(prefix, active, invalidationCallback);
         watches.add(watch);
@@ -162,15 +138,17 @@ final class OxiaJavaClientBackend implements PartitionedOxiaClient.Backend {
     }
 
     private <T> CompletableFuture<T> supply(java.util.concurrent.Callable<T> operation) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                return operation.call();
-            } catch (RuntimeException e) {
-                throw e;
-            } catch (Exception e) {
-                throw new java.util.concurrent.CompletionException(e);
-            }
-        }, requestExecutor);
+        return CompletableFuture.supplyAsync(
+                () -> {
+                    try {
+                        return operation.call();
+                    } catch (RuntimeException e) {
+                        throw e;
+                    } catch (Exception e) {
+                        throw new java.util.concurrent.CompletionException(e);
+                    }
+                },
+                requestExecutor);
     }
 
     private static PartitionedOxiaClient.VersionedValue versioned(GetResult result) {
@@ -178,9 +156,5 @@ final class OxiaJavaClientBackend implements PartitionedOxiaClient.Backend {
                 result.key(), result.value(), result.version().versionId());
     }
 
-    private record PrefixWatch(
-            String prefix,
-            java.util.concurrent.atomic.AtomicBoolean active,
-            Runnable callback) {
-    }
+    private record PrefixWatch(String prefix, java.util.concurrent.atomic.AtomicBoolean active, Runnable callback) {}
 }

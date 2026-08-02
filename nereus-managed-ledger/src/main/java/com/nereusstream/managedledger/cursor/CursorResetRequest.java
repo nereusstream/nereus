@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.Objects;
 import java.util.Optional;
 
-/** Normalized direct next-read target for one durable cursor reset. */
+/**
+ * Normalized direct next-read target for one durable cursor reset.
+ */
 public record CursorResetRequest(
         long nextReadOffset,
         Optional<BatchAckState> targetBatchAck,

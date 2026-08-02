@@ -1,6 +1,10 @@
 [versions]
 # Keep Java aligned with the current Pulsar source-build baseline.
 java = "21"
+# Code quality versions track the locked Pulsar fork where applicable.
+checkstyle = "13.3.0"
+palantir-java-format = "2.80.0"
+spotless = "8.4.0"
 # Source-composite selector only. This version is declared by the locked fork checkout but is not resolved from a
 # Maven snapshot repository; settings.gradle.kts fails source-bound tasks when the checkout is absent.
 pulsar = "5.0.0-M1-SNAPSHOT"
@@ -59,3 +63,4 @@ bookkeeper-server = { module = "org.apache.bookkeeper:bookkeeper-server", versio
 kafka-clients = { module = "org.apache.kafka:kafka-clients", version.ref = "kafka" }
 
 [plugins]
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

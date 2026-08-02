@@ -19,30 +19,32 @@ import com.nereusstream.objectstore.compacted.KafkaCompactionDispositionV2;
 import com.nereusstream.objectstore.compacted.KafkaTopicCompactedObjectRow;
 import java.util.Objects;
 
-/** Lossless boundary from a verified Kafka survivor rewrite to one sparse NTC2 row. */
+/**
+ * Lossless boundary from a verified Kafka survivor rewrite to one sparse NTC2 row.
+ */
 public final class KafkaCompactionRowMapper {
 
-  public KafkaTopicCompactedObjectRow toNtc2Row(RewrittenCompactionRecord rewritten) {
-    Objects.requireNonNull(rewritten, "rewritten");
-    return new KafkaTopicCompactedObjectRow(
-        rewritten.absoluteOffset(),
-        1,
-        disposition(rewritten),
-        rewritten.taggedCompactionKey(),
-        rewritten.exactPayload(),
-        rewritten.payloadCrc32c(),
-        rewritten.sourceBatchBaseOffset(),
-        rewritten.sourceRecordIndex(),
-        rewritten.sourceBatchSha256(),
-        rewritten.eventTimeMillis());
-  }
+    public KafkaTopicCompactedObjectRow toNtc2Row(RewrittenCompactionRecord rewritten) {
+        Objects.requireNonNull(rewritten, "rewritten");
+        return new KafkaTopicCompactedObjectRow(
+                rewritten.absoluteOffset(),
+                1,
+                disposition(rewritten),
+                rewritten.taggedCompactionKey(),
+                rewritten.exactPayload(),
+                rewritten.payloadCrc32c(),
+                rewritten.sourceBatchBaseOffset(),
+                rewritten.sourceRecordIndex(),
+                rewritten.sourceBatchSha256(),
+                rewritten.eventTimeMillis());
+    }
 
-  private static KafkaCompactionDispositionV2 disposition(RewrittenCompactionRecord rewritten) {
-    return switch (rewritten.disposition()) {
-      case RETAIN_VALUE -> KafkaCompactionDispositionV2.RETAIN_VALUE;
-      case RETAIN_TOMBSTONE -> KafkaCompactionDispositionV2.RETAIN_TOMBSTONE;
-      case RETAIN_UNKEYED -> KafkaCompactionDispositionV2.RETAIN_UNKEYED;
-      case RETAIN_CONTROL -> KafkaCompactionDispositionV2.RETAIN_CONTROL;
-    };
-  }
+    private static KafkaCompactionDispositionV2 disposition(RewrittenCompactionRecord rewritten) {
+        return switch (rewritten.disposition()) {
+            case RETAIN_VALUE -> KafkaCompactionDispositionV2.RETAIN_VALUE;
+            case RETAIN_TOMBSTONE -> KafkaCompactionDispositionV2.RETAIN_TOMBSTONE;
+            case RETAIN_UNKEYED -> KafkaCompactionDispositionV2.RETAIN_UNKEYED;
+            case RETAIN_CONTROL -> KafkaCompactionDispositionV2.RETAIN_CONTROL;
+        };
+    }
 }

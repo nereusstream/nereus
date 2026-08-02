@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import com.nereusstream.api.Checksum;
@@ -12,7 +13,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -27,8 +27,7 @@ import java.util.function.Supplier;
  * Uses one isolated canary to prove guarded PUT, exact HEAD, complete LIST, exact DELETE,
  * delete-response-loss convergence and post-delete absence for the configured object-store scope.
  */
-public final class DefaultObjectStoreDeleteCapabilityProbe
-        implements ObjectStoreDeleteCapabilityProbe {
+public final class DefaultObjectStoreDeleteCapabilityProbe implements ObjectStoreDeleteCapabilityProbe {
     private static final String PROTOCOL = "nereus-object-store-delete-capability-v1";
     private static final String PROBE_PREFIX = "__nereus_capability__/delete-v1/";
 
@@ -39,17 +38,12 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
     private final String capabilitySha256;
 
     public DefaultObjectStoreDeleteCapabilityProbe(
-            ObjectStore objectStore,
-            ObjectStoreConfiguration configuration,
-            Clock clock) {
+            ObjectStore objectStore, ObjectStoreConfiguration configuration, Clock clock) {
         this(objectStore, configuration, clock, System::nanoTime);
     }
 
     DefaultObjectStoreDeleteCapabilityProbe(
-            ObjectStore objectStore,
-            ObjectStoreConfiguration configuration,
-            Clock clock,
-            LongSupplier nanoTime) {
+            ObjectStore objectStore, ObjectStoreConfiguration configuration, Clock clock, LongSupplier nanoTime) {
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
         this.configuration = Objects.requireNonNull(configuration, "configuration");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -63,8 +57,7 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
     }
 
     @Override
-    public CompletableFuture<ObjectStoreDeleteCapabilityProof> probe(
-            ObjectStoreDeleteCapabilityRequest request) {
+    public CompletableFuture<ObjectStoreDeleteCapabilityProof> probe(ObjectStoreDeleteCapabilityRequest request) {
         ObjectStoreDeleteCapabilityRequest exact = Objects.requireNonNull(request, "request");
         ProbeContext context = context(exact);
         Deadline deadline;
@@ -74,8 +67,7 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
             return CompletableFuture.failedFuture(failure);
         }
         CompletableFuture<ObjectStoreDeleteCapabilityProof> attempt = putOrVerify(context, deadline)
-                .thenCompose(head -> verifyPresentList(context, head, deadline)
-                        .thenApply(ignored -> head))
+                .thenCompose(head -> verifyPresentList(context, head, deadline).thenApply(ignored -> head))
                 .thenCompose(head -> deleteAndVerify(context, head, deadline))
                 .thenCompose(ignored -> verifyIdempotentDelete(context, deadline))
                 .thenCompose(ignored -> verifyAbsentList(context, deadline))
@@ -89,20 +81,19 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
                         return CompletableFuture.completedFuture(proof);
                     }
                     Throwable cause = unwrap(failure);
-                    return cleanup(context, exact.timeout()).handle((ignored, cleanupFailure) -> {
+                    return cleanup(context, exact.timeout())
+                            .handle((ignored, cleanupFailure) -> {
                                 if (cleanupFailure != null) {
                                     cause.addSuppressed(unwrap(cleanupFailure));
                                 }
-                                return CompletableFuture
-                                        .<ObjectStoreDeleteCapabilityProof>failedFuture(cause);
+                                return CompletableFuture.<ObjectStoreDeleteCapabilityProof>failedFuture(cause);
                             })
                             .thenCompose(value -> value);
                 })
                 .thenCompose(value -> value);
     }
 
-    private CompletableFuture<HeadObjectResult> putOrVerify(
-            ProbeContext context, Deadline deadline) {
+    private CompletableFuture<HeadObjectResult> putOrVerify(ProbeContext context, Deadline deadline) {
         CompletableFuture<PutObjectResult> put;
         try {
             put = deadline.call(() -> objectStore.putObject(
@@ -118,26 +109,20 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
             return CompletableFuture.failedFuture(failure);
         }
         return put.handle((result, putFailure) -> putFailure)
-                .thenCompose(putFailure -> head(context, deadline)
-                        .handle((head, headFailure) -> {
-                            if (headFailure == null) {
-                                verifyHead(context, head);
-                                return head;
-                            }
-                            Throwable cause = putFailure == null
-                                    ? unwrap(headFailure)
-                                    : unwrap(putFailure);
-                            if (putFailure != null) {
-                                cause.addSuppressed(unwrap(headFailure));
-                            }
-                            throw new CompletionException(cause);
-                        }));
+                .thenCompose(putFailure -> head(context, deadline).handle((head, headFailure) -> {
+                    if (headFailure == null) {
+                        verifyHead(context, head);
+                        return head;
+                    }
+                    Throwable cause = putFailure == null ? unwrap(headFailure) : unwrap(putFailure);
+                    if (putFailure != null) {
+                        cause.addSuppressed(unwrap(headFailure));
+                    }
+                    throw new CompletionException(cause);
+                }));
     }
 
-    private CompletableFuture<Void> verifyPresentList(
-            ProbeContext context,
-            HeadObjectResult head,
-            Deadline deadline) {
+    private CompletableFuture<Void> verifyPresentList(ProbeContext context, HeadObjectResult head, Deadline deadline) {
         return list(context, deadline).thenAccept(page -> {
             if (page.continuationToken().isPresent() || page.objects().size() != 1) {
                 throw capabilityFailure("probe LIST did not return one complete exact page");
@@ -146,17 +131,15 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
             if (!listed.key().equals(context.key())
                     || listed.objectLength() != context.payload().length
                     || listed.lastModified().isEmpty()
-                    || listed.etag().filter(value -> head.etag().filter(value::equals).isEmpty())
+                    || listed.etag()
+                            .filter(value -> head.etag().filter(value::equals).isEmpty())
                             .isPresent()) {
                 throw capabilityFailure("probe LIST identity does not match exact HEAD");
             }
         });
     }
 
-    private CompletableFuture<Void> deleteAndVerify(
-            ProbeContext context,
-            HeadObjectResult head,
-            Deadline deadline) {
+    private CompletableFuture<Void> deleteAndVerify(ProbeContext context, HeadObjectResult head, Deadline deadline) {
         DeleteObjectOptions options = deleteOptions(context, head.etag(), deadline.remaining());
         CompletableFuture<DeleteObjectResult> deletion;
         try {
@@ -165,23 +148,19 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
             return CompletableFuture.failedFuture(failure);
         }
         return deletion.handle((result, failure) -> failure)
-                .thenCompose(deleteFailure -> verifyAbsent(context, deadline)
-                        .handle((ignored, absenceFailure) -> {
-                            if (absenceFailure == null) {
-                                return null;
-                            }
-                            Throwable cause = deleteFailure == null
-                                    ? unwrap(absenceFailure)
-                                    : unwrap(deleteFailure);
-                            if (deleteFailure != null) {
-                                cause.addSuppressed(unwrap(absenceFailure));
-                            }
-                            throw new CompletionException(cause);
-                        }));
+                .thenCompose(deleteFailure -> verifyAbsent(context, deadline).handle((ignored, absenceFailure) -> {
+                    if (absenceFailure == null) {
+                        return null;
+                    }
+                    Throwable cause = deleteFailure == null ? unwrap(absenceFailure) : unwrap(deleteFailure);
+                    if (deleteFailure != null) {
+                        cause.addSuppressed(unwrap(absenceFailure));
+                    }
+                    throw new CompletionException(cause);
+                }));
     }
 
-    private CompletableFuture<Void> verifyIdempotentDelete(
-            ProbeContext context, Deadline deadline) {
+    private CompletableFuture<Void> verifyIdempotentDelete(ProbeContext context, Deadline deadline) {
         DeleteObjectOptions options = deleteOptions(context, Optional.empty(), deadline.remaining());
         return deadline.call(() -> objectStore.deleteObject(context.key(), options))
                 .thenAccept(result -> {
@@ -192,8 +171,7 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
                 });
     }
 
-    private CompletableFuture<Void> verifyAbsentList(
-            ProbeContext context, Deadline deadline) {
+    private CompletableFuture<Void> verifyAbsentList(ProbeContext context, Deadline deadline) {
         return list(context, deadline).thenAccept(page -> {
             if (!page.objects().isEmpty() || page.continuationToken().isPresent()) {
                 throw capabilityFailure("probe object remains visible after exact DELETE");
@@ -201,22 +179,16 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
         });
     }
 
-    private CompletableFuture<HeadObjectResult> head(
-            ProbeContext context, Deadline deadline) {
-        return deadline.call(() -> objectStore.headObject(
-                context.key(), new HeadObjectOptions(deadline.remaining())));
+    private CompletableFuture<HeadObjectResult> head(ProbeContext context, Deadline deadline) {
+        return deadline.call(() -> objectStore.headObject(context.key(), new HeadObjectOptions(deadline.remaining())));
     }
 
-    private CompletableFuture<ListObjectsResult> list(
-            ProbeContext context, Deadline deadline) {
+    private CompletableFuture<ListObjectsResult> list(ProbeContext context, Deadline deadline) {
         return deadline.call(() -> objectStore.listObjects(
-                context.prefix(),
-                Optional.empty(),
-                new ListObjectsOptions(2, deadline.remaining())));
+                context.prefix(), Optional.empty(), new ListObjectsOptions(2, deadline.remaining())));
     }
 
-    private CompletableFuture<Void> verifyAbsent(
-            ProbeContext context, Deadline deadline) {
+    private CompletableFuture<Void> verifyAbsent(ProbeContext context, Deadline deadline) {
         return head(context, deadline).handle((value, failure) -> {
             if (failure == null) {
                 throw capabilityFailure("probe object still exists after exact DELETE");
@@ -232,7 +204,8 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
     private CompletableFuture<Void> cleanup(ProbeContext context, Duration timeout) {
         Duration bounded = minimum(timeout, configuration.requestTimeout());
         HeadObjectOptions headOptions = new HeadObjectOptions(bounded);
-        return objectStore.headObject(context.key(), headOptions)
+        return objectStore
+                .headObject(context.key(), headOptions)
                 .handle((head, failure) -> {
                     if (failure != null) {
                         Throwable cause = unwrap(failure);
@@ -246,9 +219,8 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
                     } catch (Throwable mismatch) {
                         return CompletableFuture.<Void>failedFuture(mismatch);
                     }
-                    return objectStore.deleteObject(
-                                    context.key(),
-                                    deleteOptions(context, head.etag(), bounded))
+                    return objectStore
+                            .deleteObject(context.key(), deleteOptions(context, head.etag(), bounded))
                             .<Void>thenApply(ignored -> null);
                 })
                 .thenCompose(value -> value);
@@ -263,20 +235,15 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
         }
     }
 
-    private static DeleteObjectOptions deleteOptions(
-            ProbeContext context, Optional<String> etag, Duration timeout) {
-        return new DeleteObjectOptions(
-                context.payload().length,
-                context.checksum(),
-                etag,
-                timeout);
+    private static DeleteObjectOptions deleteOptions(ProbeContext context, Optional<String> etag, Duration timeout) {
+        return new DeleteObjectOptions(context.payload().length, context.checksum(), etag, timeout);
     }
 
     private ProbeContext context(ObjectStoreDeleteCapabilityRequest request) {
         ObjectKeyPrefix prefix = new ObjectKeyPrefix(PROBE_PREFIX + request.runId() + "/");
         ObjectKey key = new ObjectKey(prefix.value() + "probe");
-        byte[] payload = (PROTOCOL + "\n" + capabilitySha256 + "\n" + request.runId() + "\n")
-                .getBytes(StandardCharsets.UTF_8);
+        byte[] payload =
+                (PROTOCOL + "\n" + capabilitySha256 + "\n" + request.runId() + "\n").getBytes(StandardCharsets.UTF_8);
         return new ProbeContext(key, prefix, payload, Crc32cChecksums.checksum(payload));
     }
 
@@ -303,19 +270,16 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
     }
 
     private static boolean isNotFound(Throwable failure) {
-        return failure instanceof NereusException nereus
-                && nereus.code() == ErrorCode.OBJECT_NOT_FOUND;
+        return failure instanceof NereusException nereus && nereus.code() == ErrorCode.OBJECT_NOT_FOUND;
     }
 
     private static NereusException capabilityFailure(String message) {
-        return new NereusException(
-                ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, message);
+        return new NereusException(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, message);
     }
 
     private static Throwable unwrap(Throwable supplied) {
         Throwable failure = supplied;
-        while ((failure instanceof CompletionException
-                        || failure instanceof java.util.concurrent.ExecutionException)
+        while ((failure instanceof CompletionException || failure instanceof java.util.concurrent.ExecutionException)
                 && failure.getCause() != null) {
             failure = failure.getCause();
         }
@@ -324,18 +288,13 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
 
     private static String sha256(byte[] value) {
         try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256").digest(value));
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("SHA-256 is unavailable", impossible);
         }
     }
 
-    private record ProbeContext(
-            ObjectKey key,
-            ObjectKeyPrefix prefix,
-            byte[] payload,
-            Checksum checksum) {
+    private record ProbeContext(ObjectKey key, ObjectKeyPrefix prefix, byte[] payload, Checksum checksum) {
         private ProbeContext {
             Objects.requireNonNull(key, "key");
             Objects.requireNonNull(prefix, "prefix");
@@ -361,9 +320,9 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
         }
 
         private void text(String value) {
-            byte[] bytes = Objects.requireNonNull(value, "value")
-                    .getBytes(StandardCharsets.UTF_8);
-            digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+            byte[] bytes = Objects.requireNonNull(value, "value").getBytes(StandardCharsets.UTF_8);
+            digest.update(
+                    ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
             digest.update(bytes);
         }
 
@@ -385,8 +344,7 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
             Objects.requireNonNull(timeout, "timeout");
             Objects.requireNonNull(nanoTime, "nanoTime");
             try {
-                return new Deadline(
-                        Math.addExact(nanoTime.getAsLong(), timeout.toNanos()), nanoTime);
+                return new Deadline(Math.addExact(nanoTime.getAsLong(), timeout.toNanos()), nanoTime);
             } catch (ArithmeticException failure) {
                 throw new IllegalArgumentException("probe deadline overflows", failure);
             }
@@ -395,15 +353,13 @@ public final class DefaultObjectStoreDeleteCapabilityProbe
         private Duration remaining() {
             long nanos = deadlineNanos - nanoTime.getAsLong();
             if (nanos <= 0) {
-                throw new NereusException(
-                        ErrorCode.TIMEOUT, true, "object-store capability probe timed out");
+                throw new NereusException(ErrorCode.TIMEOUT, true, "object-store capability probe timed out");
             }
             long millis = Math.max(1, (nanos + 999_999L) / 1_000_000L);
             return Duration.ofMillis(millis);
         }
 
-        private <T> CompletableFuture<T> call(
-                Supplier<CompletableFuture<T>> operation) {
+        private <T> CompletableFuture<T> call(Supplier<CompletableFuture<T>> operation) {
             Duration bounded = remaining();
             final CompletableFuture<T> future;
             try {

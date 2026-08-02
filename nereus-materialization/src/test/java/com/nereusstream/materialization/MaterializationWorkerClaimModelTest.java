@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.F4MetadataConditionFailedException;
@@ -34,23 +34,21 @@ class MaterializationWorkerClaimModelTest {
     @Test
     void lostClaimCasResponseReusesOneClaimIdAndOneAttempt() {
         AtomicBoolean loseClaimResponse = new AtomicBoolean(true);
-        var scenario = MaterializationWorkerTestHarness.scenario(delegate ->
-                loseFirstClaimResponse(delegate, loseClaimResponse));
+        var scenario = MaterializationWorkerTestHarness.scenario(
+                delegate -> loseFirstClaimResponse(delegate, loseClaimResponse));
         var protections = new MaterializationWorkerTestHarness.TrackingProtections();
         var exactReader = new MaterializationWorkerTestHarness.TrackingExactReader();
         AtomicInteger claimIds = new AtomicInteger();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        try (LocalFileObjectStore objects = new LocalFileObjectStore(
-                temporaryDirectory.resolve("lost-claim-objects"))) {
+        try (LocalFileObjectStore objects =
+                new LocalFileObjectStore(temporaryDirectory.resolve("lost-claim-objects"))) {
             DefaultMaterializationWorker worker = MaterializationWorkerTestHarness.worker(
                     "r".repeat(26),
                     scenario,
                     protections,
                     exactReader,
-                    (request, rows) -> CompletableFuture.failedFuture(new NereusException(
-                            ErrorCode.OBJECT_UPLOAD_FAILED,
-                            true,
-                            "stop after recovered claim")),
+                    (request, rows) -> CompletableFuture.failedFuture(
+                            new NereusException(ErrorCode.OBJECT_UPLOAD_FAILED, true, "stop after recovered claim")),
                     objects,
                     (task, output, timeout) -> CompletableFuture.completedFuture(null),
                     () -> {
@@ -67,8 +65,7 @@ class MaterializationWorkerClaimModelTest {
             assertThat(claimIds).hasValue(1);
             assertThat(durable.attempt()).isEqualTo(1);
             assertThat(durable.lifecycle()).isEqualTo(TaskLifecycle.RETRY_WAIT);
-            assertThat(durable.failureClassId())
-                    .isEqualTo(TaskFailureClass.RETRYABLE_OBJECT_STORE.wireId());
+            assertThat(durable.failureClassId()).isEqualTo(TaskFailureClass.RETRYABLE_OBJECT_STORE.wireId());
             assertThat(protections.acquired()).isEqualTo(2);
             assertThat(protections.released()).isEqualTo(2);
         } finally {
@@ -88,8 +85,8 @@ class MaterializationWorkerClaimModelTest {
         AtomicInteger secondWriterCalls = new AtomicInteger();
         ScheduledExecutorService firstScheduler = Executors.newSingleThreadScheduledExecutor();
         ScheduledExecutorService secondScheduler = Executors.newSingleThreadScheduledExecutor();
-        try (LocalFileObjectStore objects = new LocalFileObjectStore(
-                temporaryDirectory.resolve("contended-claim-objects"))) {
+        try (LocalFileObjectStore objects =
+                new LocalFileObjectStore(temporaryDirectory.resolve("contended-claim-objects"))) {
             DefaultMaterializationWorker first = MaterializationWorkerTestHarness.worker(
                     "r".repeat(26),
                     scenario,
@@ -111,8 +108,7 @@ class MaterializationWorkerClaimModelTest {
                     exactReader,
                     (request, rows) -> {
                         secondWriterCalls.incrementAndGet();
-                        return CompletableFuture.failedFuture(new AssertionError(
-                                "losing worker must not write"));
+                        return CompletableFuture.failedFuture(new AssertionError("losing worker must not write"));
                     },
                     objects,
                     (task, output, timeout) -> CompletableFuture.completedFuture(null),
@@ -134,12 +130,9 @@ class MaterializationWorkerClaimModelTest {
             assertThat(secondWriterCalls).hasValue(0);
             assertThat(secondProtections.acquired()).isZero();
 
-            blockedWrite.completeExceptionally(new NereusException(
-                    ErrorCode.OBJECT_UPLOAD_FAILED,
-                    true,
-                    "release contended worker"));
-            assertThatThrownBy(firstResult::join)
-                    .hasRootCauseMessage("release contended worker");
+            blockedWrite.completeExceptionally(
+                    new NereusException(ErrorCode.OBJECT_UPLOAD_FAILED, true, "release contended worker"));
+            assertThatThrownBy(firstResult::join).hasRootCauseMessage("release contended worker");
             MaterializationTaskRecord retry = task(scenario);
             assertThat(retry.lifecycle()).isEqualTo(TaskLifecycle.RETRY_WAIT);
             assertThat(retry.attempt()).isEqualTo(1);
@@ -152,8 +145,7 @@ class MaterializationWorkerClaimModelTest {
     }
 
     private static GenerationMetadataStore loseFirstClaimResponse(
-            GenerationMetadataStore delegate,
-            AtomicBoolean loseClaimResponse) {
+            GenerationMetadataStore delegate, AtomicBoolean loseClaimResponse) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -177,13 +169,11 @@ class MaterializationWorkerClaimModelTest {
                     CompletableFuture<VersionedMaterializationTask> written =
                             (CompletableFuture<VersionedMaterializationTask>) result;
                     return written.thenCompose(ignored -> CompletableFuture.failedFuture(
-                            new F4MetadataConditionFailedException(
-                                    "injected lost CLAIMED response")));
+                            new F4MetadataConditionFailedException("injected lost CLAIMED response")));
                 });
     }
 
-    private static MaterializationTaskRecord task(
-            MaterializationWorkerTestHarness.Scenario scenario) {
+    private static MaterializationTaskRecord task(MaterializationWorkerTestHarness.Scenario scenario) {
         return scenario.tasks()
                 .get(scenario.task().streamId(), scenario.task().taskId())
                 .join()

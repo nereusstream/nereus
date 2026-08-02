@@ -234,9 +234,11 @@ reader pin 通过同一 `(processRunId, object)` durable lease 复用本地并�
 ACTIVE root 与调用方 selection；失败会条件清理刚写入的 lease。durable protection manager 也已实现
 create/root/owner post-check、same-key owner transfer、owner-authorized release 和 response-loss fail-safe veto。
 metadata checkpoint 还新增了全分片内存 Oxia backend、generation/registration/physical-root/conditional-delete
-store contract tests、record contradiction tests，以及 production/fake 共用的 physical-root lifecycle transition validator；
+store contract tests、record contradiction tests，以及 production/fake 共用的 physical-root lifecycle transition
+validator；
 generation index/task 的 create-response-loss recovery 会核对 immutable identity，checkpoint 同版本则核对 policy digest。
-当前 registry 已冻结覆盖全部 lifecycle/optional branch、retirement-journal 和 activation/task-V2 schema 的 50 个 envelope vectors，并把 generation index、task、
+当前 registry 已冻结覆盖全部 lifecycle/optional branch、retirement-journal 和 activation/task-V2 schema 的 50 个 envelope
+vectors，并把 generation index、task、
 checkpoint、retention stats、stream registration 和 recovery root 的 ordinary CAS identity/monotonic transition
 guards 接入 production adapter。真实 Oxia gate 进一步验证了 slash-aware fixed-depth key ranges、restart、CAS、
 pagination 和 conditional metadata delete；pinned LocalStack gate 验证了 guarded upload 必须同时等待 SDK response
@@ -339,17 +341,17 @@ task/checkpoint/stream registration/watch/object listing
 
 ## 1. Locked Inputs
 
-| Input | Phase 4 lock |
-| --- | --- |
-| L0 append | successful append is primary-WAL durable and stream-head committed；head CAS remains the append linearization point |
-| Generation 0 | current legacy/generic offset-index records remain readable；generation 0 stays implicit `COMMITTED` |
-| Generic target | Phase 1.5 `ReadTarget` union and target codecs are reused；a compacted object is an `ObjectSliceReadTarget`, not a fake primary-WAL type |
-| Pulsar projection | one `PULSAR_ENTRY_V1` Entry is one Nereus offset；`Position.entryId == offset` and batch index remains inside exact Entry bytes |
-| Cursor/retention | F3 single-root cursor CAS、owner-session claim、`PROTECTION_PENDING`、`TRIM_PENDING` and read-only `CursorSnapshotInventory` are final-gated inputs |
-| Oxia primitive | only per-key create/version-CAS/range-scan/watch is assumed；Phase 4 adds conditional delete but assumes no cross-key transaction |
-| Object store | immutable put/range-read/head plus Phase 4 guarded streaming PUT、bounded list and idempotent conditional delete are implemented/final-gated；GC still requires durable authority proofs |
-| Current executable profile | `OBJECT_WAL_SYNC_OBJECT` and proof-gated `OBJECT_WAL_ASYNC_OBJECT`；F1-BK module-local BK_ONLY and BK async source/profile checkpoints exist，but production BookKeeper primary IO remains reserved |
-| Pulsar source interpretation | checkout is local master source；the declared `5.0.0-M1-SNAPSHOT` is not a published dependency |
+| Input                        | Phase 4 lock                                                                                                                                                                                      |
+|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| L0 append                    | successful append is primary-WAL durable and stream-head committed；head CAS remains the append linearization point                                                                                |
+| Generation 0                 | current legacy/generic offset-index records remain readable；generation 0 stays implicit `COMMITTED`                                                                                               |
+| Generic target               | Phase 1.5 `ReadTarget` union and target codecs are reused；a compacted object is an `ObjectSliceReadTarget`, not a fake primary-WAL type                                                           |
+| Pulsar projection            | one `PULSAR_ENTRY_V1` Entry is one Nereus offset；`Position.entryId == offset` and batch index remains inside exact Entry bytes                                                                    |
+| Cursor/retention             | F3 single-root cursor CAS、owner-session claim、`PROTECTION_PENDING`、`TRIM_PENDING` and read-only `CursorSnapshotInventory` are final-gated inputs                                                  |
+| Oxia primitive               | only per-key create/version-CAS/range-scan/watch is assumed；Phase 4 adds conditional delete but assumes no cross-key transaction                                                                  |
+| Object store                 | immutable put/range-read/head plus Phase 4 guarded streaming PUT、bounded list and idempotent conditional delete are implemented/final-gated；GC still requires durable authority proofs            |
+| Current executable profile   | `OBJECT_WAL_SYNC_OBJECT` and proof-gated `OBJECT_WAL_ASYNC_OBJECT`；F1-BK module-local BK_ONLY and BK async source/profile checkpoints exist，but production BookKeeper primary IO remains reserved |
+| Pulsar source interpretation | checkout is local master source；the declared `5.0.0-M1-SNAPSHOT` is not a published dependency                                                                                                    |
 
 Any change to either locked commit requires re-running document 01's member/call-path audit before implementation
 continues. Compilation alone is not evidence that the retention, admin, capability or deletion boundary is unchanged.
@@ -380,17 +382,18 @@ The Phase 4 code-level design closes the following choices：
 9. Compacted output identity is generation-neutral and contains both content SHA-256 and a durable output-attempt id；
    a deleted physical key is never resurrected, while the same surviving output may be reused by publication repair.
 10. Primary generation-0 bytes and old commit-log records are not reclaimable merely because a higher generation
-   exists. A versioned recovery checkpoint object/root must first replace their append-recovery and derived-index
-   repair role.
+    exists. A versioned recovery checkpoint object/root must first replace their append-recovery and derived-index
+    repair role.
 11. F4 consumes F3 logical trim only through `CursorRetentionCoordinator.requestTrim` under the current writable
-   owner session. `PROTECTION_PENDING` and `TRIM_PENDING` veto a new trim/GC decision；snapshot inventory alone never
-   authorizes deletion.
+    owner session. `PROTECTION_PENDING` and `TRIM_PENDING` veto a new trim/GC decision；snapshot inventory alone never
+    authorizes deletion.
 12. Phase 4 enables async materialization only for `OBJECT_WAL_ASYNC_OBJECT`. BookKeeper writer/reader/ledger
-   retention remains a later, separate profile implementation that reuses this protocol. Its code-level F1-BK target
-   is `../phase-bk-bookkeeper-primary-wal/README.md`；generation zero remains the BK range, while all Object outputs
-   are higher generations and use this same task/worker/publication/lag/checkpoint truth.
+    retention remains a later, separate profile implementation that reuses this protocol. Its code-level F1-BK target
+    is `../phase-bk-bookkeeper-primary-wal/README.md`；generation zero remains the BK range, while all Object outputs
+    are higher generations and use this same task/worker/publication/lag/checkpoint truth.
 13. Pulsar retention and compatible backlog eviction may be admitted only behind a separately negotiated
-    `nereus.generation-protocol=2` broker lookup capability. Pulsar compaction/offload/truncate/read-compacted remain rejected in
+    `nereus.generation-protocol=2` broker lookup capability. Pulsar compaction/offload/truncate/read-compacted remain
+    rejected in
     Phase 4；full topic-compaction compatibility belongs to F8.
 14. Physical roots use 256 deterministic shards, so restart recovery can enumerate `MARKED/DELETING` lifecycle
     truth even after bytes disappear. Object listing only discovers missing-root orphans/audit candidates；every
@@ -478,16 +481,16 @@ current L0 protocol-neutral gate.
 
 ## 6. Document Map
 
-| Document | Purpose |
-| --- | --- |
-| [01-current-contract-and-source-audit.md](01-current-contract-and-source-audit.md) | exact Nereus/Pulsar source lock、current gaps、call paths and code ownership |
-| [02-domain-api-and-object-format.md](02-domain-api-and-object-format.md) | target Java API/domain records、reader dispatch、Parquet/sparse/checkpoint object formats |
-| [03-oxia-metadata-and-publication.md](03-oxia-metadata-and-publication.md) | keyspace、record fields、binary codecs、generation publish and resolver contract |
-| [04-task-recovery-async-and-checkpoint.md](04-task-recovery-async-and-checkpoint.md) | planner/worker state machines、async profile、recovery checkpoint and crash repair |
-| [05-reader-retention-and-gc.md](05-reader-retention-and-gc.md) | durable read pins、reference handshake、logical retention、source/snapshot/object GC |
-| [06-pulsar-rollout-operations-and-compatibility.md](06-pulsar-rollout-operations-and-compatibility.md) | exact broker/facade changes、capability rollout、policy/admin matrix、F5/F6/F8 handoff |
-| [07-implementation-plan-and-gates.md](07-implementation-plan-and-gates.md) | M0-M6 file inventory、tests、failure matrix、ordinary/final release gates |
-| [08-m6-scenario-evidence-matrix.md](08-m6-scenario-evidence-matrix.md) | executable 52/52 required-scenario to annotated-test and owning-gate traceability |
+| Document                                                                                               | Purpose                                                                                 |
+|--------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| [01-current-contract-and-source-audit.md](01-current-contract-and-source-audit.md)                     | exact Nereus/Pulsar source lock、current gaps、call paths and code ownership              |
+| [02-domain-api-and-object-format.md](02-domain-api-and-object-format.md)                               | target Java API/domain records、reader dispatch、Parquet/sparse/checkpoint object formats |
+| [03-oxia-metadata-and-publication.md](03-oxia-metadata-and-publication.md)                             | keyspace、record fields、binary codecs、generation publish and resolver contract           |
+| [04-task-recovery-async-and-checkpoint.md](04-task-recovery-async-and-checkpoint.md)                   | planner/worker state machines、async profile、recovery checkpoint and crash repair        |
+| [05-reader-retention-and-gc.md](05-reader-retention-and-gc.md)                                         | durable read pins、reference handshake、logical retention、source/snapshot/object GC       |
+| [06-pulsar-rollout-operations-and-compatibility.md](06-pulsar-rollout-operations-and-compatibility.md) | exact broker/facade changes、capability rollout、policy/admin matrix、F5/F6/F8 handoff     |
+| [07-implementation-plan-and-gates.md](07-implementation-plan-and-gates.md)                             | M0-M6 file inventory、tests、failure matrix、ordinary/final release gates                  |
+| [08-m6-scenario-evidence-matrix.md](08-m6-scenario-evidence-matrix.md)                                 | executable 52/52 required-scenario to annotated-test and owning-gate traceability       |
 
 The north-star summary remains
 [nereus-future4-compaction-generation.md](../design/nereus-future4-compaction-generation.md)；when it conflicts with
@@ -945,7 +948,8 @@ production deletion 继续关闭。
 Checkpoint R 用 `HigherGenerationRetirementEligibilityVerifier` 关闭 §9.1 的剩余协议分支。所有 higher source
 先尝试 `CompletedTrimRetirementVerifier`：source range 必须完整落在同一 authoritative
 `StreamMetadataSnapshot.trimOffset` 以下，source wrapper、versioned stream authority 和可选 recovery-root wrapper
-会在同一次 proof 内精确重读；hydrated trim reason/read time 不属于持久化 authority。Generation-zero planner 也先走同一 completed-trim proof；只有未完成 trim 时
+会在同一次 proof 内精确重读；hydrated trim reason/read time 不属于持久化 authority。Generation-zero planner 也先走同一
+completed-trim proof；只有未完成 trim 时
 才要求 checkpoint P 的 current NRC1 replacement。因此 below-trim 不是时间或本地 hint，而是 exact L0
 metadata + source + recovery-root version set。
 
@@ -1892,7 +1896,8 @@ budget 内 best-effort 等待；未完成工作仍由 durable scanner 收敛。
 `CheckpointDerivedIndexRepairer` 新增 injectable live repairer seam，production composition 可以用
 `ReadAfterStableCommitRepair` 处理 live tail，再保留既有 NRC1 higher-generation restore path。
 `GenerationReadResolver` 因此接受所有启用 object materialization 的 profile；非 Object generation zero 由其
-provider reader 持有 durable read lease，positive generation 仍强制使用 Object pin。default `DefaultStreamStorage` 仍未切换到 F4
+provider reader 持有 durable read lease，positive generation 仍强制使用 Object pin。default `DefaultStreamStorage` 仍未切换到
+F4
 generation resolver。
 
 聚焦测试覆盖 detached work 尚未开始即返回、strict protection wait、secondary protection failure 不撤销 ack、
@@ -2207,15 +2212,15 @@ fresh-inner-execution audits. F4-M6 and Phase 4 are `Implemented / final-gated`.
 
 ## 7. Milestones
 
-| Milestone | Deliverable | Current status |
-| --- | --- | --- |
-| F4-M0 | local source audit and code-level protocol/design gate | complete in docs；design-only |
-| F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
-| F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
-| F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | complete/final-gated on 2026-07-19；checkpoint A–BC storage/runtime/scale/failure evidence is composed with a retry-disabled real two-broker Pulsar gate that deletes generation-zero source bytes, preserves compacted reads and exact ordinary/middle-batch MessageIds through unload、owner failover、restart and reverse takeover, and proves stock BookKeeper coexistence；safe broker defaults remain `enabled=false, dryRun=true` |
-| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | complete/final-gated on 2026-07-19；checkpoint X–AI implement exact durable registration/readiness/activation、protected async Object-WAL acknowledgement/repair、pre-I/O lag admission、coupled production runtime/config、stable exact-evidence retention planning、bounded execution and exact Pulsar policy/admin admission；the retry-disabled real two-broker gate proves cold registration、ordinary/compressed-batch MessageIds、owner failover/rejoin、durable backlog eviction、unloaded logical trim、post-trim append/read、physical-byte retention and stock BookKeeper coexistence |
-| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | complete/final-gated on 2026-07-19；BD–BQ include 52/52 executable traceability、fresh serialized nested-Pulsar evidence and the 203/203-task BP-source-lock aggregate |
+| Milestone | Deliverable                                                                          | Current status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+|-----------|--------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| F4-M0     | local source audit and code-level protocol/design gate                               | complete in docs；design-only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| F4-M1     | metadata/object lifecycle primitives、list/delete、reader lease and codecs             | complete/final-gated on 2026-07-15                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| F4-M2     | generation publication、committed resolver、target-reader dispatch and fallback        | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| F4-M3     | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| F4-M4     | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC          | complete/final-gated on 2026-07-19；checkpoint A–BC storage/runtime/scale/failure evidence is composed with a retry-disabled real two-broker Pulsar gate that deletes generation-zero source bytes, preserves compacted reads and exact ordinary/middle-batch MessageIds through unload、owner failover、restart and reverse takeover, and proves stock BookKeeper coexistence；safe broker defaults remain `enabled=false, dryRun=true`                                                                                                                                                |
+| F4-M5     | Object-WAL async profile、Pulsar retention/admin/capability integration               | complete/final-gated on 2026-07-19；checkpoint X–AI implement exact durable registration/readiness/activation、protected async Object-WAL acknowledgement/repair、pre-I/O lag admission、coupled production runtime/config、stable exact-evidence retention planning、bounded execution and exact Pulsar policy/admin admission；the retry-disabled real two-broker gate proves cold registration、ordinary/compressed-batch MessageIds、owner failover/rejoin、durable backlog eviction、unloaded logical trim、post-trim append/read、physical-byte retention and stock BookKeeper coexistence |
+| F4-M6     | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate              | complete/final-gated on 2026-07-19；BD–BQ include 52/52 executable traceability、fresh serialized nested-Pulsar evidence and the 203/203-task BP-source-lock aggregate                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：
 

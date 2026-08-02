@@ -26,7 +26,9 @@ import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Objects;
 
-/** Durable key and partition builder for the Phase 4 protocol. */
+/**
+ * Durable key and partition builder for the Phase 4 protocol.
+ */
 public final class F4Keyspace {
     public static final int MATERIALIZATION_REGISTRY_SHARDS = 64;
     public static final int PHYSICAL_OBJECT_SHARDS = 256;
@@ -54,9 +56,7 @@ public final class F4Keyspace {
 
     public String materializationRegistryKey(StreamId streamId) {
         int shard = materializationRegistryShard(streamId);
-        return materializationRegistryPrefix(shard)
-                + "/"
-                + KeyComponentCodec.encodeComponent(streamId.value());
+        return materializationRegistryPrefix(shard) + "/" + KeyComponentCodec.encodeComponent(streamId.value());
     }
 
     public String materializationRegistryPrefix(int shard) {
@@ -106,7 +106,9 @@ public final class F4Keyspace {
         return streamPrefix(streamId) + "/views/v1/topic-compacted/offset-index";
     }
 
-    /** Strict restart router for a journaled generation-index key. */
+    /**
+     * Strict restart router for a journaled generation-index key.
+     */
     public GenerationCandidateKeyIdentity parseGenerationIndexKey(String suppliedKey) {
         String key = requireText(suppliedKey, "generationIndexKey");
         String streamsPrefix = oxia.prefix() + "/streams/";
@@ -118,8 +120,7 @@ public final class F4Keyspace {
         if (streamEnd <= 0) {
             throw new IllegalArgumentException("generation index key is missing its stream component");
         }
-        StreamId stream = new StreamId(KeyComponentCodec.decodeComponent(
-                remainder.substring(0, streamEnd)));
+        StreamId stream = new StreamId(KeyComponentCodec.decodeComponent(remainder.substring(0, streamEnd)));
         String suffix = remainder.substring(streamEnd + 1);
         String committedPrefix = "offset-index/";
         String topicCompactedPrefix = "views/v1/topic-compacted/offset-index/";
@@ -135,17 +136,13 @@ public final class F4Keyspace {
             throw new IllegalArgumentException("generation index key has an unknown view namespace");
         }
         int separator = identity.indexOf('/');
-        if (separator <= 0
-                || separator == identity.length() - 1
-                || identity.indexOf('/', separator + 1) >= 0) {
+        if (separator <= 0 || separator == identity.length() - 1 || identity.indexOf('/', separator + 1) >= 0) {
             throw new IllegalArgumentException("generation index key has an invalid identity depth");
         }
-        long offsetEnd = KeyComponentCodec.decodeNonNegativeLong(
-                identity.substring(0, separator));
-        long generation = KeyComponentCodec.decodeNonNegativeLong(
-                identity.substring(separator + 1));
-        GenerationCandidateKeyIdentity decoded = new GenerationCandidateKeyIdentity(
-                stream, view, offsetEnd, generation);
+        long offsetEnd = KeyComponentCodec.decodeNonNegativeLong(identity.substring(0, separator));
+        long generation = KeyComponentCodec.decodeNonNegativeLong(identity.substring(separator + 1));
+        GenerationCandidateKeyIdentity decoded =
+                new GenerationCandidateKeyIdentity(stream, view, offsetEnd, generation);
         if (!generationIndexKey(stream, view, offsetEnd, generation).equals(key)) {
             throw new IllegalArgumentException("generation index key is not canonical");
         }
@@ -183,10 +180,7 @@ public final class F4Keyspace {
     }
 
     public String retentionStatsScanFrom(StreamId streamId, long offsetEndInclusive) {
-        return retentionStatsPrefix(streamId)
-                + "/"
-                + KeyComponentCodec.encodeNonNegativeLong(offsetEndInclusive)
-                + "/";
+        return retentionStatsPrefix(streamId) + "/" + KeyComponentCodec.encodeNonNegativeLong(offsetEndInclusive) + "/";
     }
 
     public String retentionStatsScanToAfterEnd(StreamId streamId, long offsetEndInclusive) {
@@ -233,10 +227,7 @@ public final class F4Keyspace {
                 + KeyComponentCodec.encodeComponent(requireText(processRunId, "processRunId"));
     }
 
-    public String protectionKey(
-            ObjectKeyHash object,
-            ObjectProtectionType type,
-            String referenceId) {
+    public String protectionKey(ObjectKeyHash object, ObjectProtectionType type, String referenceId) {
         Objects.requireNonNull(type, "type");
         return protectionPrefix(object)
                 + "/"
@@ -253,8 +244,7 @@ public final class F4Keyspace {
         return gcRetirementAttemptPrefix(object, gcAttemptId) + "/manifest";
     }
 
-    public String gcRetirementProtectionKey(
-            ObjectKeyHash object, String gcAttemptId, String protectionKey) {
+    public String gcRetirementProtectionKey(ObjectKeyHash object, String gcAttemptId, String protectionKey) {
         return gcRetirementProtectionPrefix(object, gcAttemptId)
                 + "/"
                 + sha256Hex("protection\0" + requireText(protectionKey, "protectionKey"));
@@ -264,8 +254,7 @@ public final class F4Keyspace {
         return gcRetirementAttemptPrefix(object, gcAttemptId) + "/protections";
     }
 
-    public String gcRetirementRemovalKey(
-            ObjectKeyHash object, String gcAttemptId, String removalKey) {
+    public String gcRetirementRemovalKey(ObjectKeyHash object, String gcAttemptId, String removalKey) {
         return gcRetirementRemovalPrefix(object, gcAttemptId)
                 + "/"
                 + sha256Hex("removal\0" + requireText(removalKey, "removalKey"));
@@ -357,10 +346,8 @@ public final class F4Keyspace {
         }
         for (int index = 0; index < exact.length(); index++) {
             char character = exact.charAt(index);
-            if (!((character >= 'a' && character <= 'z')
-                    || (character >= '2' && character <= '7'))) {
-                throw new IllegalArgumentException(
-                        name + " must be lowercase base32 without padding");
+            if (!((character >= 'a' && character <= 'z') || (character >= '2' && character <= '7'))) {
+                throw new IllegalArgumentException(name + " must be lowercase base32 without padding");
             }
         }
         return exact;

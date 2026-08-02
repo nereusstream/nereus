@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.StreamStorage;
 import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationActivationSubject;
@@ -78,17 +78,18 @@ class NereusManagedLedgerRuntimeTest {
         runtime.close();
         runtime.close();
 
-        assertThat(closes).containsExactly(
-                "cursor-storage",
-                "cursor-retention",
-                "cursor-snapshot",
-                "cursor-metadata",
-                "generation",
-                "projection",
-                "stream",
-                "l0",
-                "object",
-                "provider");
+        assertThat(closes)
+                .containsExactly(
+                        "cursor-storage",
+                        "cursor-retention",
+                        "cursor-snapshot",
+                        "cursor-metadata",
+                        "generation",
+                        "projection",
+                        "stream",
+                        "l0",
+                        "object",
+                        "provider");
         assertThat(sharedClientCloses).hasValue(1);
         assertThat(callbacks.isShutdown()).isTrue();
         assertThat(scheduler.isShutdown()).isTrue();
@@ -100,39 +101,20 @@ class NereusManagedLedgerRuntimeTest {
         List<String> closes = new ArrayList<>();
         AtomicInteger sharedClientCloses = new AtomicInteger();
         SharedOxiaClientRuntime shared = sharedRuntime(sharedClientCloses);
-        ScheduledExecutorService scheduler =
-                Executors.newSingleThreadScheduledExecutor();
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         ExecutorService callbacks = Executors.newSingleThreadExecutor();
-        ObjectReadPinManager readPins =
-                proxy(ObjectReadPinManager.class, "read-pins", closes, false);
+        ObjectReadPinManager readPins = proxy(ObjectReadPinManager.class, "read-pins", closes, false);
         GenerationProtocolActivationStore generationActivationStore =
-                proxy(
-                        GenerationProtocolActivationStore.class,
-                        "generation-activation",
-                        closes,
-                        false);
+                proxy(GenerationProtocolActivationStore.class, "generation-activation", closes, false);
         ManagedLedgerGenerationRegistrationBackfillProofCoordinator proofCoordinator =
                 completion -> CompletableFuture.completedFuture(null);
-        ManagedLedgerGenerationProtocolActivationCoordinator
-                activationCoordinator =
-                        () -> CompletableFuture.completedFuture(null);
-        GenerationProtocolActivationGuard generationActivationGuard =
-                allowGenerationActivation();
-        AutoCloseable materializationRuntime =
-                proxy(
-                        AutoCloseable.class,
-                        "materialization-runtime",
-                        closes,
-                        false);
-        AutoCloseable physicalGcRuntime = proxy(
-                AutoCloseable.class,
-                "physical-gc-runtime",
-                closes,
-                false);
-        ManagedLedgerPhysicalDeletionActivationCoordinator
-                physicalDeletionActivationCoordinator = request ->
-                        CompletableFuture.failedFuture(
-                                new AssertionError("not invoked"));
+        ManagedLedgerGenerationProtocolActivationCoordinator activationCoordinator =
+                () -> CompletableFuture.completedFuture(null);
+        GenerationProtocolActivationGuard generationActivationGuard = allowGenerationActivation();
+        AutoCloseable materializationRuntime = proxy(AutoCloseable.class, "materialization-runtime", closes, false);
+        AutoCloseable physicalGcRuntime = proxy(AutoCloseable.class, "physical-gc-runtime", closes, false);
+        ManagedLedgerPhysicalDeletionActivationCoordinator physicalDeletionActivationCoordinator =
+                request -> CompletableFuture.failedFuture(new AssertionError("not invoked"));
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
                 proxy(StreamStorage.class, "stream", closes, false),
                 proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
@@ -167,37 +149,33 @@ class NereusManagedLedgerRuntimeTest {
                 "pulsar-f2/" + PROCESS_RUN_ID);
 
         assertThat(runtime.objectReadPinManager()).isSameAs(readPins);
-        assertThat(runtime.generationRegistrationBackfillProofCoordinator())
-                .isSameAs(proofCoordinator);
-        assertThat(runtime.generationProtocolActivationCoordinator())
-                .isSameAs(activationCoordinator);
-        assertThat(runtime.generationProtocolActivationGuard())
-                .isSameAs(generationActivationGuard);
-        assertThat(runtime.materializationRuntime())
-                .isSameAs(materializationRuntime);
+        assertThat(runtime.generationRegistrationBackfillProofCoordinator()).isSameAs(proofCoordinator);
+        assertThat(runtime.generationProtocolActivationCoordinator()).isSameAs(activationCoordinator);
+        assertThat(runtime.generationProtocolActivationGuard()).isSameAs(generationActivationGuard);
+        assertThat(runtime.materializationRuntime()).isSameAs(materializationRuntime);
         assertThat(runtime.physicalGcRuntime()).isSameAs(physicalGcRuntime);
-        assertThat(runtime.physicalDeletionActivationCoordinator())
-                .isSameAs(physicalDeletionActivationCoordinator);
+        assertThat(runtime.physicalDeletionActivationCoordinator()).isSameAs(physicalDeletionActivationCoordinator);
         assertThat(runtime.hasPhysicalGcRuntime()).isTrue();
         runtime.close();
 
-        assertThat(closes).containsExactly(
-                "physical-gc-runtime",
-                "cursor-storage",
-                "cursor-retention",
-                "cursor-snapshot",
-                "cursor-metadata",
-                "materialization-runtime",
-                "generation-activation",
-                "generation",
-                "projection",
-                "stream",
-                "read-pins",
-                "protection",
-                "physical",
-                "l0",
-                "object",
-                "provider");
+        assertThat(closes)
+                .containsExactly(
+                        "physical-gc-runtime",
+                        "cursor-storage",
+                        "cursor-retention",
+                        "cursor-snapshot",
+                        "cursor-metadata",
+                        "materialization-runtime",
+                        "generation-activation",
+                        "generation",
+                        "projection",
+                        "stream",
+                        "read-pins",
+                        "protection",
+                        "physical",
+                        "l0",
+                        "object",
+                        "provider");
         assertThat(sharedClientCloses).hasValue(1);
     }
 
@@ -233,17 +211,18 @@ class NereusManagedLedgerRuntimeTest {
                 .isInstanceOf(RuntimeException.class)
                 .satisfies(error -> assertThat(error.getSuppressed()).hasSize(2));
 
-        assertThat(closes).containsExactly(
-                "cursor-storage",
-                "cursor-retention",
-                "cursor-snapshot",
-                "cursor-metadata",
-                "generation",
-                "projection",
-                "stream",
-                "l0",
-                "object",
-                "provider");
+        assertThat(closes)
+                .containsExactly(
+                        "cursor-storage",
+                        "cursor-retention",
+                        "cursor-snapshot",
+                        "cursor-metadata",
+                        "generation",
+                        "projection",
+                        "stream",
+                        "l0",
+                        "object",
+                        "provider");
         assertThat(sharedClientCloses).hasValue(1);
         assertThat(callbacks.isShutdown()).isTrue();
         assertThat(scheduler.isShutdown()).isTrue();
@@ -288,15 +267,9 @@ class NereusManagedLedgerRuntimeTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static <T> T proxy(
-            Class<T> type,
-            String name,
-            List<String> closes,
-            boolean failClose) {
-        return (T) Proxy.newProxyInstance(
-                type.getClassLoader(),
-                new Class<?>[] {type},
-                (instance, method, arguments) -> {
+    private static <T> T proxy(Class<T> type, String name, List<String> closes, boolean failClose) {
+        return (T)
+                Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, (instance, method, arguments) -> {
                     if ("close".equals(method.getName())) {
                         closes.add(name);
                         if (failClose) {
@@ -327,40 +300,33 @@ class NereusManagedLedgerRuntimeTest {
         Method factory = SharedOxiaClientRuntime.class.getDeclaredMethod(
                 "usingClient", OxiaClientConfiguration.class, SyncOxiaClient.class, Clock.class);
         factory.setAccessible(true);
-        return (SharedOxiaClientRuntime) factory.invoke(
-                null, OxiaClientConfiguration.defaults("unused:6648"), client, Clock.systemUTC());
+        return (SharedOxiaClientRuntime)
+                factory.invoke(null, OxiaClientConfiguration.defaults("unused:6648"), client, Clock.systemUTC());
     }
 
     private static CursorProtocolActivationGuard allowActivation() {
         return ledger -> CompletableFuture.completedFuture(null);
     }
 
-    private static ManagedLedgerMaterializationRegistrationCoordinator
-            allowRegistration() {
-        return (name, identity) ->
-                CompletableFuture.completedFuture(null);
+    private static ManagedLedgerMaterializationRegistrationCoordinator allowRegistration() {
+        return (name, identity) -> CompletableFuture.completedFuture(null);
     }
 
-    private static GenerationProtocolActivationGuard
-            allowGenerationActivation() {
+    private static GenerationProtocolActivationGuard allowGenerationActivation() {
         return new GenerationProtocolActivationGuard() {
             @Override
-            public CompletableFuture<GenerationActivationProof>
-                    requireReady(
-                            GenerationOperation operation,
-                            GenerationActivationSubject subject,
-                            boolean activateLiveProjectionIfAbsent) {
+            public CompletableFuture<GenerationActivationProof> requireReady(
+                    GenerationOperation operation,
+                    GenerationActivationSubject subject,
+                    boolean activateLiveProjectionIfAbsent) {
                 return CompletableFuture.failedFuture(
-                        new UnsupportedOperationException(
-                                "not used by runtime ownership test"));
+                        new UnsupportedOperationException("not used by runtime ownership test"));
             }
 
             @Override
-            public CompletableFuture<Void> revalidate(
-                    GenerationActivationProof proof) {
+            public CompletableFuture<Void> revalidate(GenerationActivationProof proof) {
                 return CompletableFuture.failedFuture(
-                        new UnsupportedOperationException(
-                                "not used by runtime ownership test"));
+                        new UnsupportedOperationException("not used by runtime ownership test"));
             }
         };
     }

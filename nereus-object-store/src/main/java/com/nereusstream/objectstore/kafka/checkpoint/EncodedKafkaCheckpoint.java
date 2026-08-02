@@ -1,15 +1,16 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.kafka.checkpoint;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.objectstore.staging.PrivateStagedObjectFile;
 import java.util.Objects;
 
-/** Close-owned private staged NKC1 bytes. */
-public record EncodedKafkaCheckpoint(
-        PrivateStagedObjectFile stagingFile,
-        long contentLength,
-        Checksum contentSha256) implements AutoCloseable {
+/**
+ * Close-owned private staged NKC1 bytes.
+ */
+public record EncodedKafkaCheckpoint(PrivateStagedObjectFile stagingFile, long contentLength, Checksum contentSha256)
+        implements AutoCloseable {
     public EncodedKafkaCheckpoint {
         Objects.requireNonNull(stagingFile, "stagingFile");
         if (contentLength <= 0 || contentLength >= stagingFile.sealedLength()) {

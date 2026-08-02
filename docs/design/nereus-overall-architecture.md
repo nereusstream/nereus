@@ -1,6 +1,7 @@
 # Nereus 总体架构设计
 
-> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3、Future 4 F4-M1–M6 and F1-BK BK-M0–M6 complete/final-gated
+> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3、Future 4 F4-M1–M6 and F1-BK BK-M0–M6
+> complete/final-gated
 > 最近设计/实现同步：2026-07-30（F9 exact-source final receipt synchronized）
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
@@ -44,7 +45,8 @@ Pulsar、KoP/Kafka and native Kafka protocol projections
 - stream-head CAS + reachable commit-log 的 fake metadata implementation，bounded replay classification，
   head-derived orphan-intent validation，dense chain validation，tuple-bound continuation repair and tests；
 - Object WAL v1 writer/reader、multi-slice layout、entry index、checksums、local test object store；
-- F4-M1–M6 final-gated delivery includes API/metadata/codecs、conditional metadata delete、slash-aware fixed-depth Oxia scans、
+- F4-M1–M6 final-gated delivery includes API/metadata/codecs、conditional metadata delete、slash-aware fixed-depth Oxia
+  scans、
   replayable/guarded object IO、physical reference proof values、durable reader-pin/protection handshakes、
   authoritative committed-generation resolve/read、same-view fallback/quarantine 和 restart-safe publication；
   M3 compacted format、exact-source worker、checkpoint/service、Pulsar Entry/NCP1 byte round trip、topic-compaction
@@ -76,7 +78,8 @@ LocalStack 与 production storage-isolation gates，以及跨 unload、owner fai
 `MessageIdAdv` 普通/批内起点回归。Future 2 is complete。
 
 Phase 3 已完成 design-only F3-M0/M0R：锁定 local Pulsar master 的 API/call paths，并冻结 one-root
-cursor CAS、generation/tombstone、destructive `ackStateEpoch`、remaining-bit partial batch ack、immutable snapshot bytes、local-only normal
+cursor CAS、generation/tombstone、destructive `ackStateEpoch`、remaining-bit partial batch ack、immutable snapshot
+bytes、local-only normal
 read position、per-writable-open owner-session claim/fencing 和 recoverable retention/trim barrier。F3-M1 的
 metadata/snapshot 基础生产代码、focused/golden tests、真实 Oxia 和 LocalStack final gate 已完成；F3-M2 的
 durable CursorStorage、retention/protection/trim state machines、owner fencing、snapshot hydration、failure/
@@ -166,7 +169,8 @@ Checkpoint AB 又实现 product-owned activation guard、frozen six-domain proof
 projection/L0/registration authority、response-loss-safe monotonic marker 和 mutation 前 proof revalidation，并把
 默认关闭的 Pulsar first-marker switch 接到 runtime。Checkpoint AC 又实现 product-owned publication
 coordinator、proof-gated publication-only `PREPARED -> ACTIVE` CAS、bounded conflict/lost-response recovery、final
-readiness revalidation 和 broker zero-failure backfill sequencing。Checkpoint AD–AE 随后实现 protected async Object-WAL acknowledgement、generation-zero
+readiness revalidation 和 broker zero-failure backfill sequencing。Checkpoint AD–AE 随后实现 protected async Object-WAL
+acknowledgement、generation-zero
 restart/read repair 和 per-stream pre-I/O proof/lag admission；checkpoint AF 已把 resolver、generation-aware
 read/repair、NRC1 replay、source repair 和 materialization service 原子装配进 production provider，并映射 exact
 Pulsar sync/async profile 与 materialization config。Checkpoint AG 又实现 product-neutral exact retention
@@ -185,7 +189,8 @@ convergence with exact Pulsar MessageIds and BookKeeper coexistence、protected-
 routing、provider-neutral Hadoop/Oxia logging composition、bounded Docker release-gate scheduling、exclusive nested
 builds of the locked Pulsar checkout、fresh inner execution for all seventeen nested broker gates、TTL expiry-monitor
 convergence in the inherited cursor acceptance and the executable 52/52 evidence matrix. Checkpoint BQ runs the
-clean BP-source-lock aggregate in 21m47s with 203/203 outer tasks executed, so M6 and Phase 4 are final-gated. Safe-default production
+clean BP-source-lock aggregate in 21m47s with 203/203 outer tasks executed, so M6 and Phase 4 are final-gated.
+Safe-default production
 deletion 继续关闭。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
@@ -283,27 +288,27 @@ separate `TOPIC_COMPACTED` view and can never outrank or backstop an ordinary co
 
 ### 4.3 Physical truth
 
-| State | Owner | Visibility meaning |
-| --- | --- | --- |
-| Primary WAL bytes | BookKeeper or object store | durable proof only |
-| BookKeeper ledger-id namespace | exact provider-scope digest + deployment-reserved positive-63-bit advanced-id prefix | prevents foreign create/delete ABA；required for every F1-BK profile |
-| BookKeeper uncertain-create slot | fixed Oxia slot + monotonic ledger-root hazard | bounds unknown creates cluster-wide and permanently vetoes automatic delete when provider completion was not durably observed |
-| Object manifest | Oxia | precondition/audit/format/reference information |
-| Object bytes | object store | immutable physical payload |
-| Generation index | Oxia | current physical read selection |
-| Catalog snapshot | external catalog + Oxia lineage | table visibility only |
+| State                            | Owner                                                                                | Visibility meaning                                                                                                            |
+|----------------------------------|--------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| Primary WAL bytes                | BookKeeper or object store                                                           | durable proof only                                                                                                            |
+| BookKeeper ledger-id namespace   | exact provider-scope digest + deployment-reserved positive-63-bit advanced-id prefix | prevents foreign create/delete ABA；required for every F1-BK profile                                                           |
+| BookKeeper uncertain-create slot | fixed Oxia slot + monotonic ledger-root hazard                                       | bounds unknown creates cluster-wide and permanently vetoes automatic delete when provider completion was not durably observed |
+| Object manifest                  | Oxia                                                                                 | precondition/audit/format/reference information                                                                               |
+| Object bytes                     | object store                                                                         | immutable physical payload                                                                                                    |
+| Generation index                 | Oxia                                                                                 | current physical read selection                                                                                               |
+| Catalog snapshot                 | external catalog + Oxia lineage                                                      | table visibility only                                                                                                         |
 
 ## 5. Storage profile model
 
 Profile 由两个决策组成：primary WAL 和 object publication mode。
 
-| Profile | Primary WAL | Producer success boundary | Secondary publication | Current status |
-| --- | --- | --- | --- | --- |
-| `BOOKKEEPER_WAL_ONLY` | BookKeeper | WAL durable + stable head commit | disabled | BK-M2 module/facade runtime and real Oxia/BookKeeper restart/delete evidence complete/final-gated；BK-M5 production rollout final-gated behind exact activation/capability admission |
-| `BOOKKEEPER_WAL_SYNC_OBJECT` | BookKeeper | stable head + gen0 BK index + `REQUIRED_OBJECT_GENERATION` COMMITTED/read proof | synchronous via shared F4 task/path | BK-M4 module-local profile and BK-M5 production mixed-profile rollout complete/final-gated |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | WAL durable + stable head commit after lag admission | background via shared F4 task/path | BK-M3 source/protection/profile/lag、retirement、real publication/read/physical-delete/response-loss and unreadable-output fail-closed evidence complete/final-gated；BK-M5 production rollout final-gated |
-| `OBJECT_WAL_SYNC_OBJECT` | object store | object WAL durable + stable head + generation-0 indexes | generation 0 on append path | Phase 1 target |
-| `OBJECT_WAL_ASYNC_OBJECT` | object store | object WAL durable + stable head commit | read-optimized generation background | Implemented/final-gated in Phase 4；activation-proof gated |
+| Profile                       | Primary WAL  | Producer success boundary                                                       | Secondary publication                | Current status                                                                                                                                                                                          |
+|-------------------------------|--------------|---------------------------------------------------------------------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `BOOKKEEPER_WAL_ONLY`         | BookKeeper   | WAL durable + stable head commit                                                | disabled                             | BK-M2 module/facade runtime and real Oxia/BookKeeper restart/delete evidence complete/final-gated；BK-M5 production rollout final-gated behind exact activation/capability admission                     |
+| `BOOKKEEPER_WAL_SYNC_OBJECT`  | BookKeeper   | stable head + gen0 BK index + `REQUIRED_OBJECT_GENERATION` COMMITTED/read proof | synchronous via shared F4 task/path  | BK-M4 module-local profile and BK-M5 production mixed-profile rollout complete/final-gated                                                                                                              |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper   | WAL durable + stable head commit after lag admission                            | background via shared F4 task/path   | BK-M3 source/protection/profile/lag、retirement、real publication/read/physical-delete/response-loss and unreadable-output fail-closed evidence complete/final-gated；BK-M5 production rollout final-gated |
+| `OBJECT_WAL_SYNC_OBJECT`      | object store | object WAL durable + stable head + generation-0 indexes                         | generation 0 on append path          | Phase 1 target                                                                                                                                                                                          |
+| `OBJECT_WAL_ASYNC_OBJECT`     | object store | object WAL durable + stable head commit                                         | read-optimized generation background | Implemented/final-gated in Phase 4；activation-proof gated                                                                                                                                               |
 
 `StorageProfile.OBJECT_WAL` canonicalizes to `OBJECT_WAL_SYNC_OBJECT`。
 
@@ -311,10 +316,10 @@ Profile 由两个决策组成：primary WAL 和 object publication mode。
 
 `DurabilityLevel` 不改变逻辑提交要求：
 
-| Level | 必须完成 | 可以延后 |
-| --- | --- | --- |
-| `WAL_DURABLE` | primary WAL durable、commit intent、stream-head CAS、stable result | generation-0 derived index confirmation、secondary object generation |
-| `WAL_DURABLE_AND_INDEX_COMMITTED` | 上述全部 + generation-0 offset index and version-matched replay marker confirmed | higher-generation compaction/lakehouse work |
+| Level                             | 必须完成                                                                         | 可以延后                                                                |
+|-----------------------------------|------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| `WAL_DURABLE`                     | primary WAL durable、commit intent、stream-head CAS、stable result              | generation-0 derived index confirmation、secondary object generation |
+| `WAL_DURABLE_AND_INDEX_COMMITTED` | 上述全部 + generation-0 offset index and version-matched replay marker confirmed | higher-generation compaction/lakehouse work                         |
 
 如果 `WAL_DURABLE` 返回后 generation-0 index 尚未就绪，read-after-ack 必须能够从 reachable commit
 repair；“数据已 ack 但没有任何可恢复 read target”是非法状态。
@@ -397,29 +402,29 @@ flowchart TB
 
 ## 7. 分层边界
 
-| Layer | Owns | Must not own |
-| --- | --- | --- |
-| L0 Core Stream Storage | stream lifecycle、offsets、sessions、WAL、head/commit、read index、resolve、trim | Pulsar/Kafka group/cursor semantics |
-| L1 Pulsar Projection | ManagedLedger、Position/MessageId、cursor/subscription、system-topic semantics | L0 offset allocation |
-| L2a KoP Kafka Projection | F5 KoP produce/fetch/group/txn mapping through Pulsar | native Kafka partition ownership or an independent durable log |
-| L2b Native Kafka Projection | F9 Kafka log/fork、producer/txn/internal-topic recovery and KRaft leader mapping | Pulsar/KoP metadata or an independent local-log truth |
-| L3 Materialization/Lakehouse | higher generations、compaction、SBT/SDT | producer append truth |
-| L4 Routing/Operations | membership、preferred brokers、brown-out、metrics/backpressure | durable partition ownership |
+| Layer                        | Owns                                                                            | Must not own                                                   |
+|------------------------------|---------------------------------------------------------------------------------|----------------------------------------------------------------|
+| L0 Core Stream Storage       | stream lifecycle、offsets、sessions、WAL、head/commit、read index、resolve、trim       | Pulsar/Kafka group/cursor semantics                            |
+| L1 Pulsar Projection         | ManagedLedger、Position/MessageId、cursor/subscription、system-topic semantics     | L0 offset allocation                                           |
+| L2a KoP Kafka Projection     | F5 KoP produce/fetch/group/txn mapping through Pulsar                           | native Kafka partition ownership or an independent durable log |
+| L2b Native Kafka Projection  | F9 Kafka log/fork、producer/txn/internal-topic recovery and KRaft leader mapping | Pulsar/KoP metadata or an independent local-log truth          |
+| L3 Materialization/Lakehouse | higher generations、compaction、SBT/SDT                                           | producer append truth                                          |
+| L4 Routing/Operations        | membership、preferred brokers、brown-out、metrics/backpressure                     | durable partition ownership                                    |
 
 ## 8. Repository module boundary
 
-| Module | Target responsibility | Current status (2026-07-19) |
-| --- | --- | --- |
-| `nereus-api` | stable protocol-neutral L0 surface | Phase 1 + Phase 1.5 generic/recovery/lifecycle API implemented |
-| `nereus-core` | coordinators and state machines | primary-WAL adapters、protected prepare/head/materialize、exact recovery、seal/delete、F4 physical lease/protection/reference SPI、protocol-neutral global reference scope、projection/stream-retirement authority capture contracts and public generation-zero protection identities implemented；M4 recovery/root/GC consumers and same-owner ACTIVE-root-epoch protection reconciliation are final-gated |
-| `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay and F4-M1–M6 metadata/publication/GC/scale gates implemented；includes canonical projection refs、task schema V2 and bounded registry/reference evidence |
-| `nereus-object-store` | object IO and Object WAL | M3 formats、F4-M4 configured-scope destructive-capability proof、M5 async Object-WAL and M6 compression/scale evidence implemented/final-gated；the AP probe alone is not activation authority |
-| `nereus-bookkeeper` | BookKeeper primary-WAL adapter/lifecycle/retention | BK-M1–M6 complete/final-gated：exact allocator/writer/recovery/reader、O(1) attempt/range recovery、bounded uncertain-allocation reconciliation、production/fake metadata stores、whole-ledger retention、cold all-shard and maximum-bound scale、fresh-runtime response-loss recovery and mixed broker/worker contention；uses public BookKeeper client API and exposes no ManagedLedger types to L0 |
+| Module                   | Target responsibility                                                | Current status (2026-07-19)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+|--------------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `nereus-api`             | stable protocol-neutral L0 surface                                   | Phase 1 + Phase 1.5 generic/recovery/lifecycle API implemented                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `nereus-core`            | coordinators and state machines                                      | primary-WAL adapters、protected prepare/head/materialize、exact recovery、seal/delete、F4 physical lease/protection/reference SPI、protocol-neutral global reference scope、projection/stream-retirement authority capture contracts and public generation-zero protection identities implemented；M4 recovery/root/GC consumers and same-owner ACTIVE-root-epoch protection reconciliation are final-gated                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `nereus-metadata-oxia`   | durable key/record/codec and Oxia client                             | legacy/new dual-read、generic new-write、mixed repair/replay and F4-M1–M6 metadata/publication/GC/scale gates implemented；includes canonical projection refs、task schema V2 and bounded registry/reference evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `nereus-object-store`    | object IO and Object WAL                                             | M3 formats、F4-M4 configured-scope destructive-capability proof、M5 async Object-WAL and M6 compression/scale evidence implemented/final-gated；the AP probe alone is not activation authority                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `nereus-bookkeeper`      | BookKeeper primary-WAL adapter/lifecycle/retention                   | BK-M1–M6 complete/final-gated：exact allocator/writer/recovery/reader、O(1) attempt/range recovery、bounded uncertain-allocation reconciliation、production/fake metadata stores、whole-ledger retention、cold all-shard and maximum-bound scale、fresh-runtime response-loss recovery and mixed broker/worker contention；uses public BookKeeper client API and exposes no ManagedLedger types to L0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M6 final-gated；M4 implements NRC1 publication/replay/index repair、root/journal fences、typed source retirement、completed-trim/COMMITTED/TOPIC_COMPACTED eligibility、future sentinel、referenced and ownerless global storage domains、dual-absence DELETED-root retirement、the managed-ledger cursor protection frontier、all-shard physical/cursor live-reference backfill、cursor/referenced/ownerless post-drain/restart execution、current-writer missing-root inventory、proof-driven registration retirement and metadata-first fixed-delay lifecycle；checkpoint BC adds exact-old-wrapper non-publishing rollover scans；checkpoint AF composes source repair plus the production materialization/checkpoint lifecycle，while AR composes this module's backfill through the adapter；M6 final-gates bounded merge/candidate/task/checkpoint/registry and two-worker contention evidence；depends on core, never the reverse |
-| `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；F4 snapshot inventory/NPR1 authority、restart-reconstructable cursor candidates、durable registration/proof/activation、AR exact-scope deletion guard and typed factory/runtime activation surface、BC bounded atomic readiness-rollover handoff、pre-I/O async admission、checkpoint-AF materialization ownership、checkpoint-AN physical-GC lifecycle ownership and checkpoints AG–AI retention planner/F3 trim/shared-lane/per-ledger facade/policy admission complete；safe defaults keep physical deletion disabled |
-| `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider、fork binding/admission/capability/policy/admin paths、shared generation/registration/proof/activation ownership、checkpoint-AF coupled Object-WAL/NRC1 checkpoint composition、checkpoint-AH retention runtime/config mapping、checkpoint-AI exact policy/admin mapping、checkpoint-AN metadata-first cursor/referenced/ownerless GC lifecycle、checkpoint-AO exact physical-GC config、checkpoint-AQ atomic activation、checkpoint-AR provider/Pulsar/restart-scope composition and checkpoint-BC atomic deletion-active readiness rollover implemented；M4/M5 retry-disabled and M6 aggregate broker gates are complete；safe defaults keep destructive execution disabled |
-| `nereus-kop-adapter` | Kafka projection | marker only |
-| `nereus-kafka-adapter` | F9 native Kafka binding/runtime/checkpoint/codec | Implemented/final-gated for the exact 2026-07-30 source tuple：M1–M7、native coordinator/internal-topic recovery、retention/compaction、five-profile process coverage、scale/chaos/compatibility/performance and the 146-row final aggregate pass；later product source changes require a fresh clean final receipt；must not be inferred from `nereus-kop-adapter` |
+| `nereus-managed-ledger`  | ManagedLedger facade                                                 | F2-M1-M4 plus F3-M1-M6 implemented/tested；F4 snapshot inventory/NPR1 authority、restart-reconstructable cursor candidates、durable registration/proof/activation、AR exact-scope deletion guard and typed factory/runtime activation surface、BC bounded atomic readiness-rollover handoff、pre-I/O async admission、checkpoint-AF materialization ownership、checkpoint-AN physical-GC lifecycle ownership and checkpoints AG–AI retention planner/F3 trim/shared-lane/per-ledger facade/policy admission complete；safe defaults keep physical deletion disabled                                                                                                                                                                                                                                                                                                                                                                                 |
+| `nereus-pulsar-adapter`  | broker integration/config/policy                                     | product runtime/S3 provider、fork binding/admission/capability/policy/admin paths、shared generation/registration/proof/activation ownership、checkpoint-AF coupled Object-WAL/NRC1 checkpoint composition、checkpoint-AH retention runtime/config mapping、checkpoint-AI exact policy/admin mapping、checkpoint-AN metadata-first cursor/referenced/ownerless GC lifecycle、checkpoint-AO exact physical-GC config、checkpoint-AQ atomic activation、checkpoint-AR provider/Pulsar/restart-scope composition and checkpoint-BC atomic deletion-active readiness rollover implemented；M4/M5 retry-disabled and M6 aggregate broker gates are complete；safe defaults keep destructive execution disabled                                                                                                                                                                                                                                             |
+| `nereus-kop-adapter`     | Kafka projection                                                     | marker only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `nereus-kafka-adapter`   | F9 native Kafka binding/runtime/checkpoint/codec                     | Implemented/final-gated for the exact 2026-07-30 source tuple：M1–M7、native coordinator/internal-topic recovery、retention/compaction、five-profile process coverage、scale/chaos/compatibility/performance and the 146-row final aggregate pass；later product source changes require a fresh clean final receipt；must not be inferred from `nereus-kop-adapter`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 Phase 1.5 已实现 tagged `ReadTarget`、generic `AppendResult/ResolvedRange`、primary-WAL registry、
 generic durable target records、exact recovery 和 lifecycle。BookKeeper profile 在其真实 writer/reader 注册前
@@ -443,7 +448,8 @@ reserved-namespace ledger allocation、fencing/retention 和 completion policy �
 /nereus/clusters/{cluster}/objects/{objectId}/gc
 ```
 
-The Phase 1.5 target adds `/streams/{streamId}/committed-appends/{commitId}` for generic replay markers and allows the existing
+The Phase 1.5 target adds `/streams/{streamId}/committed-appends/{commitId}` for generic replay markers and allows the
+existing
 commit-log/offset-index keys to contain either frozen legacy object records or new generic-target record types。The
 head/key ordering remains unchanged；adapter dispatches by envelope record type and hydrates both into one canonical
 model。Exact records/rollout rules are in
@@ -495,7 +501,8 @@ Protocol details：
 7. producer-level dedup remains an upper-layer responsibility until explicitly designed。
 
 Phase 1.5 P15-M2/M3 make stable commit and generation-zero materialization separate idempotent operations while
-retaining strict public success。P15-M4 also retains an exact process-local attempt after any post-head non-known result；recovery resumes
+retaining strict public success。P15-M4 also retains an exact process-local attempt after any post-head non-known
+result；recovery resumes
 that identity across bounded chain pages and never prepares a second target。
 
 Phase 4's designed deletion/async boundary further splits stable intent preparation from the head CAS. The new-write
@@ -645,17 +652,17 @@ operations are resolved by replay/refresh; routing changes never move durable da
 
 ## 15. Failure and recovery model
 
-| Failure point | Logical outcome | Recovery |
-| --- | --- | --- |
-| before WAL durable | not committed | caller retry |
-| WAL durable, before intent | not committed；possible orphan bytes | deterministic reuse or GC |
-| intent written, before head CAS | intent invisible | replay same commit id or GC intent |
-| head CAS sent, response unknown | `MAY_HAVE_COMMITTED` + `AppendAttemptId` | quiesce original runner, page from anchored head and replay same identity |
-| head committed, generation-0 index missing | `KNOWN_COMMITTED` | bounded continuation repair from commit log |
-| higher-generation upload before publish | old generation stays active | retry/reuse or orphan GC |
-| higher-generation publish before checkpoint | new target active | repair task/checkpoint |
-| catalog commit partial | stream unaffected | idempotent catalog/Oxia repair |
-| watch lost/duplicated | cache may be stale | linearizable re-read |
+| Failure point                               | Logical outcome                          | Recovery                                                                  |
+|---------------------------------------------|------------------------------------------|---------------------------------------------------------------------------|
+| before WAL durable                          | not committed                            | caller retry                                                              |
+| WAL durable, before intent                  | not committed；possible orphan bytes      | deterministic reuse or GC                                                 |
+| intent written, before head CAS             | intent invisible                         | replay same commit id or GC intent                                        |
+| head CAS sent, response unknown             | `MAY_HAVE_COMMITTED` + `AppendAttemptId` | quiesce original runner, page from anchored head and replay same identity |
+| head committed, generation-0 index missing  | `KNOWN_COMMITTED`                        | bounded continuation repair from commit log                               |
+| higher-generation upload before publish     | old generation stays active              | retry/reuse or orphan GC                                                  |
+| higher-generation publish before checkpoint | new target active                        | repair task/checkpoint                                                    |
+| catalog commit partial                      | stream unaffected                        | idempotent catalog/Oxia repair                                            |
+| watch lost/duplicated                       | cache may be stale                       | linearizable re-read                                                      |
 
 ## 16. Backpressure and observability
 
@@ -685,33 +692,33 @@ and secondary materialization lag；这些故障的 correctness 和恢复路径�
 
 ## 18. Delivery tracks
 
-| Track | Scope | Status |
-| --- | --- | --- |
-| F1 | L0 API、Object WAL、Oxia commit、resolve/read/trim | Phase 1 + Phase 1.5 implemented/final-gated |
-| F2 | ManagedLedger facade and virtual positions | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6） |
-| F3 | Cursor/subscription durable state | Implemented/final-gated（M0/M0R + M1-M6） |
-| F4 | Materialization/compaction/generation/GC | Implemented/final-gated（F4-M1–M6）；Parquet read/write + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar exact-byte round trip + topic SPI/registry + terminal workflow retirement + COMMITTED-source/tagged-v1/sorted-spill topic engine/worker/publication + recovery/retirement/physical+cursor GC + Object-WAL async/retention + retry-disabled two-broker source-deletion/MessageId/failover acceptance + M6 scale/failure/compatibility aggregate complete；safe deletion defaults remain closed |
-| F5 | KoP/Kafka projection | Designed |
-| F6 | SBT/SDT lakehouse | Designed |
-| F7 | Routing/brown-out/elasticity | Designed |
-| F8 | Advanced Pulsar semantics | Designed |
-| F9 | Native KRaft Kafka fork backed directly by Nereus | Implemented/final-gated for the exact product/Kafka/Pulsar/AutoMQ source tuple recorded by the clean 2026-07-30 receipt；F9-M1–M7 and all 146 scenarios pass there，while a newer product HEAD must produce a fresh final receipt before inheriting current-source PASS |
+| Track | Scope                                             | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+|-------|---------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| F1    | L0 API、Object WAL、Oxia commit、resolve/read/trim   | Phase 1 + Phase 1.5 implemented/final-gated                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| F2    | ManagedLedger facade and virtual positions        | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6）                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| F3    | Cursor/subscription durable state                 | Implemented/final-gated（M0/M0R + M1-M6）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| F4    | Materialization/compaction/generation/GC          | Implemented/final-gated（F4-M1–M6）；Parquet read/write + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar exact-byte round trip + topic SPI/registry + terminal workflow retirement + COMMITTED-source/tagged-v1/sorted-spill topic engine/worker/publication + recovery/retirement/physical+cursor GC + Object-WAL async/retention + retry-disabled two-broker source-deletion/MessageId/failover acceptance + M6 scale/failure/compatibility aggregate complete；safe deletion defaults remain closed |
+| F5    | KoP/Kafka projection                              | Designed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| F6    | SBT/SDT lakehouse                                 | Designed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| F7    | Routing/brown-out/elasticity                      | Designed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| F8    | Advanced Pulsar semantics                         | Designed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| F9    | Native KRaft Kafka fork backed directly by Nereus | Implemented/final-gated for the exact product/Kafka/Pulsar/AutoMQ source tuple recorded by the clean 2026-07-30 receipt；F9-M1–M7 and all 146 scenarios pass there，while a newer product HEAD must produce a fresh final receipt before inheriting current-source PASS                                                                                                                                                                                                                                                               |
 
 Dependencies and implementation gates live in `nereus-futures.md`。Future numbers are capability IDs, not
 claims that all work is unstarted.
 
 ## 19. Explicit open decisions
 
-| Decision | Must be closed before |
-| --- | --- |
-| Phase 1.5 non-rolling old-binary cutoff execution | first production deployment using generic new-write |
-| BookKeeper client/ledger/retention configuration over the generic target | BookKeeper profile implementation |
-| Profile migration barrier and mixed historical ranges | runtime profile change |
-| Inline/footer/index-object policy | enabling non-footer indexes |
-| Canonical Kafka record mapping and Pulsar/Kafka mixed-access admission | Future 5 implementation |
-| Cross-stream transaction protocol | Future 5/8 transaction implementation |
-| System-topic bootstrap mode | Future 8 implementation |
-| Exact Apache Kafka upstream SHA/version/Scala pin for `nereusstream/kafka` | before F9-M3 Kafka-fork implementation starts |
+| Decision                                                                   | Must be closed before                               |
+|----------------------------------------------------------------------------|-----------------------------------------------------|
+| Phase 1.5 non-rolling old-binary cutoff execution                          | first production deployment using generic new-write |
+| BookKeeper client/ledger/retention configuration over the generic target   | BookKeeper profile implementation                   |
+| Profile migration barrier and mixed historical ranges                      | runtime profile change                              |
+| Inline/footer/index-object policy                                          | enabling non-footer indexes                         |
+| Canonical Kafka record mapping and Pulsar/Kafka mixed-access admission     | Future 5 implementation                             |
+| Cross-stream transaction protocol                                          | Future 5/8 transaction implementation               |
+| System-topic bootstrap mode                                                | Future 8 implementation                             |
+| Exact Apache Kafka upstream SHA/version/Scala pin for `nereusstream/kafka` | before F9-M3 Kafka-fork implementation starts       |
 
 F4-M0 已关闭此表原有的 higher-generation conditional publish、`WAL_DURABLE`
 read-after-ack repair 与 cursor-snapshot physical-GC/read-reference-grace 协议选型；详细合同见
@@ -737,7 +744,8 @@ External background：
 
 - Oxia documentation: <https://oxia-db.github.io/docs/what-is-oxia>
 - Pulsar metadata store documentation: <https://pulsar.apache.org/docs/next/administration-zk-bk/>
-- StreamNative Ursa public preview: <https://streamnative.io/blog/announcing-the-ursa-engine-public-preview-for-streamnative-byoc-clusters>
+- StreamNative Ursa public
+  preview: <https://streamnative.io/blog/announcing-the-ursa-engine-public-preview-for-streamnative-byoc-clusters>
 - Ursa VLDB paper: <https://www.vldb.org/pvldb/vol18/p5184-guo.pdf>
 
 External material is architectural background；current repository behavior is determined by local code、tests and

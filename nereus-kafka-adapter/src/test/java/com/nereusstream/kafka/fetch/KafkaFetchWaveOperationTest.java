@@ -16,11 +16,9 @@ package com.nereusstream.kafka.fetch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -37,8 +35,8 @@ class KafkaFetchWaveOperationTest {
             NamedExecutor callbackExecutor = new NamedExecutor("fetch-callback");
             TestSource source = new TestSource();
             source.results.add(CompletableFuture.completedFuture(12));
-            KafkaFetchWaveOperation<Integer> operation = operation(
-                    source, 10, Duration.ofSeconds(1), 4, readExecutor, callbackExecutor, scheduler);
+            KafkaFetchWaveOperation<Integer> operation =
+                    operation(source, 10, Duration.ofSeconds(1), 4, readExecutor, callbackExecutor, scheduler);
 
             KafkaFetchWaveResult<Integer> result = operation.start().get(5, TimeUnit.SECONDS);
 
@@ -63,8 +61,8 @@ class KafkaFetchWaveOperationTest {
             source.results.add(CompletableFuture.completedFuture(0));
             CompletableFuture<Integer> reread = new CompletableFuture<>();
             source.results.add(reread);
-            KafkaFetchWaveOperation<Integer> operation = operation(
-                    source, 10, Duration.ofSeconds(2), 4, readExecutor, callbackExecutor, scheduler);
+            KafkaFetchWaveOperation<Integer> operation =
+                    operation(source, 10, Duration.ofSeconds(2), 4, readExecutor, callbackExecutor, scheduler);
 
             CompletableFuture<KafkaFetchWaveResult<Integer>> completion = operation.start();
             await(() -> operation.state() == KafkaFetchOperationState.WAITING);
@@ -95,14 +93,13 @@ class KafkaFetchWaveOperationTest {
             source.results.add(CompletableFuture.completedFuture(0));
             source.results.add(CompletableFuture.completedFuture(0));
             source.results.add(CompletableFuture.completedFuture(3));
-            KafkaFetchWaveOperation<Integer> operation = operation(
-                    source, 10, Duration.ofMillis(100), 1, readExecutor, callbackExecutor, scheduler);
+            KafkaFetchWaveOperation<Integer> operation =
+                    operation(source, 10, Duration.ofMillis(100), 1, readExecutor, callbackExecutor, scheduler);
 
             CompletableFuture<KafkaFetchWaveResult<Integer>> completion = operation.start();
             await(() -> operation.state() == KafkaFetchOperationState.WAITING);
             source.signal();
-            await(() -> operation.readAttempts() == 2
-                    && operation.state() == KafkaFetchOperationState.WAITING);
+            await(() -> operation.readAttempts() == 2 && operation.state() == KafkaFetchOperationState.WAITING);
 
             KafkaFetchWaveResult<Integer> result = completion.get(5, TimeUnit.SECONDS);
 
@@ -124,8 +121,8 @@ class KafkaFetchWaveOperationTest {
             CompletableFuture<Integer> initial = new CompletableFuture<>();
             source.results.add(initial);
             source.results.add(CompletableFuture.completedFuture(2));
-            KafkaFetchWaveOperation<Integer> operation = operation(
-                    source, 10, Duration.ofMillis(50), 2, readExecutor, callbackExecutor, scheduler);
+            KafkaFetchWaveOperation<Integer> operation =
+                    operation(source, 10, Duration.ofMillis(50), 2, readExecutor, callbackExecutor, scheduler);
 
             CompletableFuture<KafkaFetchWaveResult<Integer>> completion = operation.start();
             await(() -> operation.state() == KafkaFetchOperationState.TIMED_READING);
@@ -149,8 +146,8 @@ class KafkaFetchWaveOperationTest {
             Executor rejected = ignored -> {
                 throw new java.util.concurrent.RejectedExecutionException("full");
             };
-            KafkaFetchWaveOperation<Integer> operation = operation(
-                    source, 1, Duration.ofSeconds(1), 2, rejected, Runnable::run, scheduler);
+            KafkaFetchWaveOperation<Integer> operation =
+                    operation(source, 1, Duration.ofSeconds(1), 2, rejected, Runnable::run, scheduler);
 
             assertThatThrownBy(operation.start()::join)
                     .hasCauseInstanceOf(com.nereusstream.api.NereusException.class)
@@ -165,8 +162,8 @@ class KafkaFetchWaveOperationTest {
         try (ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor()) {
             TestSource source = new TestSource();
             source.results.add(new CompletableFuture<>());
-            KafkaFetchWaveOperation<Integer> operation = operation(
-                    source, 1, Duration.ofSeconds(1), 2, Runnable::run, Runnable::run, scheduler);
+            KafkaFetchWaveOperation<Integer> operation =
+                    operation(source, 1, Duration.ofSeconds(1), 2, Runnable::run, Runnable::run, scheduler);
 
             CompletableFuture<KafkaFetchWaveResult<Integer>> completion = operation.start();
             assertThat(completion.cancel(true)).isFalse();
@@ -174,8 +171,7 @@ class KafkaFetchWaveOperationTest {
 
             operation.cancel();
 
-            assertThatThrownBy(completion::join)
-                    .hasCauseInstanceOf(com.nereusstream.api.NereusException.class);
+            assertThatThrownBy(completion::join).hasCauseInstanceOf(com.nereusstream.api.NereusException.class);
             assertThat(operation.state()).isEqualTo(KafkaFetchOperationState.CANCELLED);
             assertThat(source.closed).isTrue();
         }
@@ -213,8 +209,7 @@ class KafkaFetchWaveOperationTest {
 
     private static final class TestSource implements KafkaFetchWaveSource<Integer> {
         private final ArrayDeque<CompletableFuture<Integer>> results = new ArrayDeque<>();
-        private final java.util.List<Boolean> initialFlags =
-                new java.util.concurrent.CopyOnWriteArrayList<>();
+        private final java.util.List<Boolean> initialFlags = new java.util.concurrent.CopyOnWriteArrayList<>();
         private final AtomicInteger readCalls = new AtomicInteger();
         private final AtomicInteger concurrentReads = new AtomicInteger();
         private final AtomicInteger maxConcurrentReads = new AtomicInteger();

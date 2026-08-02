@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -11,8 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 final class RecoveryCheckpointValidation {
-    private RecoveryCheckpointValidation() {
-    }
+    private RecoveryCheckpointValidation() {}
 
     static String requireText(String value, String field) {
         Objects.requireNonNull(value, field);
@@ -74,7 +74,8 @@ final class RecoveryCheckpointValidation {
 
     static byte[] strictUtf8(String value, String field) {
         try {
-            ByteBuffer encoded = StandardCharsets.UTF_8.newEncoder()
+            ByteBuffer encoded = StandardCharsets.UTF_8
+                    .newEncoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .encode(CharBuffer.wrap(value));

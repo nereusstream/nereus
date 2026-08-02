@@ -1,23 +1,21 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureRecord;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
 import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
-import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
-import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionOperationType;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionPendingOperationRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionRegistryRecord;
 import io.oxia.testcontainers.OxiaContainer;
-import java.time.Clock;
-import java.time.Duration;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Optional;
@@ -33,8 +31,7 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
     private static final String IMAGE = "oxia/oxia:0.16.3";
 
     @Container
-    private static final OxiaContainer OXIA =
-            new OxiaContainer(DockerImageName.parse(IMAGE)).withShards(4);
+    private static final OxiaContainer OXIA = new OxiaContainer(DockerImageName.parse(IMAGE)).withShards(4);
 
     @Test
     void bindingCasRegistryScanAndRestartUseRealOxia() {
@@ -47,67 +44,79 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
         VersionedKafkaCheckpointFailure checkpointFailure;
 
         try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, Clock.systemUTC());
-                OxiaJavaKafkaPartitionMetadataStore store =
-                        OxiaJavaKafkaPartitionMetadataStore.usingSharedRuntime(
-                                configuration, runtime, nereusCluster, kafkaCluster);
+                OxiaJavaKafkaPartitionMetadataStore store = OxiaJavaKafkaPartitionMetadataStore.usingSharedRuntime(
+                        configuration, runtime, nereusCluster, kafkaCluster);
                 KafkaCheckpointFailureMetadataStore failureStore =
                         KafkaCheckpointFailureMetadataStore.usingSharedRuntime(
                                 configuration, runtime, nereusCluster, kafkaCluster)) {
             KafkaPartitionBindingRecord creating = creating(id);
-            VersionedKafkaPartitionBinding created = store.putCreatingIfAbsent(creating).join();
+            VersionedKafkaPartitionBinding created =
+                    store.putCreatingIfAbsent(creating).join();
             assertThat(store.putCreatingIfAbsent(creating).join()).isEqualTo(created);
             KafkaPartitionBindingRecord activated = KafkaPartitionMetadataTransitions.activate(
-                    created.value(), KafkaPartitionMetadataTransitions.deterministicStreamName(id, 1),
-                    "stream-id", 11, 1_100);
+                    created.value(),
+                    KafkaPartitionMetadataTransitions.deterministicStreamName(id, 1),
+                    "stream-id",
+                    11,
+                    1_100);
             active = store.compareAndSet(created, activated).join();
             assertThatThrownBy(() -> store.compareAndSet(created, activated).join())
-                    .satisfies(failure -> assertThat(unwrap(failure))
-                            .isInstanceOf(KafkaMetadataConditionFailedException.class));
+                    .satisfies(failure ->
+                            assertThat(unwrap(failure)).isInstanceOf(KafkaMetadataConditionFailedException.class));
 
             KafkaPartitionKeyspace keys = new KafkaPartitionKeyspace(nereusCluster, kafkaCluster);
             store.putRegistryHint(new KafkaPartitionRegistryRecord(
-                    1, id.kafkaClusterId(), id.topicId(), id.partitionId(), keys.bindingRootKey(id),
-                    HexFormat.of().parseHex(active.durableValueSha256().value()),
-                    active.value().lifecycleId(), active.value().bindingEpoch(), 1_200, 0)).join();
-            assertThat(store.scanRegistry(keys.registryShard(id), Optional.empty(), 1).join().values())
-                    .singleElement().satisfies(value -> assertThat(value.value().identity()).isEqualTo(id));
+                            1,
+                            id.kafkaClusterId(),
+                            id.topicId(),
+                            id.partitionId(),
+                            keys.bindingRootKey(id),
+                            HexFormat.of().parseHex(active.durableValueSha256().value()),
+                            active.value().lifecycleId(),
+                            active.value().bindingEpoch(),
+                            1_200,
+                            0))
+                    .join();
+            assertThat(store.scanRegistry(keys.registryShard(id), Optional.empty(), 1)
+                            .join()
+                            .values())
+                    .singleElement()
+                    .satisfies(value -> assertThat(value.value().identity()).isEqualTo(id));
             KafkaCompactionPlanRecord requestedPlan = compactionPlan(id);
             compactionPlan = store.putCompactionPlanIfAbsent(requestedPlan).join();
-            assertThat(store.putCompactionPlanIfAbsent(requestedPlan).join())
-                    .isEqualTo(compactionPlan);
-            checkpointFailure =
-                    failureStore
-                            .putIfAbsent(checkpointFailure(id, active.value().incarnation()))
-                            .join();
+            assertThat(store.putCompactionPlanIfAbsent(requestedPlan).join()).isEqualTo(compactionPlan);
+            checkpointFailure = failureStore
+                    .putIfAbsent(checkpointFailure(id, active.value().incarnation()))
+                    .join();
         }
 
         try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, Clock.systemUTC());
-                OxiaJavaKafkaPartitionMetadataStore store =
-                        OxiaJavaKafkaPartitionMetadataStore.usingSharedRuntime(
-                                configuration, runtime, nereusCluster, kafkaCluster);
+                OxiaJavaKafkaPartitionMetadataStore store = OxiaJavaKafkaPartitionMetadataStore.usingSharedRuntime(
+                        configuration, runtime, nereusCluster, kafkaCluster);
                 KafkaCheckpointFailureMetadataStore failureStore =
                         KafkaCheckpointFailureMetadataStore.usingSharedRuntime(
                                 configuration, runtime, nereusCluster, kafkaCluster)) {
             assertThat(store.get(id).join()).contains(active);
             KafkaPartitionKeyspace keys = new KafkaPartitionKeyspace(nereusCluster, kafkaCluster);
-            assertThat(store.scanRegistry(keys.registryShard(id), Optional.empty(), 10).join().values())
+            assertThat(store.scanRegistry(keys.registryShard(id), Optional.empty(), 10)
+                            .join()
+                            .values())
                     .hasSize(1);
-            assertThat(store.getCompactionPlan(
-                            id, compactionPlan.value().materializationTaskId()).join())
+            assertThat(store.getCompactionPlan(id, compactionPlan.value().materializationTaskId())
+                            .join())
                     .contains(compactionPlan);
             assertThat(store.scanCompactionPlans(id, Optional.empty(), 1).join().plans())
                     .containsExactly(compactionPlan);
-            assertThat(
-                            failureStore
-                                    .get(
-                                            id,
-                                            active.value().incarnation(),
-                                            checkpointFailure.value().objectId())
-                                    .join())
+            assertThat(failureStore
+                            .get(
+                                    id,
+                                    active.value().incarnation(),
+                                    checkpointFailure.value().objectId())
+                            .join())
                     .contains(checkpointFailure);
             store.deleteCompactionPlan(compactionPlan).join();
-            assertThat(store.getCompactionPlan(
-                            id, compactionPlan.value().materializationTaskId()).join())
+            assertThat(store.getCompactionPlan(id, compactionPlan.value().materializationTaskId())
+                            .join())
                     .isEmpty();
         }
     }
@@ -116,22 +125,42 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
         long metadataOffset = 10;
         String attempt = KafkaPartitionMetadataTransitions.deterministicCreateAttemptId(id, metadataOffset);
         return KafkaPartitionMetadataTransitions.creating(
-                id, "orders", "BOOKKEEPER_WAL_ASYNC_OBJECT", metadataOffset, 1_000,
+                id,
+                "orders",
+                "BOOKKEEPER_WAL_ASYNC_OBJECT",
+                metadataOffset,
+                1_000,
                 new KafkaPartitionPendingOperationRecord(
-                        KafkaPartitionOperationType.CREATE.wireId(), attempt, "broker-run", 1,
-                        2_000, metadataOffset, 1_000, ""));
+                        KafkaPartitionOperationType.CREATE.wireId(),
+                        attempt,
+                        "broker-run",
+                        1,
+                        2_000,
+                        metadataOffset,
+                        1_000,
+                        ""));
     }
 
     private static KafkaCompactionPlanRecord compactionPlan(KafkaPartitionId id) {
         byte[] bytes = "canonical-kcp1-image".getBytes(StandardCharsets.UTF_8);
         return new KafkaCompactionPlanRecord(
-                1, id.kafkaClusterId(), id.topicId(), id.partitionId(),
-                "stream-id", "kcp1-" + "a".repeat(52), "mat1-" + "b".repeat(52),
-                0, 10, 12, sha256(bytes), bytes, 1_300, 0);
+                1,
+                id.kafkaClusterId(),
+                id.topicId(),
+                id.partitionId(),
+                "stream-id",
+                "kcp1-" + "a".repeat(52),
+                "mat1-" + "b".repeat(52),
+                0,
+                10,
+                12,
+                sha256(bytes),
+                bytes,
+                1_300,
+                0);
     }
 
-    private static KafkaCheckpointFailureRecord checkpointFailure(
-            KafkaPartitionId id, long incarnation) {
+    private static KafkaCheckpointFailureRecord checkpointFailure(KafkaPartitionId id, long incarnation) {
         return new KafkaCheckpointFailureRecord(
                 1,
                 id.kafkaClusterId(),
@@ -163,8 +192,7 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
 
     private static OxiaClientConfiguration configuration() {
         return new OxiaClientConfiguration(
-                OXIA.getServiceAddress(), "default", Duration.ofSeconds(10),
-                Duration.ofSeconds(30), 100, 1_024);
+                OXIA.getServiceAddress(), "default", Duration.ofSeconds(10), Duration.ofSeconds(30), 100, 1_024);
     }
 
     private static Throwable unwrap(Throwable supplied) {

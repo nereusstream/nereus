@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -32,19 +33,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 final class RecoveryCheckpointTestSupport {
     static final Duration TIMEOUT = Duration.ofSeconds(10);
 
-    private RecoveryCheckpointTestSupport() {
-    }
+    private RecoveryCheckpointTestSupport() {}
 
     static StagingFileManager staging(Path parent, long bytes) throws IOException {
         Files.createDirectories(parent);
         Path directory = Files.createDirectory(parent.resolve("staging"));
         Files.setPosixFilePermissions(directory, PosixFilePermissions.fromString("rwx------"));
         return new StagingFileManager(
-                directory,
-                bytes,
-                StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
-                Duration.ofHours(1),
-                Runnable::run);
+                directory, bytes, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES, Duration.ofHours(1), Runnable::run);
     }
 
     static RecoveryCheckpointWriteRequest request(String attemptId) {
@@ -68,9 +64,7 @@ final class RecoveryCheckpointTestSupport {
     }
 
     static List<RecoveryCheckpointPublication> publications() {
-        return List.of(
-                publication(1, "a".repeat(26), 10, 14),
-                publication(2, "b".repeat(26), 12, 14));
+        return List.of(publication(1, "a".repeat(26), 10, 14), publication(2, "b".repeat(26), 12, 14));
     }
 
     static List<RecoveryCheckpointEntry> entries() {
@@ -79,13 +73,8 @@ final class RecoveryCheckpointTestSupport {
                 entry(6, 12, 14, 111, "commit-6", "commit-5", List.of(0, 1)));
     }
 
-    static RecoveryCheckpointPublication publication(
-            long generation,
-            String publicationId,
-            long start,
-            long end) {
-        byte[] canonical = ("generation:" + generation + ":" + publicationId)
-                .getBytes(StandardCharsets.UTF_8);
+    static RecoveryCheckpointPublication publication(long generation, String publicationId, long start, long end) {
+        byte[] canonical = ("generation:" + generation + ":" + publicationId).getBytes(StandardCharsets.UTF_8);
         return new RecoveryCheckpointPublication(
                 generation,
                 new PublicationId(publicationId),
@@ -102,8 +91,7 @@ final class RecoveryCheckpointTestSupport {
             String commitId,
             String previousCommitId,
             List<Integer> publications) {
-        byte[] canonical = ("commit:" + version + ":" + commitId)
-                .getBytes(StandardCharsets.UTF_8);
+        byte[] canonical = ("commit:" + version + ":" + commitId).getBytes(StandardCharsets.UTF_8);
         return new RecoveryCheckpointEntry(
                 version,
                 new OffsetRange(start, end),
@@ -119,10 +107,9 @@ final class RecoveryCheckpointTestSupport {
         return new RecoveryCheckpointVerifier() {
             @Override
             public void verifyPublication(
-                    RecoveryCheckpointWriteRequest header,
-                    RecoveryCheckpointPublication publication) {
-                String expected = "generation:" + publication.generation()
-                        + ":" + publication.publicationId().value();
+                    RecoveryCheckpointWriteRequest header, RecoveryCheckpointPublication publication) {
+                String expected = "generation:" + publication.generation() + ":"
+                        + publication.publicationId().value();
                 if (!expected.equals(text(publication.canonicalGenerationIndexRecord()))) {
                     throw new RecoveryCheckpointFormatException("test generation record identity mismatch");
                 }
@@ -132,9 +119,7 @@ final class RecoveryCheckpointTestSupport {
             }
 
             @Override
-            public void verifyEntry(
-                    RecoveryCheckpointWriteRequest header,
-                    RecoveryCheckpointEntry entry) {
+            public void verifyEntry(RecoveryCheckpointWriteRequest header, RecoveryCheckpointEntry entry) {
                 String expected = "commit:" + entry.commitVersion() + ":" + entry.commitId();
                 if (!expected.equals(text(entry.canonicalCommitRecord()))) {
                     throw new RecoveryCheckpointFormatException("test commit record identity mismatch");
@@ -203,7 +188,8 @@ final class RecoveryCheckpointTestSupport {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException(failure);
         }

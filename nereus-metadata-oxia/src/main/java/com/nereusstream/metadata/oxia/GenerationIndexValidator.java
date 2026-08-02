@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.OffsetRange;
@@ -12,7 +13,9 @@ import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import java.util.Objects;
 
-/** Strict conversion from a durable F4 index wrapper to a committed resolver candidate. */
+/**
+ * Strict conversion from a durable F4 index wrapper to a committed resolver candidate.
+ */
 public final class GenerationIndexValidator {
     private final ReadTargetCodecRegistry targetCodecs;
 
@@ -30,8 +33,8 @@ public final class GenerationIndexValidator {
             ReadView expectedView,
             long committedEndOffset,
             long headCommitVersion) {
-        ResolvedRange resolved = requireSemantic(
-                wrapper, expectedStream, expectedView, committedEndOffset, headCommitVersion);
+        ResolvedRange resolved =
+                requireSemantic(wrapper, expectedStream, expectedView, committedEndOffset, headCommitVersion);
         if (expectedView != ReadView.COMMITTED) {
             throw F4MetadataStoreSupport.invariant(
                     "sparse semantic-view indexes cannot be represented by the committed range adapter");
@@ -54,7 +57,9 @@ public final class GenerationIndexValidator {
                 wrapper.metadataVersion());
     }
 
-    /** Validates either dense COMMITTED or sparse semantic-view metadata without losing source coverage. */
+    /**
+     * Validates either dense COMMITTED or sparse semantic-view metadata without losing source coverage.
+     */
     public ResolvedRange requireSemantic(
             VersionedGenerationIndex wrapper,
             StreamId expectedStream,

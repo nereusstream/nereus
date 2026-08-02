@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import com.nereusstream.api.StreamId;
@@ -21,7 +22,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** F2 compatibility authority for every affected historical stream incarnation. */
+/**
+ * F2 compatibility authority for every affected historical stream incarnation.
+ */
 public final class ProjectionGenerationReferenceDomain implements GcReferenceDomain {
     public static final String DOMAIN_ID = "projection-generation-v1";
     public static final int PROTOCOL_VERSION = 1;
@@ -33,14 +36,8 @@ public final class ProjectionGenerationReferenceDomain implements GcReferenceDom
     private final ManagedLedgerProjectionKeyspace keys;
 
     public ProjectionGenerationReferenceDomain(
-            String cluster,
-            ManagedLedgerProjectionMetadataStore metadataStore,
-            GcReferenceDomainConfig config) {
-        this(
-                cluster,
-                metadataStore,
-                config,
-                GcGlobalReferenceScope.unsupported());
+            String cluster, ManagedLedgerProjectionMetadataStore metadataStore, GcReferenceDomainConfig config) {
+        this(cluster, metadataStore, config, GcGlobalReferenceScope.unsupported());
     }
 
     public ProjectionGenerationReferenceDomain(
@@ -68,16 +65,13 @@ public final class ProjectionGenerationReferenceDomain implements GcReferenceDom
     @Override
     public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
         Objects.requireNonNull(query, "query");
-        GcReferenceSnapshotBuilder builder = new GcReferenceSnapshotBuilder(
-                DOMAIN_ID, PROTOCOL_VERSION, query, config);
-        return GcGlobalReferenceScope.resolveStreams(
-                        query, builder, globalScope)
+        GcReferenceSnapshotBuilder builder = new GcReferenceSnapshotBuilder(DOMAIN_ID, PROTOCOL_VERSION, query, config);
+        return GcGlobalReferenceScope.resolveStreams(query, builder, globalScope)
                 .thenCompose(streams -> scan(query, streams, builder, 0));
     }
 
     @Override
-    public CompletableFuture<Boolean> stillMatches(
-            GcReferenceQuery query, GcReferenceSnapshot snapshot) {
+    public CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot) {
         Objects.requireNonNull(query, "query");
         Objects.requireNonNull(snapshot, "snapshot");
         if (!snapshot.domainId().equals(DOMAIN_ID)
@@ -89,12 +83,8 @@ public final class ProjectionGenerationReferenceDomain implements GcReferenceDom
     }
 
     private CompletableFuture<GcReferenceSnapshot> scan(
-            GcReferenceQuery query,
-            List<StreamId> streams,
-            GcReferenceSnapshotBuilder builder,
-            int streamIndex) {
-        if (builder.limitExceeded()
-                || streamIndex == streams.size()) {
+            GcReferenceQuery query, List<StreamId> streams, GcReferenceSnapshotBuilder builder, int streamIndex) {
+        if (builder.limitExceeded() || streamIndex == streams.size()) {
             return CompletableFuture.completedFuture(builder.build());
         }
         StreamId streamId = streams.get(streamIndex);
@@ -108,47 +98,37 @@ public final class ProjectionGenerationReferenceDomain implements GcReferenceDom
     }
 
     private void addProjectionAuthorities(
-            GcReferenceSnapshotBuilder builder,
-            StreamId streamId,
-            ManagedLedgerStreamProjection view) {
+            GcReferenceSnapshotBuilder builder, StreamId streamId, ManagedLedgerStreamProjection view) {
         if (!view.streamId().equals(streamId)) {
             throw new IllegalArgumentException("projection lookup returned another stream");
         }
         String bindingKey = keys.virtualLedgerProjectionKey(streamId);
         if (view.streamBinding().isEmpty()) {
-            builder.addAuthority(new GcAuthorityToken(
-                    bindingKey,
-                    0,
-                    ReferenceDomainIdentityDigests.absence(DOMAIN_ID, bindingKey)));
+            builder.addAuthority(
+                    new GcAuthorityToken(bindingKey, 0, ReferenceDomainIdentityDigests.absence(DOMAIN_ID, bindingKey)));
             builder.veto();
             return;
         }
         VersionedVirtualLedgerProjection binding = view.streamBinding().orElseThrow();
-        builder.addAuthority(new GcAuthorityToken(
-                binding.key(),
-                binding.metadataVersion(),
-                binding.durableValueSha256()));
+        builder.addAuthority(
+                new GcAuthorityToken(binding.key(), binding.metadataVersion(), binding.durableValueSha256()));
 
         String topicKey = keys.topicProjectionKey(binding.value().managedLedgerName());
         if (view.currentTopic().isEmpty()) {
-            builder.addAuthority(new GcAuthorityToken(
-                    topicKey,
-                    0,
-                    ReferenceDomainIdentityDigests.absence(DOMAIN_ID, topicKey)));
+            builder.addAuthority(
+                    new GcAuthorityToken(topicKey, 0, ReferenceDomainIdentityDigests.absence(DOMAIN_ID, topicKey)));
             builder.veto();
             return;
         }
         VersionedTopicProjection topic = view.currentTopic().orElseThrow();
-        builder.addAuthority(new GcAuthorityToken(
-                topic.key(), topic.metadataVersion(), topic.durableValueSha256()));
+        builder.addAuthority(new GcAuthorityToken(topic.key(), topic.metadataVersion(), topic.durableValueSha256()));
         if (!allowsGenerationAwareDeletion(binding.value().identity(), topic)) {
             builder.veto();
         }
     }
 
     private static boolean allowsGenerationAwareDeletion(
-            ManagedLedgerProjectionIdentity historical,
-            VersionedTopicProjection current) {
+            ManagedLedgerProjectionIdentity historical, VersionedTopicProjection current) {
         ManagedLedgerProjectionIdentity currentIdentity = current.value().projectionIdentity();
         if (historical.equals(currentIdentity)) {
             ManagedLedgerFacadeState state = current.value().parsedFacadeState();
@@ -161,8 +141,7 @@ public final class ProjectionGenerationReferenceDomain implements GcReferenceDom
             return ManagedLedgerGenerationProtocol.isActivated(current.value());
         }
         return currentIdentity.incarnation() > historical.incarnation()
-                && currentIdentity.storageClassBindingGeneration()
-                        > historical.storageClassBindingGeneration();
+                && currentIdentity.storageClassBindingGeneration() > historical.storageClassBindingGeneration();
     }
 
     private static String requireText(String value, String name) {

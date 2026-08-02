@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Stable API error code for exceptional public futures. */
+/**
+ * Stable API error code for exceptional public futures.
+ */
 public enum ErrorCode {
     INVALID_ARGUMENT,
     CANCELLED,

@@ -1,8 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
-import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendCompletionPolicy;
+import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
@@ -15,7 +16,9 @@ import com.nereusstream.core.profile.StorageProfileResolver;
 import java.util.Objects;
 import java.util.function.Predicate;
 
-/** Executable BookKeeper primary-WAL matrix through BK-M4. */
+/**
+ * Executable BookKeeper primary-WAL matrix through BK-M4.
+ */
 public final class BookKeeperStorageProfileResolver implements StorageProfileResolver {
     @Override
     public StorageExecutionPlan requireExecutable(
@@ -35,11 +38,8 @@ public final class BookKeeperStorageProfileResolver implements StorageProfileRes
                     primaryReaderInstalled,
                     requiredObjectGenerationInstalled);
         }
-        if (!primaryAppenderInstalled
-                || !primaryReaderInstalled
-                || !requiredObjectGenerationInstalled) {
-            throw unsupportedProfile(
-                    "synchronous BookKeeper Object publication is not fully installed");
+        if (!primaryAppenderInstalled || !primaryReaderInstalled || !requiredObjectGenerationInstalled) {
+            throw unsupportedProfile("synchronous BookKeeper Object publication is not fully installed");
         }
         if (durability != DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED) {
             throw unsupportedDurability(
@@ -66,8 +66,7 @@ public final class BookKeeperStorageProfileResolver implements StorageProfileRes
             boolean primaryReaderInstalled) {
         StorageProfile profile = Objects.requireNonNull(raw, "profile").canonical();
         DurabilityLevel exactDurability = Objects.requireNonNull(durability, "durability");
-        if ((profile != StorageProfile.BOOKKEEPER_WAL_ONLY
-                        && profile != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT)
+        if ((profile != StorageProfile.BOOKKEEPER_WAL_ONLY && profile != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT)
                 || !primaryAppenderInstalled
                 || !primaryReaderInstalled) {
             throw new NereusException(
@@ -76,39 +75,37 @@ public final class BookKeeperStorageProfileResolver implements StorageProfileRes
                     "storage profile has no complete BookKeeper primary-WAL execution plan",
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
-        if (profile == StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
-                && exactDurability != DurabilityLevel.WAL_DURABLE) {
+        if (profile == StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT && exactDurability != DurabilityLevel.WAL_DURABLE) {
             throw new NereusException(
                     ErrorCode.UNSUPPORTED_DURABILITY_LEVEL,
                     false,
                     "asynchronous BookKeeper Object publication acknowledges at stable head",
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
-        ObjectPublicationMode publicationMode =
-                profile == StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
-                        ? ObjectPublicationMode.ASYNCHRONOUS
-                        : ObjectPublicationMode.DISABLED;
+        ObjectPublicationMode publicationMode = profile == StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
+                ? ObjectPublicationMode.ASYNCHRONOUS
+                : ObjectPublicationMode.DISABLED;
         return new StorageExecutionPlan(
                 profile,
                 ReadTargetType.BOOKKEEPER_ENTRY_RANGE,
                 publicationMode,
                 exactDurability,
-                profile == StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
-                                || exactDurability == DurabilityLevel.WAL_DURABLE
+                profile == StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT || exactDurability == DurabilityLevel.WAL_DURABLE
                         ? AppendAckBoundary.STABLE_HEAD
                         : AppendAckBoundary.GENERATION_ZERO_VISIBLE);
     }
 
     @Override
-    public ReadTargetType requireReadable(
-            StorageProfile raw, Predicate<ReadTargetType> readerInstalled) {
+    public ReadTargetType requireReadable(StorageProfile raw, Predicate<ReadTargetType> readerInstalled) {
         StorageProfile profile = Objects.requireNonNull(raw, "profile").canonical();
         Predicate<ReadTargetType> installed = Objects.requireNonNull(readerInstalled, "readerInstalled");
         if ((profile != StorageProfile.BOOKKEEPER_WAL_ONLY
                         && profile != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
                         && profile != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT)
                 || !installed.test(ReadTargetType.BOOKKEEPER_ENTRY_RANGE)) {
-            throw new NereusException(ErrorCode.UNSUPPORTED_STORAGE_PROFILE, false,
+            throw new NereusException(
+                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
+                    false,
                     "storage profile has no complete BookKeeper primary-WAL read plan");
         }
         return ReadTargetType.BOOKKEEPER_ENTRY_RANGE;
@@ -116,17 +113,11 @@ public final class BookKeeperStorageProfileResolver implements StorageProfileRes
 
     private static NereusException unsupportedProfile(String message) {
         return new NereusException(
-                ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
-                false,
-                message,
-                AppendOutcome.KNOWN_NOT_COMMITTED);
+                ErrorCode.UNSUPPORTED_STORAGE_PROFILE, false, message, AppendOutcome.KNOWN_NOT_COMMITTED);
     }
 
     private static NereusException unsupportedDurability(String message) {
         return new NereusException(
-                ErrorCode.UNSUPPORTED_DURABILITY_LEVEL,
-                false,
-                message,
-                AppendOutcome.KNOWN_NOT_COMMITTED);
+                ErrorCode.UNSUPPORTED_DURABILITY_LEVEL, false, message, AppendOutcome.KNOWN_NOT_COMMITTED);
     }
 }

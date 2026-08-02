@@ -15,7 +15,6 @@
 package com.nereusstream.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
@@ -84,8 +83,7 @@ class Phase1FinalIntegrationTest {
     private static final Clock CLOCK = Clock.systemUTC();
 
     @Container
-    private static final OxiaContainer OXIA =
-            new OxiaContainer(DockerImageName.parse(IMAGE)).withShards(4);
+    private static final OxiaContainer OXIA = new OxiaContainer(DockerImageName.parse(IMAGE)).withShards(4);
 
     @TempDir
     Path root;
@@ -100,48 +98,54 @@ class Phase1FinalIntegrationTest {
 
         try (MetadataContext metadata = metadata(cluster);
                 LocalFileObjectStore objectStore = new LocalFileObjectStore(objects);
-                DefaultStreamStorage storage = storage(
-                        cluster, metadata.l0(), metadata.references(), objectStore)) {
+                DefaultStreamStorage storage = storage(cluster, metadata.l0(), metadata.references(), objectStore)) {
             streamId = storage.createOrGetStream(
-                    new StreamName("orders-0"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
-                    .join().streamId();
-            firstAppend = storage.append(streamId, batch("a", "b", "c"), appendOptions()).join();
-            secondAppend = storage.append(streamId, batch("d", "e"), appendOptions()).join();
+                            new StreamName("orders-0"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
+            firstAppend = storage.append(streamId, batch("a", "b", "c"), appendOptions())
+                    .join();
+            secondAppend =
+                    storage.append(streamId, batch("d", "e"), appendOptions()).join();
             ObjectSliceReadTarget firstTarget = (ObjectSliceReadTarget) firstAppend.readTarget();
 
             assertThat(storage.read(streamId, 0, readOptions()).join().batches())
                     .extracting(value -> text(value.payload()))
                     .containsExactly("a", "b", "c", "d", "e");
-            assertThat(storage.resolve(
-                    streamId, 3, new ResolveOptions(10, true, true)).join().ranges())
-                    .singleElement().satisfies(range -> {
+            assertThat(storage.resolve(streamId, 3, new ResolveOptions(10, true, true))
+                            .join()
+                            .ranges())
+                    .singleElement()
+                    .satisfies(range -> {
                         assertThat(range.offsetRange().startOffset()).isEqualTo(3);
                         assertThat(range.offsetRange().endOffset()).isEqualTo(5);
                     });
-            long objectLength = objectStore.headObject(
-                    firstTarget.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5)))
-                    .join().objectLength();
-            storage.trim(streamId, 2, new TrimOptions(Duration.ofSeconds(5), "m8-retention")).join();
-            assertThat(failure(storage.read(streamId, 1, readOptions())).code())
-                    .isEqualTo(ErrorCode.OFFSET_TRIMMED);
+            long objectLength = objectStore
+                    .headObject(firstTarget.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5)))
+                    .join()
+                    .objectLength();
+            storage.trim(streamId, 2, new TrimOptions(Duration.ofSeconds(5), "m8-retention"))
+                    .join();
+            assertThat(failure(storage.read(streamId, 1, readOptions())).code()).isEqualTo(ErrorCode.OFFSET_TRIMMED);
             assertThat(storage.read(streamId, 2, readOptions()).join().batches())
                     .extracting(value -> text(value.payload()))
                     .containsExactly("c", "d", "e");
-            assertThat(objectStore.headObject(
-                    firstTarget.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5)))
-                    .join().objectLength()).isEqualTo(objectLength);
+            assertThat(objectStore
+                            .headObject(firstTarget.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5)))
+                            .join()
+                            .objectLength())
+                    .isEqualTo(objectLength);
         }
 
         try (MetadataContext metadata = metadata(cluster);
                 LocalFileObjectStore objectStore = new LocalFileObjectStore(objects);
-                DefaultStreamStorage restarted = storage(
-                        cluster, metadata.l0(), metadata.references(), objectStore)) {
+                DefaultStreamStorage restarted = storage(cluster, metadata.l0(), metadata.references(), objectStore)) {
             assertThat(restarted.read(streamId, 2, readOptions()).join().batches())
                     .extracting(value -> text(value.payload()))
                     .containsExactly("c", "d", "e");
-            AppendResult afterRestart = restarted.append(
-                    streamId, batch("f"), appendOptions()).join();
+            AppendResult afterRestart =
+                    restarted.append(streamId, batch("f"), appendOptions()).join();
             ObjectSliceReadTarget restartedTarget = (ObjectSliceReadTarget) afterRestart.readTarget();
             ObjectSliceReadTarget firstTarget = (ObjectSliceReadTarget) firstAppend.readTarget();
             ObjectSliceReadTarget secondTarget = (ObjectSliceReadTarget) secondAppend.readTarget();
@@ -149,7 +153,8 @@ class Phase1FinalIntegrationTest {
             assertThat(afterRestart.range().endOffset()).isEqualTo(6);
             assertThat(restartedTarget.objectId()).isNotEqualTo(firstTarget.objectId());
             assertThat(restartedTarget.objectId()).isNotEqualTo(secondTarget.objectId());
-            assertThat(restarted.getStreamMetadata(streamId).join().committedEndOffset()).isEqualTo(6);
+            assertThat(restarted.getStreamMetadata(streamId).join().committedEndOffset())
+                    .isEqualTo(6);
         }
     }
 
@@ -161,35 +166,39 @@ class Phase1FinalIntegrationTest {
 
         try (MetadataContext metadata = metadata(cluster);
                 LocalFileObjectStore objectStore = new LocalFileObjectStore(objects)) {
-            OxiaMetadataStore failBeforeHead = failNextCommitBeforeHead(
-                    metadata.l0(), orphanManifest);
-            try (DefaultStreamStorage storage = storage(
-                    cluster, failBeforeHead, metadata.references(), objectStore)) {
+            OxiaMetadataStore failBeforeHead = failNextCommitBeforeHead(metadata.l0(), orphanManifest);
+            try (DefaultStreamStorage storage = storage(cluster, failBeforeHead, metadata.references(), objectStore)) {
                 StreamId orphanStream = storage.createOrGetStream(
-                        new StreamName("orphan"),
-                        new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
-                        .join().streamId();
-                NereusException appendFailure = failure(storage.append(
-                        orphanStream, batch("orphan"), appendOptions()));
+                                new StreamName("orphan"),
+                                new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                        .join()
+                        .streamId();
+                NereusException appendFailure = failure(storage.append(orphanStream, batch("orphan"), appendOptions()));
                 assertThat(appendFailure.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
-                assertThat(metadata.l0().getCommittedEndOffset(
-                        cluster, orphanStream).join().committedEndOffset())
+                assertThat(metadata.l0()
+                                .getCommittedEndOffset(cluster, orphanStream)
+                                .join()
+                                .committedEndOffset())
                         .isZero();
-                assertThat(storage.read(orphanStream, 0, readOptions()).join().batches()).isEmpty();
+                assertThat(storage.read(orphanStream, 0, readOptions()).join().batches())
+                        .isEmpty();
             }
 
             ObjectManifestRecord manifest = orphanManifest.get();
             assertThat(manifest).isNotNull();
             try (MetadataOrphanObjectScanner scanner = new MetadataOrphanObjectScanner(
                     cluster, metadata.l0(), RecoveryMetricsObserver.noop(), Runnable::run)) {
-                OrphanObjectAssessment assessment = scanner.scan(
-                        new com.nereusstream.api.ObjectId(manifest.objectId())).join();
+                OrphanObjectAssessment assessment = scanner.scan(new com.nereusstream.api.ObjectId(manifest.objectId()))
+                        .join();
                 assertThat(assessment.status()).isEqualTo(OrphanObjectStatus.UNREFERENCED_MANIFEST);
                 assertThat(assessment.deletionAllowed()).isFalse();
             }
-            assertThat(objectStore.headObject(
-                    new com.nereusstream.api.ObjectKey(manifest.objectKey()),
-                    new HeadObjectOptions(Duration.ofSeconds(5))).join().objectLength())
+            assertThat(objectStore
+                            .headObject(
+                                    new com.nereusstream.api.ObjectKey(manifest.objectKey()),
+                                    new HeadObjectOptions(Duration.ofSeconds(5)))
+                            .join()
+                            .objectLength())
                     .isEqualTo(manifest.objectLength());
         }
 
@@ -197,13 +206,14 @@ class Phase1FinalIntegrationTest {
         AppendResult committed;
         try (MetadataContext metadata = metadata(cluster);
                 LocalFileObjectStore objectStore = new LocalFileObjectStore(objects);
-                DefaultStreamStorage storage = storage(
-                        cluster, metadata.l0(), metadata.references(), objectStore)) {
+                DefaultStreamStorage storage = storage(cluster, metadata.l0(), metadata.references(), objectStore)) {
             repairStream = storage.createOrGetStream(
-                    new StreamName("repair"),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
-                    .join().streamId();
-            committed = storage.append(repairStream, batch("committed"), appendOptions()).join();
+                            new StreamName("repair"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
+            committed = storage.append(repairStream, batch("committed"), appendOptions())
+                    .join();
         }
 
         OxiaKeyspace keyspace = new OxiaKeyspace(cluster);
@@ -216,18 +226,23 @@ class Phase1FinalIntegrationTest {
 
         try (MetadataContext metadata = metadata(cluster);
                 LocalFileObjectStore objectStore = new LocalFileObjectStore(objects);
-                DefaultStreamStorage restarted = storage(
-                        cluster, metadata.l0(), metadata.references(), objectStore)) {
-            assertThat(metadata.l0().scanOffsetIndex(
-                    cluster, repairStream, 0, 10).join()).isEmpty();
+                DefaultStreamStorage restarted = storage(cluster, metadata.l0(), metadata.references(), objectStore)) {
+            assertThat(metadata.l0()
+                            .scanOffsetIndex(cluster, repairStream, 0, 10)
+                            .join())
+                    .isEmpty();
             assertThat(restarted.read(repairStream, 0, readOptions()).join().batches())
                     .extracting(value -> text(value.payload()))
                     .containsExactly("committed");
-            assertThat(metadata.l0().scanOffsetIndex(
-                    cluster, repairStream, 0, 10).join()).hasSize(1);
+            assertThat(metadata.l0()
+                            .scanOffsetIndex(cluster, repairStream, 0, 10)
+                            .join())
+                    .hasSize(1);
             try (MetadataOrphanObjectScanner scanner = new MetadataOrphanObjectScanner(
                     cluster, metadata.l0(), RecoveryMetricsObserver.noop(), Runnable::run)) {
-                assertThat(scanner.scan(((ObjectSliceReadTarget) committed.readTarget()).objectId()).join().status())
+                assertThat(scanner.scan(((ObjectSliceReadTarget) committed.readTarget()).objectId())
+                                .join()
+                                .status())
                         .isEqualTo(OrphanObjectStatus.FULLY_REFERENCED);
             }
         }
@@ -235,28 +250,15 @@ class Phase1FinalIntegrationTest {
 
     private MetadataContext metadata(String cluster) {
         OxiaClientConfiguration configuration = new OxiaClientConfiguration(
-                OXIA.getServiceAddress(),
-                "default",
-                Duration.ofSeconds(10),
-                Duration.ofSeconds(30),
-                1_000,
-                1_024);
+                OXIA.getServiceAddress(), "default", Duration.ofSeconds(10), Duration.ofSeconds(30), 1_000, 1_024);
         SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, CLOCK);
-        OxiaJavaClientMetadataStore l0 = OxiaJavaClientMetadataStore.usingSharedRuntime(
-                configuration, runtime, CLOCK);
+        OxiaJavaClientMetadataStore l0 = OxiaJavaClientMetadataStore.usingSharedRuntime(configuration, runtime, CLOCK);
         OxiaJavaPhysicalObjectMetadataStore physical =
-                OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
-                        configuration, runtime, CLOCK);
+                OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(configuration, runtime, CLOCK);
         ObjectProtectionManager protections = new DefaultObjectProtectionManager(
-                cluster,
-                physical,
-                Duration.ofMinutes(5),
-                Duration.ofSeconds(5),
-                Duration.ofDays(1),
-                CLOCK);
+                cluster, physical, Duration.ofMinutes(5), Duration.ofSeconds(5), Duration.ofDays(1), CLOCK);
         GenerationZeroPhysicalReferencePublisher references =
-                new DefaultGenerationZeroPhysicalReferencePublisher(
-                        cluster, l0, physical, protections);
+                new DefaultGenerationZeroPhysicalReferencePublisher(cluster, l0, physical, protections);
         return new MetadataContext(runtime, l0, physical, protections, references);
     }
 
@@ -280,7 +282,8 @@ class Phase1FinalIntegrationTest {
             OxiaJavaClientMetadataStore l0,
             OxiaJavaPhysicalObjectMetadataStore physical,
             ObjectProtectionManager protections,
-            GenerationZeroPhysicalReferencePublisher references) implements AutoCloseable {
+            GenerationZeroPhysicalReferencePublisher references)
+            implements AutoCloseable {
         @Override
         public void close() {
             protections.close();
@@ -291,8 +294,7 @@ class Phase1FinalIntegrationTest {
     }
 
     private static OxiaMetadataStore failNextCommitBeforeHead(
-            OxiaMetadataStore delegate,
-            AtomicReference<ObjectManifestRecord> manifestCapture) {
+            OxiaMetadataStore delegate, AtomicReference<ObjectManifestRecord> manifestCapture) {
         AtomicBoolean fail = new AtomicBoolean(true);
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
@@ -301,8 +303,7 @@ class Phase1FinalIntegrationTest {
                     if (method.getName().equals("putObjectManifest")) {
                         manifestCapture.set((ObjectManifestRecord) args[1]);
                     }
-                    if (method.getName().equals("commitPreparedStableAppend")
-                            && fail.compareAndSet(true, false)) {
+                    if (method.getName().equals("commitPreparedStableAppend") && fail.compareAndSet(true, false)) {
                         return NereusException.failedAppendFuture(
                                 ErrorCode.METADATA_UNAVAILABLE,
                                 true,

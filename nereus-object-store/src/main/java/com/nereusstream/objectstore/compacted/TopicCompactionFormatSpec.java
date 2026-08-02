@@ -1,13 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import java.util.Objects;
 
-/** Protocol-neutral NTC1 strategy identity copied from the durable materialization policy. */
-public record TopicCompactionFormatSpec(
-        String strategyId,
-        long strategyVersion,
-        String keyCodecId) {
+/**
+ * Protocol-neutral NTC1 strategy identity copied from the durable materialization policy.
+ */
+public record TopicCompactionFormatSpec(String strategyId, long strategyVersion, String keyCodecId) {
     public TopicCompactionFormatSpec {
         strategyId = requireText(strategyId, "strategyId");
         if (strategyVersion <= 0) {

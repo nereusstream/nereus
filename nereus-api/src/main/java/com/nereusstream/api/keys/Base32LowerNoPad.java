@@ -17,8 +17,7 @@ package com.nereusstream.api.keys;
 final class Base32LowerNoPad {
     private static final char[] ALPHABET = "abcdefghijklmnopqrstuvwxyz234567".toCharArray();
 
-    private Base32LowerNoPad() {
-    }
+    private Base32LowerNoPad() {}
 
     static String encode(byte[] bytes) {
         StringBuilder result = new StringBuilder((bytes.length * 8 + 4) / 5);

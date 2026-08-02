@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.callbacks;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.NereusException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,8 +45,10 @@ class CallbackPrimitivesTest {
     void callbackExceptionStillRunsCleanup() {
         AtomicInteger cleanups = new AtomicInteger();
         TerminalCallback<Integer> terminal = new TerminalCallback<>(
-                ignored -> { throw new IllegalStateException("callback"); },
-                ignored -> { },
+                ignored -> {
+                    throw new IllegalStateException("callback");
+                },
+                ignored -> {},
                 cleanups::incrementAndGet);
 
         assertThatThrownBy(() -> terminal.tryComplete(1)).isInstanceOf(IllegalStateException.class);
@@ -82,11 +84,9 @@ class CallbackPrimitivesTest {
             SerialCallbackLane lane = new SerialCallbackLane(executor, 1);
             long sequence = lane.admit();
             assertThatThrownBy(lane::admit).isInstanceOf(NereusException.class);
-            assertThatThrownBy(() -> lane.complete(sequence + 1, () -> { }))
-                    .isInstanceOf(NereusException.class);
-            lane.complete(sequence, () -> { });
-            assertThatThrownBy(() -> lane.complete(sequence, () -> { }))
-                    .isInstanceOf(NereusException.class);
+            assertThatThrownBy(() -> lane.complete(sequence + 1, () -> {})).isInstanceOf(NereusException.class);
+            lane.complete(sequence, () -> {});
+            assertThatThrownBy(() -> lane.complete(sequence, () -> {})).isInstanceOf(NereusException.class);
             CompletableFuture<Void> drained = lane.closeAfterDrain();
             drained.get(5, TimeUnit.SECONDS);
         } finally {
@@ -97,9 +97,11 @@ class CallbackPrimitivesTest {
     @Test
     void executorRejectionDrainsEveryAdmittedTerminalCallbackExactlyOnce() throws Exception {
         AtomicInteger callbacks = new AtomicInteger();
-        SerialCallbackLane lane = new SerialCallbackLane(command -> {
-            throw new RejectedExecutionException("callback executor stopped");
-        }, 3);
+        SerialCallbackLane lane = new SerialCallbackLane(
+                command -> {
+                    throw new RejectedExecutionException("callback executor stopped");
+                },
+                3);
         long zero = lane.admit();
         long one = lane.admit();
 

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -20,19 +21,17 @@ import java.util.Objects;
 
 final class GcPlanValidation {
     static final int MAX_REFERENCE_DOMAINS = 32;
-    static final Comparator<GcReferenceSnapshot> DOMAIN_ORDER = Comparator
-            .comparing(GcReferenceSnapshot::domainId)
-            .thenComparingInt(GcReferenceSnapshot::protocolVersion);
-    static final Comparator<GcDomainSnapshotProof> DOMAIN_PROOF_ORDER = Comparator
-            .comparing(GcDomainSnapshotProof::domainId)
+    static final Comparator<GcReferenceSnapshot> DOMAIN_ORDER =
+            Comparator.comparing(GcReferenceSnapshot::domainId).thenComparingInt(GcReferenceSnapshot::protocolVersion);
+    static final Comparator<GcDomainSnapshotProof> DOMAIN_PROOF_ORDER = Comparator.comparing(
+                    GcDomainSnapshotProof::domainId)
             .thenComparingInt(GcDomainSnapshotProof::protocolVersion);
-    static final Comparator<GcPlannedProtectionRemoval> PROTECTION_ORDER = Comparator
-            .comparing(value -> value.protection().key());
-    static final Comparator<GcPlannedMetadataRemoval> METADATA_ORDER = Comparator
-            .comparing(GcPlannedMetadataRemoval::key);
+    static final Comparator<GcPlannedProtectionRemoval> PROTECTION_ORDER =
+            Comparator.comparing(value -> value.protection().key());
+    static final Comparator<GcPlannedMetadataRemoval> METADATA_ORDER =
+            Comparator.comparing(GcPlannedMetadataRemoval::key);
 
-    private GcPlanValidation() {
-    }
+    private GcPlanValidation() {}
 
     static String requireBase32Id(String value, String name) {
         Objects.requireNonNull(value, name);
@@ -41,19 +40,14 @@ final class GcPlanValidation {
         }
         for (int index = 0; index < value.length(); index++) {
             char character = value.charAt(index);
-            if (!((character >= 'a' && character <= 'z')
-                    || (character >= '2' && character <= '7'))) {
+            if (!((character >= 'a' && character <= 'z') || (character >= '2' && character <= '7'))) {
                 throw new IllegalArgumentException(name + " must be lowercase base32 without padding");
             }
         }
         return value;
     }
 
-    static <T> List<T> canonical(
-            List<T> values,
-            Comparator<T> order,
-            int maximum,
-            String name) {
+    static <T> List<T> canonical(List<T> values, Comparator<T> order, int maximum, String name) {
         List<T> exact = List.copyOf(Objects.requireNonNull(values, name));
         if (exact.isEmpty() || exact.size() > maximum || exact.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException(name + " must be non-empty, bounded, and contain no nulls");
@@ -66,11 +60,7 @@ final class GcPlanValidation {
         return exact;
     }
 
-    static <T> List<T> canonicalAllowEmpty(
-            List<T> values,
-            Comparator<T> order,
-            int maximum,
-            String name) {
+    static <T> List<T> canonicalAllowEmpty(List<T> values, Comparator<T> order, int maximum, String name) {
         List<T> exact = List.copyOf(Objects.requireNonNull(values, name));
         if (exact.size() > maximum || exact.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException(name + " exceeds its bound or contains null");
@@ -89,11 +79,9 @@ final class GcPlanValidation {
             List<GcPlannedProtectionRemoval> protections,
             List<GcPlannedMetadataRemoval> metadataRemovals) {
         Objects.requireNonNull(query, "query");
-        List<GcDomainSnapshotProof> proofs = domainSnapshots.stream()
-                .map(GcDomainSnapshotProof::from)
-                .toList();
-        return referenceSetSha256(
-                query.queryIdentitySha256(), proofs, protections, metadataRemovals);
+        List<GcDomainSnapshotProof> proofs =
+                domainSnapshots.stream().map(GcDomainSnapshotProof::from).toList();
+        return referenceSetSha256(query.queryIdentitySha256(), proofs, protections, metadataRemovals);
     }
 
     static Checksum referenceSetSha256(
@@ -101,29 +89,18 @@ final class GcPlanValidation {
             List<GcDomainSnapshotProof> domainProofs,
             List<GcPlannedProtectionRemoval> protections,
             List<GcPlannedMetadataRemoval> metadataRemovals) {
-        Checksum query = GcReferenceQuery.requireSha256(
-                queryIdentitySha256, "queryIdentitySha256");
-        List<GcDomainSnapshotProof> proofs = canonical(
-                domainProofs,
-                DOMAIN_PROOF_ORDER,
-                MAX_REFERENCE_DOMAINS,
-                "domainProofs");
+        Checksum query = GcReferenceQuery.requireSha256(queryIdentitySha256, "queryIdentitySha256");
+        List<GcDomainSnapshotProof> proofs =
+                canonical(domainProofs, DOMAIN_PROOF_ORDER, MAX_REFERENCE_DOMAINS, "domainProofs");
         for (GcDomainSnapshotProof proof : proofs) {
             if (!proof.queryIdentitySha256().equals(query)) {
-                throw new IllegalArgumentException(
-                        "domain proof belongs to another GC reference query");
+                throw new IllegalArgumentException("domain proof belongs to another GC reference query");
             }
         }
-        List<GcPlannedProtectionRemoval> exactProtections = canonicalAllowEmpty(
-                protections,
-                PROTECTION_ORDER,
-                PhysicalGcConfig.MAX_DOMAIN_VALUES,
-                "protections");
+        List<GcPlannedProtectionRemoval> exactProtections =
+                canonicalAllowEmpty(protections, PROTECTION_ORDER, PhysicalGcConfig.MAX_DOMAIN_VALUES, "protections");
         List<GcPlannedMetadataRemoval> exactMetadataRemovals = canonicalAllowEmpty(
-                metadataRemovals,
-                METADATA_ORDER,
-                PhysicalGcConfig.MAX_DOMAIN_VALUES,
-                "metadataRemovals");
+                metadataRemovals, METADATA_ORDER, PhysicalGcConfig.MAX_DOMAIN_VALUES, "metadataRemovals");
         DigestWriter writer = new DigestWriter("nereus-gc-reference-set-v2");
         writer.checksum(query);
         writer.int32(proofs.size());
@@ -160,14 +137,12 @@ final class GcPlanValidation {
     }
 
     static void requireEveryReferenceHasExactRemoval(
-            List<GcReferenceSnapshot> snapshots,
-            List<GcPlannedMetadataRemoval> metadataRemovals) {
+            List<GcReferenceSnapshot> snapshots, List<GcPlannedMetadataRemoval> metadataRemovals) {
         Map<String, GcPlannedMetadataRemoval> removalsByKey = new HashMap<>();
         for (GcPlannedMetadataRemoval removal : metadataRemovals) {
             GcPlannedMetadataRemoval previous = removalsByKey.put(removal.key(), removal);
             if (previous != null) {
-                throw new IllegalArgumentException(
-                        "planned metadata removal keys must be unique across removal types");
+                throw new IllegalArgumentException("planned metadata removal keys must be unique across removal types");
             }
         }
         for (GcReferenceSnapshot snapshot : snapshots) {
@@ -176,8 +151,7 @@ final class GcPlanValidation {
                 if (removal == null
                         || !removal.removalType().equals(reference.referenceType())
                         || removal.metadataVersion() != reference.ownerMetadataVersion()
-                        || !removal.durableValueSha256().equals(
-                                reference.ownerIdentitySha256())) {
+                        || !removal.durableValueSha256().equals(reference.ownerIdentitySha256())) {
                     throw new IllegalArgumentException(
                             "every domain reference must have an exact planned metadata removal");
                 }

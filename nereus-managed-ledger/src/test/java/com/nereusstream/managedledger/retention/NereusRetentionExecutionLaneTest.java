@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamId;
@@ -18,29 +18,23 @@ import org.junit.jupiter.api.Test;
 
 class NereusRetentionExecutionLaneTest {
     @Test
-    void coalescesOneExecutionPerStreamButReturnsIndependentCompletions()
-            throws Exception {
+    void coalescesOneExecutionPerStreamButReturnsIndependentCompletions() throws Exception {
         NereusRetentionExecutionLane lane = lane(2, 4, Duration.ofSeconds(2));
         try {
             StreamId stream = new StreamId("retention-coalesce");
             CountDownLatch started = new CountDownLatch(1);
             AtomicInteger invocations = new AtomicInteger();
-            CompletableFuture<Optional<RetentionCandidate>> source =
-                    new CompletableFuture<>();
-            CompletableFuture<Optional<RetentionCandidate>> first = lane.submit(
-                    stream,
-                    () -> {
-                        invocations.incrementAndGet();
-                        started.countDown();
-                        return source;
-                    });
+            CompletableFuture<Optional<RetentionCandidate>> source = new CompletableFuture<>();
+            CompletableFuture<Optional<RetentionCandidate>> first = lane.submit(stream, () -> {
+                invocations.incrementAndGet();
+                started.countDown();
+                return source;
+            });
             assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
-            CompletableFuture<Optional<RetentionCandidate>> second = lane.submit(
-                    stream,
-                    () -> {
-                        invocations.incrementAndGet();
-                        return CompletableFuture.completedFuture(Optional.empty());
-                    });
+            CompletableFuture<Optional<RetentionCandidate>> second = lane.submit(stream, () -> {
+                invocations.incrementAndGet();
+                return CompletableFuture.completedFuture(Optional.empty());
+            });
 
             assertThat(first).isNotSameAs(second);
             assertThat(first.cancel(false)).isTrue();
@@ -54,30 +48,25 @@ class NereusRetentionExecutionLaneTest {
     }
 
     @Test
-    void holdsConcurrencyUntilAsyncCompletionAndRejectsQueueOverflow()
-            throws Exception {
+    void holdsConcurrencyUntilAsyncCompletionAndRejectsQueueOverflow() throws Exception {
         NereusRetentionExecutionLane lane = lane(1, 1, Duration.ofSeconds(2));
         try {
             CountDownLatch firstStarted = new CountDownLatch(1);
             CountDownLatch secondStarted = new CountDownLatch(1);
-            CompletableFuture<Optional<RetentionCandidate>> firstSource =
-                    new CompletableFuture<>();
-            CompletableFuture<Optional<RetentionCandidate>> first = lane.submit(
-                    new StreamId("retention-running"),
-                    () -> {
+            CompletableFuture<Optional<RetentionCandidate>> firstSource = new CompletableFuture<>();
+            CompletableFuture<Optional<RetentionCandidate>> first =
+                    lane.submit(new StreamId("retention-running"), () -> {
                         firstStarted.countDown();
                         return firstSource;
                     });
             assertThat(firstStarted.await(2, TimeUnit.SECONDS)).isTrue();
-            CompletableFuture<Optional<RetentionCandidate>> second = lane.submit(
-                    new StreamId("retention-queued"),
-                    () -> {
+            CompletableFuture<Optional<RetentionCandidate>> second =
+                    lane.submit(new StreamId("retention-queued"), () -> {
                         secondStarted.countDown();
                         return CompletableFuture.completedFuture(Optional.empty());
                     });
             CompletableFuture<Optional<RetentionCandidate>> rejected = lane.submit(
-                    new StreamId("retention-rejected"),
-                    () -> CompletableFuture.completedFuture(Optional.empty()));
+                    new StreamId("retention-rejected"), () -> CompletableFuture.completedFuture(Optional.empty()));
 
             assertFailureCode(rejected, ErrorCode.BACKPRESSURE_REJECTED);
             assertThat(secondStarted.getCount()).isEqualTo(1);
@@ -93,15 +82,10 @@ class NereusRetentionExecutionLaneTest {
 
     @Test
     void timesOutTheWholeOperationAndRejectsAfterClose() {
-        NereusRetentionExecutionLane lane = lane(
-                1,
-                1,
-                Duration.ofMillis(50));
-        CompletableFuture<Optional<RetentionCandidate>> source =
-                new CompletableFuture<>();
-        CompletableFuture<Optional<RetentionCandidate>> timedOut = lane.submit(
-                new StreamId("retention-timeout"),
-                () -> source);
+        NereusRetentionExecutionLane lane = lane(1, 1, Duration.ofMillis(50));
+        CompletableFuture<Optional<RetentionCandidate>> source = new CompletableFuture<>();
+        CompletableFuture<Optional<RetentionCandidate>> timedOut =
+                lane.submit(new StreamId("retention-timeout"), () -> source);
 
         assertFailureCode(timedOut, ErrorCode.TIMEOUT);
         assertThat(source).isCancelled();
@@ -114,37 +98,20 @@ class NereusRetentionExecutionLaneTest {
                 ErrorCode.STORAGE_CLOSED);
     }
 
-    private static NereusRetentionExecutionLane lane(
-            int concurrent,
-            int queued,
-            Duration operationTimeout) {
+    private static NereusRetentionExecutionLane lane(int concurrent, int queued, Duration operationTimeout) {
         AtomicInteger threadIds = new AtomicInteger();
         return new NereusRetentionExecutionLane(
-                new NereusRetentionConfig(
-                        16,
-                        concurrent,
-                        queued,
-                        operationTimeout,
-                        Duration.ofSeconds(2)),
-                command -> {
-                    Thread thread = new Thread(
-                            command,
-                            "retention-test-" + threadIds.incrementAndGet());
+                new NereusRetentionConfig(16, concurrent, queued, operationTimeout, Duration.ofSeconds(2)), command -> {
+                    Thread thread = new Thread(command, "retention-test-" + threadIds.incrementAndGet());
                     thread.setDaemon(true);
                     return thread;
                 });
     }
 
-    private static void assertFailureCode(
-            CompletableFuture<?> future,
-            ErrorCode code) {
-        assertThatThrownBy(future::join)
-                .isInstanceOf(CompletionException.class)
-                .satisfies(failure -> {
-                    assertThat(failure.getCause())
-                            .isInstanceOf(NereusException.class);
-                    assertThat(((NereusException) failure.getCause()).code())
-                            .isEqualTo(code);
-                });
+    private static void assertFailureCode(CompletableFuture<?> future, ErrorCode code) {
+        assertThatThrownBy(future::join).isInstanceOf(CompletionException.class).satisfies(failure -> {
+            assertThat(failure.getCause()).isInstanceOf(NereusException.class);
+            assertThat(((NereusException) failure.getCause()).code()).isEqualTo(code);
+        });
     }
 }

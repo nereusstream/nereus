@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 
-public final class GcRetirementRemovalRecordCodecV1
-        extends AbstractF4RecordCodecV1<GcRetirementRemovalRecord> {
+public final class GcRetirementRemovalRecordCodecV1 extends AbstractF4RecordCodecV1<GcRetirementRemovalRecord> {
     public GcRetirementRemovalRecordCodecV1() {
         super(GcRetirementRemovalRecord.class);
     }

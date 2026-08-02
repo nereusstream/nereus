@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -19,7 +20,6 @@ import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.MaterializationCheckpointScanPage;
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
-import com.nereusstream.metadata.oxia.ObjectProtectionScanPage;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.TaskScanPage;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
@@ -50,9 +50,10 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 
-/** Exact task/index/checkpoint/root/protection proof before terminal task metadata deletion. */
-public final class DefaultTerminalWorkflowMetadataRetirer
-        implements TerminalWorkflowMetadataRetirer {
+/**
+ * Exact task/index/checkpoint/root/protection proof before terminal task metadata deletion.
+ */
+public final class DefaultTerminalWorkflowMetadataRetirer implements TerminalWorkflowMetadataRetirer {
     private static final int MAX_SCAN_ENTRIES = 4_096;
     private static final int MAX_DELETE_RECOVERY_ATTEMPTS = 8;
 
@@ -106,8 +107,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
         this.generations = Objects.requireNonNull(generations, "generations");
         this.physical = Objects.requireNonNull(physical, "physical");
         this.sourceProtections = Objects.requireNonNull(sourceProtections, "sourceProtections");
-        this.metadataAuditGraceMillis = requirePositiveMillis(
-                metadataAuditGrace, "metadataAuditGrace");
+        this.metadataAuditGraceMillis = requirePositiveMillis(metadataAuditGrace, "metadataAuditGrace");
         if (pageSize <= 0 || pageSize > 1_000) {
             throw new IllegalArgumentException("pageSize must be in [1, 1000]");
         }
@@ -125,8 +125,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             MaterializationTaskMutationGuard mutationGuard) {
         try {
             if (stableCompletedTrimOffset < 0) {
-                throw new IllegalArgumentException(
-                        "stableCompletedTrimOffset must be non-negative");
+                throw new IllegalArgumentException("stableCompletedTrimOffset must be non-negative");
             }
             Operation operation = new Operation(
                     Objects.requireNonNull(streamId, "streamId"),
@@ -176,8 +175,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
 
         private CompletableFuture<Void> scanTaskPage(Optional<F4ScanToken> continuation) {
             return deadline.bound(
-                            () -> generations.scanTasks(
-                                    cluster, streamId, continuation, pageSize),
+                            () -> generations.scanTasks(cluster, streamId, continuation, pageSize),
                             "scan terminal materialization tasks")
                     .thenCompose(page -> {
                         addTaskPage(page);
@@ -205,8 +203,8 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 }
                 if (retired.retired()) {
                     accumulator.tasksRetired++;
-                    accumulator.protectionsReleased = Math.addExact(
-                            accumulator.protectionsReleased, retired.protectionsReleased());
+                    accumulator.protectionsReleased =
+                            Math.addExact(accumulator.protectionsReleased, retired.protectionsReleased());
                 }
                 return retireTaskAt(index + 1);
             });
@@ -215,17 +213,12 @@ public final class DefaultTerminalWorkflowMetadataRetirer
         private CompletableFuture<Void> scanStatsPage(Optional<F4ScanToken> continuation) {
             return deadline.bound(
                             () -> generations.scanRangeRetentionStats(
-                                    cluster,
-                                    streamId,
-                                    0,
-                                    Long.MAX_VALUE,
-                                    continuation,
-                                    pageSize),
+                                    cluster, streamId, 0, Long.MAX_VALUE, continuation, pageSize),
                             "scan range-retention stats for terminal metadata retirement")
                     .thenCompose(page -> {
-                        if (scannedStats.size() > MAX_SCAN_ENTRIES - page.values().size()) {
-                            throw invariant(
-                                    "retention-stats retirement exceeded its hard scan bound", null);
+                        if (scannedStats.size()
+                                > MAX_SCAN_ENTRIES - page.values().size()) {
+                            throw invariant("retention-stats retirement exceeded its hard scan bound", null);
                         }
                         scannedStats.addAll(page.values());
                         accumulator.retentionStatsScanned = scannedStats.size();
@@ -247,20 +240,15 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             });
         }
 
-        private CompletableFuture<Boolean> retireStats(
-                VersionedRangeRetentionStats expected,
-                int attempt) {
+        private CompletableFuture<Boolean> retireStats(VersionedRangeRetentionStats expected, int attempt) {
             if (attempt >= MAX_DELETE_RECOVERY_ATTEMPTS) {
-                return CompletableFuture.failedFuture(invariant(
-                        "retention-stats delete recovery exhausted", null));
+                return CompletableFuture.failedFuture(invariant("retention-stats delete recovery exhausted", null));
             }
             return staleStats(expected.value()).thenCompose(stale -> {
                 if (!stale) {
                     return CompletableFuture.completedFuture(false);
                 }
-                return deadline.bound(
-                                mutationGuard::revalidate,
-                                "revalidate retention-stats retirement activation")
+                return deadline.bound(mutationGuard::revalidate, "revalidate retention-stats retirement activation")
                         .thenCompose(ignored -> deadline.bound(
                                 () -> generations.getRangeRetentionStats(
                                         cluster,
@@ -269,8 +257,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                                         expected.value().commitVersion()),
                                 "reload exact range-retention stats before delete"))
                         .thenCompose(reloaded -> {
-                            if (reloaded.isEmpty()
-                                    || !sameStats(expected, reloaded.orElseThrow())) {
+                            if (reloaded.isEmpty() || !sameStats(expected, reloaded.orElseThrow())) {
                                 return CompletableFuture.completedFuture(false);
                             }
                             return staleStats(reloaded.orElseThrow().value())
@@ -281,9 +268,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             });
         }
 
-        private CompletableFuture<Boolean> deleteStats(
-                VersionedRangeRetentionStats expected,
-                int attempt) {
+        private CompletableFuture<Boolean> deleteStats(VersionedRangeRetentionStats expected, int attempt) {
             return deadline.bound(
                             () -> generations.deleteRangeRetentionStats(
                                     cluster,
@@ -323,20 +308,14 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             }
             return deadline.bound(
                             () -> generations.getCandidateByKey(
-                                    cluster,
-                                    streamId,
-                                    ReadView.COMMITTED,
-                                    stats.sourceIndexKey()),
+                                    cluster, streamId, ReadView.COMMITTED, stats.sourceIndexKey()),
                             "reload retention-stats source index")
-                    .thenApply(source -> source.isEmpty()
-                            || !matchesStatsSource(stats, source.orElseThrow()));
+                    .thenApply(source -> source.isEmpty() || !matchesStatsSource(stats, source.orElseThrow()));
         }
 
-        private CompletableFuture<Void> scanCheckpointPage(
-                Optional<F4ScanToken> continuation) {
+        private CompletableFuture<Void> scanCheckpointPage(Optional<F4ScanToken> continuation) {
             return deadline.bound(
-                            () -> generations.scanMaterializationCheckpoints(
-                                    cluster, streamId, continuation, pageSize),
+                            () -> generations.scanMaterializationCheckpoints(cluster, streamId, continuation, pageSize),
                             "scan advisory materialization checkpoints for retirement")
                     .thenCompose(page -> {
                         addCheckpointPage(page);
@@ -348,8 +327,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
 
         private void addCheckpointPage(MaterializationCheckpointScanPage page) {
             if (scannedCheckpoints.size() > MAX_SCAN_ENTRIES - page.values().size()) {
-                throw invariant(
-                        "checkpoint retirement exceeded its hard scan bound", null);
+                throw invariant("checkpoint retirement exceeded its hard scan bound", null);
             }
             scannedCheckpoints.addAll(page.values());
             accumulator.checkpointsScanned = scannedCheckpoints.size();
@@ -367,12 +345,10 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             });
         }
 
-        private CompletableFuture<Boolean> retireCheckpoint(
-                VersionedMaterializationCheckpoint expected,
-                int attempt) {
+        private CompletableFuture<Boolean> retireCheckpoint(VersionedMaterializationCheckpoint expected, int attempt) {
             if (attempt >= MAX_DELETE_RECOVERY_ATTEMPTS) {
-                return CompletableFuture.failedFuture(invariant(
-                        "old-policy checkpoint delete recovery exhausted", null));
+                return CompletableFuture.failedFuture(
+                        invariant("old-policy checkpoint delete recovery exhausted", null));
             }
             if (isCurrentPolicy(expected.value())
                     || !auditGraceElapsed(expected.value().updatedAtMillis())) {
@@ -383,8 +359,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                     return CompletableFuture.completedFuture(false);
                 }
                 return deadline.bound(
-                                mutationGuard::revalidate,
-                                "revalidate old-policy checkpoint retirement activation")
+                                mutationGuard::revalidate, "revalidate old-policy checkpoint retirement activation")
                         .thenCompose(ignored -> oldPolicySnapshot(expected.value()))
                         .thenCompose(second -> {
                             if (!second.retirable() || !first.equals(second)) {
@@ -398,21 +373,16 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                                                     expected.value().policyVersion()),
                                             "reload old-policy checkpoint before delete")
                                     .thenCompose(reloaded -> {
-                                        if (reloaded.isEmpty()
-                                                || !sameCheckpoint(
-                                                        expected, reloaded.orElseThrow())) {
+                                        if (reloaded.isEmpty() || !sameCheckpoint(expected, reloaded.orElseThrow())) {
                                             return CompletableFuture.completedFuture(false);
                                         }
-                                        return deleteCheckpoint(
-                                                reloaded.orElseThrow(), attempt);
+                                        return deleteCheckpoint(reloaded.orElseThrow(), attempt);
                                     });
                         });
             });
         }
 
-        private CompletableFuture<Boolean> deleteCheckpoint(
-                VersionedMaterializationCheckpoint expected,
-                int attempt) {
+        private CompletableFuture<Boolean> deleteCheckpoint(VersionedMaterializationCheckpoint expected, int attempt) {
             return deadline.bound(
                             () -> generations.deleteMaterializationCheckpoint(
                                     cluster,
@@ -440,29 +410,26 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                                     if (!sameCheckpoint(expected, reloaded.orElseThrow())) {
                                         return CompletableFuture.failedFuture(original);
                                     }
-                                    return retireCheckpoint(
-                                            reloaded.orElseThrow(), attempt + 1);
+                                    return retireCheckpoint(reloaded.orElseThrow(), attempt + 1);
                                 });
                     })
                     .thenCompose(value -> value);
         }
 
-        private CompletableFuture<OldPolicySnapshot> oldPolicySnapshot(
-                MaterializationCheckpointRecord checkpoint) {
+        private CompletableFuture<OldPolicySnapshot> oldPolicySnapshot(MaterializationCheckpointRecord checkpoint) {
             List<VersionedMaterializationTask> tasks = new ArrayList<>();
             List<IndexFingerprint> indexes = new ArrayList<>();
             return scanFreshTasks(Optional.empty(), tasks)
-                    .thenCompose(ignored -> scanPolicyIndexes(
-                            checkpoint, ReadView.COMMITTED, Optional.empty(), indexes))
-                    .thenCompose(ignored -> scanPolicyIndexes(
-                            checkpoint, ReadView.TOPIC_COMPACTED, Optional.empty(), indexes))
+                    .thenCompose(
+                            ignored -> scanPolicyIndexes(checkpoint, ReadView.COMMITTED, Optional.empty(), indexes))
+                    .thenCompose(ignored ->
+                            scanPolicyIndexes(checkpoint, ReadView.TOPIC_COMPACTED, Optional.empty(), indexes))
                     .thenApply(ignored -> {
-                        boolean taskReference = tasks.stream().anyMatch(task ->
-                                task.value().policyId().equals(checkpoint.policyId())
-                                        && task.value().policyVersion()
-                                                == checkpoint.policyVersion());
-                        boolean preparedPublication = indexes.stream().anyMatch(index ->
-                                index.lifecycle() == GenerationLifecycle.PREPARED);
+                        boolean taskReference = tasks.stream()
+                                .anyMatch(task -> task.value().policyId().equals(checkpoint.policyId())
+                                        && task.value().policyVersion() == checkpoint.policyVersion());
+                        boolean preparedPublication =
+                                indexes.stream().anyMatch(index -> index.lifecycle() == GenerationLifecycle.PREPARED);
                         return new OldPolicySnapshot(
                                 !taskReference && !preparedPublication,
                                 tasks.stream().map(TaskFingerprint::from).toList(),
@@ -471,16 +438,13 @@ public final class DefaultTerminalWorkflowMetadataRetirer
         }
 
         private CompletableFuture<Void> scanFreshTasks(
-                Optional<F4ScanToken> continuation,
-                List<VersionedMaterializationTask> values) {
+                Optional<F4ScanToken> continuation, List<VersionedMaterializationTask> values) {
             return deadline.bound(
-                            () -> generations.scanTasks(
-                                    cluster, streamId, continuation, pageSize),
+                            () -> generations.scanTasks(cluster, streamId, continuation, pageSize),
                             "rescan task prefix for old-policy checkpoint retirement")
                     .thenCompose(page -> {
                         if (values.size() > MAX_SCAN_ENTRIES - page.values().size()) {
-                            throw invariant(
-                                    "old-policy task rescan exceeded its hard bound", null);
+                            throw invariant("old-policy task rescan exceeded its hard bound", null);
                         }
                         values.addAll(page.values());
                         return page.continuation().isPresent()
@@ -496,32 +460,20 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 List<IndexFingerprint> values) {
             return deadline.bound(
                             () -> generations.scanIndex(
-                                    cluster,
-                                    streamId,
-                                    view,
-                                    0,
-                                    Long.MAX_VALUE,
-                                    continuation,
-                                    pageSize),
+                                    cluster, streamId, view, 0, Long.MAX_VALUE, continuation, pageSize),
                             "rescan generation-index prefix for old-policy checkpoint retirement")
                     .thenCompose(page -> {
                         for (VersionedGenerationCandidate candidate : page.values()) {
                             if (candidate instanceof VersionedGenerationIndex higher
-                                    && higher.value().policySha256().equals(
-                                            checkpoint.policySha256())) {
+                                    && higher.value().policySha256().equals(checkpoint.policySha256())) {
                                 if (values.size() == MAX_SCAN_ENTRIES) {
-                                    throw invariant(
-                                            "old-policy index rescan exceeded its hard bound", null);
+                                    throw invariant("old-policy index rescan exceeded its hard bound", null);
                                 }
                                 values.add(IndexFingerprint.from(higher));
                             }
                         }
                         return page.continuation().isPresent()
-                                ? scanPolicyIndexes(
-                                        checkpoint,
-                                        view,
-                                        page.continuation(),
-                                        values)
+                                ? scanPolicyIndexes(checkpoint, view, page.continuation(), values)
                                 : CompletableFuture.completedFuture(null);
                     });
         }
@@ -530,17 +482,15 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             boolean sameIdentity = checkpoint.policyId().equals(currentPolicy.policyId())
                     && checkpoint.policyVersion() == currentPolicy.policyVersion();
             if (sameIdentity
-                    && !checkpoint.policySha256().equals(
-                            currentPolicy.digestSha256().value())) {
-                throw invariant(
-                        "current policy checkpoint identity collided with another digest", null);
+                    && !checkpoint
+                            .policySha256()
+                            .equals(currentPolicy.digestSha256().value())) {
+                throw invariant("current policy checkpoint identity collided with another digest", null);
             }
             return sameIdentity;
         }
 
-        private CompletableFuture<TaskRetirement> retireTask(
-                VersionedMaterializationTask expected,
-                int deleteAttempt) {
+        private CompletableFuture<TaskRetirement> retireTask(VersionedMaterializationTask expected, int deleteAttempt) {
             if (!isTerminal(expected.value().lifecycle()) || !auditGraceElapsed(expected.value())) {
                 return CompletableFuture.completedFuture(TaskRetirement.NOT_ELIGIBLE);
             }
@@ -549,45 +499,35 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                     return CompletableFuture.completedFuture(TaskRetirement.NOT_ELIGIBLE);
                 }
                 TaskProof initial = initialOptional.orElseThrow();
-                return releaseAt(initial, 0).thenCompose(released ->
-                        prove(expected, true).thenCompose(finalOptional -> {
+                return releaseAt(initial, 0)
+                        .thenCompose(released -> prove(expected, true).thenCompose(finalOptional -> {
                             if (finalOptional.isEmpty()) {
-                                return CompletableFuture.completedFuture(
-                                        new TaskRetirement(true, false, released));
+                                return CompletableFuture.completedFuture(new TaskRetirement(true, false, released));
                             }
                             TaskProof exact = finalOptional.orElseThrow();
                             if (!sameRoots(initial.roots(), exact.roots())) {
-                                return CompletableFuture.completedFuture(
-                                        new TaskRetirement(true, false, released));
+                                return CompletableFuture.completedFuture(new TaskRetirement(true, false, released));
                             }
                             return deadline.bound(
                                             mutationGuard::revalidate,
                                             "revalidate terminal metadata retirement activation")
-                                    .thenCompose(ignored -> deleteTask(
-                                            exact.task(), deleteAttempt, released));
+                                    .thenCompose(ignored -> deleteTask(exact.task(), deleteAttempt, released));
                         }));
             });
         }
 
         private CompletableFuture<TaskRetirement> deleteTask(
-                VersionedMaterializationTask expected,
-                int attempt,
-                int released) {
+                VersionedMaterializationTask expected, int attempt, int released) {
             if (attempt >= MAX_DELETE_RECOVERY_ATTEMPTS) {
-                return CompletableFuture.failedFuture(invariant(
-                        "terminal task delete recovery exhausted", null));
+                return CompletableFuture.failedFuture(invariant("terminal task delete recovery exhausted", null));
             }
             return deadline.bound(
                             () -> generations.deleteTask(
-                                    cluster,
-                                    streamId,
-                                    expected.value().taskId(),
-                                    expected.metadataVersion()),
+                                    cluster, streamId, expected.value().taskId(), expected.metadataVersion()),
                             "delete terminal materialization task")
                     .handle((ignored, failure) -> {
                         if (failure == null) {
-                            return CompletableFuture.completedFuture(
-                                    new TaskRetirement(true, true, released));
+                            return CompletableFuture.completedFuture(new TaskRetirement(true, true, released));
                         }
                         Throwable original = unwrap(failure);
                         return deadline.bound(
@@ -609,64 +549,56 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                                             .thenApply(retry -> new TaskRetirement(
                                                     true,
                                                     retry.retired(),
-                                                    Math.addExact(
-                                                            released,
-                                                            retry.protectionsReleased())));
+                                                    Math.addExact(released, retry.protectionsReleased())));
                                 });
                     })
                     .thenCompose(value -> value);
         }
 
         private CompletableFuture<Optional<TaskProof>> prove(
-                VersionedMaterializationTask expected,
-                boolean requireNoTemporaryProtections) {
+                VersionedMaterializationTask expected, boolean requireNoTemporaryProtections) {
             return deadline.bound(
                             () -> generations.getTask(
                                     cluster, streamId, expected.value().taskId()),
                             "reload terminal materialization task")
                     .thenCompose(actualOptional -> {
-                        if (actualOptional.isEmpty()
-                                || !sameTask(expected, actualOptional.orElseThrow())) {
+                        if (actualOptional.isEmpty() || !sameTask(expected, actualOptional.orElseThrow())) {
                             return CompletableFuture.completedFuture(Optional.empty());
                         }
                         VersionedMaterializationTask actual = actualOptional.orElseThrow();
-                        if (!isTerminal(actual.value().lifecycle())
-                                || !auditGraceElapsed(actual.value())) {
+                        if (!isTerminal(actual.value().lifecycle()) || !auditGraceElapsed(actual.value())) {
                             return CompletableFuture.completedFuture(Optional.empty());
                         }
                         MaterializationTask task = tasks.requireTask(actual);
-                        Optional<MaterializationOutput> output = actual.value().output()
+                        Optional<MaterializationOutput> output = actual.value()
+                                .output()
                                 .map(value -> MaterializationRecordMapper.domainOutput(task, value));
                         List<ObjectExpectation> expectations = expectations(task, output);
-                        return loadRoots(expectations, 0, new LinkedHashMap<>())
-                                .thenCompose(rootsOptional -> {
-                                    if (rootsOptional.isEmpty()) {
-                                        return CompletableFuture.completedFuture(Optional.empty());
-                                    }
-                                    Map<ObjectKeyHash, VersionedPhysicalObjectRoot> roots =
-                                            rootsOptional.orElseThrow();
-                                    return loadProviderSourceProtections(
-                                                    actual, task, 0, new ArrayList<>())
-                                            .thenCompose(providerProtections -> {
-                                                if (actual.value().lifecycle()
-                                                        == TaskLifecycle.PUBLISHED) {
-                                                    return provePublished(
-                                                            actual,
-                                                            task,
-                                                            output.orElseThrow(),
-                                                            roots,
-                                                            providerProtections,
-                                                            requireNoTemporaryProtections);
-                                                }
-                                                return proveFailedTerminal(
-                                                        actual,
-                                                        task,
-                                                        output,
-                                                        roots,
-                                                        providerProtections,
-                                                        requireNoTemporaryProtections);
-                                            });
-                                });
+                        return loadRoots(expectations, 0, new LinkedHashMap<>()).thenCompose(rootsOptional -> {
+                            if (rootsOptional.isEmpty()) {
+                                return CompletableFuture.completedFuture(Optional.empty());
+                            }
+                            Map<ObjectKeyHash, VersionedPhysicalObjectRoot> roots = rootsOptional.orElseThrow();
+                            return loadProviderSourceProtections(actual, task, 0, new ArrayList<>())
+                                    .thenCompose(providerProtections -> {
+                                        if (actual.value().lifecycle() == TaskLifecycle.PUBLISHED) {
+                                            return provePublished(
+                                                    actual,
+                                                    task,
+                                                    output.orElseThrow(),
+                                                    roots,
+                                                    providerProtections,
+                                                    requireNoTemporaryProtections);
+                                        }
+                                        return proveFailedTerminal(
+                                                actual,
+                                                task,
+                                                output,
+                                                roots,
+                                                providerProtections,
+                                                requireNoTemporaryProtections);
+                                    });
+                        });
                     });
         }
 
@@ -682,19 +614,16 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             if (source.readTarget() instanceof ObjectSliceReadTarget) {
                 return loadProviderSourceProtections(durable, task, index + 1, values);
             }
-            String referenceId = MaterializationProtectionIdentities.sourceReferenceId(
-                    cluster, task, source);
+            String referenceId = MaterializationProtectionIdentities.sourceReferenceId(cluster, task, source);
             return deadline.bound(
-                            () -> sourceProtections.findExisting(
-                                    task.streamId(), source, referenceId),
+                            () -> sourceProtections.findExisting(task.streamId(), source, referenceId),
                             "find terminal provider source protection")
                     .thenCompose(optional -> {
                         optional.ifPresent(protection -> {
                             if (!protection.referenceId().equals(referenceId)
                                     || !protection.owner().ownerKey().equals(durable.key())
                                     || protection.owner().metadataVersion() > durable.metadataVersion()) {
-                                throw invariant(
-                                        "terminal provider source protection has an invalid owner", null);
+                                throw invariant("terminal provider source protection has an invalid owner", null);
                             }
                             values.add(protection);
                         });
@@ -713,8 +642,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             GenerationIndexIdentity identity = new GenerationIndexIdentity(
                     task.streamId(), task.view(), task.coverage().endOffset(), generation);
             CompletableFuture<Optional<VersionedGenerationIndex>> indexFuture = deadline.bound(
-                    () -> generations.getIndex(cluster, identity),
-                    "reload terminal task generation index");
+                    () -> generations.getIndex(cluster, identity), "reload terminal task generation index");
             CompletableFuture<Optional<VersionedMaterializationCheckpoint>> checkpointFuture = deadline.bound(
                     () -> generations.getMaterializationCheckpoint(
                             cluster,
@@ -732,17 +660,11 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                         || !checkpointCovers(task, checkpoint.value())) {
                     return CompletableFuture.completedFuture(Optional.empty());
                 }
-                return auditProtections(
-                                durable,
-                                task,
-                                Optional.of(output),
-                                roots,
-                                Optional.of(index))
+                return auditProtections(durable, task, Optional.of(output), roots, Optional.of(index))
                         .thenApply(audit -> {
                             if (!audit.valid()
                                     || requireNoTemporaryProtections
-                                            && (!audit.temporary().isEmpty()
-                                                    || !providerProtections.isEmpty())) {
+                                            && (!audit.temporary().isEmpty() || !providerProtections.isEmpty())) {
                                 return Optional.empty();
                             }
                             return Optional.of(new TaskProof(
@@ -763,40 +685,30 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 Map<ObjectKeyHash, VersionedPhysicalObjectRoot> roots,
                 List<MaterializationSourceProtection> providerProtections,
                 boolean requireNoTemporaryProtections) {
-            return scanTaskIndexes(task, Optional.empty(), new ArrayList<>())
-                    .thenCompose(indexes -> {
-                        if (indexes.stream().anyMatch(index -> referencesTerminalTask(
-                                durable, output, index))) {
-                            return CompletableFuture.completedFuture(Optional.empty());
-                        }
-                        return auditProtections(
-                                        durable,
-                                        task,
-                                        output,
-                                        roots,
-                                        Optional.empty())
-                                .thenApply(audit -> {
-                                    if (!audit.valid()
-                                            || requireNoTemporaryProtections
-                                                    && (!audit.temporary().isEmpty()
-                                                            || !providerProtections.isEmpty())) {
-                                        return Optional.empty();
-                                    }
-                                    return Optional.of(new TaskProof(
-                                            durable,
-                                            Optional.empty(),
-                                            Optional.empty(),
-                                            roots,
-                                            audit.temporary(),
-                                            providerProtections));
-                                });
-                    });
+            return scanTaskIndexes(task, Optional.empty(), new ArrayList<>()).thenCompose(indexes -> {
+                if (indexes.stream().anyMatch(index -> referencesTerminalTask(durable, output, index))) {
+                    return CompletableFuture.completedFuture(Optional.empty());
+                }
+                return auditProtections(durable, task, output, roots, Optional.empty())
+                        .thenApply(audit -> {
+                            if (!audit.valid()
+                                    || requireNoTemporaryProtections
+                                            && (!audit.temporary().isEmpty() || !providerProtections.isEmpty())) {
+                                return Optional.empty();
+                            }
+                            return Optional.of(new TaskProof(
+                                    durable,
+                                    Optional.empty(),
+                                    Optional.empty(),
+                                    roots,
+                                    audit.temporary(),
+                                    providerProtections));
+                        });
+            });
         }
 
         private CompletableFuture<List<VersionedGenerationIndex>> scanTaskIndexes(
-                MaterializationTask task,
-                Optional<F4ScanToken> continuation,
-                List<VersionedGenerationIndex> values) {
+                MaterializationTask task, Optional<F4ScanToken> continuation, List<VersionedGenerationIndex> values) {
             return deadline.bound(
                             () -> generations.scanIndex(
                                     cluster,
@@ -815,14 +727,11 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                     });
         }
 
-        private void addHigherIndexes(
-                GenerationScanPage page,
-                List<VersionedGenerationIndex> values) {
+        private void addHigherIndexes(GenerationScanPage page, List<VersionedGenerationIndex> values) {
             for (var candidate : page.values()) {
                 if (candidate instanceof VersionedGenerationIndex higher) {
                     if (values.size() == MAX_SCAN_ENTRIES) {
-                        throw invariant(
-                                "terminal task index audit exceeded its hard scan bound", null);
+                        throw invariant("terminal task index audit exceeded its hard scan bound", null);
                     }
                     values.add(higher);
                 }
@@ -839,8 +748,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             List<VersionedObjectProtection> all = new ArrayList<>();
             List<ObjectKeyHash> objects = List.copyOf(roots.keySet());
             return scanObjectProtections(objects, 0, Optional.empty(), all)
-                    .thenApply(ignored -> classifyProtections(
-                            durable, roots, expected, visibleIndex, all));
+                    .thenApply(ignored -> classifyProtections(durable, roots, expected, visibleIndex, all));
         }
 
         private CompletableFuture<Void> scanObjectProtections(
@@ -853,24 +761,17 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             }
             ObjectKeyHash object = objects.get(objectIndex);
             return deadline.bound(
-                            () -> physical.scanProtections(
-                                    cluster, object, continuation, pageSize),
+                            () -> physical.scanProtections(cluster, object, continuation, pageSize),
                             "scan terminal task object protections")
                     .thenCompose(page -> {
                         if (values.size() > MAX_SCAN_ENTRIES - page.values().size()) {
-                            throw invariant(
-                                    "terminal protection audit exceeded its hard scan bound", null);
+                            throw invariant("terminal protection audit exceeded its hard scan bound", null);
                         }
                         values.addAll(page.values());
                         if (page.continuation().isPresent()) {
-                            return scanObjectProtections(
-                                    objects,
-                                    objectIndex,
-                                    page.continuation(),
-                                    values);
+                            return scanObjectProtections(objects, objectIndex, page.continuation(), values);
                         }
-                        return scanObjectProtections(
-                                objects, objectIndex + 1, Optional.empty(), values);
+                        return scanObjectProtections(objects, objectIndex + 1, Optional.empty(), values);
                     });
         }
 
@@ -893,8 +794,8 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 ProtectionRole role = expected.get(key);
                 boolean taskOwned = record.ownerKey().equals(durable.key());
                 if (role == ProtectionRole.VISIBLE) {
-                    ObjectProtectionOwner owner = MaterializationProtectionIdentities.indexOwner(
-                            visibleIndex.orElseThrow());
+                    ObjectProtectionOwner owner =
+                            MaterializationProtectionIdentities.indexOwner(visibleIndex.orElseThrow());
                     if (!matchesOwner(record, owner)
                             || record.rootLifecycleEpoch() != root.value().lifecycleEpoch()) {
                         return ProtectionAudit.INVALID;
@@ -912,48 +813,44 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                     continue;
                 }
                 if (taskOwned) {
-                    throw invariant(
-                            "terminal task owns an unexpected object protection", null);
+                    throw invariant("terminal task owns an unexpected object protection", null);
                 }
             }
-            return visibleFound
-                    ? new ProtectionAudit(true, List.copyOf(temporary))
-                    : ProtectionAudit.INVALID;
+            return visibleFound ? new ProtectionAudit(true, List.copyOf(temporary)) : ProtectionAudit.INVALID;
         }
 
         private CompletableFuture<Integer> releaseAt(TaskProof proof, int index) {
             int objectCount = proof.temporaryProtections().size();
-            int total = Math.addExact(objectCount, proof.providerSourceProtections().size());
+            int total =
+                    Math.addExact(objectCount, proof.providerSourceProtections().size());
             if (index == total) {
                 return CompletableFuture.completedFuture(index);
             }
             if (index < objectCount) {
-                VersionedObjectProtection protection = proof.temporaryProtections().get(index);
+                VersionedObjectProtection protection =
+                        proof.temporaryProtections().get(index);
                 return revalidateTaskAndRoot(proof.task(), proof.roots(), protection)
                         .thenCompose(ignored -> deleteProtection(protection, 0))
                         .thenCompose(ignored -> releaseAt(proof, index + 1));
             }
             MaterializationSourceProtection protection =
                     proof.providerSourceProtections().get(index - objectCount);
-            return sourceProtections.release(
-                            protection,
-                            current -> authorizeProviderSourceRelease(proof, current))
+            return sourceProtections
+                    .release(protection, current -> authorizeProviderSourceRelease(proof, current))
                     .thenCompose(ignored -> releaseAt(proof, index + 1));
         }
 
         private CompletableFuture<Void> authorizeProviderSourceRelease(
-                TaskProof expected,
-                MaterializationSourceProtection current) {
+                TaskProof expected, MaterializationSourceProtection current) {
             return prove(expected.task(), false).thenAccept(optional -> {
-                TaskProof actual = optional.orElseThrow(() -> condition(
-                        "terminal task proof disappeared before provider protection release", null));
+                TaskProof actual = optional.orElseThrow(
+                        () -> condition("terminal task proof disappeared before provider protection release", null));
                 if (!sameRoots(expected.roots(), actual.roots())
                         || !sameOptionalIndex(expected.index(), actual.index())
                         || !sameOptionalCheckpoint(expected.checkpoint(), actual.checkpoint())
                         || actual.providerSourceProtections().stream()
                                 .noneMatch(value -> sameProviderProtection(value, current))) {
-                    throw condition(
-                            "terminal provider source authority changed before release", null);
+                    throw condition("terminal provider source authority changed before release", null);
                 }
             });
         }
@@ -976,53 +873,46 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                         || !sameTask(expected, pair.left().orElseThrow())
                         || pair.right().isEmpty()
                         || !sameRoot(expectedRoot, pair.right().orElseThrow())) {
-                    throw condition(
-                            "terminal task/root changed before protection release", null);
+                    throw condition("terminal task/root changed before protection release", null);
                 }
             });
         }
 
-        private CompletableFuture<Void> deleteProtection(
-                VersionedObjectProtection expected,
-                int attempt) {
+        private CompletableFuture<Void> deleteProtection(VersionedObjectProtection expected, int attempt) {
             if (attempt >= MAX_DELETE_RECOVERY_ATTEMPTS) {
-                return CompletableFuture.failedFuture(invariant(
-                        "terminal protection delete recovery exhausted", null));
+                return CompletableFuture.failedFuture(invariant("terminal protection delete recovery exhausted", null));
             }
             ObjectProtectionIdentity identity = protectionIdentity(expected.value());
             return deadline.bound(
-                            () -> physical.deleteProtection(
-                                    cluster, identity, expected.metadataVersion()),
+                            () -> physical.deleteProtection(cluster, identity, expected.metadataVersion()),
                             "delete terminal task-owned protection")
                     .handle((ignored, failure) -> {
                         if (failure == null) {
                             return CompletableFuture.<Void>completedFuture(null);
                         }
                         Throwable original = unwrap(failure);
-                        return findProtection(identity, Optional.empty())
-                                .thenCompose(actual -> {
-                                    if (actual.isEmpty()) {
-                                        return CompletableFuture.completedFuture(null);
-                                    }
-                                    if (!sameProtection(expected, actual.orElseThrow())) {
-                                        return CompletableFuture.failedFuture(original);
-                                    }
-                                    return deleteProtection(actual.orElseThrow(), attempt + 1);
-                                });
+                        return findProtection(identity, Optional.empty()).thenCompose(actual -> {
+                            if (actual.isEmpty()) {
+                                return CompletableFuture.completedFuture(null);
+                            }
+                            if (!sameProtection(expected, actual.orElseThrow())) {
+                                return CompletableFuture.failedFuture(original);
+                            }
+                            return deleteProtection(actual.orElseThrow(), attempt + 1);
+                        });
                     })
                     .thenCompose(value -> value);
         }
 
         private CompletableFuture<Optional<VersionedObjectProtection>> findProtection(
-                ObjectProtectionIdentity identity,
-                Optional<F4ScanToken> continuation) {
+                ObjectProtectionIdentity identity, Optional<F4ScanToken> continuation) {
             return deadline.bound(
-                            () -> physical.scanProtections(
-                                    cluster, identity.object(), continuation, pageSize),
+                            () -> physical.scanProtections(cluster, identity.object(), continuation, pageSize),
                             "reload terminal task-owned protection")
                     .thenCompose(page -> {
                         Optional<VersionedObjectProtection> found = page.values().stream()
-                                .filter(value -> protectionIdentity(value.value()).equals(identity))
+                                .filter(value ->
+                                        protectionIdentity(value.value()).equals(identity))
                                 .findFirst();
                         if (found.isPresent() || page.continuation().isEmpty()) {
                             return CompletableFuture.completedFuture(found);
@@ -1047,8 +937,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 return loadRoots(expectations, index + 1, roots);
             }
             return deadline.bound(
-                            () -> physical.getRoot(cluster, expectation.object()),
-                            "reload terminal task physical root")
+                            () -> physical.getRoot(cluster, expectation.object()), "reload terminal task physical root")
                     .thenCompose(optional -> {
                         if (optional.isEmpty()) {
                             return CompletableFuture.completedFuture(Optional.empty());
@@ -1058,8 +947,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                             return CompletableFuture.completedFuture(Optional.empty());
                         }
                         if (!expectation.matches(root)) {
-                            throw invariant(
-                                    "terminal task target conflicts with physical root", null);
+                            throw invariant("terminal task target conflicts with physical root", null);
                         }
                         roots.put(expectation.object(), root);
                         return loadRoots(expectations, index + 1, roots);
@@ -1073,8 +961,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
     }
 
     private static List<ObjectExpectation> expectations(
-            MaterializationTask task,
-            Optional<MaterializationOutput> output) {
+            MaterializationTask task, Optional<MaterializationOutput> output) {
         List<ObjectExpectation> values = new ArrayList<>();
         for (SourceGeneration source : task.sources()) {
             if (!(source.readTarget() instanceof ObjectSliceReadTarget target)) {
@@ -1091,11 +978,10 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                     : source.view() == ReadView.COMMITTED
                             ? PhysicalObjectKind.COMMITTED_COMPACTED
                             : PhysicalObjectKind.TOPIC_COMPACTED;
-            values.add(ObjectExpectation.source(
-                    target.objectKey(), target.objectId(), kind, requiredEnd));
+            values.add(ObjectExpectation.source(target.objectKey(), target.objectId(), kind, requiredEnd));
         }
-        output.ifPresent(value -> values.add(ObjectExpectation.exact(
-                MaterializationRecordMapper.physicalIdentity(value))));
+        output.ifPresent(
+                value -> values.add(ObjectExpectation.exact(MaterializationRecordMapper.physicalIdentity(value))));
         return List.copyOf(values);
     }
 
@@ -1113,8 +999,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                     new ProtectionKey(
                             ObjectKeyHash.from(target.objectKey()),
                             ObjectProtectionType.MATERIALIZATION_SOURCE,
-                            MaterializationProtectionIdentities.sourceReferenceId(
-                                    cluster, task, source)),
+                            MaterializationProtectionIdentities.sourceReferenceId(cluster, task, source)),
                     ProtectionRole.TEMPORARY);
         }
         if (output.isPresent()) {
@@ -1124,8 +1009,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                     new ProtectionKey(
                             value.objectKeyHash(),
                             ObjectProtectionType.MATERIALIZATION_OUTPUT,
-                            MaterializationProtectionIdentities.outputReferenceId(
-                                    cluster, task, value)),
+                            MaterializationProtectionIdentities.outputReferenceId(cluster, task, value)),
                     ProtectionRole.TEMPORARY);
         }
         if (visibleIndex.isPresent()) {
@@ -1146,10 +1030,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
         return Map.copyOf(result);
     }
 
-    private static void putExpected(
-            Map<ProtectionKey, ProtectionRole> values,
-            ProtectionKey key,
-            ProtectionRole role) {
+    private static void putExpected(Map<ProtectionKey, ProtectionRole> values, ProtectionKey key, ProtectionRole role) {
         ProtectionRole existing = values.putIfAbsent(key, role);
         if (existing != null && existing != role) {
             throw invariant("one protection identity has conflicting terminal roles", null);
@@ -1175,8 +1056,10 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 && value.sourceSetSha256().equals(task.sourceSetSha256().value())
                 && value.policySha256().equals(task.policyDigestSha256().value())
                 && value.readTarget().equals(encodedTarget)
-                && value.targetIdentitySha256().equals(output.targetIdentitySha256().value())
-                && value.materializationPolicySha256().equals(task.policyDigestSha256().value())
+                && value.targetIdentitySha256()
+                        .equals(output.targetIdentitySha256().value())
+                && value.materializationPolicySha256()
+                        .equals(task.policyDigestSha256().value())
                 && value.payloadFormat().equals(output.payloadFormat().name())
                 && value.sourceRecordCount() == output.sourceRecordCount()
                 && value.outputRecordCount() == output.outputRecordCount()
@@ -1187,13 +1070,10 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 && value.firstCommitVersion() == task.sources().get(0).commitVersion()
                 && value.lastCommitVersion() == task.taskSequence()
                 && value.schemaRefs().equals(output.schemaRefs())
-                && value.projectionRef().equals(
-                        MaterializationRecordMapper.projectionIdentity(output.projectionRef()));
+                && value.projectionRef().equals(MaterializationRecordMapper.projectionIdentity(output.projectionRef()));
     }
 
-    private static boolean checkpointCovers(
-            MaterializationTask task,
-            MaterializationCheckpointRecord checkpoint) {
+    private static boolean checkpointCovers(MaterializationTask task, MaterializationCheckpointRecord checkpoint) {
         return checkpoint.streamId().equals(task.streamId().value())
                 && checkpoint.policyId().equals(task.policy().policyId())
                 && checkpoint.policyVersion() == task.policy().policyVersion()
@@ -1204,34 +1084,29 @@ public final class DefaultTerminalWorkflowMetadataRetirer
     }
 
     private static boolean referencesTerminalTask(
-            VersionedMaterializationTask task,
-            Optional<MaterializationOutput> output,
-            VersionedGenerationIndex index) {
+            VersionedMaterializationTask task, Optional<MaterializationOutput> output, VersionedGenerationIndex index) {
         GenerationIndexRecord value = index.value();
-        if (value.lifecycle() != GenerationLifecycle.PREPARED
-                && value.lifecycle() != GenerationLifecycle.COMMITTED) {
+        if (value.lifecycle() != GenerationLifecycle.PREPARED && value.lifecycle() != GenerationLifecycle.COMMITTED) {
             return false;
         }
         return value.taskId().equals(task.value().taskId())
                 || output.isPresent()
-                        && (value.targetIdentitySha256().equals(
-                                        output.orElseThrow().targetIdentitySha256().value())
-                                || value.readTarget().equals(ReadTargetCodecRegistry.phase15()
-                                        .encode(output.orElseThrow().readTarget())));
+                        && (value.targetIdentitySha256()
+                                        .equals(output.orElseThrow()
+                                                .targetIdentitySha256()
+                                                .value())
+                                || value.readTarget()
+                                        .equals(ReadTargetCodecRegistry.phase15()
+                                                .encode(output.orElseThrow().readTarget())));
     }
 
-    private static boolean matchesStatsSource(
-            RangeRetentionStatsRecord stats,
-            VersionedGenerationCandidate source) {
+    private static boolean matchesStatsSource(RangeRetentionStatsRecord stats, VersionedGenerationCandidate source) {
         return source.key().equals(stats.sourceIndexKey())
                 && source.metadataVersion() == stats.sourceIndexMetadataVersion()
-                && source.durableValueSha256().value().equals(
-                        stats.sourceIndexIdentitySha256());
+                && source.durableValueSha256().value().equals(stats.sourceIndexIdentitySha256());
     }
 
-    private static boolean matchesOwner(
-            ObjectProtectionRecord record,
-            ObjectProtectionOwner owner) {
+    private static boolean matchesOwner(ObjectProtectionRecord record, ObjectProtectionOwner owner) {
         return record.ownerKey().equals(owner.ownerKey())
                 && record.ownerMetadataVersion() == owner.metadataVersion()
                 && record.ownerIdentitySha256().equals(owner.identitySha256().value());
@@ -1257,9 +1132,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 || lifecycle == TaskLifecycle.TERMINAL_FAILED;
     }
 
-    private static boolean sameTask(
-            VersionedMaterializationTask left,
-            VersionedMaterializationTask right) {
+    private static boolean sameTask(VersionedMaterializationTask left, VersionedMaterializationTask right) {
         return left.key().equals(right.key())
                 && left.metadataVersion() == right.metadataVersion()
                 && left.durableValueSha256().equals(right.durableValueSha256())
@@ -1276,18 +1149,14 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 });
     }
 
-    private static boolean sameRoot(
-            VersionedPhysicalObjectRoot left,
-            VersionedPhysicalObjectRoot right) {
+    private static boolean sameRoot(VersionedPhysicalObjectRoot left, VersionedPhysicalObjectRoot right) {
         return left.key().equals(right.key())
                 && left.metadataVersion() == right.metadataVersion()
                 && left.durableValueSha256().equals(right.durableValueSha256())
                 && left.value().equals(right.value());
     }
 
-    private static boolean sameProtection(
-            VersionedObjectProtection left,
-            VersionedObjectProtection right) {
+    private static boolean sameProtection(VersionedObjectProtection left, VersionedObjectProtection right) {
         return left.key().equals(right.key())
                 && left.metadataVersion() == right.metadataVersion()
                 && left.durableValueSha256().equals(right.durableValueSha256())
@@ -1295,8 +1164,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
     }
 
     private static boolean sameProviderProtection(
-            MaterializationSourceProtection left,
-            MaterializationSourceProtection right) {
+            MaterializationSourceProtection left, MaterializationSourceProtection right) {
         return left.targetType() == right.targetType()
                 && left.referenceId().equals(right.referenceId())
                 && left.owner().equals(right.owner())
@@ -1305,33 +1173,25 @@ public final class DefaultTerminalWorkflowMetadataRetirer
     }
 
     private static boolean sameOptionalIndex(
-            Optional<VersionedGenerationIndex> left,
-            Optional<VersionedGenerationIndex> right) {
+            Optional<VersionedGenerationIndex> left, Optional<VersionedGenerationIndex> right) {
         return left.isEmpty() && right.isEmpty()
-                || left.isPresent() && right.isPresent()
-                        && sameIndex(left.orElseThrow(), right.orElseThrow());
+                || left.isPresent() && right.isPresent() && sameIndex(left.orElseThrow(), right.orElseThrow());
     }
 
     private static boolean sameOptionalCheckpoint(
-            Optional<VersionedMaterializationCheckpoint> left,
-            Optional<VersionedMaterializationCheckpoint> right) {
+            Optional<VersionedMaterializationCheckpoint> left, Optional<VersionedMaterializationCheckpoint> right) {
         return left.isEmpty() && right.isEmpty()
-                || left.isPresent() && right.isPresent()
-                        && sameCheckpoint(left.orElseThrow(), right.orElseThrow());
+                || left.isPresent() && right.isPresent() && sameCheckpoint(left.orElseThrow(), right.orElseThrow());
     }
 
-    private static boolean sameIndex(
-            VersionedGenerationIndex left,
-            VersionedGenerationIndex right) {
+    private static boolean sameIndex(VersionedGenerationIndex left, VersionedGenerationIndex right) {
         return left.key().equals(right.key())
                 && left.metadataVersion() == right.metadataVersion()
                 && left.durableValueSha256().equals(right.durableValueSha256())
                 && left.value().equals(right.value());
     }
 
-    private static boolean sameStats(
-            VersionedRangeRetentionStats left,
-            VersionedRangeRetentionStats right) {
+    private static boolean sameStats(VersionedRangeRetentionStats left, VersionedRangeRetentionStats right) {
         return left.key().equals(right.key())
                 && left.metadataVersion() == right.metadataVersion()
                 && left.durableValueSha256().equals(right.durableValueSha256())
@@ -1339,8 +1199,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
     }
 
     private static boolean sameCheckpoint(
-            VersionedMaterializationCheckpoint left,
-            VersionedMaterializationCheckpoint right) {
+            VersionedMaterializationCheckpoint left, VersionedMaterializationCheckpoint right) {
         return left.key().equals(right.key())
                 && left.metadataVersion() == right.metadataVersion()
                 && left.durableValueSha256().equals(right.durableValueSha256())
@@ -1399,42 +1258,33 @@ public final class DefaultTerminalWorkflowMetadataRetirer
     }
 
     private static NereusException invariant(String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static NereusException condition(String message, Throwable cause) {
         return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message, cause);
     }
 
-    private record Pair<L, R>(L left, R right) {
-    }
+    private record Pair<L, R>(L left, R right) {}
 
-    private record OldPolicySnapshot(
-            boolean retirable,
-            List<TaskFingerprint> tasks,
-            List<IndexFingerprint> indexes) {
+    private record OldPolicySnapshot(boolean retirable, List<TaskFingerprint> tasks, List<IndexFingerprint> indexes) {
         private OldPolicySnapshot {
             tasks = List.copyOf(Objects.requireNonNull(tasks, "tasks"));
             indexes = List.copyOf(Objects.requireNonNull(indexes, "indexes"));
         }
     }
 
-    private record TaskFingerprint(
-            String key,
-            long metadataVersion,
-            String durableValueSha256) {
+    private record TaskFingerprint(String key, long metadataVersion, String durableValueSha256) {
         private static TaskFingerprint from(VersionedMaterializationTask task) {
             return new TaskFingerprint(
-                    task.key(), task.metadataVersion(), task.durableValueSha256().value());
+                    task.key(),
+                    task.metadataVersion(),
+                    task.durableValueSha256().value());
         }
     }
 
     private record IndexFingerprint(
-            String key,
-            long metadataVersion,
-            String durableValueSha256,
-            GenerationLifecycle lifecycle) {
+            String key, long metadataVersion, String durableValueSha256, GenerationLifecycle lifecycle) {
         private static IndexFingerprint from(VersionedGenerationIndex index) {
             return new IndexFingerprint(
                     index.key(),
@@ -1456,10 +1306,9 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             index = Objects.requireNonNull(index, "index");
             checkpoint = Objects.requireNonNull(checkpoint, "checkpoint");
             roots = Map.copyOf(Objects.requireNonNull(roots, "roots"));
-            temporaryProtections = List.copyOf(Objects.requireNonNull(
-                    temporaryProtections, "temporaryProtections"));
-            providerSourceProtections = List.copyOf(Objects.requireNonNull(
-                    providerSourceProtections, "providerSourceProtections"));
+            temporaryProtections = List.copyOf(Objects.requireNonNull(temporaryProtections, "temporaryProtections"));
+            providerSourceProtections =
+                    List.copyOf(Objects.requireNonNull(providerSourceProtections, "providerSourceProtections"));
         }
     }
 
@@ -1473,16 +1322,13 @@ public final class DefaultTerminalWorkflowMetadataRetirer
         }
     }
 
-    private record ProtectionAudit(
-            boolean valid,
-            List<VersionedObjectProtection> temporary) {
+    private record ProtectionAudit(boolean valid, List<VersionedObjectProtection> temporary) {
         private static final ProtectionAudit INVALID = new ProtectionAudit(false, List.of());
 
         private ProtectionAudit {
             temporary = List.copyOf(Objects.requireNonNull(temporary, "temporary"));
             if (!valid && !temporary.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "invalid protection audit cannot carry cleanup handles");
+                throw new IllegalArgumentException("invalid protection audit cannot carry cleanup handles");
             }
         }
     }
@@ -1492,10 +1338,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
         VISIBLE
     }
 
-    private record ProtectionKey(
-            ObjectKeyHash object,
-            ObjectProtectionType type,
-            String referenceId) {
+    private record ProtectionKey(ObjectKeyHash object, ObjectProtectionType type, String referenceId) {
         private ProtectionKey {
             Objects.requireNonNull(object, "object");
             Objects.requireNonNull(type, "type");
@@ -1521,13 +1364,8 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             exact = Objects.requireNonNull(exact, "exact");
         }
 
-        private static ObjectExpectation source(
-                ObjectKey key,
-                ObjectId id,
-                PhysicalObjectKind kind,
-                long requiredEnd) {
-            return new ObjectExpectation(
-                    ObjectKeyHash.from(key), key, id, kind, requiredEnd, Optional.empty());
+        private static ObjectExpectation source(ObjectKey key, ObjectId id, PhysicalObjectKind kind, long requiredEnd) {
+            return new ObjectExpectation(ObjectKeyHash.from(key), key, id, kind, requiredEnd, Optional.empty());
         }
 
         private static ObjectExpectation exact(PhysicalObjectIdentity identity) {

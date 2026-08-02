@@ -238,11 +238,11 @@ Transaction buffer stores records written by transactions before commit visibili
 
 Visibility:
 
-| Transaction state | `read_uncommitted` | normal Pulsar dispatch |
-| --- | --- | --- |
-| OPEN | optional/debug only | hidden |
-| COMMITTED | visible | visible |
-| ABORTED | hidden or abort marker only | hidden |
+| Transaction state | `read_uncommitted`          | normal Pulsar dispatch |
+|-------------------|-----------------------------|------------------------|
+| OPEN              | optional/debug only         | hidden                 |
+| COMMITTED         | visible                     | visible                |
+| ABORTED           | hidden or abort marker only | hidden                 |
 
 Reader must apply transaction visibility before dispatch.
 
@@ -276,11 +276,11 @@ Nereus must support Pulsar internal topics without circular dependency.
 
 Bootstrap options:
 
-| Option | Description | Tradeoff |
-| --- | --- | --- |
-| Classic bootstrap | keep selected system topics on existing storage during bootstrap | easiest migration, split storage |
-| Nereus self-hosted bootstrap | all system topics use `nereus` after Oxia is ready | clean target, harder boot order |
-| Hybrid bootstrap | minimal bootstrap metadata in Oxia, system topics later migrate to Nereus | balanced |
+| Option                       | Description                                                               | Tradeoff                         |
+|------------------------------|---------------------------------------------------------------------------|----------------------------------|
+| Classic bootstrap            | keep selected system topics on existing storage during bootstrap          | easiest migration, split storage |
+| Nereus self-hosted bootstrap | all system topics use `nereus` after Oxia is ready                        | clean target, harder boot order  |
+| Hybrid bootstrap             | minimal bootstrap metadata in Oxia, system topics later migrate to Nereus | balanced                         |
 
 Recommended default:
 
@@ -369,16 +369,16 @@ discardable and must be invalidated through notifications.
 
 ## 15. Failure Model
 
-| Failure | Expected behavior |
-| --- | --- |
-| Broker crashes during Key_Shared rebalance | New broker recovers assignment epoch and cursor state |
-| Broker crashes with delayed timers in memory | Timers rebuild from delayed index |
-| Pending ack txn CAS loses before commit decision | Refresh and retry or abort from `OPEN`；after `COMMITTING`, recovery must finish the idempotent cursor apply and terminal commit |
-| Transaction buffer marker missing | Reader keeps records hidden until transaction state resolves |
-| Replicated subscription update duplicated | Target applies idempotently by source offset/version |
-| System topic bootstrap interrupted | Bootstrap state resumes from Oxia stage marker |
-| Topic compaction publish succeeds before broker response | New generation visible; retry is idempotent |
-| Geo-replication target write succeeds but state update fails | Repair uses source offset range dedup key |
+| Failure                                                      | Expected behavior                                                                                                               |
+|--------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| Broker crashes during Key_Shared rebalance                   | New broker recovers assignment epoch and cursor state                                                                           |
+| Broker crashes with delayed timers in memory                 | Timers rebuild from delayed index                                                                                               |
+| Pending ack txn CAS loses before commit decision             | Refresh and retry or abort from `OPEN`；after `COMMITTING`, recovery must finish the idempotent cursor apply and terminal commit |
+| Transaction buffer marker missing                            | Reader keeps records hidden until transaction state resolves                                                                    |
+| Replicated subscription update duplicated                    | Target applies idempotently by source offset/version                                                                            |
+| System topic bootstrap interrupted                           | Bootstrap state resumes from Oxia stage marker                                                                                  |
+| Topic compaction publish succeeds before broker response     | New generation visible; retry is idempotent                                                                                     |
+| Geo-replication target write succeeds but state update fails | Repair uses source offset range dedup key                                                                                       |
 
 ## 16. Compatibility Impact
 

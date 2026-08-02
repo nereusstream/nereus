@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.api.Checksum;
@@ -23,7 +24,9 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.TreeMap;
 
-/** Canonical root hydration plus inline/snapshot persistence selection. */
+/**
+ * Canonical root hydration plus inline/snapshot persistence selection.
+ */
 public final class CursorStatePersistencePlanner {
     private static final String PREFLIGHT_SNAPSHOT_ID = "00000000000000000000000000000000";
 
@@ -50,19 +53,15 @@ public final class CursorStatePersistencePlanner {
         if (referenced != snapshotBase.isPresent()) {
             throw corruption("cursor snapshot bytes do not match root reference presence");
         }
-        CursorIdentity identity = new CursorIdentity(
-                expectedLedger,
-                root.cursorName(),
-                root.cursorNameHash(),
-                root.cursorGeneration());
+        CursorIdentity identity =
+                new CursorIdentity(expectedLedger, root.cursorName(), root.cursorNameHash(), root.cursorGeneration());
         Optional<CursorSnapshotReference> reference =
                 root.snapshotReference().map(CursorStatePersistencePlanner::fromRecord);
         CursorAckState effective;
         if (root.lifecycle() == CursorRecordLifecycle.DELETED) {
             effective = CursorAckState.empty(root.markDeleteOffset());
         } else {
-            CursorAckState base = snapshotBase.orElseGet(
-                    () -> CursorAckState.empty(root.markDeleteOffset()));
+            CursorAckState base = snapshotBase.orElseGet(() -> CursorAckState.empty(root.markDeleteOffset()));
             effective = applyRootDelta(root, base);
         }
         return new HydratedState(
@@ -92,14 +91,9 @@ public final class CursorStatePersistencePlanner {
         requireSuccessor(current.state(), candidate);
 
         RootDelta delta = selectInlineDelta(current, candidate);
-        CursorStateRecord inline = toRecord(
-                candidate,
-                candidate.snapshotReference(),
-                delta.ranges(),
-                delta.partials());
+        CursorStateRecord inline = toRecord(candidate, candidate.snapshotReference(), delta.ranges(), delta.partials());
         int inlineEncodedBytes = encodedBytes(inline);
-        int plannedRootMax = config.cursorMetadataValueMaxBytes()
-                - config.cursorMetadataSafetyMarginBytes();
+        int plannedRootMax = config.cursorMetadataValueMaxBytes() - config.cursorMetadataSafetyMarginBytes();
         if (delta.compatible() && delta.ranges().isEmpty() && delta.partials().isEmpty()) {
             if (inlineEncodedBytes > plannedRootMax) {
                 throw new IllegalArgumentException(
@@ -108,10 +102,8 @@ public final class CursorStatePersistencePlanner {
             return new InlinePlan(inline);
         }
         boolean thresholdExceeded = !delta.compatible()
-                || inlineAckBytes(delta.ranges(), delta.partials())
-                        > config.cursorInlineAckMaxBytes()
-                || delta.ranges().size() + delta.partials().size()
-                        > config.cursorInlineDeltaMaxCount()
+                || inlineAckBytes(delta.ranges(), delta.partials()) > config.cursorInlineAckMaxBytes()
+                || delta.ranges().size() + delta.partials().size() > config.cursorInlineDeltaMaxCount()
                 || inlineEncodedBytes > plannedRootMax;
         if (!thresholdExceeded) {
             return new InlinePlan(inline);
@@ -125,8 +117,8 @@ public final class CursorStatePersistencePlanner {
                 candidate.mutationSequence(),
                 candidate.acknowledgements(),
                 candidate.updatedAtMillis());
-        CursorSnapshotCodecV1.EncodedSnapshot preflight = CursorSnapshotCodecV1.encode(
-                request, PREFLIGHT_SNAPSHOT_ID, config);
+        CursorSnapshotCodecV1.EncodedSnapshot preflight =
+                CursorSnapshotCodecV1.encode(request, PREFLIGHT_SNAPSHOT_ID, config);
         CursorSnapshotReference placeholder = new CursorSnapshotReference(
                 snapshotObjectKey(candidate.identity(), PREFLIGHT_SNAPSHOT_ID),
                 PREFLIGHT_SNAPSHOT_ID,
@@ -138,8 +130,7 @@ public final class CursorStatePersistencePlanner {
                 preflight.formatCrc32c(),
                 1,
                 candidate.updatedAtMillis());
-        CursorStateRecord referenced = toRecord(
-                candidate, Optional.of(placeholder), List.of(), List.of());
+        CursorStateRecord referenced = toRecord(candidate, Optional.of(placeholder), List.of(), List.of());
         int referencedBytes = encodedBytes(referenced);
         if (referencedBytes > plannedRootMax) {
             throw new IllegalArgumentException(
@@ -148,12 +139,10 @@ public final class CursorStatePersistencePlanner {
         return new SnapshotPlan(request);
     }
 
-    public CursorStateRecord afterSnapshot(
-            CursorState candidate, CursorSnapshotReference reference) {
+    public CursorStateRecord afterSnapshot(CursorState candidate, CursorSnapshotReference reference) {
         Objects.requireNonNull(candidate, "candidate");
         Objects.requireNonNull(reference, "reference");
-        CursorStateRecord record = toRecord(
-                candidate, Optional.of(reference), List.of(), List.of());
+        CursorStateRecord record = toRecord(candidate, Optional.of(reference), List.of(), List.of());
         if (encodedBytes(record) > config.cursorMetadataValueMaxBytes()) {
             throw new IllegalArgumentException("cursor snapshot root exceeds the metadata hard bound");
         }
@@ -161,9 +150,7 @@ public final class CursorStatePersistencePlanner {
     }
 
     public CursorState persisted(
-            CursorState candidate,
-            Optional<CursorSnapshotReference> reference,
-            long metadataVersion) {
+            CursorState candidate, Optional<CursorSnapshotReference> reference, long metadataVersion) {
         Objects.requireNonNull(candidate, "candidate");
         return new CursorState(
                 candidate.identity(),
@@ -204,13 +191,12 @@ public final class CursorStatePersistencePlanner {
                     toPartialRecords(candidate.acknowledgements().partialBatchAcks()),
                     true);
         }
-        CursorAckState base = current.snapshotBase().orElseThrow(
-                () -> corruption("referenced cursor lacks hydrated snapshot base"));
+        CursorAckState base =
+                current.snapshotBase().orElseThrow(() -> corruption("referenced cursor lacks hydrated snapshot base"));
         return deltaFromSnapshot(base, candidate.acknowledgements());
     }
 
-    private static RootDelta deltaFromSnapshot(
-            CursorAckState snapshot, CursorAckState candidate) {
+    private static RootDelta deltaFromSnapshot(CursorAckState snapshot, CursorAckState candidate) {
         if (candidate.markDeleteOffset() < snapshot.markDeleteOffset()) {
             return RootDelta.incompatible();
         }
@@ -218,11 +204,9 @@ public final class CursorStatePersistencePlanner {
         if (!baseIsSubsumed(clipped, candidate)) {
             return RootDelta.incompatible();
         }
-        List<OffsetRange> addedRanges = subtractRanges(
-                candidate.wholeAckRanges(), clipped.wholeAckRanges());
+        List<OffsetRange> addedRanges = subtractRanges(candidate.wholeAckRanges(), clipped.wholeAckRanges());
         List<CursorPartialBatchAckRecord> overrides = new ArrayList<>();
-        for (Map.Entry<Long, BatchAckState> entry :
-                candidate.partialBatchAcks().entrySet()) {
+        for (Map.Entry<Long, BatchAckState> entry : candidate.partialBatchAcks().entrySet()) {
             BatchAckState base = clipped.partialBatchAcks().get(entry.getKey());
             if (!entry.getValue().equals(base)) {
                 overrides.add(toPartialRecord(entry.getKey(), entry.getValue()));
@@ -272,23 +256,19 @@ public final class CursorStatePersistencePlanner {
         return cursor >= expected.endOffset();
     }
 
-    private static List<OffsetRange> subtractRanges(
-            List<OffsetRange> candidate, List<OffsetRange> base) {
+    private static List<OffsetRange> subtractRanges(List<OffsetRange> candidate, List<OffsetRange> base) {
         List<OffsetRange> result = new ArrayList<>();
         int baseIndex = 0;
         for (OffsetRange range : candidate) {
             long cursor = range.startOffset();
-            while (baseIndex < base.size()
-                    && base.get(baseIndex).endOffset() <= cursor) {
+            while (baseIndex < base.size() && base.get(baseIndex).endOffset() <= cursor) {
                 baseIndex++;
             }
             int scan = baseIndex;
-            while (scan < base.size()
-                    && base.get(scan).startOffset() < range.endOffset()) {
+            while (scan < base.size() && base.get(scan).startOffset() < range.endOffset()) {
                 OffsetRange covered = base.get(scan);
                 if (covered.startOffset() > cursor) {
-                    result.add(new OffsetRange(
-                            cursor, Math.min(covered.startOffset(), range.endOffset())));
+                    result.add(new OffsetRange(cursor, Math.min(covered.startOffset(), range.endOffset())));
                 }
                 cursor = Math.max(cursor, covered.endOffset());
                 if (cursor >= range.endOffset()) {
@@ -303,8 +283,7 @@ public final class CursorStatePersistencePlanner {
         return List.copyOf(result);
     }
 
-    private static CursorAckState applyRootDelta(
-            CursorStateRecord root, CursorAckState snapshot) {
+    private static CursorAckState applyRootDelta(CursorStateRecord root, CursorAckState snapshot) {
         if (snapshot.markDeleteOffset() > root.markDeleteOffset()) {
             throw corruption("snapshot mark-delete is ahead of the cursor root");
         }
@@ -313,15 +292,13 @@ public final class CursorStatePersistencePlanner {
             throw corruption("snapshot range should have been folded into the cursor root mark-delete");
         }
         List<OffsetRange> ranges = new ArrayList<>(clipped.wholeAckRanges());
-        root.inlineWholeAckDeltas().forEach(range ->
-                ranges.add(new OffsetRange(range.startOffset(), range.endOffset())));
-        NavigableMap<Long, BatchAckState> partials =
-                new TreeMap<>(clipped.partialBatchAcks());
-        root.inlinePartialAckOverrides().forEach(partial -> partials.put(
-                partial.entryOffset(),
-                new BatchAckState(partial.batchSize(), partial.remainingWords())));
-        CursorAckState effective = new CursorAckState(
-                root.markDeleteOffset(), ranges, partials);
+        root.inlineWholeAckDeltas()
+                .forEach(range -> ranges.add(new OffsetRange(range.startOffset(), range.endOffset())));
+        NavigableMap<Long, BatchAckState> partials = new TreeMap<>(clipped.partialBatchAcks());
+        root.inlinePartialAckOverrides()
+                .forEach(partial -> partials.put(
+                        partial.entryOffset(), new BatchAckState(partial.batchSize(), partial.remainingWords())));
+        CursorAckState effective = new CursorAckState(root.markDeleteOffset(), ranges, partials);
         if (effective.markDeleteOffset() != root.markDeleteOffset()) {
             throw corruption("cursor root mark-delete is not canonical with its snapshot delta");
         }
@@ -337,8 +314,7 @@ public final class CursorStatePersistencePlanner {
             if (range.endOffset() <= markDeleteOffset) {
                 continue;
             }
-            ranges.add(new OffsetRange(
-                    Math.max(markDeleteOffset, range.startOffset()), range.endOffset()));
+            ranges.add(new OffsetRange(Math.max(markDeleteOffset, range.startOffset()), range.endOffset()));
         }
         NavigableMap<Long, BatchAckState> partials =
                 new TreeMap<>(state.partialBatchAcks().tailMap(markDeleteOffset, true));
@@ -381,31 +357,30 @@ public final class CursorStatePersistencePlanner {
         }
     }
 
-    private static long inlineAckBytes(
-            List<CursorAckRangeRecord> ranges,
-            List<CursorPartialBatchAckRecord> partials) {
+    private static long inlineAckBytes(List<CursorAckRangeRecord> ranges, List<CursorPartialBatchAckRecord> partials) {
         long bytes = Integer.BYTES * 2L + ranges.size() * (Long.BYTES * 2L);
         for (CursorPartialBatchAckRecord partial : partials) {
             bytes = Math.addExact(
                     bytes,
-                    Long.BYTES + Integer.BYTES * 2L
+                    Long.BYTES
+                            + Integer.BYTES * 2L
                             + Math.multiplyExact((long) partial.remainingWords().length, Long.BYTES));
         }
         return bytes;
     }
 
     private ObjectKey snapshotObjectKey(CursorIdentity identity, String snapshotId) {
-        return new ObjectKey(
-                KeyComponentCodec.encodeComponent(cluster)
-                        + "/cursor-snapshots/v1/"
-                        + KeyComponentCodec.encodeComponent(identity.ledger().projection().streamId())
-                        + "/"
-                        + identity.cursorNameHash()
-                        + "/"
-                        + KeyComponentCodec.encodeNonNegativeLong(identity.cursorGeneration())
-                        + "/"
-                        + snapshotId
-                        + ".ncs");
+        return new ObjectKey(KeyComponentCodec.encodeComponent(cluster)
+                + "/cursor-snapshots/v1/"
+                + KeyComponentCodec.encodeComponent(
+                        identity.ledger().projection().streamId())
+                + "/"
+                + identity.cursorNameHash()
+                + "/"
+                + KeyComponentCodec.encodeNonNegativeLong(identity.cursorGeneration())
+                + "/"
+                + snapshotId
+                + ".ncs");
     }
 
     private static CursorSnapshotReference fromRecord(CursorSnapshotReferenceRecord reference) {
@@ -416,9 +391,7 @@ public final class CursorStatePersistencePlanner {
                 reference.sourceMutationSequence(),
                 reference.baseMarkDeleteOffset(),
                 reference.objectLength(),
-                new Checksum(
-                        ChecksumType.valueOf(reference.storageChecksumType()),
-                        reference.storageChecksumValue()),
+                new Checksum(ChecksumType.valueOf(reference.storageChecksumType()), reference.storageChecksumValue()),
                 reference.formatCrc32c(),
                 reference.formatVersion(),
                 reference.createdAtMillis());
@@ -434,17 +407,14 @@ public final class CursorStatePersistencePlanner {
                 .toList();
     }
 
-    private static List<CursorPartialBatchAckRecord> toPartialRecords(
-            NavigableMap<Long, BatchAckState> partials) {
+    private static List<CursorPartialBatchAckRecord> toPartialRecords(NavigableMap<Long, BatchAckState> partials) {
         return partials.entrySet().stream()
                 .map(entry -> toPartialRecord(entry.getKey(), entry.getValue()))
                 .toList();
     }
 
-    private static CursorPartialBatchAckRecord toPartialRecord(
-            long offset, BatchAckState state) {
-        return new CursorPartialBatchAckRecord(
-                offset, state.batchSize(), state.remainingWords());
+    private static CursorPartialBatchAckRecord toPartialRecord(long offset, BatchAckState state) {
+        return new CursorPartialBatchAckRecord(offset, state.batchSize(), state.remainingWords());
     }
 
     private static void requireSuccessor(CursorState current, CursorState candidate) {
@@ -456,15 +426,11 @@ public final class CursorStatePersistencePlanner {
         }
     }
 
-    private static CursorSnapshotCodecV1.CursorSnapshotCorruptionException corruption(
-            String message) {
+    private static CursorSnapshotCodecV1.CursorSnapshotCorruptionException corruption(String message) {
         return new CursorSnapshotCodecV1.CursorSnapshotCorruptionException(message);
     }
 
-    public record HydratedState(
-            VersionedCursorState root,
-            CursorState state,
-            Optional<CursorAckState> snapshotBase) {
+    public record HydratedState(VersionedCursorState root, CursorState state, Optional<CursorAckState> snapshotBase) {
         public HydratedState {
             Objects.requireNonNull(root, "root");
             Objects.requireNonNull(state, "state");
@@ -472,8 +438,7 @@ public final class CursorStatePersistencePlanner {
         }
     }
 
-    public sealed interface PersistencePlan permits InlinePlan, SnapshotPlan {
-    }
+    public sealed interface PersistencePlan permits InlinePlan, SnapshotPlan {}
 
     public record InlinePlan(CursorStateRecord record) implements PersistencePlan {
         public InlinePlan {
@@ -488,9 +453,7 @@ public final class CursorStatePersistencePlanner {
     }
 
     private record RootDelta(
-            List<CursorAckRangeRecord> ranges,
-            List<CursorPartialBatchAckRecord> partials,
-            boolean compatible) {
+            List<CursorAckRangeRecord> ranges, List<CursorPartialBatchAckRecord> partials, boolean compatible) {
         private RootDelta {
             ranges = List.copyOf(ranges);
             partials = List.copyOf(partials);

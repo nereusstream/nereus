@@ -41,141 +41,127 @@ import java.util.Optional;
  * binding activates it, this planner never emits a COMMITTED segment below its exclusive end.
  */
 public final class KafkaCompactedFetchPlanner {
-  public Plan plan(
-      KafkaPartitionIdentity identity,
-      StreamId streamId,
-      KafkaStableSnapshot stableSnapshot,
-      KafkaStorageReadRequest request,
-      VersionedKafkaPartitionBinding binding) {
-    Objects.requireNonNull(identity, "identity");
-    Objects.requireNonNull(streamId, "streamId");
-    Objects.requireNonNull(stableSnapshot, "stableSnapshot");
-    Objects.requireNonNull(request, "request");
-    VersionedKafkaPartitionBinding exactBinding = Objects.requireNonNull(binding, "binding");
-    KafkaPartitionBindingRecord root = exactBinding.value();
-    if (!root.identity().equals(identity.durableId())
-        || !root.streamId().equals(streamId.value())
-        || root.lifecycle() != KafkaPartitionLifecycle.ACTIVE) {
-      throw invariant("Kafka Fetch binding does not identify the exact ACTIVE partition stream");
-    }
-    long authoritativeLogStart =
-        Math.max(stableSnapshot.logStartOffset(), root.observedLogStartOffset());
-    if (request.startOffset() < authoritativeLogStart) {
-      throw new NereusException(
-          ErrorCode.OFFSET_TRIMMED,
-          false,
-          "Kafka Fetch offset precedes the authoritative partition log start");
-    }
-    long upperBound = Math.min(request.maxOffsetExclusive(), stableSnapshot.stableEndOffset());
-    if (request.startOffset() >= upperBound) {
-      return new Plan(
-          exactBinding, new OffsetRange(request.startOffset(), request.startOffset()), List.of());
-    }
-
-    KafkaCompactionCoverageRecord coverage = root.compactionCoverage();
-    ArrayList<Segment> segments = new ArrayList<>(2);
-    long cursor = request.startOffset();
-    if (coverage.coverageVersion() != 0 && cursor < coverage.endOffset()) {
-      if (coverage.startOffset() > authoritativeLogStart
-          || coverage.endOffset() > stableSnapshot.stableEndOffset()) {
-        throw invariant(
-            "Kafka mandatory compaction coverage is outside the readable partition window");
-      }
-      long compactedEnd = Math.min(coverage.endOffset(), upperBound);
-      segments.add(
-          new Segment(
-              ReadView.TOPIC_COMPACTED,
-              new OffsetRange(cursor, compactedEnd),
-              Optional.of(
-                  new MandatoryAuthority(
-                      coverage.activationEpoch(),
-                      sha256(coverage.generationSetSha256()),
-                      sha256(coverage.policySha256())))));
-      cursor = compactedEnd;
-    }
-    if (cursor < upperBound) {
-      segments.add(
-          new Segment(ReadView.COMMITTED, new OffsetRange(cursor, upperBound), Optional.empty()));
-    }
-    return new Plan(exactBinding, new OffsetRange(request.startOffset(), upperBound), segments);
-  }
-
-  public Plan committedOnly(KafkaStableSnapshot stableSnapshot, KafkaStorageReadRequest request) {
-    Objects.requireNonNull(stableSnapshot, "stableSnapshot");
-    Objects.requireNonNull(request, "request");
-    if (request.startOffset() < stableSnapshot.logStartOffset()) {
-      throw new NereusException(
-          ErrorCode.OFFSET_TRIMMED, false, "Kafka Fetch offset precedes the partition log start");
-    }
-    long upperBound = Math.min(request.maxOffsetExclusive(), stableSnapshot.stableEndOffset());
-    OffsetRange range =
-        new OffsetRange(request.startOffset(), Math.max(request.startOffset(), upperBound));
-    List<Segment> segments =
-        range.isEmpty()
-            ? List.of()
-            : List.of(new Segment(ReadView.COMMITTED, range, Optional.empty()));
-    return new Plan(null, range, segments);
-  }
-
-  public record Plan(
-      VersionedKafkaPartitionBinding binding, OffsetRange requestRange, List<Segment> segments) {
-    public Plan {
-      Objects.requireNonNull(requestRange, "requestRange");
-      segments = List.copyOf(Objects.requireNonNull(segments, "segments"));
-      long cursor = requestRange.startOffset();
-      boolean committedSeen = false;
-      for (Segment segment : segments) {
-        if (segment.range().startOffset() != cursor
-            || segment.range().endOffset() > requestRange.endOffset()
-            || (committedSeen && segment.view() != ReadView.COMMITTED)) {
-          throw new IllegalArgumentException(
-              "Kafka Fetch plan segments must be ordered, gap-free and view-monotonic");
+    public Plan plan(
+            KafkaPartitionIdentity identity,
+            StreamId streamId,
+            KafkaStableSnapshot stableSnapshot,
+            KafkaStorageReadRequest request,
+            VersionedKafkaPartitionBinding binding) {
+        Objects.requireNonNull(identity, "identity");
+        Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(stableSnapshot, "stableSnapshot");
+        Objects.requireNonNull(request, "request");
+        VersionedKafkaPartitionBinding exactBinding = Objects.requireNonNull(binding, "binding");
+        KafkaPartitionBindingRecord root = exactBinding.value();
+        if (!root.identity().equals(identity.durableId())
+                || !root.streamId().equals(streamId.value())
+                || root.lifecycle() != KafkaPartitionLifecycle.ACTIVE) {
+            throw invariant("Kafka Fetch binding does not identify the exact ACTIVE partition stream");
         }
-        committedSeen |= segment.view() == ReadView.COMMITTED;
-        cursor = segment.range().endOffset();
-      }
-      if (cursor != requestRange.endOffset()) {
-        throw new IllegalArgumentException(
-            "Kafka Fetch plan does not cover the requested readable range");
-      }
+        long authoritativeLogStart = Math.max(stableSnapshot.logStartOffset(), root.observedLogStartOffset());
+        if (request.startOffset() < authoritativeLogStart) {
+            throw new NereusException(
+                    ErrorCode.OFFSET_TRIMMED,
+                    false,
+                    "Kafka Fetch offset precedes the authoritative partition log start");
+        }
+        long upperBound = Math.min(request.maxOffsetExclusive(), stableSnapshot.stableEndOffset());
+        if (request.startOffset() >= upperBound) {
+            return new Plan(exactBinding, new OffsetRange(request.startOffset(), request.startOffset()), List.of());
+        }
+
+        KafkaCompactionCoverageRecord coverage = root.compactionCoverage();
+        ArrayList<Segment> segments = new ArrayList<>(2);
+        long cursor = request.startOffset();
+        if (coverage.coverageVersion() != 0 && cursor < coverage.endOffset()) {
+            if (coverage.startOffset() > authoritativeLogStart
+                    || coverage.endOffset() > stableSnapshot.stableEndOffset()) {
+                throw invariant("Kafka mandatory compaction coverage is outside the readable partition window");
+            }
+            long compactedEnd = Math.min(coverage.endOffset(), upperBound);
+            segments.add(new Segment(
+                    ReadView.TOPIC_COMPACTED,
+                    new OffsetRange(cursor, compactedEnd),
+                    Optional.of(new MandatoryAuthority(
+                            coverage.activationEpoch(),
+                            sha256(coverage.generationSetSha256()),
+                            sha256(coverage.policySha256())))));
+            cursor = compactedEnd;
+        }
+        if (cursor < upperBound) {
+            segments.add(new Segment(ReadView.COMMITTED, new OffsetRange(cursor, upperBound), Optional.empty()));
+        }
+        return new Plan(exactBinding, new OffsetRange(request.startOffset(), upperBound), segments);
     }
 
-    public boolean hasMandatoryCompactedPrefix() {
-      return !segments.isEmpty() && segments.get(0).view() == ReadView.TOPIC_COMPACTED;
+    public Plan committedOnly(KafkaStableSnapshot stableSnapshot, KafkaStorageReadRequest request) {
+        Objects.requireNonNull(stableSnapshot, "stableSnapshot");
+        Objects.requireNonNull(request, "request");
+        if (request.startOffset() < stableSnapshot.logStartOffset()) {
+            throw new NereusException(
+                    ErrorCode.OFFSET_TRIMMED, false, "Kafka Fetch offset precedes the partition log start");
+        }
+        long upperBound = Math.min(request.maxOffsetExclusive(), stableSnapshot.stableEndOffset());
+        OffsetRange range = new OffsetRange(request.startOffset(), Math.max(request.startOffset(), upperBound));
+        List<Segment> segments =
+                range.isEmpty() ? List.of() : List.of(new Segment(ReadView.COMMITTED, range, Optional.empty()));
+        return new Plan(null, range, segments);
     }
-  }
 
-  public record Segment(
-      ReadView view, OffsetRange range, Optional<MandatoryAuthority> mandatoryAuthority) {
-    public Segment {
-      Objects.requireNonNull(view, "view");
-      Objects.requireNonNull(range, "range");
-      mandatoryAuthority = Objects.requireNonNull(mandatoryAuthority, "mandatoryAuthority");
-      if (range.isEmpty() || (view == ReadView.TOPIC_COMPACTED) != mandatoryAuthority.isPresent()) {
-        throw new IllegalArgumentException(
-            "Kafka Fetch segment view and mandatory authority are inconsistent");
-      }
+    public record Plan(VersionedKafkaPartitionBinding binding, OffsetRange requestRange, List<Segment> segments) {
+        public Plan {
+            Objects.requireNonNull(requestRange, "requestRange");
+            segments = List.copyOf(Objects.requireNonNull(segments, "segments"));
+            long cursor = requestRange.startOffset();
+            boolean committedSeen = false;
+            for (Segment segment : segments) {
+                if (segment.range().startOffset() != cursor
+                        || segment.range().endOffset() > requestRange.endOffset()
+                        || (committedSeen && segment.view() != ReadView.COMMITTED)) {
+                    throw new IllegalArgumentException(
+                            "Kafka Fetch plan segments must be ordered, gap-free and view-monotonic");
+                }
+                committedSeen |= segment.view() == ReadView.COMMITTED;
+                cursor = segment.range().endOffset();
+            }
+            if (cursor != requestRange.endOffset()) {
+                throw new IllegalArgumentException("Kafka Fetch plan does not cover the requested readable range");
+            }
+        }
+
+        public boolean hasMandatoryCompactedPrefix() {
+            return !segments.isEmpty() && segments.get(0).view() == ReadView.TOPIC_COMPACTED;
+        }
     }
-  }
 
-  public record MandatoryAuthority(
-      long activationEpoch, Checksum generationSetSha256, Checksum policySha256) {
-    public MandatoryAuthority {
-      Objects.requireNonNull(generationSetSha256, "generationSetSha256");
-      Objects.requireNonNull(policySha256, "policySha256");
-      if (activationEpoch <= 0
-          || generationSetSha256.type() != ChecksumType.SHA256
-          || policySha256.type() != ChecksumType.SHA256) {
-        throw new IllegalArgumentException("invalid Kafka mandatory compaction read authority");
-      }
+    public record Segment(ReadView view, OffsetRange range, Optional<MandatoryAuthority> mandatoryAuthority) {
+        public Segment {
+            Objects.requireNonNull(view, "view");
+            Objects.requireNonNull(range, "range");
+            mandatoryAuthority = Objects.requireNonNull(mandatoryAuthority, "mandatoryAuthority");
+            if (range.isEmpty() || (view == ReadView.TOPIC_COMPACTED) != mandatoryAuthority.isPresent()) {
+                throw new IllegalArgumentException("Kafka Fetch segment view and mandatory authority are inconsistent");
+            }
+        }
     }
-  }
 
-  private static Checksum sha256(byte[] value) {
-    return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(value));
-  }
+    public record MandatoryAuthority(long activationEpoch, Checksum generationSetSha256, Checksum policySha256) {
+        public MandatoryAuthority {
+            Objects.requireNonNull(generationSetSha256, "generationSetSha256");
+            Objects.requireNonNull(policySha256, "policySha256");
+            if (activationEpoch <= 0
+                    || generationSetSha256.type() != ChecksumType.SHA256
+                    || policySha256.type() != ChecksumType.SHA256) {
+                throw new IllegalArgumentException("invalid Kafka mandatory compaction read authority");
+            }
+        }
+    }
 
-  private static NereusException invariant(String message) {
-    return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
-  }
+    private static Checksum sha256(byte[] value) {
+        return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(value));
+    }
+
+    private static NereusException invariant(String message) {
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+    }
 }

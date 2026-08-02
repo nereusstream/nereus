@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import static com.nereusstream.core.physical.ObjectProtectionTestSupport.CLUSTER;
@@ -10,7 +11,6 @@ import static com.nereusstream.core.physical.ObjectProtectionTestSupport.permane
 import static com.nereusstream.core.physical.ObjectProtectionTestSupport.unwrap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKeyHash;
@@ -28,19 +28,18 @@ class ObjectReferenceHandshakeModelTest {
     @Test
     void rootLossAfterCreatePreventsAdmissionAndCleansTheKnownNewProtection() {
         PostCreateRootLossStore store = new PostCreateRootLossStore();
-        DefaultObjectProtectionManager manager = manager(
-                store, new ObjectProtectionTestSupport.MutableClock(NOW));
+        DefaultObjectProtectionManager manager = manager(store, new ObjectProtectionTestSupport.MutableClock(NOW));
         ObjectProtectionRequest request = permanent(owner("b", 20));
         AtomicInteger ownerChecks = new AtomicInteger();
 
         assertThatThrownBy(() -> manager.acquire(request, ignored -> {
-                    ownerChecks.incrementAndGet();
-                    return CompletableFuture.completedFuture(null);
-                }).join())
+                            ownerChecks.incrementAndGet();
+                            return CompletableFuture.completedFuture(null);
+                        })
+                        .join())
                 .satisfies(error -> assertThat(unwrap(error))
-                        .isInstanceOfSatisfying(NereusException.class, nereus ->
-                                assertThat(nereus.code()).isEqualTo(
-                                        ErrorCode.METADATA_CONDITION_FAILED)));
+                        .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                                .isEqualTo(ErrorCode.METADATA_CONDITION_FAILED)));
 
         assertThat(ownerChecks.get()).isZero();
         assertThat(store.protection(CLUSTER, request.identity())).isEmpty();
@@ -49,38 +48,33 @@ class ObjectReferenceHandshakeModelTest {
     @Test
     void lostCreateResponseNeverClaimsExclusiveCleanupOwnership() {
         LostCreateResponseStore store = new LostCreateResponseStore();
-        DefaultObjectProtectionManager manager = manager(
-                store, new ObjectProtectionTestSupport.MutableClock(NOW));
+        DefaultObjectProtectionManager manager = manager(store, new ObjectProtectionTestSupport.MutableClock(NOW));
         ObjectProtectionRequest request = permanent(owner("c", 21));
-        NereusException stale = new NereusException(
-                ErrorCode.METADATA_CONDITION_FAILED,
-                true,
-                "owner post-check failed");
+        NereusException stale =
+                new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, "owner post-check failed");
 
-        assertThatThrownBy(() -> manager.acquire(
-                        request,
-                        ignored -> CompletableFuture.failedFuture(stale)).join())
+        assertThatThrownBy(() -> manager.acquire(request, ignored -> CompletableFuture.failedFuture(stale))
+                        .join())
                 .satisfies(error -> assertThat(unwrap(error)).isSameAs(stale));
 
         assertThat(store.protection(CLUSTER, request.identity())).isPresent();
 
-        ObjectProtection recovered = manager.acquire(
-                request, ignored -> CompletableFuture.completedFuture(null)).join();
-        manager.release(
-                recovered, ignored -> CompletableFuture.completedFuture(null)).join();
+        ObjectProtection recovered = manager.acquire(request, ignored -> CompletableFuture.completedFuture(null))
+                .join();
+        manager.release(recovered, ignored -> CompletableFuture.completedFuture(null))
+                .join();
     }
 
     @Test
     void lostDeleteResponseIsSuccessOnlyAfterExactAbsenceIsObserved() {
         LostDeleteResponseStore store = new LostDeleteResponseStore();
-        DefaultObjectProtectionManager manager = manager(
-                store, new ObjectProtectionTestSupport.MutableClock(NOW));
+        DefaultObjectProtectionManager manager = manager(store, new ObjectProtectionTestSupport.MutableClock(NOW));
         ObjectProtection protection = manager.acquire(
-                permanent(owner("d", 22)),
-                ignored -> CompletableFuture.completedFuture(null)).join();
+                        permanent(owner("d", 22)), ignored -> CompletableFuture.completedFuture(null))
+                .join();
 
-        manager.release(
-                protection, ignored -> CompletableFuture.completedFuture(null)).join();
+        manager.release(protection, ignored -> CompletableFuture.completedFuture(null))
+                .join();
 
         assertThat(store.protection(CLUSTER, protection.identity())).isEmpty();
         assertThat(store.deleteAttempts.get()).isOne();
@@ -89,21 +83,18 @@ class ObjectReferenceHandshakeModelTest {
     @Test
     void rootLossAfterTransferLeavesTheNewSameKeyProtectionAsVeto() {
         PostTransferRootLossStore store = new PostTransferRootLossStore();
-        DefaultObjectProtectionManager manager = manager(
-                store, new ObjectProtectionTestSupport.MutableClock(NOW));
+        DefaultObjectProtectionManager manager = manager(store, new ObjectProtectionTestSupport.MutableClock(NOW));
         ObjectProtection original = manager.acquire(
-                permanent(owner("e", 23)),
-                ignored -> CompletableFuture.completedFuture(null)).join();
+                        permanent(owner("e", 23)), ignored -> CompletableFuture.completedFuture(null))
+                .join();
         ObjectProtectionOwner newOwner = owner("f", 24);
 
-        assertThatThrownBy(() -> manager.transfer(
-                        original,
-                        newOwner,
-                        ignored -> CompletableFuture.completedFuture(null)).join())
+        assertThatThrownBy(
+                        () -> manager.transfer(original, newOwner, ignored -> CompletableFuture.completedFuture(null))
+                                .join())
                 .satisfies(error -> assertThat(unwrap(error))
-                        .isInstanceOfSatisfying(NereusException.class, nereus ->
-                                assertThat(nereus.code()).isEqualTo(
-                                        ErrorCode.METADATA_CONDITION_FAILED)));
+                        .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                                .isEqualTo(ErrorCode.METADATA_CONDITION_FAILED)));
 
         assertThat(store.protection(CLUSTER, original.identity()))
                 .get()
@@ -111,21 +102,18 @@ class ObjectReferenceHandshakeModelTest {
                 .isEqualTo(newOwner.ownerKey());
 
         ObjectProtection recovered = manager.transfer(
-                original,
-                newOwner,
-                ignored -> CompletableFuture.completedFuture(null)).join();
-        manager.release(
-                recovered, ignored -> CompletableFuture.completedFuture(null)).join();
+                        original, newOwner, ignored -> CompletableFuture.completedFuture(null))
+                .join();
+        manager.release(recovered, ignored -> CompletableFuture.completedFuture(null))
+                .join();
     }
 
-    private static final class PostCreateRootLossStore
-            extends FakePhysicalObjectMetadataStore {
+    private static final class PostCreateRootLossStore extends FakePhysicalObjectMetadataStore {
         private boolean hideNextRoot;
 
         @Override
         public synchronized CompletableFuture<VersionedObjectProtection> createProtection(
-                String cluster,
-                ObjectProtectionRecord protection) {
+                String cluster, ObjectProtectionRecord protection) {
             return super.createProtection(cluster, protection).thenApply(value -> {
                 hideNextRoot = true;
                 return value;
@@ -134,8 +122,7 @@ class ObjectReferenceHandshakeModelTest {
 
         @Override
         public synchronized CompletableFuture<Optional<VersionedPhysicalObjectRoot>> getRoot(
-                String cluster,
-                ObjectKeyHash object) {
+                String cluster, ObjectKeyHash object) {
             if (hideNextRoot) {
                 hideNextRoot = false;
                 return CompletableFuture.completedFuture(Optional.empty());
@@ -144,50 +131,41 @@ class ObjectReferenceHandshakeModelTest {
         }
     }
 
-    private static final class LostCreateResponseStore
-            extends FakePhysicalObjectMetadataStore {
+    private static final class LostCreateResponseStore extends FakePhysicalObjectMetadataStore {
         private boolean lose = true;
 
         @Override
         public synchronized CompletableFuture<VersionedObjectProtection> createProtection(
-                String cluster,
-                ObjectProtectionRecord protection) {
-            CompletableFuture<VersionedObjectProtection> write =
-                    super.createProtection(cluster, protection);
+                String cluster, ObjectProtectionRecord protection) {
+            CompletableFuture<VersionedObjectProtection> write = super.createProtection(cluster, protection);
             if (lose) {
                 lose = false;
-                return write.thenCompose(ignored -> CompletableFuture.failedFuture(
-                        new RuntimeException("lost create response")));
+                return write.thenCompose(
+                        ignored -> CompletableFuture.failedFuture(new RuntimeException("lost create response")));
             }
             return write;
         }
     }
 
-    private static final class LostDeleteResponseStore
-            extends FakePhysicalObjectMetadataStore {
+    private static final class LostDeleteResponseStore extends FakePhysicalObjectMetadataStore {
         private final AtomicInteger deleteAttempts = new AtomicInteger();
 
         @Override
         public synchronized CompletableFuture<Void> deleteProtection(
-                String cluster,
-                ObjectProtectionIdentity protection,
-                long expectedVersion) {
+                String cluster, ObjectProtectionIdentity protection, long expectedVersion) {
             deleteAttempts.incrementAndGet();
             return super.deleteProtection(cluster, protection, expectedVersion)
-                    .thenCompose(ignored -> CompletableFuture.failedFuture(
-                            new RuntimeException("lost delete response")));
+                    .thenCompose(
+                            ignored -> CompletableFuture.failedFuture(new RuntimeException("lost delete response")));
         }
     }
 
-    private static final class PostTransferRootLossStore
-            extends FakePhysicalObjectMetadataStore {
+    private static final class PostTransferRootLossStore extends FakePhysicalObjectMetadataStore {
         private boolean hideNextRoot;
 
         @Override
         public synchronized CompletableFuture<VersionedObjectProtection> compareAndSetProtection(
-                String cluster,
-                ObjectProtectionRecord protection,
-                long expectedVersion) {
+                String cluster, ObjectProtectionRecord protection, long expectedVersion) {
             return super.compareAndSetProtection(cluster, protection, expectedVersion)
                     .thenApply(value -> {
                         hideNextRoot = true;
@@ -197,8 +175,7 @@ class ObjectReferenceHandshakeModelTest {
 
         @Override
         public synchronized CompletableFuture<Optional<VersionedPhysicalObjectRoot>> getRoot(
-                String cluster,
-                ObjectKeyHash object) {
+                String cluster, ObjectKeyHash object) {
             if (hideNextRoot) {
                 hideNextRoot = false;
                 return CompletableFuture.completedFuture(Optional.empty());

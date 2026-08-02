@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.keys.DeterministicIds;
@@ -8,14 +9,15 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** The sole exact-name and hash helper for durable F3 cursors. */
+/**
+ * The sole exact-name and hash helper for durable F3 cursors.
+ */
 public final class CursorNames {
     public static final int MAX_CURSOR_NAME_BYTES = 16 * 1024;
 
     private static final String NAME_HASH_DOMAIN = "nereus-cursor-v1\0";
 
-    private CursorNames() {
-    }
+    private CursorNames() {}
 
     public static String requireCursorName(String cursorName) {
         Objects.requireNonNull(cursorName, "cursorName");
@@ -27,7 +29,8 @@ public final class CursorNames {
         }
         int encodedLength;
         try {
-            encodedLength = StandardCharsets.UTF_8.newEncoder()
+            encodedLength = StandardCharsets.UTF_8
+                    .newEncoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .encode(CharBuffer.wrap(cursorName))

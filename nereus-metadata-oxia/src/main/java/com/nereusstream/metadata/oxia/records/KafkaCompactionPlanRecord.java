@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.metadata.oxia.KafkaPartitionId;
@@ -7,7 +8,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Immutable Oxia attachment for one bounded canonical KCP1 compaction-plan image. */
+/**
+ * Immutable Oxia attachment for one bounded canonical KCP1 compaction-plan image.
+ */
 public record KafkaCompactionPlanRecord(
         int formatVersion,
         String kafkaClusterId,
@@ -30,19 +33,15 @@ public record KafkaCompactionPlanRecord(
         if (formatVersion != FORMAT_VERSION) {
             throw new IllegalArgumentException("Kafka compaction plan formatVersion must be 1");
         }
-        KafkaPartitionId identity =
-                new KafkaPartitionId(kafkaClusterId, topicId, partitionId);
+        KafkaPartitionId identity = new KafkaPartitionId(kafkaClusterId, topicId, partitionId);
         kafkaClusterId = identity.kafkaClusterId();
         topicId = identity.topicId();
         streamId = KafkaMetadataValidation.text(streamId, "streamId");
         planId = KafkaMetadataValidation.text(planId, "planId");
-        materializationTaskId =
-                KafkaMetadataValidation.text(materializationTaskId, "materializationTaskId");
+        materializationTaskId = KafkaMetadataValidation.text(materializationTaskId, "materializationTaskId");
         requirePlanId(planId);
         requireTaskId(materializationTaskId);
-        if (outputStartOffset < 0
-                || outputEndOffset <= outputStartOffset
-                || decisionEndOffset < outputEndOffset) {
+        if (outputStartOffset < 0 || outputEndOffset <= outputStartOffset || decisionEndOffset < outputEndOffset) {
             throw new IllegalArgumentException("invalid Kafka compaction plan ranges");
         }
         planSha256 = KafkaMetadataValidation.sha256(planSha256, "planSha256", false);
@@ -94,20 +93,20 @@ public record KafkaCompactionPlanRecord(
     public boolean equals(Object other) {
         return this == other
                 || other instanceof KafkaCompactionPlanRecord that
-                && formatVersion == that.formatVersion
-                && partitionId == that.partitionId
-                && outputStartOffset == that.outputStartOffset
-                && outputEndOffset == that.outputEndOffset
-                && decisionEndOffset == that.decisionEndOffset
-                && createdAtMillis == that.createdAtMillis
-                && metadataVersion == that.metadataVersion
-                && kafkaClusterId.equals(that.kafkaClusterId)
-                && topicId.equals(that.topicId)
-                && streamId.equals(that.streamId)
-                && planId.equals(that.planId)
-                && materializationTaskId.equals(that.materializationTaskId)
-                && Arrays.equals(planSha256, that.planSha256)
-                && Arrays.equals(planBytes, that.planBytes);
+                        && formatVersion == that.formatVersion
+                        && partitionId == that.partitionId
+                        && outputStartOffset == that.outputStartOffset
+                        && outputEndOffset == that.outputEndOffset
+                        && decisionEndOffset == that.decisionEndOffset
+                        && createdAtMillis == that.createdAtMillis
+                        && metadataVersion == that.metadataVersion
+                        && kafkaClusterId.equals(that.kafkaClusterId)
+                        && topicId.equals(that.topicId)
+                        && streamId.equals(that.streamId)
+                        && planId.equals(that.planId)
+                        && materializationTaskId.equals(that.materializationTaskId)
+                        && Arrays.equals(planSha256, that.planSha256)
+                        && Arrays.equals(planBytes, that.planBytes);
     }
 
     @Override
@@ -143,8 +142,7 @@ public record KafkaCompactionPlanRecord(
         }
         for (int index = prefix.length(); index < value.length(); index++) {
             char character = value.charAt(index);
-            if (!((character >= 'a' && character <= 'z')
-                    || (character >= '2' && character <= '7'))) {
+            if (!((character >= 'a' && character <= 'z') || (character >= '2' && character <= '7'))) {
                 throw new IllegalArgumentException(field + " is not base32lower");
             }
         }

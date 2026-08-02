@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.StreamId;
@@ -6,15 +7,17 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-/** Canonical activation/backfill-gated stream enumeration for an ownerless reference scan. */
+/**
+ * Canonical activation/backfill-gated stream enumeration for an ownerless reference scan.
+ */
 public record GcGlobalReferenceScopeSnapshot(
         boolean complete,
         long streamCount,
         long authorityCount,
         List<StreamId> streams,
         List<GcAuthorityToken> authorities) {
-    private static final Comparator<GcAuthorityToken> AUTHORITY_ORDER = Comparator
-            .comparing(GcAuthorityToken::authorityKey)
+    private static final Comparator<GcAuthorityToken> AUTHORITY_ORDER = Comparator.comparing(
+                    GcAuthorityToken::authorityKey)
             .thenComparingLong(GcAuthorityToken::metadataVersion)
             .thenComparing(value -> value.identitySha256().value());
 
@@ -25,32 +28,25 @@ public record GcGlobalReferenceScopeSnapshot(
         streams = List.copyOf(Objects.requireNonNull(streams, "streams"));
         authorities = List.copyOf(Objects.requireNonNull(authorities, "authorities"));
         if (streamCount < streams.size() || authorityCount < authorities.size()) {
-            throw new IllegalArgumentException(
-                    "global scope counts cannot be smaller than retained values");
+            throw new IllegalArgumentException("global scope counts cannot be smaller than retained values");
         }
         for (int index = 1; index < streams.size(); index++) {
             if (streams.get(index - 1).value().compareTo(streams.get(index).value()) >= 0) {
-                throw new IllegalArgumentException(
-                        "global scope streams must be strictly sorted and unique");
+                throw new IllegalArgumentException("global scope streams must be strictly sorted and unique");
             }
         }
         for (int index = 1; index < authorities.size(); index++) {
             if (AUTHORITY_ORDER.compare(authorities.get(index - 1), authorities.get(index)) >= 0) {
-                throw new IllegalArgumentException(
-                        "global scope authorities must be strictly sorted and unique");
+                throw new IllegalArgumentException("global scope authorities must be strictly sorted and unique");
             }
         }
-        if (complete
-                && (streamCount != streams.size()
-                        || authorityCount != authorities.size())) {
-            throw new IllegalArgumentException(
-                    "complete global scope counts must equal retained values");
+        if (complete && (streamCount != streams.size() || authorityCount != authorities.size())) {
+            throw new IllegalArgumentException("complete global scope counts must equal retained values");
         }
     }
 
     public static GcGlobalReferenceScopeSnapshot incomplete() {
-        return new GcGlobalReferenceScopeSnapshot(
-                false, 0, 0, List.of(), List.of());
+        return new GcGlobalReferenceScopeSnapshot(false, 0, 0, List.of(), List.of());
     }
 
     public void contributeTo(GcReferenceSnapshotBuilder builder) {

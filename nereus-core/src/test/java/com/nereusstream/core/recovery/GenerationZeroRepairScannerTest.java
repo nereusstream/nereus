@@ -15,24 +15,18 @@
 package com.nereusstream.core.recovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import org.junit.jupiter.api.Test;
 
 class GenerationZeroRepairScannerTest {
     @Test
     void repairsAndProtectsEveryUntrimmedLiveCommitFromStableHeadEvidence() {
-        GenerationZeroRepairTestSupport.Fixture fixture =
-                GenerationZeroRepairTestSupport.fixture(0);
+        GenerationZeroRepairTestSupport.Fixture fixture = GenerationZeroRepairTestSupport.fixture(0);
 
-        GenerationZeroRepairScanner.ScanResult result =
-                fixture.scanner()
-                        .repairAll(
-                                GenerationZeroRepairTestSupport.STREAM,
-                                GenerationZeroRepairTestSupport.TIMEOUT)
-                        .join();
+        GenerationZeroRepairScanner.ScanResult result = fixture.scanner()
+                .repairAll(GenerationZeroRepairTestSupport.STREAM, GenerationZeroRepairTestSupport.TIMEOUT)
+                .join();
 
-        assertThat(result.streamId())
-                .isEqualTo(GenerationZeroRepairTestSupport.STREAM);
+        assertThat(result.streamId()).isEqualTo(GenerationZeroRepairTestSupport.STREAM);
         assertThat(result.scannedCommits()).isOne();
         assertThat(result.protectedIndexes()).isOne();
         assertThat(result.anchorReached()).isTrue();
@@ -44,15 +38,11 @@ class GenerationZeroRepairScannerTest {
 
     @Test
     void fullyTrimmedLiveCommitCreatesNoNewIndexOrProtection() {
-        GenerationZeroRepairTestSupport.Fixture fixture =
-                GenerationZeroRepairTestSupport.fixture(1);
+        GenerationZeroRepairTestSupport.Fixture fixture = GenerationZeroRepairTestSupport.fixture(1);
 
-        GenerationZeroRepairScanner.ScanResult result =
-                fixture.scanner()
-                        .repairAll(
-                                GenerationZeroRepairTestSupport.STREAM,
-                                GenerationZeroRepairTestSupport.TIMEOUT)
-                        .join();
+        GenerationZeroRepairScanner.ScanResult result = fixture.scanner()
+                .repairAll(GenerationZeroRepairTestSupport.STREAM, GenerationZeroRepairTestSupport.TIMEOUT)
+                .join();
 
         assertThat(result.scannedCommits()).isOne();
         assertThat(result.protectedIndexes()).isZero();

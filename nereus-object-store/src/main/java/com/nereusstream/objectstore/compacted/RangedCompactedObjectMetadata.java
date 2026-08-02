@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -9,7 +10,9 @@ import com.nereusstream.api.StreamId;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Strictly decoded NCP2/NTC2 file metadata. */
+/**
+ * Strictly decoded NCP2/NTC2 file metadata.
+ */
 public record RangedCompactedObjectMetadata(
         ReadView view,
         StreamId streamId,

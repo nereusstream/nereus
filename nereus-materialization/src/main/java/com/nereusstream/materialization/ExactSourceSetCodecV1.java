@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ApiLimits;
@@ -21,11 +22,12 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Strict canonical binary codec for a durable exact source-set snapshot. */
+/**
+ * Strict canonical binary codec for a durable exact source-set snapshot.
+ */
 public final class ExactSourceSetCodecV1 {
     public static final int MAX_ENCODED_BYTES = 64 << 10;
     public static final int MAX_EXTENDED_ENCODED_BYTES = 1 << 20;
@@ -47,10 +49,7 @@ public final class ExactSourceSetCodecV1 {
     }
 
     public byte[] encode(ExactSourceSet sourceSet) {
-        return encode(
-                sourceSet,
-                MAX_ENCODED_BYTES,
-                MaterializationPolicy.MAX_SOURCE_RANGES);
+        return encode(sourceSet, MAX_ENCODED_BYTES, MaterializationPolicy.MAX_SOURCE_RANGES);
     }
 
     /**
@@ -60,15 +59,11 @@ public final class ExactSourceSetCodecV1 {
      * durable representation, such as compressed Kafka compaction plans. It does not raise the
      * ordinary F4 source-set limit.
      */
-    public byte[] encode(
-            ExactSourceSet sourceSet,
-            int maximumEncodedBytes,
-            int maximumSourceRanges) {
+    public byte[] encode(ExactSourceSet sourceSet, int maximumEncodedBytes, int maximumSourceRanges) {
         ExactSourceSet exact = Objects.requireNonNull(sourceSet, "sourceSet");
         requireExtendedLimits(maximumEncodedBytes, maximumSourceRanges);
         if (exact.sources().size() > maximumSourceRanges) {
-            throw new IllegalArgumentException(
-                    "exact source-set source count exceeds its caller limit");
+            throw new IllegalArgumentException("exact source-set source count exceeds its caller limit");
         }
         try {
             Writer writer = new Writer();
@@ -84,13 +79,12 @@ public final class ExactSourceSetCodecV1 {
             }
             byte[] encoded = writer.bytes();
             if (encoded.length > maximumEncodedBytes) {
-                throw new IllegalArgumentException(
-                        "exact source-set encoding exceeds its byte limit"
-                                + " [encodedBytes="
-                                + encoded.length
-                                + ", sourceCount="
-                                + exact.sources().size()
-                                + "]");
+                throw new IllegalArgumentException("exact source-set encoding exceeds its byte limit"
+                        + " [encodedBytes="
+                        + encoded.length
+                        + ", sourceCount="
+                        + exact.sources().size()
+                        + "]");
             }
             return encoded;
         } catch (IOException failure) {
@@ -99,17 +93,13 @@ public final class ExactSourceSetCodecV1 {
     }
 
     public ExactSourceSet decode(byte[] bytes) {
-        return decode(
-                bytes,
-                MAX_ENCODED_BYTES,
-                MaterializationPolicy.MAX_SOURCE_RANGES);
+        return decode(bytes, MAX_ENCODED_BYTES, MaterializationPolicy.MAX_SOURCE_RANGES);
     }
 
-    /** Decodes the extended EXS1 form under the same caller-owned bounds used to encode it. */
-    public ExactSourceSet decode(
-            byte[] bytes,
-            int maximumEncodedBytes,
-            int maximumSourceRanges) {
+    /**
+     * Decodes the extended EXS1 form under the same caller-owned bounds used to encode it.
+     */
+    public ExactSourceSet decode(byte[] bytes, int maximumEncodedBytes, int maximumSourceRanges) {
         requireExtendedLimits(maximumEncodedBytes, maximumSourceRanges);
         byte[] exact = Objects.requireNonNull(bytes, "bytes").clone();
         if (exact.length == 0 || exact.length > maximumEncodedBytes) {
@@ -121,14 +111,9 @@ public final class ExactSourceSetCodecV1 {
                 throw malformed("unsupported exact source-set header", null);
             }
             ReadView view = ReadView.fromWireId(reader.unsignedShort("view"));
-            OffsetRange coverage =
-                    new OffsetRange(reader.longValue("coverageStart"), reader.longValue("coverageEnd"));
+            OffsetRange coverage = new OffsetRange(reader.longValue("coverageStart"), reader.longValue("coverageEnd"));
             Checksum expectedDigest = reader.checksum("sourceSetSha256");
-            int sourceCount =
-                    reader.count(
-                            "sourceCount",
-                            maximumSourceRanges,
-                            Long.BYTES * 12);
+            int sourceCount = reader.count("sourceCount", maximumSourceRanges, Long.BYTES * 12);
             if (sourceCount == 0) {
                 throw malformed("exact source-set source count cannot be zero", null);
             }
@@ -139,22 +124,19 @@ public final class ExactSourceSetCodecV1 {
             reader.requireConsumed();
             return new ExactSourceSet(view, coverage, sources, expectedDigest);
         } catch (IllegalArgumentException failure) {
-            if (failure.getMessage() != null
-                    && failure.getMessage().startsWith("malformed exact source set:")) {
+            if (failure.getMessage() != null && failure.getMessage().startsWith("malformed exact source set:")) {
                 throw failure;
             }
             throw malformed("invalid exact source-set fields", failure);
         }
     }
 
-    private static void requireExtendedLimits(
-            int maximumEncodedBytes, int maximumSourceRanges) {
+    private static void requireExtendedLimits(int maximumEncodedBytes, int maximumSourceRanges) {
         if (maximumEncodedBytes <= 0
                 || maximumEncodedBytes > MAX_EXTENDED_ENCODED_BYTES
                 || maximumSourceRanges <= 0
                 || maximumSourceRanges > MAX_EXTENDED_SOURCE_RANGES) {
-            throw new IllegalArgumentException(
-                    "extended exact source-set limits are outside hard codec bounds");
+            throw new IllegalArgumentException("extended exact source-set limits are outside hard codec bounds");
         }
     }
 
@@ -195,8 +177,7 @@ public final class ExactSourceSetCodecV1 {
 
     private SourceGeneration readSource(Reader reader) {
         ReadView view = ReadView.fromWireId(reader.unsignedShort("sourceView"));
-        OffsetRange range =
-                new OffsetRange(reader.longValue("sourceStart"), reader.longValue("sourceEnd"));
+        OffsetRange range = new OffsetRange(reader.longValue("sourceStart"), reader.longValue("sourceEnd"));
         long generation = reader.longValue("generation");
         long commitVersion = reader.longValue("commitVersion");
         String indexKey = reader.text("indexKey");
@@ -204,33 +185,23 @@ public final class ExactSourceSetCodecV1 {
         Checksum indexSha = reader.checksum("indexRecordSha256");
         ReadTargetRecord targetRecord = readTarget(reader);
         Checksum targetIdentity = reader.checksum("targetIdentitySha256");
-        Optional<Checksum> policy =
-                reader.optional("materializationPolicyPresent")
-                        ? Optional.of(reader.checksum("materializationPolicySha256"))
-                        : Optional.empty();
-        PayloadFormat payloadFormat =
-                enumValue(PayloadFormat.class, reader.text("payloadFormat"), "payloadFormat");
-        Optional<ProjectionRef> projection =
-                reader.optional("projectionPresent")
-                        ? Optional.of(
-                                new ProjectionRef(
-                                        enumValue(
-                                                ProjectionType.class,
-                                                reader.text("projectionType"),
-                                                "projectionType"),
-                                        reader.text("projectionValue")))
-                        : Optional.empty();
+        Optional<Checksum> policy = reader.optional("materializationPolicyPresent")
+                ? Optional.of(reader.checksum("materializationPolicySha256"))
+                : Optional.empty();
+        PayloadFormat payloadFormat = enumValue(PayloadFormat.class, reader.text("payloadFormat"), "payloadFormat");
+        Optional<ProjectionRef> projection = reader.optional("projectionPresent")
+                ? Optional.of(new ProjectionRef(
+                        enumValue(ProjectionType.class, reader.text("projectionType"), "projectionType"),
+                        reader.text("projectionValue")))
+                : Optional.empty();
         int recordCount = reader.intValue("recordCount");
         int entryCount = reader.intValue("entryCount");
         long logicalBytes = reader.longValue("logicalBytes");
         int schemaCount = reader.count("schemaCount", MAX_SCHEMA_REFS, Long.BYTES);
         ArrayList<SchemaRef> schemas = new ArrayList<>(schemaCount);
         for (int index = 0; index < schemaCount; index++) {
-            schemas.add(
-                    new SchemaRef(
-                            reader.text("schemaNamespace"),
-                            reader.text("schemaId"),
-                            reader.longValue("schemaVersion")));
+            schemas.add(new SchemaRef(
+                    reader.text("schemaNamespace"), reader.text("schemaId"), reader.longValue("schemaVersion")));
         }
         return new SourceGeneration(
                 view,
@@ -267,14 +238,12 @@ public final class ExactSourceSetCodecV1 {
                 reader.text("targetType"),
                 reader.intValue("targetVersion"),
                 reader.text("targetPayloadEncoding"),
-                reader.byteArray(
-                        "targetPayload", ApiLimits.MAX_READ_TARGET_ENCODED_BYTES),
+                reader.byteArray("targetPayload", ApiLimits.MAX_READ_TARGET_ENCODED_BYTES),
                 reader.text("targetIdentityChecksumType"),
                 reader.text("targetIdentityChecksumValue"));
     }
 
-    private static <E extends Enum<E>> E enumValue(
-            Class<E> type, String value, String field) {
+    private static <EnumT extends Enum<EnumT>> EnumT enumValue(Class<EnumT> type, String value, String field) {
         try {
             return Enum.valueOf(type, value);
         } catch (IllegalArgumentException failure) {
@@ -283,8 +252,7 @@ public final class ExactSourceSetCodecV1 {
     }
 
     private static IllegalArgumentException malformed(String message, Throwable cause) {
-        return new IllegalArgumentException(
-                "malformed exact source set: " + message, cause);
+        return new IllegalArgumentException("malformed exact source set: " + message, cause);
     }
 
     private static final class Writer {
@@ -319,8 +287,7 @@ public final class ExactSourceSetCodecV1 {
         }
 
         void text(String value) throws IOException {
-            byte[] encoded = Objects.requireNonNull(value, "value")
-                    .getBytes(StandardCharsets.UTF_8);
+            byte[] encoded = Objects.requireNonNull(value, "value").getBytes(StandardCharsets.UTF_8);
             if (encoded.length > MAX_STRING_BYTES) {
                 throw new IllegalArgumentException("exact source-set string exceeds its byte limit");
             }
@@ -407,8 +374,7 @@ public final class ExactSourceSetCodecV1 {
             int count = intValue(field);
             if (count < 0
                     || count > maximum
-                    || (minimumBytesPerItem > 0
-                            && count > input.remaining() / minimumBytesPerItem)) {
+                    || (minimumBytesPerItem > 0 && count > input.remaining() / minimumBytesPerItem)) {
                 throw malformed(field + " is outside its bound", null);
             }
             return count;

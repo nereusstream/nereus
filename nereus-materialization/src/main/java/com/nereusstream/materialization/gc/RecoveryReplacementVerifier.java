@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -42,10 +43,11 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 
-/** Shared NRC1-to-current-index/root proof used before source lifecycle retirement. */
+/**
+ * Shared NRC1-to-current-index/root proof used before source lifecycle retirement.
+ */
 final class RecoveryReplacementVerifier {
-    private static final ReadTargetCodecRegistry TARGET_CODECS =
-            ReadTargetCodecRegistry.phase15();
+    private static final ReadTargetCodecRegistry TARGET_CODECS = ReadTargetCodecRegistry.phase15();
 
     private final String cluster;
     private final GenerationMetadataStore generations;
@@ -53,8 +55,7 @@ final class RecoveryReplacementVerifier {
     private final RecoveryCheckpointCodecV1 checkpoints;
     private final PhysicalGcConfig config;
     private final F4Keyspace keys;
-    private final GenerationIndexRecordCodecV1 generationCodec =
-            new GenerationIndexRecordCodecV1();
+    private final GenerationIndexRecordCodecV1 generationCodec = new GenerationIndexRecordCodecV1();
 
     RecoveryReplacementVerifier(
             String cluster,
@@ -85,8 +86,7 @@ final class RecoveryReplacementVerifier {
                 || entry.range().endOffset() != requirement.offsetEnd()
                 || entry.commitVersion() != requirement.commitVersion()
                 || entry.cumulativeSizeAtEnd() != requirement.cumulativeSizeAtEnd()) {
-            return CompletableFuture.failedFuture(invariant(
-                    "NRC1 entry does not match the replacement requirement"));
+            return CompletableFuture.failedFuture(invariant("NRC1 entry does not match the replacement requirement"));
         }
         return select(query, stream, checkpoint, entry, requirement, 0);
     }
@@ -99,52 +99,32 @@ final class RecoveryReplacementVerifier {
             ReplacementRequirement requirement,
             int cursor) {
         if (cursor == entry.coveringPublicationIndexes().size()) {
-            String source = requirement.minimumGenerationExclusive() == 0
-                    ? "generation-zero"
-                    : "higher-generation";
-            return CompletableFuture.failedFuture(condition(
-                    source + " source has no current healthy NRC1 replacement"));
+            String source = requirement.minimumGenerationExclusive() == 0 ? "generation-zero" : "higher-generation";
+            return CompletableFuture.failedFuture(
+                    condition(source + " source has no current healthy NRC1 replacement"));
         }
         int publicationIndex = entry.coveringPublicationIndexes().get(cursor);
-        return checkpoints.scanPublications(
-                        checkpoint,
-                        OptionalInt.of(publicationIndex),
-                        1,
-                        config.operationTimeout())
+        return checkpoints
+                .scanPublications(checkpoint, OptionalInt.of(publicationIndex), 1, config.operationTimeout())
                 .thenCompose(page -> {
                     if (page.values().size() != 1) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "NRC1 publication index did not resolve exactly one row"));
+                        return CompletableFuture.failedFuture(
+                                invariant("NRC1 publication index did not resolve exactly one row"));
                     }
-                    EmbeddedReplacement embedded = decode(
-                            stream, requirement, page.values().get(0));
-                    if (embedded.record().generation()
-                            <= requirement.minimumGenerationExclusive()) {
-                        return select(
-                                query,
-                                stream,
-                                checkpoint,
-                                entry,
-                                requirement,
-                                cursor + 1);
+                    EmbeddedReplacement embedded =
+                            decode(stream, requirement, page.values().get(0));
+                    if (embedded.record().generation() <= requirement.minimumGenerationExclusive()) {
+                        return select(query, stream, checkpoint, entry, requirement, cursor + 1);
                     }
-                    return loadHealthy(query, embedded).thenCompose(optional ->
-                            optional.<CompletableFuture<HealthyReplacement>>map(
-                                            CompletableFuture::completedFuture)
-                                    .orElseGet(() -> select(
-                                            query,
-                                            stream,
-                                            checkpoint,
-                                            entry,
-                                            requirement,
-                                            cursor + 1)));
+                    return loadHealthy(query, embedded).thenCompose(optional -> optional.<CompletableFuture<
+                                            HealthyReplacement>>
+                                    map(CompletableFuture::completedFuture)
+                            .orElseGet(() -> select(query, stream, checkpoint, entry, requirement, cursor + 1)));
                 });
     }
 
     private EmbeddedReplacement decode(
-            StreamId stream,
-            ReplacementRequirement requirement,
-            RecoveryCheckpointPublication publication) {
+            StreamId stream, ReplacementRequirement requirement, RecoveryCheckpointPublication publication) {
         byte[] canonical = bytes(publication.canonicalGenerationIndexRecord());
         GenerationIndexRecord record;
         try {
@@ -167,13 +147,10 @@ final class RecoveryReplacementVerifier {
                 || record.offsetEnd() < requirement.offsetEnd()
                 || record.firstCommitVersion() > requirement.commitVersion()
                 || record.lastCommitVersion() < requirement.commitVersion()
-                || record.cumulativeSizeAtStart()
-                        > requirement.cumulativeSizeAtStart()
+                || record.cumulativeSizeAtStart() > requirement.cumulativeSizeAtStart()
                 || record.cumulativeSizeAtEnd() < requirement.cumulativeSizeAtEnd()
-                || !record.targetIdentitySha256().equals(
-                        record.readTarget().identityChecksumValue())) {
-            throw invariant(
-                    "NRC1 replacement index is non-canonical or does not cover the source commit");
+                || !record.targetIdentitySha256().equals(record.readTarget().identityChecksumValue())) {
+            throw invariant("NRC1 replacement index is non-canonical or does not cover the source commit");
         }
         ReadTarget decoded;
         try {
@@ -184,31 +161,21 @@ final class RecoveryReplacementVerifier {
         if (!(decoded instanceof ObjectSliceReadTarget target)) {
             throw invariant("NRC1 source-retirement replacement is not an object slice");
         }
-        GenerationIndexIdentity identity = new GenerationIndexIdentity(
-                stream,
-                ReadView.COMMITTED,
-                record.offsetEnd(),
-                record.generation());
-        String key = keys.generationIndexKey(
-                stream,
-                ReadView.COMMITTED,
-                record.offsetEnd(),
-                record.generation());
+        GenerationIndexIdentity identity =
+                new GenerationIndexIdentity(stream, ReadView.COMMITTED, record.offsetEnd(), record.generation());
+        String key = keys.generationIndexKey(stream, ReadView.COMMITTED, record.offsetEnd(), record.generation());
         return new EmbeddedReplacement(record, identity, key, target);
     }
 
     private CompletableFuture<Optional<HealthyReplacement>> loadHealthy(
-            GcReferenceQuery query,
-            EmbeddedReplacement embedded) {
+            GcReferenceQuery query, EmbeddedReplacement embedded) {
         return generations.getIndex(cluster, embedded.identity()).thenCompose(optionalIndex -> {
             if (optionalIndex.isEmpty()) {
                 return CompletableFuture.completedFuture(Optional.empty());
             }
             VersionedGenerationIndex index = optionalIndex.orElseThrow();
-            GenerationIndexRecord expected = embedded.record().withMetadataVersion(
-                    index.metadataVersion());
-            Checksum expectedDigest = GenerationIndexDigests.durableValueSha256(
-                    embedded.record());
+            GenerationIndexRecord expected = embedded.record().withMetadataVersion(index.metadataVersion());
+            Checksum expectedDigest = GenerationIndexDigests.durableValueSha256(embedded.record());
             if (!index.key().equals(embedded.key())
                     || !index.value().equals(expected)
                     || !index.durableValueSha256().equals(expectedDigest)) {
@@ -219,8 +186,7 @@ final class RecoveryReplacementVerifier {
     }
 
     CompletableFuture<Optional<HealthyReplacement>> loadCurrentHealthy(
-            GcReferenceQuery query,
-            VersionedGenerationIndex current) {
+            GcReferenceQuery query, VersionedGenerationIndex current) {
         Objects.requireNonNull(query, "query");
         Objects.requireNonNull(current, "current");
         GenerationIndexRecord value = current.value();
@@ -238,23 +204,16 @@ final class RecoveryReplacementVerifier {
         } catch (RuntimeException failure) {
             throw invariant("current generation replacement target cannot be decoded");
         }
-        String expectedKey = keys.generationIndexKey(
-                new StreamId(value.streamId()),
-                view,
-                value.offsetEnd(),
-                value.generation());
-        Checksum expectedDigest = GenerationIndexDigests.durableValueSha256(
-                value.withMetadataVersion(0));
+        String expectedKey =
+                keys.generationIndexKey(new StreamId(value.streamId()), view, value.offsetEnd(), value.generation());
+        Checksum expectedDigest = GenerationIndexDigests.durableValueSha256(value.withMetadataVersion(0));
         if (!current.key().equals(expectedKey)
                 || value.lifecycle() != GenerationLifecycle.COMMITTED
                 || !current.durableValueSha256().equals(expectedDigest)) {
             throw invariant("current generation replacement wrapper is non-canonical");
         }
         GenerationIndexIdentity identity = new GenerationIndexIdentity(
-                new StreamId(value.streamId()),
-                view,
-                value.offsetEnd(),
-                value.generation());
+                new StreamId(value.streamId()), view, value.offsetEnd(), value.generation());
         return generations.getIndex(cluster, identity).thenCompose(reloaded -> {
             if (!reloaded.equals(Optional.of(current))) {
                 return CompletableFuture.completedFuture(Optional.empty());
@@ -264,14 +223,10 @@ final class RecoveryReplacementVerifier {
     }
 
     private CompletableFuture<Optional<HealthyReplacement>> loadHealthyRoot(
-            GcReferenceQuery query,
-            VersionedGenerationIndex index,
-            ObjectSliceReadTarget target) {
+            GcReferenceQuery query, VersionedGenerationIndex index, ObjectSliceReadTarget target) {
         ObjectKeyHash object = ObjectKeyHash.from(target.objectKey());
         if (object.equals(query.object().objectKeyHash())
-                || query.object().objectId()
-                        .map(target.objectId()::equals)
-                        .orElse(false)) {
+                || query.object().objectId().map(target.objectId()::equals).orElse(false)) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
         return physicalObjects.getRoot(cluster, object).thenApply(optionalRoot -> {
@@ -285,30 +240,28 @@ final class RecoveryReplacementVerifier {
             } catch (RuntimeException failure) {
                 throw invariant("generation replacement physical root is malformed");
             }
-            long requiredEnd = Math.addExact(
-                    target.objectOffset(), target.objectLength());
+            long requiredEnd = Math.addExact(target.objectOffset(), target.objectLength());
             ReadView view = ReadView.fromWireId(index.value().readViewId());
             if (target.objectType() == ObjectType.STREAM_COMPACTED_OBJECT
                     && !(view == ReadView.COMMITTED
-                            ? MaterializationPolicy.isLosslessCommittedFormat(
-                                    target.physicalFormat())
-                            : MaterializationPolicy.isTopicCompactedFormat(
-                                    target.physicalFormat()))) {
+                            ? MaterializationPolicy.isLosslessCommittedFormat(target.physicalFormat())
+                            : MaterializationPolicy.isTopicCompactedFormat(target.physicalFormat()))) {
                 return Optional.empty();
             }
-            PhysicalObjectKind expectedKind = switch (target.objectType()) {
-                case MULTI_STREAM_WAL_OBJECT -> {
-                    if (view != ReadView.COMMITTED) {
-                        throw invariant("TOPIC_COMPACTED replacement cannot target an Object-WAL slice");
-                    }
-                    yield PhysicalObjectKind.OBJECT_WAL;
-                }
-                case STREAM_COMPACTED_OBJECT -> view == ReadView.COMMITTED
-                        ? PhysicalObjectKind.COMMITTED_COMPACTED
-                        : PhysicalObjectKind.TOPIC_COMPACTED;
-                default -> throw invariant(
-                        "source-retirement replacement object type is unsupported");
-            };
+            PhysicalObjectKind expectedKind =
+                    switch (target.objectType()) {
+                        case MULTI_STREAM_WAL_OBJECT -> {
+                            if (view != ReadView.COMMITTED) {
+                                throw invariant("TOPIC_COMPACTED replacement cannot target an Object-WAL slice");
+                            }
+                            yield PhysicalObjectKind.OBJECT_WAL;
+                        }
+                        case STREAM_COMPACTED_OBJECT ->
+                            view == ReadView.COMMITTED
+                                    ? PhysicalObjectKind.COMMITTED_COMPACTED
+                                    : PhysicalObjectKind.TOPIC_COMPACTED;
+                        default -> throw invariant("source-retirement replacement object type is unsupported");
+                    };
             if (!root.key().equals(keys.physicalRootKey(object))
                     || root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
                     || !physical.objectKey().equals(target.objectKey())
@@ -330,9 +283,7 @@ final class RecoveryReplacementVerifier {
         return revalidate(expected, "healthy same-view replacement");
     }
 
-    private CompletableFuture<Void> revalidate(
-            HealthyReplacement expected,
-            String label) {
+    private CompletableFuture<Void> revalidate(HealthyReplacement expected, String label) {
         Objects.requireNonNull(expected, "expected");
         requireText(label, "label");
         GenerationIndexRecord value = expected.index().value();
@@ -343,24 +294,20 @@ final class RecoveryReplacementVerifier {
                 value.generation());
         return generations.getIndex(cluster, identity).thenCompose(index -> {
             if (!index.equals(Optional.of(expected.index()))) {
-                return CompletableFuture.failedFuture(condition(
-                        label + " index changed while source facts were frozen"));
+                return CompletableFuture.failedFuture(
+                        condition(label + " index changed while source facts were frozen"));
             }
-            ObjectKeyHash object = new ObjectKeyHash(
-                    expected.root().value().objectKeyHash());
+            ObjectKeyHash object = new ObjectKeyHash(expected.root().value().objectKeyHash());
             return physicalObjects.getRoot(cluster, object).thenAccept(root -> {
                 if (!root.equals(Optional.of(expected.root()))) {
-                    throw condition(
-                            label + " root changed while source facts were frozen");
+                    throw condition(label + " root changed while source facts were frozen");
                 }
             });
         });
     }
 
     void requireCheckpointIdentity(
-            StreamId stream,
-            RecoveryCheckpointReferenceRecord reference,
-            RecoveryCheckpointObject checkpoint) {
+            StreamId stream, RecoveryCheckpointReferenceRecord reference, RecoveryCheckpointObject checkpoint) {
         RecoveryCheckpointWriteRequest header = checkpoint.header();
         if (!checkpoint.objectId().equals(new ObjectId(reference.objectId()))
                 || !checkpoint.objectKey().equals(new ObjectKey(reference.objectKey()))
@@ -380,8 +327,7 @@ final class RecoveryReplacementVerifier {
                 || !header.lastCommitId().equals(reference.lastCommitId())
                 || !header.sourceHeadCommitId().equals(reference.sourceHeadCommitId())
                 || header.sourceHeadCommitVersion() != reference.sourceHeadCommitVersion()
-                || !header.projectionIdentitySha256().value().equals(
-                        reference.projectionIdentitySha256())
+                || !header.projectionIdentitySha256().value().equals(reference.projectionIdentitySha256())
                 || header.expectedEntryCount() != reference.commitEntryCount()
                 || header.expectedPublicationCount() != reference.publicationCount()) {
             throw invariant("verified recovery checkpoint does not match its root reference");
@@ -404,8 +350,7 @@ final class RecoveryReplacementVerifier {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static NereusException condition(String message) {
@@ -426,8 +371,7 @@ final class RecoveryReplacementVerifier {
                     || cumulativeSizeAtStart < 0
                     || cumulativeSizeAtEnd < cumulativeSizeAtStart
                     || minimumGenerationExclusive < 0) {
-                throw new IllegalArgumentException(
-                        "recovery replacement requirement is invalid");
+                throw new IllegalArgumentException("recovery replacement requirement is invalid");
             }
         }
 
@@ -437,16 +381,13 @@ final class RecoveryReplacementVerifier {
                     index.offsetStart(),
                     index.offsetEnd(),
                     index.commitVersion(),
-                    Math.subtractExact(
-                            index.cumulativeSize(), index.logicalBytes()),
+                    Math.subtractExact(index.cumulativeSize(), index.logicalBytes()),
                     index.cumulativeSize(),
                     0);
         }
     }
 
-    record HealthyReplacement(
-            VersionedGenerationIndex index,
-            VersionedPhysicalObjectRoot root) {
+    record HealthyReplacement(VersionedGenerationIndex index, VersionedPhysicalObjectRoot root) {
         HealthyReplacement {
             Objects.requireNonNull(index, "index");
             Objects.requireNonNull(root, "root");
@@ -454,10 +395,7 @@ final class RecoveryReplacementVerifier {
     }
 
     private record EmbeddedReplacement(
-            GenerationIndexRecord record,
-            GenerationIndexIdentity identity,
-            String key,
-            ObjectSliceReadTarget target) {
+            GenerationIndexRecord record, GenerationIndexIdentity identity, String key, ObjectSliceReadTarget target) {
         private EmbeddedReplacement {
             Objects.requireNonNull(record, "record");
             Objects.requireNonNull(identity, "identity");

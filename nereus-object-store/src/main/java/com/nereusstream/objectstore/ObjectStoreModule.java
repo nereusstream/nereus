@@ -14,8 +14,9 @@
 
 package com.nereusstream.objectstore;
 
-/** Boundary for object WAL and object IO integrations. */
+/**
+ * Boundary for object WAL and object IO integrations.
+ */
 public final class ObjectStoreModule {
-    private ObjectStoreModule() {
-    }
+    private ObjectStoreModule() {}
 }

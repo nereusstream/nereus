@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.MetadataCanonicalizer;
@@ -12,13 +13,26 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Canonical in-memory committed append hydrated from either durable record generation. */
+/**
+ * Canonical in-memory committed append hydrated from either durable record generation.
+ */
 public record CommittedAppend(
-        StreamId streamId, String commitId, String previousCommitId, ReadTarget readTarget,
-        OffsetRange range, long generation, long cumulativeSize, long commitVersion,
-        PayloadFormat payloadFormat, int recordCount, int entryCount, long logicalBytes,
-        List<SchemaRef> schemaRefs, Optional<ProjectionRef> projectionRef,
-        long minEventTimeMillis, long maxEventTimeMillis) {
+        StreamId streamId,
+        String commitId,
+        String previousCommitId,
+        ReadTarget readTarget,
+        OffsetRange range,
+        long generation,
+        long cumulativeSize,
+        long commitVersion,
+        PayloadFormat payloadFormat,
+        int recordCount,
+        int entryCount,
+        long logicalBytes,
+        List<SchemaRef> schemaRefs,
+        Optional<ProjectionRef> projectionRef,
+        long minEventTimeMillis,
+        long maxEventTimeMillis) {
     public CommittedAppend {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(commitId, "commitId");
@@ -28,8 +42,14 @@ public record CommittedAppend(
         Objects.requireNonNull(payloadFormat, "payloadFormat");
         schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
-        if (commitId.isBlank() || range.isEmpty() || generation != 0 || cumulativeSize < logicalBytes
-                || commitVersion <= 0 || recordCount != range.recordCount() || entryCount <= 0 || logicalBytes < 0) {
+        if (commitId.isBlank()
+                || range.isEmpty()
+                || generation != 0
+                || cumulativeSize < logicalBytes
+                || commitVersion <= 0
+                || recordCount != range.recordCount()
+                || entryCount <= 0
+                || logicalBytes < 0) {
             throw new IllegalArgumentException("committed append fields are invalid");
         }
     }

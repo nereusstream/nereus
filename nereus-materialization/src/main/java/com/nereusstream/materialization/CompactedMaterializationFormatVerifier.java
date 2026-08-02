@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.PayloadFormat;
@@ -13,7 +14,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Task-aware production bridge from durable materialization facts to full NCP1/NTC1 verification. */
+/**
+ * Task-aware production bridge from durable materialization facts to full NCP1/NTC1 verification.
+ */
 public final class CompactedMaterializationFormatVerifier implements MaterializationFormatVerifier {
     private final CompactedObjectVerifier verifier;
 
@@ -22,10 +25,7 @@ public final class CompactedMaterializationFormatVerifier implements Materializa
     }
 
     @Override
-    public CompletableFuture<Void> verify(
-            MaterializationTask task,
-            MaterializationOutput output,
-            Duration timeout) {
+    public CompletableFuture<Void> verify(MaterializationTask task, MaterializationOutput output, Duration timeout) {
         CompactedObjectVerificationRequest request;
         try {
             Objects.requireNonNull(task, "task");
@@ -53,14 +53,11 @@ public final class CompactedMaterializationFormatVerifier implements Materializa
     }
 
     private static void requireAgreement(
-            MaterializationTask task,
-            MaterializationOutput output,
-            CompactedObjectMetadata metadata) {
-        Optional<TopicCompactionFormatSpec> topicSpec = task.policy().topicCompaction().map(spec ->
-                new TopicCompactionFormatSpec(
-                        spec.strategyId(),
-                        spec.strategyVersion(),
-                        spec.keyCodecId()));
+            MaterializationTask task, MaterializationOutput output, CompactedObjectMetadata metadata) {
+        Optional<TopicCompactionFormatSpec> topicSpec = task.policy()
+                .topicCompaction()
+                .map(spec ->
+                        new TopicCompactionFormatSpec(spec.strategyId(), spec.strategyVersion(), spec.keyCodecId()));
         if (!task.taskId().equals(output.taskId())
                 || metadata.view() != task.view()
                 || !metadata.streamId().equals(task.streamId())
@@ -69,7 +66,8 @@ public final class CompactedMaterializationFormatVerifier implements Materializa
                 || !metadata.policySha256().equals(task.policyDigestSha256())
                 || !metadata.outputAttemptId().equals(output.outputAttemptId())
                 || !metadata.logicalFormat().equals(output.logicalFormat())
-                || !metadata.projectionIdentitySha256().map(ignored -> true)
+                || !metadata.projectionIdentitySha256()
+                        .map(ignored -> true)
                         .equals(output.projectionRef().map(ignored -> true))
                 || metadata.sourceRecordCount() != output.sourceRecordCount()
                 || metadata.outputRecordCount() != output.outputRecordCount()

@@ -1,12 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
+import com.nereusstream.api.AppendAttemptId;
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
-import com.nereusstream.api.AppendAttemptId;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendResult;
@@ -28,8 +28,8 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.TrimOptions;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
-import com.nereusstream.bookkeeper.BookKeeperClientOperations;
 import com.nereusstream.bookkeeper.BookKeeperAppendRecoveryCoordinator;
+import com.nereusstream.bookkeeper.BookKeeperClientOperations;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
 import com.nereusstream.bookkeeper.BookKeeperLedgerAllocationRequest;
 import com.nereusstream.bookkeeper.BookKeeperLedgerAllocator;
@@ -41,8 +41,8 @@ import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationVerifie
 import com.nereusstream.bookkeeper.BookKeeperLedgerRecovery;
 import com.nereusstream.bookkeeper.BookKeeperLedgerRetentionManager;
 import com.nereusstream.bookkeeper.BookKeeperOperationDeadline;
-import com.nereusstream.bookkeeper.BookKeeperPrimaryPhysicalReferenceAdapter;
 import com.nereusstream.bookkeeper.BookKeeperPreparedPrimaryAppend;
+import com.nereusstream.bookkeeper.BookKeeperPrimaryPhysicalReferenceAdapter;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryWalAppender;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryWalReader;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationProof;
@@ -79,8 +79,8 @@ import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
 import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperAllocationSlotRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
-import com.nereusstream.metadata.oxia.records.BookKeeperLedgerReaderLeaseRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerReaderLeaseRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperProtectionType;
 import com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle;
@@ -123,7 +123,9 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-/** BK-M2 destructive acceptance over production metadata and provider adapters. */
+/**
+ * BK-M2 destructive acceptance over production metadata and provider adapters.
+ */
 @Testcontainers
 class BookKeeperWalOnlyOxiaBkIntegrationTest {
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
@@ -149,7 +151,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             long retiredLedgerId;
             try (Process first = Process.open(
                     bookKeeperCluster, cluster, deployment, "process-first", configuration, reservation, clock)) {
-                streamId = first.storage.createOrGetStream(
+                streamId = first.storage
+                        .createOrGetStream(
                                 new StreamName("persistent://tenant/namespace/bk-m2-" + suffix),
                                 new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                         .join()
@@ -159,7 +162,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         first.append(streamId, new byte[] {3}),
                         first.append(streamId, new byte[] {4, 5, 6}));
 
-                assertThat(firstResults).extracting(result -> result.range().startOffset())
+                assertThat(firstResults)
+                        .extracting(result -> result.range().startOffset())
                         .containsExactly(0L, 1L, 2L);
                 BookKeeperEntryRangeReadTarget firstTarget = target(firstResults.get(0));
                 assertThat(target(firstResults.get(1)).ledgerId()).isEqualTo(firstTarget.ledgerId());
@@ -169,11 +173,14 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
             try (Process restarted = Process.open(
                     bookKeeperCluster, cluster, deployment, "process-restarted", configuration, reservation, clock)) {
-                assertRead(restarted, streamId,
-                        List.of(new byte[] {1, 2}, new byte[] {3}, new byte[] {4, 5, 6}));
-                var resolved = restarted.storage.resolve(streamId, 0, new ResolveOptions(10, false, true)).join();
+                assertRead(restarted, streamId, List.of(new byte[] {1, 2}, new byte[] {3}, new byte[] {4, 5, 6}));
+                var resolved = restarted
+                        .storage
+                        .resolve(streamId, 0, new ResolveOptions(10, false, true))
+                        .join();
                 assertThat(resolved.ranges()).hasSize(3);
-                assertThat(resolved.ranges()).extracting(range -> range.readTarget())
+                assertThat(resolved.ranges())
+                        .extracting(range -> range.readTarget())
                         .containsExactly(
                                 firstResults.get(0).readTarget(),
                                 firstResults.get(1).readTarget(),
@@ -181,19 +188,23 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
                 AppendResult afterRestart = restarted.append(streamId, new byte[] {7});
                 assertThat(afterRestart.range().startOffset()).isEqualTo(3);
-                assertThat(target(afterRestart).ledgerId()).isNotEqualTo(target(firstResults.get(2)).ledgerId());
+                assertThat(target(afterRestart).ledgerId())
+                        .isNotEqualTo(target(firstResults.get(2)).ledgerId());
 
                 retiredLedgerId = target(firstResults.get(0)).ledgerId();
-                var sealedRoot = restarted.bookKeeperMetadata.getRoot(
-                                cluster, configuration.providerScopeSha256(), retiredLedgerId)
+                var sealedRoot = restarted
+                        .bookKeeperMetadata
+                        .getRoot(cluster, configuration.providerScopeSha256(), retiredLedgerId)
                         .join()
                         .orElseThrow();
                 assertThat(sealedRoot.value().lifecycle().name()).isEqualTo("SEALED");
 
-                restarted.storage.trim(streamId, 2, new TrimOptions(TIMEOUT, "bk-m2 destructive acceptance"))
+                restarted
+                        .storage
+                        .trim(streamId, 2, new TrimOptions(TIMEOUT, "bk-m2 destructive acceptance"))
                         .join();
-                BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
-                        cluster, restarted.l0, restarted.bookKeeperMetadata);
+                BookKeeperWalOnlyRetirementAuthority authority =
+                        new BookKeeperWalOnlyRetirementAuthority(cluster, restarted.l0, restarted.bookKeeperMetadata);
                 BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
                         cluster, configuration, restarted.bookKeeperMetadata, authority);
                 var retired = new BookKeeperWalOnlyReferenceRetirementCoordinator(
@@ -230,27 +241,42 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         gate,
                         clock);
 
-                var candidate = gate.evaluate(sealedRoot, TIMEOUT).join().candidate().orElseThrow();
+                var candidate =
+                        gate.evaluate(sealedRoot, TIMEOUT).join().candidate().orElseThrow();
                 var marked = retention.mark(candidate, TIMEOUT).join();
                 assertThat(marked.action()).isEqualTo(BookKeeperLedgerGcAction.MARKED);
-                assertThat(retention.converge(marked.root().orElseThrow(), TIMEOUT).join().action())
+                assertThat(retention
+                                .converge(marked.root().orElseThrow(), TIMEOUT)
+                                .join()
+                                .action())
                         .isEqualTo(BookKeeperLedgerGcAction.WAITING_DRAIN);
 
                 clock.advance(Duration.ofMinutes(2).plusMillis(1));
-                var deleting = retention.converge(marked.root().orElseThrow(), TIMEOUT).join();
+                var deleting =
+                        retention.converge(marked.root().orElseThrow(), TIMEOUT).join();
                 assertThat(deleting.action()).isEqualTo(BookKeeperLedgerGcAction.DELETING);
-                var firstAbsence = retention.converge(deleting.root().orElseThrow(), TIMEOUT).join();
+                var firstAbsence = retention
+                        .converge(deleting.root().orElseThrow(), TIMEOUT)
+                        .join();
                 assertThat(firstAbsence.action()).isEqualTo(BookKeeperLedgerGcAction.FIRST_ABSENCE_RECORDED);
                 assertThat(deletionOperations.lostResponseInjected()).isTrue();
-                assertThat(retention.converge(firstAbsence.root().orElseThrow(), TIMEOUT).join().action())
+                assertThat(retention
+                                .converge(firstAbsence.root().orElseThrow(), TIMEOUT)
+                                .join()
+                                .action())
                         .isEqualTo(BookKeeperLedgerGcAction.WAITING_SECOND_ABSENCE);
                 firstAbsenceRoot = firstAbsence.root().orElseThrow();
             }
 
             clock.advance(Duration.ofSeconds(10).plusMillis(1));
             try (Process gcRestarted = Process.open(
-                    bookKeeperCluster, cluster, deployment, "process-gc-restarted",
-                    configuration, reservation, clock)) {
+                    bookKeeperCluster,
+                    cluster,
+                    deployment,
+                    "process-gc-restarted",
+                    configuration,
+                    reservation,
+                    clock)) {
                 BookKeeperLedgerGcConfiguration gc = new BookKeeperLedgerGcConfiguration(
                         1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, false);
                 BookKeeperProtocolActivationProof activation = activation(configuration, reservation);
@@ -276,7 +302,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         clock);
                 var deleted = retention.converge(firstAbsenceRoot, TIMEOUT).join();
                 assertThat(deleted.action()).isEqualTo(BookKeeperLedgerGcAction.DELETED);
-                assertThatThrownBy(() -> gcRestarted.rawOperations
+                assertThatThrownBy(() -> gcRestarted
+                                .rawOperations
                                 .metadata(retiredLedgerId, new BookKeeperOperationDeadline(TIMEOUT))
                                 .join())
                         .hasCauseInstanceOf(com.nereusstream.api.NereusException.class);
@@ -298,38 +325,27 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
                 Process process = Process.open(
-                        bookKeeperCluster,
-                        cluster,
-                        deployment,
-                        "process-multi",
-                        configuration,
-                        reservation,
-                        clock)) {
-            StreamId stream = process.storage.createOrGetStream(
+                        bookKeeperCluster, cluster, deployment, "process-multi", configuration, reservation, clock)) {
+            StreamId stream = process.storage
+                    .createOrGetStream(
                             new StreamName("persistent://tenant/namespace/bk-multi-" + suffix),
                             new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                     .join()
                     .streamId();
 
-            AppendResult result = process.append(
-                    stream,
-                    new byte[] {1, 2},
-                    new byte[] {3},
-                    new byte[] {4, 5, 6});
+            AppendResult result = process.append(stream, new byte[] {1, 2}, new byte[] {3}, new byte[] {4, 5, 6});
             BookKeeperEntryRangeReadTarget target = target(result);
 
             assertThat(result.range().startOffset()).isZero();
             assertThat(result.range().endOffset()).isEqualTo(3);
             assertThat(target.firstEntryId()).isZero();
             assertThat(target.entryCount()).isEqualTo(3);
-            assertRead(process, stream, List.of(
-                    new byte[] {1, 2}, new byte[] {3}, new byte[] {4, 5, 6}));
+            assertRead(process, stream, List.of(new byte[] {1, 2}, new byte[] {3}, new byte[] {4, 5, 6}));
         }
     }
 
     @Test
-    void realReaderNeverRecoveryOpensVerifiesWholeRangeBeforeClippingAndFailsClosedOnChecksumDrift()
-            throws Exception {
+    void realReaderNeverRecoveryOpensVerifiesWholeRangeBeforeClippingAndFailsClosedOnChecksumDrift() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "bk-m2-reader-" + suffix;
         String deployment = "deployment-" + suffix;
@@ -349,7 +365,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         reservation,
                         clock,
                         raw -> counting(raw, counting))) {
-            StreamId stream = process.storage.createOrGetStream(
+            StreamId stream = process.storage
+                    .createOrGetStream(
                             new StreamName("persistent://tenant/namespace/bk-reader-" + suffix),
                             new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                     .join()
@@ -361,7 +378,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             assertThat(counting.get().recoveryOpenCalls()).isZero();
             assertThat(counting.get().lastReadRange()).containsExactly(0, 2);
 
-            ResolvedRange resolved = process.storage.resolve(stream, 0, new ResolveOptions(10, false, true))
+            ResolvedRange resolved = process.storage
+                    .resolve(stream, 0, new ResolveOptions(10, false, true))
                     .join()
                     .ranges()
                     .get(0);
@@ -385,12 +403,14 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     resolved.schemaRefs(),
                     resolved.projectionRef(),
                     resolved.commitVersion());
-            assertThatThrownBy(() -> process.reader.readPhysicalWithStats(
-                            stream,
-                            0,
-                            List.of(corruptRange),
-                            new ReadOptions(100, 1024, ReadIsolation.COMMITTED, TIMEOUT))
-                    .join()).hasCauseInstanceOf(NereusException.class)
+            assertThatThrownBy(() -> process.reader
+                            .readPhysicalWithStats(
+                                    stream,
+                                    0,
+                                    List.of(corruptRange),
+                                    new ReadOptions(100, 1024, ReadIsolation.COMMITTED, TIMEOUT))
+                            .join())
+                    .hasCauseInstanceOf(NereusException.class)
                     .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
                             .isEqualTo(ErrorCode.PRIMARY_WAL_CHECKSUM_MISMATCH));
             assertThat(counting.get().recoveryOpenCalls()).isZero();
@@ -418,7 +438,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     configuration,
                     reservation,
                     clock)) {
-                stream = writer.storage.createOrGetStream(
+                stream = writer.storage
+                        .createOrGetStream(
                                 new StreamName("persistent://tenant/namespace/bk-reader-drift-" + suffix),
                                 new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                         .join()
@@ -427,9 +448,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             }
 
             for (ReadCorruption corruption : List.of(
-                    ReadCorruption.SHORT_COUNT,
-                    ReadCorruption.WRONG_ENTRY_ID,
-                    ReadCorruption.WRONG_CONFIGURATION)) {
+                    ReadCorruption.SHORT_COUNT, ReadCorruption.WRONG_ENTRY_ID, ReadCorruption.WRONG_CONFIGURATION)) {
                 AtomicReference<CountingOperations> counting = new AtomicReference<>();
                 try (Process reader = Process.open(
                         bookKeeperCluster,
@@ -440,18 +459,20 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         reservation,
                         clock,
                         raw -> counting(raw, counting, corruption))) {
-                    ResolvedRange resolved = reader.storage.resolve(
-                                    stream, 0, new ResolveOptions(10, false, true))
+                    ResolvedRange resolved = reader.storage
+                            .resolve(stream, 0, new ResolveOptions(10, false, true))
                             .join()
                             .ranges()
                             .get(0);
 
-                    assertThatThrownBy(() -> reader.reader.readPhysicalWithStats(
-                                    stream,
-                                    0,
-                                    List.of(resolved),
-                                    new ReadOptions(100, 1024, ReadIsolation.COMMITTED, TIMEOUT))
-                            .join()).hasCauseInstanceOf(NereusException.class)
+                    assertThatThrownBy(() -> reader.reader
+                                    .readPhysicalWithStats(
+                                            stream,
+                                            0,
+                                            List.of(resolved),
+                                            new ReadOptions(100, 1024, ReadIsolation.COMMITTED, TIMEOUT))
+                                    .join())
+                            .hasCauseInstanceOf(NereusException.class)
                             .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
                                     .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
                     assertThat(counting.get().normalOpenCalls()).isOne();
@@ -469,8 +490,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         String cluster = "bk-m2-retain-live-" + suffix;
         String deployment = "deployment-" + suffix;
         String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
-        BookKeeperWalConfiguration configuration =
-                configuration(100, 1024 * 1024, 3, Duration.ofHours(1));
+        BookKeeperWalConfiguration configuration = configuration(100, 1024 * 1024, 3, Duration.ofHours(1));
         BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
         Clock clock = Clock.fixed(Instant.ofEpochMilli(1_575_000), ZoneId.of("UTC"));
 
@@ -483,40 +503,46 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         configuration,
                         reservation,
                         clock)) {
-            BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
-                    cluster, process.l0, process.bookKeeperMetadata);
-            BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
-                    cluster, configuration, process.bookKeeperMetadata, authority);
+            BookKeeperWalOnlyRetirementAuthority authority =
+                    new BookKeeperWalOnlyRetirementAuthority(cluster, process.l0, process.bookKeeperMetadata);
+            BookKeeperWalReferenceManager references =
+                    new BookKeeperWalReferenceManager(cluster, configuration, process.bookKeeperMetadata, authority);
             BookKeeperWalOnlyReferenceRetirementCoordinator retirement =
                     new BookKeeperWalOnlyReferenceRetirementCoordinator(
                             cluster, configuration, process.bookKeeperMetadata, authority, references);
 
-            StreamId partialStream = process.storage.createOrGetStream(
+            StreamId partialStream = process.storage
+                    .createOrGetStream(
                             new StreamName("persistent://tenant/namespace/bk-partial-trim-" + suffix),
                             new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                     .join()
                     .streamId();
-            AppendResult partial = process.append(
-                    partialStream, new byte[] {1}, new byte[] {2}, new byte[] {3});
+            AppendResult partial = process.append(partialStream, new byte[] {1}, new byte[] {2}, new byte[] {3});
             process.append(partialStream, new byte[] {4});
             process.append(partialStream, new byte[] {5});
             process.append(partialStream, new byte[] {6});
             long partialLedger = target(partial).ledgerId();
-            var partialRoot = process.bookKeeperMetadata.getRoot(
-                            cluster, configuration.providerScopeSha256(), partialLedger)
+            var partialRoot = process.bookKeeperMetadata
+                    .getRoot(cluster, configuration.providerScopeSha256(), partialLedger)
                     .join()
                     .orElseThrow();
             assertThat(partialRoot.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
-            process.storage.trim(partialStream, 1, new TrimOptions(TIMEOUT, "partial range trim")).join();
+            process.storage
+                    .trim(partialStream, 1, new TrimOptions(TIMEOUT, "partial range trim"))
+                    .join();
 
-            var partialRetirement = retirement.retireEligible(partialRoot, TIMEOUT).join();
+            var partialRetirement =
+                    retirement.retireEligible(partialRoot, TIMEOUT).join();
             assertThat(partialRetirement.newlyRetiredProtections()).isZero();
             assertThat(partialRetirement.fullyRetired()).isFalse();
-            assertThat(process.rawOperations.metadata(
-                            partialLedger, new BookKeeperOperationDeadline(TIMEOUT))
-                    .join().getLastEntryId()).isEqualTo(4);
+            assertThat(process.rawOperations
+                            .metadata(partialLedger, new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getLastEntryId())
+                    .isEqualTo(4);
 
-            StreamId mixedStream = process.storage.createOrGetStream(
+            StreamId mixedStream = process.storage
+                    .createOrGetStream(
                             new StreamName("persistent://tenant/namespace/bk-mixed-trim-" + suffix),
                             new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                     .join()
@@ -526,19 +552,23 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             process.append(mixedStream, new byte[] {13});
             process.append(mixedStream, new byte[] {14});
             long mixedLedger = target(mixedFirst).ledgerId();
-            var mixedRoot = process.bookKeeperMetadata.getRoot(
-                            cluster, configuration.providerScopeSha256(), mixedLedger)
+            var mixedRoot = process.bookKeeperMetadata
+                    .getRoot(cluster, configuration.providerScopeSha256(), mixedLedger)
                     .join()
                     .orElseThrow();
             assertThat(mixedRoot.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
-            process.storage.trim(mixedStream, 1, new TrimOptions(TIMEOUT, "mixed ledger trim")).join();
+            process.storage
+                    .trim(mixedStream, 1, new TrimOptions(TIMEOUT, "mixed ledger trim"))
+                    .join();
 
             var mixedRetirement = retirement.retireEligible(mixedRoot, TIMEOUT).join();
             assertThat(mixedRetirement.newlyRetiredProtections()).isEqualTo(3);
             assertThat(mixedRetirement.fullyRetired()).isFalse();
-            assertThat(process.rawOperations.metadata(
-                            mixedLedger, new BookKeeperOperationDeadline(TIMEOUT))
-                    .join().getLastEntryId()).isEqualTo(2);
+            assertThat(process.rawOperations
+                            .metadata(mixedLedger, new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getLastEntryId())
+                    .isEqualTo(2);
             assertRead(process, mixedStream, List.of(new byte[] {12}, new byte[] {13}, new byte[] {14}), 1);
         }
     }
@@ -562,7 +592,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         configuration,
                         reservation,
                         clock)) {
-            StreamId stream = process.storage.createOrGetStream(
+            StreamId stream = process.storage
+                    .createOrGetStream(
                             new StreamName("persistent://tenant/namespace/bk-gc-negative-" + suffix),
                             new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                     .join()
@@ -571,20 +602,24 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             process.append(stream, new byte[] {3});
             process.append(stream, new byte[] {4});
             long ledgerId = target(first).ledgerId();
-            var sealed = process.bookKeeperMetadata.getRoot(
-                            cluster, configuration.providerScopeSha256(), ledgerId)
+            var sealed = process.bookKeeperMetadata
+                    .getRoot(cluster, configuration.providerScopeSha256(), ledgerId)
                     .join()
                     .orElseThrow();
             assertThat(sealed.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
-            process.storage.trim(stream, 3, new TrimOptions(TIMEOUT, "gc negative boundaries")).join();
-            BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
-                    cluster, process.l0, process.bookKeeperMetadata);
-            BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
-                    cluster, configuration, process.bookKeeperMetadata, authority);
+            process.storage
+                    .trim(stream, 3, new TrimOptions(TIMEOUT, "gc negative boundaries"))
+                    .join();
+            BookKeeperWalOnlyRetirementAuthority authority =
+                    new BookKeeperWalOnlyRetirementAuthority(cluster, process.l0, process.bookKeeperMetadata);
+            BookKeeperWalReferenceManager references =
+                    new BookKeeperWalReferenceManager(cluster, configuration, process.bookKeeperMetadata, authority);
             assertThat(new BookKeeperWalOnlyReferenceRetirementCoordinator(
-                            cluster, configuration, process.bookKeeperMetadata, authority, references)
-                    .retireEligible(sealed, TIMEOUT)
-                    .join().fullyRetired()).isTrue();
+                                    cluster, configuration, process.bookKeeperMetadata, authority, references)
+                            .retireEligible(sealed, TIMEOUT)
+                            .join()
+                            .fullyRetired())
+                    .isTrue();
 
             BookKeeperLedgerGcConfiguration enabled = new BookKeeperLedgerGcConfiguration(
                     1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, false);
@@ -613,7 +648,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             var marked = retention.mark(candidate, TIMEOUT).join();
             assertThat(marked.action()).isEqualTo(BookKeeperLedgerGcAction.MARKED);
 
-            var lateReader = process.bookKeeperMetadata.createReaderLease(
+            var lateReader = process.bookKeeperMetadata
+                    .createReaderLease(
                             cluster,
                             configuration.providerScopeSha256(),
                             new BookKeeperLedgerReaderLeaseRecord(
@@ -629,13 +665,17 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                                     0))
                     .join();
             clock.advance(Duration.ofMinutes(2).plusMillis(1));
-            var unmarked = retention.converge(marked.root().orElseThrow(), TIMEOUT).join();
+            var unmarked =
+                    retention.converge(marked.root().orElseThrow(), TIMEOUT).join();
             assertThat(unmarked.action()).isEqualTo(BookKeeperLedgerGcAction.UNMARKED);
-            assertThat(unmarked.root().orElseThrow().value().lifecycle())
-                    .isEqualTo(BookKeeperLedgerLifecycle.SEALED);
-            assertThat(process.rawOperations.metadata(ledgerId, new BookKeeperOperationDeadline(TIMEOUT))
-                    .join().getLedgerId()).isEqualTo(ledgerId);
-            process.bookKeeperMetadata.deleteReaderLease(
+            assertThat(unmarked.root().orElseThrow().value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
+            assertThat(process.rawOperations
+                            .metadata(ledgerId, new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getLedgerId())
+                    .isEqualTo(ledgerId);
+            process.bookKeeperMetadata
+                    .deleteReaderLease(
                             cluster,
                             configuration.providerScopeSha256(),
                             ledgerId,
@@ -644,7 +684,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     .join();
 
             var currentRoot = unmarked.root().orElseThrow();
-            var currentCandidate = gate.evaluate(currentRoot, TIMEOUT).join().candidate().orElseThrow();
+            var currentCandidate =
+                    gate.evaluate(currentRoot, TIMEOUT).join().candidate().orElseThrow();
             BookKeeperLedgerRetentionManager disabled = new BookKeeperLedgerRetentionManager(
                     cluster,
                     configuration,
@@ -676,11 +717,15 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     .isEqualTo(BookKeeperLedgerGcAction.DRY_RUN_ADMITTED);
             assertThat(dryRun.converge(currentRoot, TIMEOUT).join().action())
                     .isEqualTo(BookKeeperLedgerGcAction.DRY_RUN_ADMITTED);
-            assertThat(process.bookKeeperMetadata.getRoot(
-                            cluster, configuration.providerScopeSha256(), ledgerId)
-                    .join()).contains(currentRoot);
-            assertThat(process.rawOperations.metadata(ledgerId, new BookKeeperOperationDeadline(TIMEOUT))
-                    .join().getLedgerId()).isEqualTo(ledgerId);
+            assertThat(process.bookKeeperMetadata
+                            .getRoot(cluster, configuration.providerScopeSha256(), ledgerId)
+                            .join())
+                    .contains(currentRoot);
+            assertThat(process.rawOperations
+                            .metadata(ledgerId, new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getLedgerId())
+                    .isEqualTo(ledgerId);
         }
     }
 
@@ -709,8 +754,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, false);
             BookKeeperProtocolActivationProof activation = activation(configuration, reservation);
 
-            EligibleLedger foreign = eligibleSealedLedger(
-                    process, cluster, configuration, suffix + "-foreign");
+            EligibleLedger foreign = eligibleSealedLedger(process, cluster, configuration, suffix + "-foreign");
             BookKeeperWalRetentionGate foreignGate = new BookKeeperWalRetentionGate(
                     cluster,
                     configuration,
@@ -731,17 +775,23 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     counting.get(),
                     foreignGate,
                     clock);
-            var foreignCandidate = foreignGate.evaluate(foreign.root(), TIMEOUT)
-                    .join().candidate().orElseThrow();
+            var foreignCandidate = foreignGate
+                    .evaluate(foreign.root(), TIMEOUT)
+                    .join()
+                    .candidate()
+                    .orElseThrow();
             var foreignMarked = foreignRetention.mark(foreignCandidate, TIMEOUT).join();
             clock.advance(Duration.ofMinutes(2).plusMillis(1));
-            var foreignDeleting = foreignRetention.converge(
-                    foreignMarked.root().orElseThrow(), TIMEOUT).join();
+            var foreignDeleting = foreignRetention
+                    .converge(foreignMarked.root().orElseThrow(), TIMEOUT)
+                    .join();
             assertThat(foreignDeleting.action()).isEqualTo(BookKeeperLedgerGcAction.DELETING);
 
-            process.rawOperations.delete(
-                    foreign.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT)).join();
-            WriteAdvHandle foreignHandle = process.rawOperations.createAdvanced(
+            process.rawOperations
+                    .delete(foreign.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
+                    .join();
+            WriteAdvHandle foreignHandle = process.rawOperations
+                    .createAdvanced(
                             foreign.ledgerId(),
                             configuration,
                             "bk-m2-secret".getBytes(StandardCharsets.UTF_8),
@@ -750,20 +800,21 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     .join();
             foreignHandle.closeAsync().join();
 
-            var quarantined = foreignRetention.converge(
-                    foreignDeleting.root().orElseThrow(), TIMEOUT).join();
+            var quarantined = foreignRetention
+                    .converge(foreignDeleting.root().orElseThrow(), TIMEOUT)
+                    .join();
             assertThat(quarantined.action()).isEqualTo(BookKeeperLedgerGcAction.QUARANTINED);
             assertThat(quarantined.root().orElseThrow().value().lifecycle())
                     .isEqualTo(BookKeeperLedgerLifecycle.QUARANTINED);
-            assertThat(process.rawOperations.metadata(
-                            foreign.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
-                    .join().getCustomMetadata()).containsKey("foreign.owner");
+            assertThat(process.rawOperations
+                            .metadata(foreign.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getCustomMetadata())
+                    .containsKey("foreign.owner");
             assertThat(counting.get().deleteCalls()).isZero();
 
-            EligibleLedger drift = eligibleSealedLedger(
-                    process, cluster, configuration, suffix + "-namespace");
-            AtomicReference<BookKeeperLedgerIdNamespaceReservation> namespace =
-                    new AtomicReference<>(reservation);
+            EligibleLedger drift = eligibleSealedLedger(process, cluster, configuration, suffix + "-namespace");
+            AtomicReference<BookKeeperLedgerIdNamespaceReservation> namespace = new AtomicReference<>(reservation);
             BookKeeperLedgerIdNamespaceReservationVerifier driftVerifier =
                     new BookKeeperLedgerIdNamespaceReservationVerifier(
                             (scope, bits, prefix, timeout) ->
@@ -789,12 +840,13 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     counting.get(),
                     driftGate,
                     clock);
-            var driftCandidate = driftGate.evaluate(drift.root(), TIMEOUT)
-                    .join().candidate().orElseThrow();
+            var driftCandidate =
+                    driftGate.evaluate(drift.root(), TIMEOUT).join().candidate().orElseThrow();
             var driftMarked = driftRetention.mark(driftCandidate, TIMEOUT).join();
             clock.advance(Duration.ofMinutes(2).plusMillis(1));
-            var driftDeleting = driftRetention.converge(
-                    driftMarked.root().orElseThrow(), TIMEOUT).join();
+            var driftDeleting = driftRetention
+                    .converge(driftMarked.root().orElseThrow(), TIMEOUT)
+                    .join();
             assertThat(driftDeleting.action()).isEqualTo(BookKeeperLedgerGcAction.DELETING);
             namespace.set(new BookKeeperLedgerIdNamespaceReservation(
                     reservation.schemaVersion(),
@@ -813,16 +865,20 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     sha('c'),
                     reservation.canonicalKey()));
 
-            assertThatThrownBy(() -> driftRetention.converge(
-                            driftDeleting.root().orElseThrow(), TIMEOUT).join())
+            assertThatThrownBy(() -> driftRetention
+                            .converge(driftDeleting.root().orElseThrow(), TIMEOUT)
+                            .join())
                     .hasRootCauseMessage(
                             "BookKeeper deletion activation does not match the exact WAL/namespace binding");
-            assertThat(process.bookKeeperMetadata.getRoot(
-                            cluster, configuration.providerScopeSha256(), drift.ledgerId())
-                    .join()).contains(driftDeleting.root().orElseThrow());
-            assertThat(process.rawOperations.metadata(
-                            drift.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
-                    .join().getLedgerId()).isEqualTo(drift.ledgerId());
+            assertThat(process.bookKeeperMetadata
+                            .getRoot(cluster, configuration.providerScopeSha256(), drift.ledgerId())
+                            .join())
+                    .contains(driftDeleting.root().orElseThrow());
+            assertThat(process.rawOperations
+                            .metadata(drift.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getLedgerId())
+                    .isEqualTo(drift.ledgerId());
             assertThat(counting.get().deleteCalls()).isZero();
         }
     }
@@ -846,19 +902,13 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         configuration,
                         reservation,
                         clock)) {
-            EligibleLedger eligible = eligibleSealedLedger(
-                    process, cluster, configuration, suffix + "-cartesian");
+            EligibleLedger eligible = eligibleSealedLedger(process, cluster, configuration, suffix + "-cartesian");
             int maximum = Math.multiplyExact(
-                    configuration.maxAppendRangesPerLedger(),
-                    configuration.protectionSlotsPerRange());
+                    configuration.maxAppendRangesPerLedger(), configuration.protectionSlotsPerRange());
 
             for (int rangeSlot = 0; rangeSlot < configuration.maxAppendRangesPerLedger(); rangeSlot++) {
-                BookKeeperLedgerProtectionRecord canonical = process.bookKeeperMetadata.getProtection(
-                                cluster,
-                                configuration.providerScopeSha256(),
-                                eligible.ledgerId(),
-                                rangeSlot,
-                                0)
+                BookKeeperLedgerProtectionRecord canonical = process.bookKeeperMetadata
+                        .getProtection(cluster, configuration.providerScopeSha256(), eligible.ledgerId(), rangeSlot, 0)
                         .join()
                         .orElseThrow()
                         .value();
@@ -868,7 +918,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     BookKeeperProtectionType type = protectionSlot % 2 == 0
                             ? BookKeeperProtectionType.REPAIR
                             : BookKeeperProtectionType.MATERIALIZATION_SOURCE;
-                    process.bookKeeperMetadata.createProtection(
+                    process.bookKeeperMetadata
+                            .createProtection(
                                     cluster,
                                     configuration.providerScopeSha256(),
                                     activeProtection(canonical, rangeSlot, protectionSlot, type, clock.millis()))
@@ -876,7 +927,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 }
             }
 
-            var inventory = process.bookKeeperMetadata.scanProtections(
+            var inventory = process.bookKeeperMetadata
+                    .scanProtections(
                             cluster,
                             configuration.providerScopeSha256(),
                             eligible.ledgerId(),
@@ -887,7 +939,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             assertThat(inventory.continuation()).isEmpty();
             assertThat(inventory.values().stream()
                             .filter(value -> value.value().lifecycle() == ProtectionLifecycle.ACTIVE)
-                            .map(value -> BookKeeperProtectionType.fromWireId(value.value().protectionTypeId()))
+                            .map(value -> BookKeeperProtectionType.fromWireId(
+                                    value.value().protectionTypeId()))
                             .toList())
                     .contains(BookKeeperProtectionType.REPAIR, BookKeeperProtectionType.MATERIALIZATION_SOURCE);
 
@@ -905,9 +958,11 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     clock);
             assertThat(gate.evaluate(eligible.root(), TIMEOUT).join().blockers())
                     .containsExactly(BookKeeperRetentionBlocker.PROTECTION_PRESENT);
-            assertThat(process.rawOperations.metadata(
-                            eligible.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
-                    .join().getLedgerId()).isEqualTo(eligible.ledgerId());
+            assertThat(process.rawOperations
+                            .metadata(eligible.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getLedgerId())
+                    .isEqualTo(eligible.ledgerId());
         }
     }
 
@@ -947,7 +1002,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             String boundary,
             BookKeeperWalConfiguration configuration,
             MutableClock clock,
-            Duration advanceBeforeSecondAppend) throws Exception {
+            Duration advanceBeforeSecondAppend)
+            throws Exception {
         String cluster = "bk-m2-rollover-" + boundary + "-" + suffix;
         String deployment = "deployment-" + boundary + "-" + suffix;
         BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
@@ -959,7 +1015,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 configuration,
                 reservation,
                 clock)) {
-            StreamId stream = process.storage.createOrGetStream(
+            StreamId stream = process.storage
+                    .createOrGetStream(
                             new StreamName("persistent://tenant/namespace/bk-rollover-" + boundary + "-" + suffix),
                             new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                     .join()
@@ -1006,34 +1063,36 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                             injected.set(operations);
                             return operations;
                         })) {
-                    StreamId stream = process.storage.createOrGetStream(
-                                    new StreamName("persistent://tenant/namespace/bk-partial-"
-                                            + failedWrite + "-" + suffix),
+                    StreamId stream = process.storage
+                            .createOrGetStream(
+                                    new StreamName(
+                                            "persistent://tenant/namespace/bk-partial-" + failedWrite + "-" + suffix),
                                     new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                             .join()
                             .streamId();
 
-                    assertThatThrownBy(() -> process.append(
-                                    stream, new byte[] {1}, new byte[] {2}, new byte[] {3}))
+                    assertThatThrownBy(() -> process.append(stream, new byte[] {1}, new byte[] {2}, new byte[] {3}))
                             .hasCauseInstanceOf(NereusException.class);
                     assertThat(injected.get().failureInjected()).isTrue();
 
-                    var failedReservation = process.bookKeeperMetadata.scanReservations(
-                                    cluster, stream, Optional.empty(), 10)
+                    var failedReservation = process.bookKeeperMetadata
+                            .scanReservations(cluster, stream, Optional.empty(), 10)
                             .join()
                             .values()
                             .get(0);
-                    assertThat(failedReservation.value().lifecycle())
-                            .isEqualTo(AppendReservationLifecycle.ABANDONED);
+                    assertThat(failedReservation.value().lifecycle()).isEqualTo(AppendReservationLifecycle.ABANDONED);
                     long failedLedger = failedReservation.value().ledgerId();
-                    assertThat(process.bookKeeperMetadata.getRoot(
-                                    cluster, configuration.providerScopeSha256(), failedLedger)
-                            .join()).get().satisfies(root ->
-                                    assertThat(root.value().lifecycle())
-                                            .isEqualTo(BookKeeperLedgerLifecycle.SEALED));
-                    assertThat(process.rawOperations.metadata(
-                                    failedLedger, new BookKeeperOperationDeadline(TIMEOUT))
-                            .join().isClosed()).isTrue();
+                    assertThat(process.bookKeeperMetadata
+                                    .getRoot(cluster, configuration.providerScopeSha256(), failedLedger)
+                                    .join())
+                            .get()
+                            .satisfies(root ->
+                                    assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED));
+                    assertThat(process.rawOperations
+                                    .metadata(failedLedger, new BookKeeperOperationDeadline(TIMEOUT))
+                                    .join()
+                                    .isClosed())
+                            .isTrue();
 
                     AppendResult retry = process.append(stream, new byte[] {9});
                     assertThat(target(retry).ledgerId()).isNotEqualTo(failedLedger);
@@ -1064,67 +1123,67 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         reservation,
                         clock,
                         raw -> counting(raw, counting))) {
-            StreamId stream = process.storage.createOrGetStream(
+            StreamId stream = process.storage
+                    .createOrGetStream(
                             new StreamName("persistent://tenant/namespace/bk-reader-slots-" + suffix),
                             new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                     .join()
                     .streamId();
             long ledgerId = target(process.append(stream, new byte[] {1})).ledgerId();
-            var root = process.bookKeeperMetadata.getRoot(
-                            cluster, configuration.providerScopeSha256(), ledgerId)
+            var root = process.bookKeeperMetadata
+                    .getRoot(cluster, configuration.providerScopeSha256(), ledgerId)
                     .join()
                     .orElseThrow();
 
             BookKeeperReaderLeaseManager sharedManager = new BookKeeperReaderLeaseManager(
-                    cluster,
-                    configuration,
-                    process.bookKeeperMetadata,
-                    clock,
-                    "reader-process-shared");
+                    cluster, configuration, process.bookKeeperMetadata, clock, "reader-process-shared");
             var firstSharedFuture = sharedManager.claim(root, TIMEOUT);
             var secondSharedFuture = sharedManager.claim(root, TIMEOUT);
             var firstShared = firstSharedFuture.join();
             var secondShared = secondSharedFuture.join();
-            assertThat(firstShared.value().readerSlot()).isEqualTo(secondShared.value().readerSlot());
-            assertThat(process.bookKeeperMetadata.scanReaderLeases(
-                            cluster,
-                            configuration.providerScopeSha256(),
-                            ledgerId,
-                            Optional.empty(),
-                            configuration.maxReaderLeasesPerLedger())
-                    .join().values()).hasSize(1);
+            assertThat(firstShared.value().readerSlot())
+                    .isEqualTo(secondShared.value().readerSlot());
+            assertThat(process.bookKeeperMetadata
+                            .scanReaderLeases(
+                                    cluster,
+                                    configuration.providerScopeSha256(),
+                                    ledgerId,
+                                    Optional.empty(),
+                                    configuration.maxReaderLeasesPerLedger())
+                            .join()
+                            .values())
+                    .hasSize(1);
             firstShared.release().join();
 
-            List<CompletableFuture<BookKeeperReaderLeaseManager.Lease>> claimFutures =
-                    java.util.stream.IntStream.range(1, configuration.maxReaderLeasesPerLedger())
-                            .mapToObj(index -> new BookKeeperReaderLeaseManager(
-                                            cluster,
-                                            configuration,
-                                            process.bookKeeperMetadata,
-                                            clock,
-                                            "reader-process-" + index)
-                                    .claim(root, TIMEOUT))
-                            .toList();
-            CompletableFuture.allOf(claimFutures.toArray(CompletableFuture[]::new)).join();
+            List<CompletableFuture<BookKeeperReaderLeaseManager.Lease>> claimFutures = java.util.stream.IntStream.range(
+                            1, configuration.maxReaderLeasesPerLedger())
+                    .mapToObj(index -> new BookKeeperReaderLeaseManager(
+                                    cluster,
+                                    configuration,
+                                    process.bookKeeperMetadata,
+                                    clock,
+                                    "reader-process-" + index)
+                            .claim(root, TIMEOUT))
+                    .toList();
+            CompletableFuture.allOf(claimFutures.toArray(CompletableFuture[]::new))
+                    .join();
             List<BookKeeperReaderLeaseManager.Lease> independent =
                     claimFutures.stream().map(CompletableFuture::join).toList();
-            assertThat(process.bookKeeperMetadata.scanReaderLeases(
-                            cluster,
-                            configuration.providerScopeSha256(),
-                            ledgerId,
-                            Optional.empty(),
-                            configuration.maxReaderLeasesPerLedger())
-                    .join().values())
+            assertThat(process.bookKeeperMetadata
+                            .scanReaderLeases(
+                                    cluster,
+                                    configuration.providerScopeSha256(),
+                                    ledgerId,
+                                    Optional.empty(),
+                                    configuration.maxReaderLeasesPerLedger())
+                            .join()
+                            .values())
                     .hasSize(configuration.maxReaderLeasesPerLedger())
                     .extracting(value -> value.value().readerSlot())
                     .doesNotHaveDuplicates();
 
             BookKeeperReaderLeaseManager overflow = new BookKeeperReaderLeaseManager(
-                    cluster,
-                    configuration,
-                    process.bookKeeperMetadata,
-                    clock,
-                    "reader-process-overflow");
+                    cluster, configuration, process.bookKeeperMetadata, clock, "reader-process-overflow");
             assertThatThrownBy(() -> overflow.claim(root, TIMEOUT).join())
                     .hasCauseInstanceOf(NereusException.class)
                     .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
@@ -1132,14 +1191,16 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             assertThat(counting.get().normalOpenCalls()).isZero();
             assertThat(counting.get().recoveryOpenCalls()).isZero();
 
-            var sharedDurable = process.bookKeeperMetadata.getReaderLease(
+            var sharedDurable = process.bookKeeperMetadata
+                    .getReaderLease(
                             cluster,
                             configuration.providerScopeSha256(),
                             ledgerId,
                             secondShared.value().readerSlot())
                     .join()
                     .orElseThrow();
-            process.bookKeeperMetadata.deleteReaderLease(
+            process.bookKeeperMetadata
+                    .deleteReaderLease(
                             cluster,
                             configuration.providerScopeSha256(),
                             ledgerId,
@@ -1152,13 +1213,16 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                             .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
             secondShared.release().join();
             independent.forEach(lease -> lease.release().join());
-            assertThat(process.bookKeeperMetadata.scanReaderLeases(
-                            cluster,
-                            configuration.providerScopeSha256(),
-                            ledgerId,
-                            Optional.empty(),
-                            configuration.maxReaderLeasesPerLedger())
-                    .join().values()).isEmpty();
+            assertThat(process.bookKeeperMetadata
+                            .scanReaderLeases(
+                                    cluster,
+                                    configuration.providerScopeSha256(),
+                                    ledgerId,
+                                    Optional.empty(),
+                                    configuration.maxReaderLeasesPerLedger())
+                            .join()
+                            .values())
+                    .isEmpty();
         }
     }
 
@@ -1187,7 +1251,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     reservation,
                     clock,
                     raw -> counting(raw, firstCounter))) {
-                currentStream = first.storage.createOrGetStream(
+                currentStream = first.storage
+                        .createOrGetStream(
                                 new StreamName("persistent://tenant/namespace/bk-recovery-current-" + suffix),
                                 new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                         .join()
@@ -1208,7 +1273,9 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     reservation,
                     clock,
                     raw -> counting(raw, restartCounter))) {
-                AppendResult recovered = restarted.recoveryCoordinator.recoverAfterRestart(
+                AppendResult recovered = restarted
+                        .recoveryCoordinator
+                        .recoverAfterRestart(
                                 currentSession,
                                 currentAttempt,
                                 DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
@@ -1224,48 +1291,40 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             AppendAttemptId oldAttempt = new AppendAttemptId("attempt-fenced-" + suffix);
             DurablePrimaryAppend oldDurable;
             try (Process old = Process.open(
-                    bookKeeperCluster,
-                    cluster,
-                    deployment,
-                    "process-fenced-old",
-                    configuration,
-                    reservation,
-                    clock)) {
-                fencedStream = old.storage.createOrGetStream(
+                    bookKeeperCluster, cluster, deployment, "process-fenced-old", configuration, reservation, clock)) {
+                fencedStream = old.storage
+                        .createOrGetStream(
                                 new StreamName("persistent://tenant/namespace/bk-recovery-fenced-" + suffix),
                                 new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                         .join()
                         .streamId();
                 oldSession = old.acquire(fencedStream, "writer-old");
-                oldDurable = old.persistOnly(
-                        fencedStream, oldSession, oldAttempt, new byte[] {3}, new byte[] {4});
+                oldDurable = old.persistOnly(fencedStream, oldSession, oldAttempt, new byte[] {3}, new byte[] {4});
             }
 
             clock.advance(Duration.ofMinutes(2));
             try (Process newOwner = Process.open(
-                    bookKeeperCluster,
-                    cluster,
-                    deployment,
-                    "process-fenced-new",
-                    configuration,
-                    reservation,
-                    clock)) {
+                    bookKeeperCluster, cluster, deployment, "process-fenced-new", configuration, reservation, clock)) {
                 AppendSession replacementSession = newOwner.acquire(fencedStream, "writer-new");
-                assertThatThrownBy(() -> newOwner.recoveryCoordinator.recoverAfterRestart(
-                                replacementSession,
-                                oldAttempt,
-                                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
-                                TIMEOUT)
-                        .join()).hasCauseInstanceOf(NereusException.class);
+                assertThatThrownBy(() -> newOwner.recoveryCoordinator
+                                .recoverAfterRestart(
+                                        replacementSession,
+                                        oldAttempt,
+                                        DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                                        TIMEOUT)
+                                .join())
+                        .hasCauseInstanceOf(NereusException.class);
                 var oldTarget = (BookKeeperEntryRangeReadTarget) oldDurable.readTarget();
-                assertThat(newOwner.bookKeeperMetadata.getReservation(
-                                cluster,
-                                fencedStream,
-                                com.nereusstream.bookkeeper.BookKeeperAppendReservationIds.forAttempt(
-                                        fencedStream, oldAttempt))
-                        .join()).get().satisfies(value ->
-                                assertThat(value.value().lifecycle())
-                                        .isEqualTo(AppendReservationLifecycle.ABANDONED));
+                assertThat(newOwner.bookKeeperMetadata
+                                .getReservation(
+                                        cluster,
+                                        fencedStream,
+                                        com.nereusstream.bookkeeper.BookKeeperAppendReservationIds.forAttempt(
+                                                fencedStream, oldAttempt))
+                                .join())
+                        .get()
+                        .satisfies(value ->
+                                assertThat(value.value().lifecycle()).isEqualTo(AppendReservationLifecycle.ABANDONED));
 
                 DurablePrimaryAppend replacement = newOwner.persistOnly(
                         fencedStream,
@@ -1281,8 +1340,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     @Test
-    void realOxiaStableAppendResponseLossReusesOneBookKeeperRangeAndRepairsGenerationZero()
-            throws Exception {
+    void realOxiaStableAppendResponseLossReusesOneBookKeeperRangeAndRepairsGenerationZero() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "bk-m2-stable-loss-" + suffix;
         String deployment = "deployment-" + suffix;
@@ -1305,7 +1363,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         clock,
                         raw -> counting(raw, operations),
                         responseLoss::decorate)) {
-                    StreamId stream = process.storage.createOrGetStream(
+                    StreamId stream = process.storage
+                            .createOrGetStream(
                                     new StreamName("persistent://tenant/namespace/bk-stable-loss-"
                                             + cut.name().toLowerCase(java.util.Locale.ROOT) + "-" + suffix),
                                     new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
@@ -1318,34 +1377,39 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     } catch (java.util.concurrent.CompletionException expectedResponseLoss) {
                         NereusException failure = requireNereusFailure(expectedResponseLoss);
                         assertThat(responseLoss.injected())
-                                .as("expected %s response loss but append failed first with %s: %s",
+                                .as(
+                                        "expected %s response loss but append failed first with %s: %s",
                                         cut, failure.code(), failure.getMessage())
                                 .isTrue();
-                        AppendAttemptId recoveryAttempt = failure.appendAttemptId().orElseGet(() -> new AppendAttemptId(
-                                process.bookKeeperMetadata.scanReservations(
-                                                cluster, stream, Optional.empty(), 10)
+                        AppendAttemptId recoveryAttempt = failure.appendAttemptId()
+                                .orElseGet(() -> new AppendAttemptId(process.bookKeeperMetadata
+                                        .scanReservations(cluster, stream, Optional.empty(), 10)
                                         .join()
                                         .values()
                                         .get(0)
                                         .value()
                                         .appendAttemptId()));
                         recovered = failure.appendAttemptId().isPresent()
-                                ? process.storage.recoverAppend(
-                                                stream,
-                                                recoveryAttempt,
-                                                new AppendRecoveryOptions(TIMEOUT))
+                                ? process.storage
+                                        .recoverAppend(stream, recoveryAttempt, new AppendRecoveryOptions(TIMEOUT))
                                         .join()
-                                : process.recoveryCoordinator.recoverAfterRestart(
+                                : process.recoveryCoordinator
+                                        .recoverAfterRestart(
                                                 session,
                                                 recoveryAttempt,
                                                 DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
                                                 TIMEOUT)
                                         .join();
                     }
-                    assertThat(responseLoss.injected()).as("response cut %s", cut).isTrue();
+                    assertThat(responseLoss.injected())
+                            .as("response cut %s", cut)
+                            .isTrue();
                     assertThat(operations.get().writeCalls()).isEqualTo(2);
                     AppendResult stable = recovered;
-                    assertThat(process.storage.resolve(stream, 0, new ResolveOptions(10, false, true)).join().ranges())
+                    assertThat(process.storage
+                                    .resolve(stream, 0, new ResolveOptions(10, false, true))
+                                    .join()
+                                    .ranges())
                             .singleElement()
                             .satisfies(range -> {
                                 assertThat(range.readTarget()).isEqualTo(stable.readTarget());
@@ -1378,38 +1442,37 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         reservation,
                         clock,
                         raw -> counting(raw, oldOperations))) {
-            StreamId stream = oldProcess.storage.createOrGetStream(
+            StreamId stream = oldProcess
+                    .storage
+                    .createOrGetStream(
                             new StreamName("persistent://tenant/namespace/bk-live-fence-" + suffix),
                             new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                     .join()
                     .streamId();
             AppendSession oldSession = oldProcess.acquire(stream, "writer-old");
             AppendAttemptId oldAttempt = new AppendAttemptId("attempt-live-old-" + suffix);
-            DurablePrimaryAppend oldDurable = oldProcess.persistOnly(
-                    stream, oldSession, oldAttempt, new byte[] {1});
+            DurablePrimaryAppend oldDurable = oldProcess.persistOnly(stream, oldSession, oldAttempt, new byte[] {1});
             WriteAdvHandle oldHandle = oldOperations.get().createdHandle();
             long oldLedger = ((BookKeeperEntryRangeReadTarget) oldDurable.readTarget()).ledgerId();
 
             clock.advance(Duration.ofMinutes(1).plusMillis(1));
             try (Process newProcess = Process.open(
-                    bookKeeperCluster,
-                    cluster,
-                    deployment,
-                    "process-live-new",
-                    configuration,
-                    reservation,
-                    clock)) {
+                    bookKeeperCluster, cluster, deployment, "process-live-new", configuration, reservation, clock)) {
                 AppendSession newSession = newProcess.acquire(stream, "writer-new");
-                assertThatThrownBy(() -> newProcess.recoveryCoordinator.recoverAfterRestart(
-                                newSession,
-                                oldAttempt,
-                                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
-                                TIMEOUT)
-                        .join()).hasCauseInstanceOf(NereusException.class)
+                assertThatThrownBy(() -> newProcess
+                                .recoveryCoordinator
+                                .recoverAfterRestart(
+                                        newSession,
+                                        oldAttempt,
+                                        DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                                        TIMEOUT)
+                                .join())
+                        .hasCauseInstanceOf(NereusException.class)
                         .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
                                 .isEqualTo(ErrorCode.FENCED_APPEND));
 
-                assertThatThrownBy(() -> oldProcess.appender
+                assertThatThrownBy(() -> oldProcess
+                                .appender
                                 .validateBeforeHeadCommit(oldDurable, oldSession, TIMEOUT)
                                 .join())
                         .hasCauseInstanceOf(NereusException.class)
@@ -1418,12 +1481,11 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
                 ByteBuf staleEntry = Unpooled.wrappedBuffer(new byte[] {9});
                 try {
-                    assertThatThrownBy(() -> oldProcess.rawOperations.write(
-                                    oldHandle,
-                                    1,
-                                    staleEntry,
-                                    new BookKeeperOperationDeadline(TIMEOUT))
-                            .join()).hasCauseInstanceOf(NereusException.class)
+                    assertThatThrownBy(() -> oldProcess
+                                    .rawOperations
+                                    .write(oldHandle, 1, staleEntry, new BookKeeperOperationDeadline(TIMEOUT))
+                                    .join())
+                            .hasCauseInstanceOf(NereusException.class)
                             .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
                                     .isEqualTo(ErrorCode.FENCED_APPEND));
                 } finally {
@@ -1431,10 +1493,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 }
 
                 DurablePrimaryAppend replacement = newProcess.persistOnly(
-                        stream,
-                        newSession,
-                        new AppendAttemptId("attempt-live-new-" + suffix),
-                        new byte[] {2});
+                        stream, newSession, new AppendAttemptId("attempt-live-new-" + suffix), new byte[] {2});
                 BookKeeperEntryRangeReadTarget replacementTarget =
                         (BookKeeperEntryRangeReadTarget) replacement.readTarget();
                 assertThat(replacementTarget.ledgerId()).isNotEqualTo(oldLedger);
@@ -1478,46 +1537,56 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         configuration,
                         reservation,
                         clock)) {
-            StreamId stream = oldProcess.storage.createOrGetStream(
+            StreamId stream = oldProcess
+                    .storage
+                    .createOrGetStream(
                             new StreamName("persistent://tenant/namespace/bk-recovery-contenders-" + suffix),
                             new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                     .join()
                     .streamId();
             AppendSession oldSession = oldProcess.acquire(stream, "writer-old");
             DurablePrimaryAppend oldDurable = oldProcess.persistOnly(
-                    stream,
-                    oldSession,
-                    new AppendAttemptId("attempt-contender-old-" + suffix),
-                    new byte[] {1});
+                    stream, oldSession, new AppendAttemptId("attempt-contender-old-" + suffix), new byte[] {1});
             long oldLedger = ((BookKeeperEntryRangeReadTarget) oldDurable.readTarget()).ledgerId();
 
             clock.advance(Duration.ofMinutes(1).plusMillis(1));
             AppendSession newSession = contenderA.acquire(stream, "writer-new");
-            var observed = contenderA.bookKeeperMetadata.getWriter(cluster, stream).join().orElseThrow();
-            CompletableFuture<?> adoptionA = contenderA.writerState.adoptForRecovery(
-                    observed, newSession, "real Oxia contender a");
-            CompletableFuture<?> adoptionB = contenderB.writerState.adoptForRecovery(
-                    observed, newSession, "real Oxia contender b");
+            var observed = contenderA
+                    .bookKeeperMetadata
+                    .getWriter(cluster, stream)
+                    .join()
+                    .orElseThrow();
+            CompletableFuture<?> adoptionA =
+                    contenderA.writerState.adoptForRecovery(observed, newSession, "real Oxia contender a");
+            CompletableFuture<?> adoptionB =
+                    contenderB.writerState.adoptForRecovery(observed, newSession, "real Oxia contender b");
             CompletableFuture.allOf(
-                            adoptionA.handle((value, failure) -> null),
-                            adoptionB.handle((value, failure) -> null))
+                            adoptionA.handle((value, failure) -> null), adoptionB.handle((value, failure) -> null))
                     .join();
-            assertThat(adoptionA.isCompletedExceptionally() ^ adoptionB.isCompletedExceptionally()).isTrue();
+            assertThat(adoptionA.isCompletedExceptionally() ^ adoptionB.isCompletedExceptionally())
+                    .isTrue();
 
             Process winner = adoptionA.isCompletedExceptionally() ? contenderB : contenderA;
-            winner.recovery.recoverWriter(newSession, TIMEOUT, "real Oxia recovery winner").join();
-            var replacement = winner.allocator.allocate(new BookKeeperLedgerAllocationRequest(
-                            stream, newSession, TIMEOUT))
+            winner.recovery
+                    .recoverWriter(newSession, TIMEOUT, "real Oxia recovery winner")
+                    .join();
+            var replacement = winner.allocator
+                    .allocate(new BookKeeperLedgerAllocationRequest(stream, newSession, TIMEOUT))
                     .join();
             assertThat(replacement.root().value().ledgerId()).isNotEqualTo(oldLedger);
-            assertThat(winner.bookKeeperMetadata.getRoot(
-                            cluster, configuration.providerScopeSha256(), oldLedger)
-                    .join()).get().satisfies(root ->
-                            assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED));
-            assertThat(winner.bookKeeperMetadata.getWriter(cluster, stream).join()).get().satisfies(writer -> {
-                assertThat(writer.value().lifecycle()).isEqualTo(BookKeeperWriterLifecycle.ACTIVE);
-                assertThat(writer.value().activeLedgerId()).isEqualTo(replacement.root().value().ledgerId());
-            });
+            assertThat(winner.bookKeeperMetadata
+                            .getRoot(cluster, configuration.providerScopeSha256(), oldLedger)
+                            .join())
+                    .get()
+                    .satisfies(
+                            root -> assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED));
+            assertThat(winner.bookKeeperMetadata.getWriter(cluster, stream).join())
+                    .get()
+                    .satisfies(writer -> {
+                        assertThat(writer.value().lifecycle()).isEqualTo(BookKeeperWriterLifecycle.ACTIVE);
+                        assertThat(writer.value().activeLedgerId())
+                                .isEqualTo(replacement.root().value().ledgerId());
+                    });
         }
     }
 
@@ -1543,7 +1612,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         reservation,
                         clock,
                         raw -> deadlineRecording(raw, createCompletionDelay, deadlines))) {
-            StreamId stream = process.storage.createOrGetStream(
+            StreamId stream = process.storage
+                    .createOrGetStream(
                             new StreamName("persistent://tenant/namespace/bk-deadline-" + suffix),
                             new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                     .join()
@@ -1562,8 +1632,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     private static CountingOperations counting(
-            BookKeeperClientOperations raw,
-            AtomicReference<CountingOperations> target) {
+            BookKeeperClientOperations raw, AtomicReference<CountingOperations> target) {
         CountingOperations operations = new CountingOperations(raw);
         target.set(operations);
         return operations;
@@ -1579,17 +1648,14 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     private static ForeignCollisionOperations foreignCollision(
-            BookKeeperClientOperations raw,
-            AtomicReference<ForeignCollisionOperations> target) {
+            BookKeeperClientOperations raw, AtomicReference<ForeignCollisionOperations> target) {
         ForeignCollisionOperations operations = new ForeignCollisionOperations(raw);
         target.set(operations);
         return operations;
     }
 
     private static CountingOperations counting(
-            BookKeeperClientOperations raw,
-            AtomicReference<CountingOperations> target,
-            ReadCorruption corruption) {
+            BookKeeperClientOperations raw, AtomicReference<CountingOperations> target, ReadCorruption corruption) {
         CountingOperations operations = new CountingOperations(raw, corruption);
         target.set(operations);
         return operations;
@@ -1622,14 +1688,14 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             LostCreateResponseOperations operations = new LostCreateResponseOperations(raw);
             BookKeeperLedgerIdNamespaceReservationVerifier namespaceVerifier =
                     new BookKeeperLedgerIdNamespaceReservationVerifier(
-                            (scope, bits, prefix, timeout) -> CompletableFuture.completedFuture(
-                                    Optional.of(reservation)),
+                            (scope, bits, prefix, timeout) ->
+                                    CompletableFuture.completedFuture(Optional.of(reservation)),
                             deployment);
             byte[] password = "bk-m2-secret".getBytes(StandardCharsets.UTF_8);
             StreamId stream = new StreamId("stream-create-loss-" + suffix);
             AppendSession session = new AppendSession(stream, "writer-1", 1, "token-1", 1, 10_000);
-            BookKeeperWriterStateMachine writerState = new BookKeeperWriterStateMachine(
-                    cluster, configuration, metadata, clock, "process-create-loss");
+            BookKeeperWriterStateMachine writerState =
+                    new BookKeeperWriterStateMachine(cluster, configuration, metadata, clock, "process-create-loss");
             BookKeeperLedgerAllocator allocator = new BookKeeperLedgerAllocator(
                     cluster,
                     configuration,
@@ -1641,23 +1707,25 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     writerState,
                     clock);
 
-            assertThatThrownBy(() -> allocator.allocate(
-                            new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
-                    .join()).hasCauseInstanceOf(com.nereusstream.api.NereusException.class);
+            assertThatThrownBy(() -> allocator
+                            .allocate(new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
+                            .join())
+                    .hasCauseInstanceOf(com.nereusstream.api.NereusException.class);
 
-            var allocation = metadata.scanAllocations(
-                            cluster, stream, Optional.<BookKeeperScanToken>empty(), 10)
+            var allocation = metadata.scanAllocations(cluster, stream, Optional.<BookKeeperScanToken>empty(), 10)
                     .join()
                     .values()
                     .get(0);
             long uncertainLedgerId = allocation.value().candidateLedgerId();
             assertThat(allocation.value().lifecycle()).isEqualTo(LedgerAllocationLifecycle.PHYSICAL_CREATED);
             assertThat(allocation.value().lateCreateHazard()).isTrue();
-            assertThat(metadata.getAllocationSlot(cluster, allocation.value().allocationSlot()).join())
+            assertThat(metadata.getAllocationSlot(cluster, allocation.value().allocationSlot())
+                            .join())
                     .get()
                     .extracting(slot -> slot.value().lifecycle())
                     .isEqualTo(AllocationSlotLifecycle.CREATE_UNCERTAIN);
-            assertThat(metadata.getRoot(cluster, configuration.providerScopeSha256(), uncertainLedgerId).join())
+            assertThat(metadata.getRoot(cluster, configuration.providerScopeSha256(), uncertainLedgerId)
+                            .join())
                     .get()
                     .satisfies(root -> {
                         assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
@@ -1667,21 +1735,22 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     .get()
                     .extracting(writer -> writer.value().lifecycle())
                     .isEqualTo(BookKeeperWriterLifecycle.IDLE);
-            assertThat(raw.metadata(uncertainLedgerId, new BookKeeperOperationDeadline(TIMEOUT)).join().isClosed())
+            assertThat(raw.metadata(uncertainLedgerId, new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .isClosed())
                     .isTrue();
 
-            var replacement = allocator.allocate(
-                            new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
+            var replacement = allocator
+                    .allocate(new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
                     .join();
             assertThat(replacement.root().value().ledgerId()).isNotEqualTo(uncertainLedgerId);
             replacement.handle().closeAsync().join();
 
             DelayedCreateOperations delayedOperations = new DelayedCreateOperations(raw);
             StreamId lateStream = new StreamId("stream-late-create-" + suffix);
-            AppendSession lateSession = new AppendSession(
-                    lateStream, "writer-2", 1, "token-2", 1, 10_000);
-            BookKeeperWriterStateMachine lateWriterState = new BookKeeperWriterStateMachine(
-                    cluster, configuration, metadata, clock, "process-late-create");
+            AppendSession lateSession = new AppendSession(lateStream, "writer-2", 1, "token-2", 1, 10_000);
+            BookKeeperWriterStateMachine lateWriterState =
+                    new BookKeeperWriterStateMachine(cluster, configuration, metadata, clock, "process-late-create");
             BookKeeperLedgerAllocator lateAllocator = new BookKeeperLedgerAllocator(
                     cluster,
                     configuration,
@@ -1692,25 +1761,29 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     ignored -> password.clone(),
                     lateWriterState,
                     clock);
-            assertThatThrownBy(() -> lateAllocator.allocate(
-                            new BookKeeperLedgerAllocationRequest(lateStream, lateSession, TIMEOUT))
-                    .join()).hasCauseInstanceOf(com.nereusstream.api.NereusException.class);
+            assertThatThrownBy(() -> lateAllocator
+                            .allocate(new BookKeeperLedgerAllocationRequest(lateStream, lateSession, TIMEOUT))
+                            .join())
+                    .hasCauseInstanceOf(com.nereusstream.api.NereusException.class);
 
             WriteAdvHandle delayedHandle = delayedOperations.createNow().join();
             long lateLedgerId = delayedHandle.getId();
-            var lateRecovery = lateAllocator.reconcileUncertainAllocations(TIMEOUT).join();
+            var lateRecovery =
+                    lateAllocator.reconcileUncertainAllocations(TIMEOUT).join();
             assertThat(lateRecovery.uncertainSlots()).isEqualTo(2);
             assertThat(lateRecovery.recoveredLedgers()).isEqualTo(2);
-            assertThat(metadata.getRoot(cluster, configuration.providerScopeSha256(), lateLedgerId).join())
+            assertThat(metadata.getRoot(cluster, configuration.providerScopeSha256(), lateLedgerId)
+                            .join())
                     .get()
                     .satisfies(root -> {
                         assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
                         assertThat(root.value().lateCreateHazard()).isTrue();
                     });
-            assertThat(raw.metadata(lateLedgerId, new BookKeeperOperationDeadline(TIMEOUT)).join().isClosed())
+            assertThat(raw.metadata(lateLedgerId, new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .isClosed())
                     .isTrue();
-            var lateRoot = metadata.getRoot(
-                            cluster, configuration.providerScopeSha256(), lateLedgerId)
+            var lateRoot = metadata.getRoot(cluster, configuration.providerScopeSha256(), lateLedgerId)
                     .join()
                     .orElseThrow();
             BookKeeperLedgerGcConfiguration gc = new BookKeeperLedgerGcConfiguration(
@@ -1733,8 +1806,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             CountingOperations foreignCounting = new CountingOperations(raw);
             DelayedCreateOperations foreignDelayed = new DelayedCreateOperations(foreignCounting);
             StreamId foreignLateStream = new StreamId("stream-foreign-late-create-" + suffix);
-            AppendSession foreignLateSession = new AppendSession(
-                    foreignLateStream, "writer-3", 1, "token-3", 1, 10_000);
+            AppendSession foreignLateSession =
+                    new AppendSession(foreignLateStream, "writer-3", 1, "token-3", 1, 10_000);
             BookKeeperWriterStateMachine foreignLateWriter = new BookKeeperWriterStateMachine(
                     cluster, configuration, metadata, clock, "process-foreign-late-create");
             BookKeeperLedgerAllocator foreignLateAllocator = new BookKeeperLedgerAllocator(
@@ -1747,22 +1820,25 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     ignored -> password.clone(),
                     foreignLateWriter,
                     clock);
-            assertThatThrownBy(() -> foreignLateAllocator.allocate(
-                            new BookKeeperLedgerAllocationRequest(
+            assertThatThrownBy(() -> foreignLateAllocator
+                            .allocate(new BookKeeperLedgerAllocationRequest(
                                     foreignLateStream, foreignLateSession, TIMEOUT))
-                    .join()).hasCauseInstanceOf(NereusException.class);
+                            .join())
+                    .hasCauseInstanceOf(NereusException.class);
 
             WriteAdvHandle foreignLateHandle = foreignDelayed.createForeignNow().join();
             long foreignLateLedger = foreignLateHandle.getId();
             foreignLateAllocator.reconcileUncertainAllocations(TIMEOUT).join();
-            assertThat(metadata.getRoot(
-                            cluster, configuration.providerScopeSha256(), foreignLateLedger)
-                    .join()).get().satisfies(root -> {
+            assertThat(metadata.getRoot(cluster, configuration.providerScopeSha256(), foreignLateLedger)
+                            .join())
+                    .get()
+                    .satisfies(root -> {
                         assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.QUARANTINED);
                         assertThat(root.value().lateCreateHazard()).isTrue();
                     });
             assertThat(raw.metadata(foreignLateLedger, new BookKeeperOperationDeadline(TIMEOUT))
-                            .join().getCustomMetadata())
+                            .join()
+                            .getCustomMetadata())
                     .containsKey("stock-owner");
             assertThat(foreignCounting.deleteCalls()).isZero();
             foreignLateHandle.closeAsync().join();
@@ -1770,8 +1846,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     @Test
-    void foreignLedgerCreatedAtProviderBoundaryIsQuarantinedAndNeverDeletedBeforeFreshCandidateWins()
-            throws Exception {
+    void foreignLedgerCreatedAtProviderBoundaryIsQuarantinedAndNeverDeletedBeforeFreshCandidateWins() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "bk-m2-foreign-collision-" + suffix;
         String deployment = "deployment-" + suffix;
@@ -1791,38 +1866,45 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         reservation,
                         clock,
                         raw -> foreignCollision(raw, operations))) {
-            StreamId stream = process.storage.createOrGetStream(
+            StreamId stream = process.storage
+                    .createOrGetStream(
                             new StreamName("persistent://tenant/namespace/bk-foreign-collision-" + suffix),
                             new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                     .join()
                     .streamId();
             AppendSession session = process.acquire(stream, "writer-1");
 
-            assertThatThrownBy(() -> process.allocator.allocate(
-                            new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
-                    .join()).hasCauseInstanceOf(NereusException.class);
+            assertThatThrownBy(() -> process.allocator
+                            .allocate(new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
+                            .join())
+                    .hasCauseInstanceOf(NereusException.class);
 
             long foreignLedger = operations.get().foreignLedgerId();
-            assertThat(process.bookKeeperMetadata.getRoot(
-                            cluster, configuration.providerScopeSha256(), foreignLedger)
-                    .join()).get().satisfies(root -> {
+            assertThat(process.bookKeeperMetadata
+                            .getRoot(cluster, configuration.providerScopeSha256(), foreignLedger)
+                            .join())
+                    .get()
+                    .satisfies(root -> {
                         assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.QUARANTINED);
                         assertThat(root.value().lateCreateHazard()).isTrue();
                     });
-            assertThat(process.rawOperations.metadata(
-                            foreignLedger, new BookKeeperOperationDeadline(TIMEOUT))
-                    .join().getCustomMetadata())
+            assertThat(process.rawOperations
+                            .metadata(foreignLedger, new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getCustomMetadata())
                     .containsKey("stock-owner");
             assertThat(operations.get().deleteCalls()).isZero();
 
-            var replacement = process.allocator.allocate(
-                            new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
+            var replacement = process.allocator
+                    .allocate(new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
                     .join();
             assertThat(replacement.root().value().ledgerId()).isNotEqualTo(foreignLedger);
             replacement.handle().closeAsync().join();
-            assertThat(process.rawOperations.metadata(
-                            foreignLedger, new BookKeeperOperationDeadline(TIMEOUT))
-                    .join().getLedgerId()).isEqualTo(foreignLedger);
+            assertThat(process.rawOperations
+                            .metadata(foreignLedger, new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getLedgerId())
+                    .isEqualTo(foreignLedger);
             assertThat(operations.get().deleteCalls()).isZero();
         }
     }
@@ -1832,8 +1914,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         String cluster = "bk-m2-shards-" + UUID.randomUUID().toString().replace("-", "");
         Clock clock = Clock.fixed(Instant.ofEpochMilli(3_000_000), ZoneId.of("UTC"));
         OxiaClientConfiguration oxia = OxiaClientConfiguration.defaults(OXIA.getServiceAddress());
-        BookKeeperMetadataStoreConfig metadataConfiguration =
-                new BookKeeperMetadataStoreConfig(128, 4, 128, 256);
+        BookKeeperMetadataStoreConfig metadataConfiguration = new BookKeeperMetadataStoreConfig(128, 4, 128, 256);
         BookKeeperKeyspace keys = metadataConfiguration.keyspace(cluster);
         Map<Integer, BookKeeperLedgerRootRecord> roots = oneRootPerShard(keys);
 
@@ -1843,19 +1924,22 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             roots.values().forEach(root -> first.createRoot(cluster, root).join());
             for (int slot = 0; slot < BookKeeperKeyspace.ALLOCATION_SLOT_SHARDS; slot++) {
                 long ledgerId = 100_000L + slot;
-                first.createAllocationSlot(cluster, new BookKeeperAllocationSlotRecord(
-                        1,
-                        slot,
-                        "allocation-slot-" + slot,
-                        BookKeeperMetadataStoreContractScenario.STREAM.value(),
-                        ledgerId,
-                        keys.ledgerIdentitySha256(
-                                BookKeeperMetadataStoreContractScenario.PROVIDER_SCOPE, ledgerId),
-                        BookKeeperMetadataStoreContractScenario.CONFIGURATION,
-                        AllocationSlotLifecycle.CREATE_UNCERTAIN,
-                        100,
-                        101,
-                        0)).join();
+                first.createAllocationSlot(
+                                cluster,
+                                new BookKeeperAllocationSlotRecord(
+                                        1,
+                                        slot,
+                                        "allocation-slot-" + slot,
+                                        BookKeeperMetadataStoreContractScenario.STREAM.value(),
+                                        ledgerId,
+                                        keys.ledgerIdentitySha256(
+                                                BookKeeperMetadataStoreContractScenario.PROVIDER_SCOPE, ledgerId),
+                                        BookKeeperMetadataStoreContractScenario.CONFIGURATION,
+                                        AllocationSlotLifecycle.CREATE_UNCERTAIN,
+                                        100,
+                                        101,
+                                        0))
+                        .join();
             }
         }
 
@@ -1863,7 +1947,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 OxiaJavaBookKeeperMetadataStore restarted = OxiaJavaBookKeeperMetadataStore.usingSharedRuntime(
                         oxia, restartedRuntime, clock, metadataConfiguration)) {
             for (int shard = 0; shard < BookKeeperKeyspace.LEDGER_SHARDS; shard++) {
-                var page = restarted.scanRoots(cluster, shard, Optional.empty(), 1).join();
+                var page =
+                        restarted.scanRoots(cluster, shard, Optional.empty(), 1).join();
                 assertThat(page.values())
                         .singleElement()
                         .extracting(value -> value.value().ledgerIdentitySha256())
@@ -1871,7 +1956,9 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 assertThat(page.continuation()).isEmpty();
             }
             for (int shard = 0; shard < BookKeeperKeyspace.ALLOCATION_SLOT_SHARDS; shard++) {
-                var page = restarted.scanAllocationSlots(cluster, shard, Optional.empty(), 1).join();
+                var page = restarted
+                        .scanAllocationSlots(cluster, shard, Optional.empty(), 1)
+                        .join();
                 assertThat(page.values())
                         .singleElement()
                         .extracting(value -> value.value().slot())
@@ -1886,24 +1973,21 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     private static void assertRead(Process process, StreamId streamId, List<byte[]> payloads, long startOffset) {
-        var read = process.storage.read(
-                        streamId, startOffset, new ReadOptions(100, 1024, ReadIsolation.COMMITTED, TIMEOUT))
+        var read = process.storage
+                .read(streamId, startOffset, new ReadOptions(100, 1024, ReadIsolation.COMMITTED, TIMEOUT))
                 .join();
         assertThat(read.nextOffset()).isEqualTo(startOffset + payloads.size());
         assertThat(read.batches()).hasSize(payloads.size());
         for (int index = 0; index < payloads.size(); index++) {
             assertThat(read.batches().get(index).payload()).containsExactly(payloads.get(index));
-            assertThat(read.batches().get(index).source().target())
-                    .isInstanceOf(BookKeeperEntryRangeReadTarget.class);
+            assertThat(read.batches().get(index).source().target()).isInstanceOf(BookKeeperEntryRangeReadTarget.class);
         }
     }
 
     private static EligibleLedger eligibleSealedLedger(
-            Process process,
-            String cluster,
-            BookKeeperWalConfiguration configuration,
-            String suffix) {
-        StreamId stream = process.storage.createOrGetStream(
+            Process process, String cluster, BookKeeperWalConfiguration configuration, String suffix) {
+        StreamId stream = process.storage
+                .createOrGetStream(
                         new StreamName("persistent://tenant/namespace/bk-eligible-" + suffix),
                         new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                 .join()
@@ -1912,20 +1996,24 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         process.append(stream, new byte[] {3});
         process.append(stream, new byte[] {4});
         long ledgerId = target(first).ledgerId();
-        var root = process.bookKeeperMetadata.getRoot(
-                        cluster, configuration.providerScopeSha256(), ledgerId)
+        var root = process.bookKeeperMetadata
+                .getRoot(cluster, configuration.providerScopeSha256(), ledgerId)
                 .join()
                 .orElseThrow();
         assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
-        process.storage.trim(stream, 3, new TrimOptions(TIMEOUT, "eligible ledger helper")).join();
-        BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
-                cluster, process.l0, process.bookKeeperMetadata);
-        BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
-                cluster, configuration, process.bookKeeperMetadata, authority);
+        process.storage
+                .trim(stream, 3, new TrimOptions(TIMEOUT, "eligible ledger helper"))
+                .join();
+        BookKeeperWalOnlyRetirementAuthority authority =
+                new BookKeeperWalOnlyRetirementAuthority(cluster, process.l0, process.bookKeeperMetadata);
+        BookKeeperWalReferenceManager references =
+                new BookKeeperWalReferenceManager(cluster, configuration, process.bookKeeperMetadata, authority);
         assertThat(new BookKeeperWalOnlyReferenceRetirementCoordinator(
-                        cluster, configuration, process.bookKeeperMetadata, authority, references)
-                .retireEligible(root, TIMEOUT)
-                .join().fullyRetired()).isTrue();
+                                cluster, configuration, process.bookKeeperMetadata, authority, references)
+                        .retireEligible(root, TIMEOUT)
+                        .join()
+                        .fullyRetired())
+                .isTrue();
         return new EligibleLedger(ledgerId, root);
     }
 
@@ -1978,16 +2066,13 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
     private static Map<Integer, BookKeeperLedgerRootRecord> oneRootPerShard(BookKeeperKeyspace keys) {
         Map<Integer, BookKeeperLedgerRootRecord> roots = new LinkedHashMap<>();
-        for (long ledgerId = 1;
-                ledgerId < 100_000 && roots.size() < BookKeeperKeyspace.LEDGER_SHARDS;
-                ledgerId++) {
-            String identity = keys.ledgerIdentitySha256(
-                    BookKeeperMetadataStoreContractScenario.PROVIDER_SCOPE, ledgerId);
+        for (long ledgerId = 1; ledgerId < 100_000 && roots.size() < BookKeeperKeyspace.LEDGER_SHARDS; ledgerId++) {
+            String identity =
+                    keys.ledgerIdentitySha256(BookKeeperMetadataStoreContractScenario.PROVIDER_SCOPE, ledgerId);
             int shard = keys.ledgerShard(identity);
             roots.putIfAbsent(
                     shard,
-                    BookKeeperMetadataStoreContractScenario.root(
-                            keys, ledgerId, BookKeeperLedgerLifecycle.ACTIVE, 2));
+                    BookKeeperMetadataStoreContractScenario.root(keys, ledgerId, BookKeeperLedgerLifecycle.ACTIVE, 2));
         }
         assertThat(roots).hasSize(BookKeeperKeyspace.LEDGER_SHARDS);
         return roots;
@@ -2002,10 +2087,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     private static BookKeeperWalConfiguration configuration(
-            long maxEntriesPerLedger,
-            long maxBytesPerLedger,
-            int maxAppendRangesPerLedger,
-            Duration maxLedgerAge) {
+            long maxEntriesPerLedger, long maxBytesPerLedger, int maxAppendRangesPerLedger, Duration maxLedgerAge) {
         return new BookKeeperWalConfiguration(
                 "primary",
                 "11".repeat(32),
@@ -2058,8 +2140,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     private static BookKeeperProtocolActivationProof activation(
-            BookKeeperWalConfiguration configuration,
-            BookKeeperLedgerIdNamespaceReservation reservation) {
+            BookKeeperWalConfiguration configuration, BookKeeperLedgerIdNamespaceReservation reservation) {
         return new BookKeeperProtocolActivationProof(
                 1,
                 configuration.clusterAlias(),
@@ -2113,9 +2194,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 .build();
     }
 
-    private record EligibleLedger(
-            long ledgerId,
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root) { }
+    private record EligibleLedger(long ledgerId, BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root) {}
 
     private static final class Process implements AutoCloseable {
         private final String clusterName;
@@ -2174,7 +2253,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 String processRunId,
                 BookKeeperWalConfiguration configuration,
                 BookKeeperLedgerIdNamespaceReservation reservation,
-                Clock clock) throws Exception {
+                Clock clock)
+                throws Exception {
             return open(
                     cluster,
                     clusterName,
@@ -2227,21 +2307,20 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     configuration.protectionSlotsPerRange(),
                     configuration.maxReaderLeasesPerLedger(),
                     configuration.maxUncertainAllocations());
-            OxiaJavaClientMetadataStore l0 = OxiaJavaClientMetadataStore.usingSharedRuntime(
-                    oxia, oxiaRuntime, clock, metadataConfiguration);
-            OxiaMetadataStore runtimeMetadata = java.util.Objects.requireNonNull(
-                    metadataDecorator.apply(l0), "decorated Oxia metadata store");
+            OxiaJavaClientMetadataStore l0 =
+                    OxiaJavaClientMetadataStore.usingSharedRuntime(oxia, oxiaRuntime, clock, metadataConfiguration);
+            OxiaMetadataStore runtimeMetadata =
+                    java.util.Objects.requireNonNull(metadataDecorator.apply(l0), "decorated Oxia metadata store");
             OxiaJavaBookKeeperMetadataStore bookKeeperMetadata =
-                    OxiaJavaBookKeeperMetadataStore.usingSharedRuntime(
-                            oxia, oxiaRuntime, clock, metadataConfiguration);
+                    OxiaJavaBookKeeperMetadataStore.usingSharedRuntime(oxia, oxiaRuntime, clock, metadataConfiguration);
             BookKeeper client = cluster.newClient();
             DefaultBookKeeperClientOperations rawOperations = new DefaultBookKeeperClientOperations(client);
             BookKeeperClientOperations operations = java.util.Objects.requireNonNull(
                     operationDecorator.apply(rawOperations), "decorated BookKeeper operations");
             BookKeeperLedgerIdNamespaceReservationVerifier namespaceVerifier =
                     new BookKeeperLedgerIdNamespaceReservationVerifier(
-                            (scope, bits, prefix, timeout) -> CompletableFuture.completedFuture(
-                                    Optional.of(reservation)),
+                            (scope, bits, prefix, timeout) ->
+                                    CompletableFuture.completedFuture(Optional.of(reservation)),
                             deployment);
             byte[] password = "bk-m2-secret".getBytes(StandardCharsets.UTF_8);
             BookKeeperWriterStateMachine writerState = new BookKeeperWriterStateMachine(
@@ -2276,8 +2355,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     writerState,
                     operations,
                     clock);
-            BookKeeperLedgerHandleCache handles = new BookKeeperLedgerHandleCache(
-                    8, 8 * 1024, 1024, Duration.ofMinutes(1));
+            BookKeeperLedgerHandleCache handles =
+                    new BookKeeperLedgerHandleCache(8, 8 * 1024, 1024, Duration.ofMinutes(1));
             BookKeeperReaderLeaseManager leases = new BookKeeperReaderLeaseManager(
                     clusterName, configuration, bookKeeperMetadata, clock, processRunId);
             BookKeeperPrimaryWalReader reader = new BookKeeperPrimaryWalReader(
@@ -2288,17 +2367,10 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     ignored -> password.clone(),
                     handles,
                     leases);
-            BookKeeperPrimaryPhysicalReferenceAdapter references =
-                    new BookKeeperPrimaryPhysicalReferenceAdapter(
-                            clusterName, configuration, bookKeeperMetadata, bookKeeperMetadata, clock);
+            BookKeeperPrimaryPhysicalReferenceAdapter references = new BookKeeperPrimaryPhysicalReferenceAdapter(
+                    clusterName, configuration, bookKeeperMetadata, bookKeeperMetadata, clock);
             BookKeeperAppendRecoveryCoordinator recoveryCoordinator = new BookKeeperAppendRecoveryCoordinator(
-                    clusterName,
-                    configuration,
-                    bookKeeperMetadata,
-                    runtimeMetadata,
-                    references,
-                    recovery,
-                    clock);
+                    clusterName, configuration, bookKeeperMetadata, runtimeMetadata, references, recovery, clock);
             BookKeeperWalRuntime runtime = new BookKeeperWalRuntime(appender, reader, references);
             StreamStorageConfig storageConfiguration = StreamStorageConfig.defaults(clusterName, "writer-1");
             DefaultStreamStorage storage = runtime.newGenerationZeroStorage(
@@ -2336,10 +2408,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             return append(streamId, Optional.of(session), payloads);
         }
 
-        private AppendResult append(
-                StreamId streamId,
-                Optional<AppendSession> session,
-                byte[]... payloads) {
+        private AppendResult append(StreamId streamId, Optional<AppendSession> session, byte[]... payloads) {
             List<AppendEntry> entries = java.util.stream.IntStream.range(0, payloads.length)
                     .mapToObj(index -> new AppendEntry(payloads[index], 1, index + 1L, Map.of()))
                     .toList();
@@ -2357,11 +2426,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                             streamId,
                             batch,
                             new AppendOptions(
-                                    session,
-                                    DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
-                                    TIMEOUT,
-                                    true,
-                                    Map.of()))
+                                    session, DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED, TIMEOUT, true, Map.of()))
                     .join();
         }
 
@@ -2381,10 +2446,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         }
 
         private DurablePrimaryAppend persistOnly(
-                StreamId stream,
-                AppendSession session,
-                AppendAttemptId attempt,
-                byte[]... payloads) {
+                StreamId stream, AppendSession session, AppendAttemptId attempt, byte[]... payloads) {
             List<AppendEntry> entries = java.util.stream.IntStream.range(0, payloads.length)
                     .mapToObj(index -> new AppendEntry(payloads[index], 1, index + 1L, Map.of()))
                     .toList();
@@ -2398,8 +2460,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     List.of(),
                     Map.of(),
                     Optional.empty());
-            try (BookKeeperPreparedPrimaryAppend prepared = appender.prepare(new PrimaryAppendRequest(
-                    stream, batch, session, 0, attempt, TIMEOUT))) {
+            try (BookKeeperPreparedPrimaryAppend prepared =
+                    appender.prepare(new PrimaryAppendRequest(stream, batch, session, 0, attempt, TIMEOUT))) {
                 return appender.persist(prepared, TIMEOUT).join();
             }
         }
@@ -2451,11 +2513,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                         if (cut.matches(method)
                                 && result instanceof CompletableFuture<?> future
                                 && injected.compareAndSet(false, true)) {
-                            return future.thenCompose(value -> CompletableFuture.failedFuture(
-                                    new NereusException(
-                                            ErrorCode.TIMEOUT,
-                                            true,
-                                            "injected applied " + cut + " response loss")));
+                            return future.thenCompose(value -> CompletableFuture.failedFuture(new NereusException(
+                                    ErrorCode.TIMEOUT, true, "injected applied " + cut + " response loss")));
                         }
                         return result;
                     });
@@ -2465,10 +2524,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             return injected.get();
         }
 
-        private static Object invoke(
-                java.lang.reflect.Method method,
-                Object target,
-                Object[] arguments) throws Throwable {
+        private static Object invoke(java.lang.reflect.Method method, Object target, Object[] arguments)
+                throws Throwable {
             try {
                 return method.invoke(target, arguments);
             } catch (InvocationTargetException failure) {
@@ -2518,8 +2575,11 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 byte[] password,
                 boolean recovery,
                 BookKeeperOperationDeadline deadline) {
-            if (recovery) recoveryOpens.incrementAndGet();
-            else normalOpens.incrementAndGet();
+            if (recovery) {
+                recoveryOpens.incrementAndGet();
+            } else {
+                normalOpens.incrementAndGet();
+            }
             return delegate.open(ledgerId, digestType, password, recovery, deadline)
                     .thenApply(handle -> !recovery && readCorruption == ReadCorruption.WRONG_CONFIGURATION
                             ? withWrongConfiguration(handle)
@@ -2528,20 +2588,14 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         @Override
         public CompletableFuture<Long> write(
-                WriteAdvHandle handle,
-                long entryId,
-                ByteBuf entry,
-                BookKeeperOperationDeadline deadline) {
+                WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
             writes.incrementAndGet();
             return delegate.write(handle, entryId, entry, deadline);
         }
 
         @Override
         public CompletableFuture<LedgerEntries> readUnconfirmed(
-                ReadHandle handle,
-                long firstEntryId,
-                long lastEntryIdInclusive,
-                BookKeeperOperationDeadline deadline) {
+                ReadHandle handle, long firstEntryId, long lastEntryIdInclusive, BookKeeperOperationDeadline deadline) {
             lastReadRange.set(new long[] {firstEntryId, lastEntryIdInclusive});
             reads.incrementAndGet();
             return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline)
@@ -2553,8 +2607,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         }
 
         @Override
-        public CompletableFuture<LedgerMetadata> metadata(
-                long ledgerId, BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
             return delegate.metadata(ledgerId, deadline);
         }
 
@@ -2589,7 +2642,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         }
 
         private long[] lastReadRange() {
-            return java.util.Objects.requireNonNull(lastReadRange.get(), "BookKeeper read range").clone();
+            return java.util.Objects.requireNonNull(lastReadRange.get(), "BookKeeper read range")
+                    .clone();
         }
 
         private static ReadHandle withWrongConfiguration(ReadHandle handle) {
@@ -2607,13 +2661,15 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     ReadHandle.class.getClassLoader(),
                     new Class<?>[] {ReadHandle.class},
                     (ignored, method, arguments) -> {
-                        if (method.getName().equals("getLedgerMetadata")) return corrupt;
+                        if (method.getName().equals("getLedgerMetadata")) {
+                            return corrupt;
+                        }
                         return invoke(method, handle, arguments);
                     });
         }
 
-        private static Object invoke(
-                java.lang.reflect.Method method, Object target, Object[] arguments) throws Throwable {
+        private static Object invoke(java.lang.reflect.Method method, Object target, Object[] arguments)
+                throws Throwable {
             try {
                 return method.invoke(target, arguments);
             } catch (InvocationTargetException failure) {
@@ -2628,9 +2684,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         private final AtomicLong createBudgetNanos = new AtomicLong(-1);
         private final AtomicLong writeBudgetNanos = new AtomicLong(-1);
 
-        private DeadlineRecordingOperations(
-                BookKeeperClientOperations delegate,
-                Duration createCompletionDelay) {
+        private DeadlineRecordingOperations(BookKeeperClientOperations delegate, Duration createCompletionDelay) {
             this.delegate = delegate;
             this.createCompletionDelay = createCompletionDelay;
         }
@@ -2647,8 +2701,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     .thenCompose(handle -> CompletableFuture.supplyAsync(
                             () -> handle,
                             CompletableFuture.delayedExecutor(
-                                    createCompletionDelay.toNanos(),
-                                    java.util.concurrent.TimeUnit.NANOSECONDS)));
+                                    createCompletionDelay.toNanos(), java.util.concurrent.TimeUnit.NANOSECONDS)));
         }
 
         @Override
@@ -2663,27 +2716,19 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         @Override
         public CompletableFuture<Long> write(
-                WriteAdvHandle handle,
-                long entryId,
-                ByteBuf entry,
-                BookKeeperOperationDeadline deadline) {
+                WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
             writeBudgetNanos.compareAndSet(-1, deadline.remaining().toNanos());
             return delegate.write(handle, entryId, entry, deadline);
         }
 
         @Override
         public CompletableFuture<LedgerEntries> readUnconfirmed(
-                ReadHandle handle,
-                long firstEntryId,
-                long lastEntryIdInclusive,
-                BookKeeperOperationDeadline deadline) {
+                ReadHandle handle, long firstEntryId, long lastEntryIdInclusive, BookKeeperOperationDeadline deadline) {
             return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
         }
 
         @Override
-        public CompletableFuture<LedgerMetadata> metadata(
-                long ledgerId,
-                BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
             return delegate.metadata(ledgerId, deadline);
         }
 
@@ -2712,12 +2757,13 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         private final LedgerEntries delegate;
         private final List<org.apache.bookkeeper.client.api.LedgerEntry> entries;
 
-        private CorruptLedgerEntries(
-                LedgerEntries delegate, boolean omitLast, boolean changeFirstEntryId) {
+        private CorruptLedgerEntries(LedgerEntries delegate, boolean omitLast, boolean changeFirstEntryId) {
             this.delegate = delegate;
             List<org.apache.bookkeeper.client.api.LedgerEntry> copied = new ArrayList<>();
             delegate.forEach(copied::add);
-            if (omitLast && !copied.isEmpty()) copied.remove(copied.size() - 1);
+            if (omitLast && !copied.isEmpty()) {
+                copied.remove(copied.size() - 1);
+            }
             if (changeFirstEntryId && !copied.isEmpty()) {
                 var first = copied.get(0);
                 copied.set(0, new CorruptLedgerEntry(first, first.getEntryId() + 1));
@@ -2753,16 +2799,45 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             this.entryId = entryId;
         }
 
-        @Override public long getLedgerId() { return delegate.getLedgerId(); }
-        @Override public long getEntryId() { return entryId; }
-        @Override public long getLength() { return delegate.getLength(); }
-        @Override public byte[] getEntryBytes() { return delegate.getEntryBytes(); }
-        @Override public java.nio.ByteBuffer getEntryNioBuffer() { return delegate.getEntryNioBuffer(); }
-        @Override public ByteBuf getEntryBuffer() { return delegate.getEntryBuffer(); }
-        @Override public org.apache.bookkeeper.client.api.LedgerEntry duplicate() {
+        @Override
+        public long getLedgerId() {
+            return delegate.getLedgerId();
+        }
+
+        @Override
+        public long getEntryId() {
+            return entryId;
+        }
+
+        @Override
+        public long getLength() {
+            return delegate.getLength();
+        }
+
+        @Override
+        public byte[] getEntryBytes() {
+            return delegate.getEntryBytes();
+        }
+
+        @Override
+        public java.nio.ByteBuffer getEntryNioBuffer() {
+            return delegate.getEntryNioBuffer();
+        }
+
+        @Override
+        public ByteBuf getEntryBuffer() {
+            return delegate.getEntryBuffer();
+        }
+
+        @Override
+        public org.apache.bookkeeper.client.api.LedgerEntry duplicate() {
             return new CorruptLedgerEntry(delegate.duplicate(), entryId);
         }
-        @Override public void close() { delegate.close(); }
+
+        @Override
+        public void close() {
+            delegate.close();
+        }
     }
 
     private static final class FailNthWriteOperations implements BookKeeperClientOperations {
@@ -2798,31 +2873,22 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         @Override
         public CompletableFuture<Long> write(
-                WriteAdvHandle handle,
-                long entryId,
-                ByteBuf entry,
-                BookKeeperOperationDeadline deadline) {
+                WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
             if (writes.incrementAndGet() == failedWrite && injected.compareAndSet(false, true)) {
                 return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.PRIMARY_WAL_WRITE_FAILED,
-                        true,
-                        "injected real BookKeeper write cut " + failedWrite));
+                        ErrorCode.PRIMARY_WAL_WRITE_FAILED, true, "injected real BookKeeper write cut " + failedWrite));
             }
             return delegate.write(handle, entryId, entry, deadline);
         }
 
         @Override
         public CompletableFuture<LedgerEntries> readUnconfirmed(
-                ReadHandle handle,
-                long firstEntryId,
-                long lastEntryIdInclusive,
-                BookKeeperOperationDeadline deadline) {
+                ReadHandle handle, long firstEntryId, long lastEntryIdInclusive, BookKeeperOperationDeadline deadline) {
             return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
         }
 
         @Override
-        public CompletableFuture<LedgerMetadata> metadata(
-                long ledgerId, BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
             return delegate.metadata(ledgerId, deadline);
         }
 
@@ -2867,25 +2933,18 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         @Override
         public CompletableFuture<Long> write(
-                WriteAdvHandle handle,
-                long entryId,
-                ByteBuf entry,
-                BookKeeperOperationDeadline deadline) {
+                WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
             return delegate.write(handle, entryId, entry, deadline);
         }
 
         @Override
         public CompletableFuture<LedgerEntries> readUnconfirmed(
-                ReadHandle handle,
-                long firstEntryId,
-                long lastEntryIdInclusive,
-                BookKeeperOperationDeadline deadline) {
+                ReadHandle handle, long firstEntryId, long lastEntryIdInclusive, BookKeeperOperationDeadline deadline) {
             return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
         }
 
         @Override
-        public CompletableFuture<LedgerMetadata> metadata(
-                long ledgerId, BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
             return delegate.metadata(ledgerId, deadline);
         }
 
@@ -2924,9 +2983,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     .thenCompose(handle -> {
                         if (inject.compareAndSet(true, false)) {
                             return CompletableFuture.failedFuture(new com.nereusstream.api.NereusException(
-                                    com.nereusstream.api.ErrorCode.TIMEOUT,
-                                    true,
-                                    "injected lost CreateAdv response"));
+                                    com.nereusstream.api.ErrorCode.TIMEOUT, true, "injected lost CreateAdv response"));
                         }
                         return CompletableFuture.completedFuture(handle);
                     });
@@ -2944,25 +3001,18 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         @Override
         public CompletableFuture<Long> write(
-                WriteAdvHandle handle,
-                long entryId,
-                ByteBuf entry,
-                BookKeeperOperationDeadline deadline) {
+                WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
             return delegate.write(handle, entryId, entry, deadline);
         }
 
         @Override
         public CompletableFuture<LedgerEntries> readUnconfirmed(
-                ReadHandle handle,
-                long firstEntryId,
-                long lastEntryIdInclusive,
-                BookKeeperOperationDeadline deadline) {
+                ReadHandle handle, long firstEntryId, long lastEntryIdInclusive, BookKeeperOperationDeadline deadline) {
             return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
         }
 
         @Override
-        public CompletableFuture<LedgerMetadata> metadata(
-                long ledgerId, BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
             return delegate.metadata(ledgerId, deadline);
         }
 
@@ -2999,8 +3049,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                             password,
                             Map.of("stock-owner", "foreign-control-topic".getBytes(StandardCharsets.UTF_8)),
                             deadline)
-                    .thenCompose(foreign -> foreign.closeAsync().thenCompose(ignored ->
-                            delegate.createAdvanced(
+                    .thenCompose(foreign -> foreign.closeAsync()
+                            .thenCompose(ignored -> delegate.createAdvanced(
                                     ledgerId, configuration, password, customMetadata, deadline)));
         }
 
@@ -3016,26 +3066,18 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         @Override
         public CompletableFuture<Long> write(
-                WriteAdvHandle handle,
-                long entryId,
-                ByteBuf entry,
-                BookKeeperOperationDeadline deadline) {
+                WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
             return delegate.write(handle, entryId, entry, deadline);
         }
 
         @Override
         public CompletableFuture<LedgerEntries> readUnconfirmed(
-                ReadHandle handle,
-                long firstEntryId,
-                long lastEntryIdInclusive,
-                BookKeeperOperationDeadline deadline) {
+                ReadHandle handle, long firstEntryId, long lastEntryIdInclusive, BookKeeperOperationDeadline deadline) {
             return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
         }
 
         @Override
-        public CompletableFuture<LedgerMetadata> metadata(
-                long ledgerId,
-                BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
             return delegate.metadata(ledgerId, deadline);
         }
 
@@ -3070,14 +3112,13 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 Map<String, byte[]> customMetadata,
                 BookKeeperOperationDeadline deadline) {
             if (pending != null) {
-                return CompletableFuture.failedFuture(new IllegalStateException(
-                        "only one delayed CreateAdv is supported by this fixture"));
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("only one delayed CreateAdv is supported by this fixture"));
             }
-            Map<String, byte[]> copiedMetadata = customMetadata.entrySet().stream().collect(
-                    java.util.stream.Collectors.toUnmodifiableMap(
+            Map<String, byte[]> copiedMetadata = customMetadata.entrySet().stream()
+                    .collect(java.util.stream.Collectors.toUnmodifiableMap(
                             Map.Entry::getKey, entry -> entry.getValue().clone()));
-            pending = new PendingCreate(
-                    ledgerId, configuration, password.clone(), copiedMetadata, deadline);
+            pending = new PendingCreate(ledgerId, configuration, password.clone(), copiedMetadata, deadline);
             return CompletableFuture.failedFuture(new com.nereusstream.api.NereusException(
                     com.nereusstream.api.ErrorCode.TIMEOUT,
                     true,
@@ -3120,25 +3161,18 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         @Override
         public CompletableFuture<Long> write(
-                WriteAdvHandle handle,
-                long entryId,
-                ByteBuf entry,
-                BookKeeperOperationDeadline deadline) {
+                WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
             return delegate.write(handle, entryId, entry, deadline);
         }
 
         @Override
         public CompletableFuture<LedgerEntries> readUnconfirmed(
-                ReadHandle handle,
-                long firstEntryId,
-                long lastEntryIdInclusive,
-                BookKeeperOperationDeadline deadline) {
+                ReadHandle handle, long firstEntryId, long lastEntryIdInclusive, BookKeeperOperationDeadline deadline) {
             return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
         }
 
         @Override
-        public CompletableFuture<LedgerMetadata> metadata(
-                long ledgerId, BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
             return delegate.metadata(ledgerId, deadline);
         }
 
@@ -3152,7 +3186,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 BookKeeperWalConfiguration configuration,
                 byte[] password,
                 Map<String, byte[]> customMetadata,
-                BookKeeperOperationDeadline deadline) { }
+                BookKeeperOperationDeadline deadline) {}
     }
 
     private static final class MutableClock extends Clock {

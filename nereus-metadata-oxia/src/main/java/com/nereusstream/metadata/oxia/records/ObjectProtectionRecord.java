@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Durable object-deletion veto tied to one revalidatable authoritative owner. */
+/**
+ * Durable object-deletion veto tied to one revalidatable authoritative owner.
+ */
 public record ObjectProtectionRecord(
         int schemaVersion,
         String objectKeyHash,
@@ -37,8 +40,16 @@ public record ObjectProtectionRecord(
 
     public ObjectProtectionRecord withMetadataVersion(long version) {
         return new ObjectProtectionRecord(
-                schemaVersion, objectKeyHash, protectionTypeId, referenceId, ownerKey,
-                ownerMetadataVersion, ownerIdentitySha256, rootLifecycleEpoch,
-                createdAtMillis, expiresAtMillis, version);
+                schemaVersion,
+                objectKeyHash,
+                protectionTypeId,
+                referenceId,
+                ownerKey,
+                ownerMetadataVersion,
+                ownerIdentitySha256,
+                rootLifecycleEpoch,
+                createdAtMillis,
+                expiresAtMillis,
+                version);
     }
 }

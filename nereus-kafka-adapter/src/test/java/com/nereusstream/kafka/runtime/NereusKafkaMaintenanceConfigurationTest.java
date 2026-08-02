@@ -16,7 +16,6 @@ package com.nereusstream.kafka.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import java.nio.file.Path;
@@ -30,46 +29,35 @@ class NereusKafkaMaintenanceConfigurationTest {
         NereusKafkaMaintenanceConfiguration configuration =
                 configuration(Path.of("/tmp/nereus-kafka-checkpoint"), 1L << 30, 8 << 20);
 
-        assertThat(configuration.stagingDirectory())
-                .isEqualTo(Path.of("/tmp/nereus-kafka-checkpoint"));
-        assertThat(configuration.contentPolicySha256().type())
-                .isEqualTo(ChecksumType.SHA256);
+        assertThat(configuration.stagingDirectory()).isEqualTo(Path.of("/tmp/nereus-kafka-checkpoint"));
+        assertThat(configuration.contentPolicySha256().type()).isEqualTo(ChecksumType.SHA256);
         assertThat(configuration.writerBuild()).isEqualTo("nereus-test");
     }
 
     @Test
     void rejectsUnsafeStagingAndContentIdentity() {
-        assertThatThrownBy(
-                        () -> configuration(
-                                Path.of("relative/checkpoint"),
-                                1L << 30,
-                                8 << 20))
+        assertThatThrownBy(() -> configuration(Path.of("relative/checkpoint"), 1L << 30, 8 << 20))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("absolute");
 
-        assertThatThrownBy(
-                        () -> configuration(
-                                Path.of("/tmp/nereus-kafka-checkpoint"),
-                                64L << 10,
-                                8 << 20))
+        assertThatThrownBy(() -> configuration(Path.of("/tmp/nereus-kafka-checkpoint"), 64L << 10, 8 << 20))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maxStagingBytes");
 
-        assertThatThrownBy(
-                        () -> new NereusKafkaMaintenanceConfiguration(
-                                Path.of("/tmp/nereus-kafka-checkpoint"),
-                                1L << 30,
-                                8 << 20,
-                                Duration.ofHours(1),
-                                Duration.ofSeconds(30),
-                                Duration.ofSeconds(30),
-                                Duration.ofSeconds(30),
-                                Duration.ofMinutes(5),
-                                Duration.ofMinutes(5),
-                                4,
-                                1_024,
-                                new Checksum(ChecksumType.CRC32C, "00000000"),
-                                "nereus-test"))
+        assertThatThrownBy(() -> new NereusKafkaMaintenanceConfiguration(
+                        Path.of("/tmp/nereus-kafka-checkpoint"),
+                        1L << 30,
+                        8 << 20,
+                        Duration.ofHours(1),
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(30),
+                        Duration.ofMinutes(5),
+                        Duration.ofMinutes(5),
+                        4,
+                        1_024,
+                        new Checksum(ChecksumType.CRC32C, "00000000"),
+                        "nereus-test"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("SHA256");
     }

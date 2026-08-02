@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.CapabilityMetadataClient;
 import com.nereusstream.metadata.oxia.CapabilityMetadataValue;
 import java.time.Duration;
@@ -23,43 +23,37 @@ class OxiaBookKeeperCapabilityStoreTest {
                 new OxiaBookKeeperLedgerIdNamespaceReservationStore(client);
         BookKeeperWalConfiguration configuration = configuration();
         BookKeeperLedgerIdNamespaceReservationValue active = namespaceValue(
-                configuration,
-                BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE,
-                1,
-                0,
-                "22".repeat(32));
+                configuration, BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE, 1, 0, "22".repeat(32));
 
         client.failNextAfterApply = true;
-        BookKeeperLedgerIdNamespaceReservation created = store.create(active, TIMEOUT).join();
+        BookKeeperLedgerIdNamespaceReservation created =
+                store.create(active, TIMEOUT).join();
         assertThat(created.metadataVersion()).isZero();
 
         BookKeeperLedgerIdNamespaceReservationValue revoked = namespaceValue(
-                configuration,
-                BookKeeperLedgerIdNamespaceReservation.Lifecycle.REVOKED,
-                2,
-                200,
-                "33".repeat(32));
+                configuration, BookKeeperLedgerIdNamespaceReservation.Lifecycle.REVOKED, 2, 200, "33".repeat(32));
         client.failNextAfterApply = true;
-        BookKeeperLedgerIdNamespaceReservation updated = store.compareAndSet(
-                revoked, created.metadataVersion(), TIMEOUT).join();
+        BookKeeperLedgerIdNamespaceReservation updated =
+                store.compareAndSet(revoked, created.metadataVersion(), TIMEOUT).join();
         assertThat(updated.metadataVersion()).isEqualTo(1);
         assertThat(store.read(
-                        configuration.providerScopeSha256(),
-                        configuration.ledgerIdPrefixBits(),
-                        configuration.ledgerIdPrefixValue(),
-                        TIMEOUT).join().orElseThrow())
+                                configuration.providerScopeSha256(),
+                                configuration.ledgerIdPrefixBits(),
+                                configuration.ledgerIdPrefixValue(),
+                                TIMEOUT)
+                        .join()
+                        .orElseThrow())
                 .isEqualTo(updated);
     }
 
     @Test
     void activationCreateAndCasRecoverAppliedResponseLossButNotForeignConflict() {
         FakeCapabilityClient client = new FakeCapabilityClient();
-        OxiaBookKeeperProtocolActivationStore store =
-                new OxiaBookKeeperProtocolActivationStore(client);
+        OxiaBookKeeperProtocolActivationStore store = new OxiaBookKeeperProtocolActivationStore(client);
         BookKeeperWalConfiguration configuration = configuration();
         BookKeeperLedgerIdNamespaceReservation namespace = namespace(configuration);
-        BookKeeperProtocolActivationValue prepared = BookKeeperProtocolActivationValue.prepared(
-                configuration, namespace, 3, "44".repeat(32));
+        BookKeeperProtocolActivationValue prepared =
+                BookKeeperProtocolActivationValue.prepared(configuration, namespace, 3, "44".repeat(32));
 
         client.failNextAfterApply = true;
         var created = store.create(prepared, TIMEOUT).join();
@@ -84,30 +78,30 @@ class OxiaBookKeeperCapabilityStoreTest {
                 "0".repeat(64),
                 100);
         client.failNextAfterApply = true;
-        var updated = store.compareAndSet(active, created.metadataVersion(), TIMEOUT).join();
+        var updated =
+                store.compareAndSet(active, created.metadataVersion(), TIMEOUT).join();
         assertThat(updated.metadataVersion()).isEqualTo(1);
         assertThat(updated.supportsAllPublications()).isTrue();
 
         FakeCapabilityClient conflicting = new FakeCapabilityClient();
-        OxiaBookKeeperProtocolActivationStore conflictStore =
-                new OxiaBookKeeperProtocolActivationStore(conflicting);
+        OxiaBookKeeperProtocolActivationStore conflictStore = new OxiaBookKeeperProtocolActivationStore(conflicting);
         conflictStore.create(prepared, TIMEOUT).join();
-        BookKeeperProtocolActivationValue drifted = BookKeeperProtocolActivationValue.prepared(
-                configuration, namespace, 4, "55".repeat(32));
-        assertThatThrownBy(() -> conflictStore.create(drifted, TIMEOUT).join())
-                .hasRootCauseMessage("condition failed");
+        BookKeeperProtocolActivationValue drifted =
+                BookKeeperProtocolActivationValue.prepared(configuration, namespace, 4, "55".repeat(32));
+        assertThatThrownBy(() -> conflictStore.create(drifted, TIMEOUT).join()).hasRootCauseMessage("condition failed");
     }
 
-    private static BookKeeperLedgerIdNamespaceReservation namespace(
-            BookKeeperWalConfiguration configuration) {
+    private static BookKeeperLedgerIdNamespaceReservation namespace(BookKeeperWalConfiguration configuration) {
         FakeCapabilityClient client = new FakeCapabilityClient();
         return new OxiaBookKeeperLedgerIdNamespaceReservationStore(client)
-                .create(namespaceValue(
-                        configuration,
-                        BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE,
-                        1,
-                        0,
-                        "22".repeat(32)), TIMEOUT)
+                .create(
+                        namespaceValue(
+                                configuration,
+                                BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE,
+                                1,
+                                0,
+                                "22".repeat(32)),
+                        TIMEOUT)
                 .join();
     }
 
@@ -169,14 +163,12 @@ class OxiaBookKeeperCapabilityStoreTest {
         private boolean failNextAfterApply;
 
         @Override
-        public CompletableFuture<Optional<CapabilityMetadataValue>> get(
-                String key, String partitionKey) {
+        public CompletableFuture<Optional<CapabilityMetadataValue>> get(String key, String partitionKey) {
             return CompletableFuture.completedFuture(Optional.ofNullable(values.get(key)));
         }
 
         @Override
-        public CompletableFuture<CapabilityMetadataValue> putIfAbsent(
-                String key, byte[] value, String partitionKey) {
+        public CompletableFuture<CapabilityMetadataValue> putIfAbsent(String key, byte[] value, String partitionKey) {
             if (values.containsKey(key)) {
                 return CompletableFuture.failedFuture(new IllegalStateException("condition failed"));
             }
@@ -185,10 +177,7 @@ class OxiaBookKeeperCapabilityStoreTest {
 
         @Override
         public CompletableFuture<CapabilityMetadataValue> putIfVersion(
-                String key,
-                byte[] value,
-                long expectedVersion,
-                String partitionKey) {
+                String key, byte[] value, long expectedVersion, String partitionKey) {
             CapabilityMetadataValue current = values.get(key);
             if (current == null || current.version() != expectedVersion) {
                 return CompletableFuture.failedFuture(new IllegalStateException("condition failed"));
@@ -196,8 +185,7 @@ class OxiaBookKeeperCapabilityStoreTest {
             return applied(key, value, expectedVersion + 1);
         }
 
-        private CompletableFuture<CapabilityMetadataValue> applied(
-                String key, byte[] value, long version) {
+        private CompletableFuture<CapabilityMetadataValue> applied(String key, byte[] value, long version) {
             CapabilityMetadataValue stored = new CapabilityMetadataValue(key, value, version);
             values.put(key, stored);
             if (failNextAfterApply) {

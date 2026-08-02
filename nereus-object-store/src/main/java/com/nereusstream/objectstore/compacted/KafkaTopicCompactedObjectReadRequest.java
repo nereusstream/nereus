@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.FirstEntryPolicy;
@@ -9,7 +10,9 @@ import com.nereusstream.api.target.ObjectSliceReadTarget;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Exact immutable NTC2 target, boundary mode, and logical read limits. */
+/**
+ * Exact immutable NTC2 target, boundary mode, and logical read limits.
+ */
 public record KafkaTopicCompactedObjectReadRequest(
         StreamId streamId,
         OffsetRange sourceCoverage,

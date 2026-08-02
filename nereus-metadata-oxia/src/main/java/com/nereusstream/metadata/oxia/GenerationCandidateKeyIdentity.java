@@ -1,16 +1,15 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-/** Exact routing identity decoded from one canonical generation-candidate key. */
-public record GenerationCandidateKeyIdentity(
-        StreamId streamId,
-        ReadView view,
-        long offsetEnd,
-        long generation) {
+/**
+ * Exact routing identity decoded from one canonical generation-candidate key.
+ */
+public record GenerationCandidateKeyIdentity(StreamId streamId, ReadView view, long offsetEnd, long generation) {
     public GenerationCandidateKeyIdentity {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(view, "view");
@@ -18,8 +17,7 @@ public record GenerationCandidateKeyIdentity(
             throw new IllegalArgumentException("generation-candidate key identity is invalid");
         }
         if (generation == 0 && view != ReadView.COMMITTED) {
-            throw new IllegalArgumentException(
-                    "generation zero exists only in the COMMITTED view");
+            throw new IllegalArgumentException("generation zero exists only in the COMMITTED view");
         }
     }
 

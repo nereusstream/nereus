@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.ErrorCode;
@@ -43,7 +44,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
-/** Exact NCP2/NTC2 target adapter; physical and logical format identities are both registry keys. */
+/**
+ * Exact NCP2/NTC2 target adapter; physical and logical format identities are both registry keys.
+ */
 public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
     public static final ReadTargetReaderKey NCP2_KEY = key(CompactedObjectFormatV2.COMMITTED_PHYSICAL_FORMAT);
     public static final ReadTargetReaderKey NTC2_KEY = key(CompactedObjectFormatV2.TOPIC_COMPACTED_PHYSICAL_FORMAT);
@@ -52,8 +55,7 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
     private final KafkaTopicCompactedObjectReader ntc2Reader;
 
     public ParquetV2CompactedTargetReader(
-            RangedCompactedObjectReader ncp2Reader,
-            KafkaTopicCompactedObjectReader ntc2Reader) {
+            RangedCompactedObjectReader ncp2Reader, KafkaTopicCompactedObjectReader ntc2Reader) {
         this.ncp2Reader = Objects.requireNonNull(ncp2Reader, "ncp2Reader");
         this.ntc2Reader = Objects.requireNonNull(ntc2Reader, "ntc2Reader");
     }
@@ -80,10 +82,7 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
 
     @Override
     public CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
-            StreamId streamId,
-            long startOffset,
-            List<ResolvedRange> ranges,
-            ReadOptions options) {
+            StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
         return readPhysicalWithStats(
                 streamId,
                 new ReadRequest(
@@ -97,9 +96,7 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
 
     @Override
     public CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
-            StreamId streamId,
-            ReadRequest request,
-            List<ResolvedRange> ranges) {
+            StreamId streamId, ReadRequest request, List<ResolvedRange> ranges) {
         try {
             Objects.requireNonNull(streamId, "streamId");
             Objects.requireNonNull(request, "request");
@@ -133,70 +130,106 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
             long returnedBytes,
             long coverageEndOffset) {
         ReadOptions options = request.options();
-        if (index >= ranges.size()
-                || returnedRecords >= options.maxRecords()
-                || returnedBytes >= options.maxBytes()) {
-            return CompletableFuture.completedFuture(new PhysicalReadResult(
-                    batches, stats, OptionalLong.of(coverageEndOffset)));
+        if (index >= ranges.size() || returnedRecords >= options.maxRecords() || returnedBytes >= options.maxBytes()) {
+            return CompletableFuture.completedFuture(
+                    new PhysicalReadResult(batches, stats, OptionalLong.of(coverageEndOffset)));
         }
         ResolvedRange range = ranges.get(index);
         long start = Math.max(coverageEndOffset, range.offsetRange().startOffset());
         if (start >= range.offsetRange().endOffset()) {
             return readNext(
-                    streamId, request, ranges, index + 1, deadline, batches, stats,
-                    returnedRecords, returnedBytes, coverageEndOffset);
+                    streamId,
+                    request,
+                    ranges,
+                    index + 1,
+                    deadline,
+                    batches,
+                    stats,
+                    returnedRecords,
+                    returnedBytes,
+                    coverageEndOffset);
         }
         int remainingRecords = Math.toIntExact(options.maxRecords() - returnedRecords);
         int remainingBytes = Math.toIntExact(options.maxBytes() - returnedBytes);
-        FirstEntryPolicy firstPolicy = batches.isEmpty()
-                ? request.firstEntryPolicy()
-                : FirstEntryPolicy.LEGACY_STRICT_LIMIT;
+        FirstEntryPolicy firstPolicy =
+                batches.isEmpty() ? request.firstEntryPolicy() : FirstEntryPolicy.LEGACY_STRICT_LIMIT;
         ObjectSliceReadTarget target = requireTarget(range);
         if (request.view() == ReadView.COMMITTED) {
             RangedCompactedObjectReadRequest physical = new RangedCompactedObjectReadRequest(
-                    streamId, range.offsetRange(), start, target, range.payloadFormat(),
-                    request.boundaryMode(), firstPolicy, remainingRecords, remainingBytes, deadline.remaining());
-            return ncp2Reader.read(physical)
+                    streamId,
+                    range.offsetRange(),
+                    start,
+                    target,
+                    range.payloadFormat(),
+                    request.boundaryMode(),
+                    firstPolicy,
+                    remainingRecords,
+                    remainingBytes,
+                    deadline.remaining());
+            return ncp2Reader
+                    .read(physical)
                     .handle((result, failure) -> failure == null
                             ? appendNcp2(
-                                    streamId, request, ranges, index, deadline, batches, stats,
-                                    returnedRecords, returnedBytes, range, target, result)
-                            : stopAtReadLimitOrFail(
-                                    failure, batches, stats, coverageEndOffset))
+                                    streamId,
+                                    request,
+                                    ranges,
+                                    index,
+                                    deadline,
+                                    batches,
+                                    stats,
+                                    returnedRecords,
+                                    returnedBytes,
+                                    range,
+                                    target,
+                                    result)
+                            : stopAtReadLimitOrFail(failure, batches, stats, coverageEndOffset))
                     .thenCompose(next -> next);
         }
         KafkaTopicCompactedObjectReadRequest physical = new KafkaTopicCompactedObjectReadRequest(
-                streamId, range.offsetRange(), start, target, request.boundaryMode(), firstPolicy,
-                remainingRecords, remainingBytes, deadline.remaining());
-        return ntc2Reader.read(physical)
+                streamId,
+                range.offsetRange(),
+                start,
+                target,
+                request.boundaryMode(),
+                firstPolicy,
+                remainingRecords,
+                remainingBytes,
+                deadline.remaining());
+        return ntc2Reader
+                .read(physical)
                 .handle((result, failure) -> failure == null
                         ? appendNtc2(
-                                streamId, request, ranges, index, deadline, batches, stats,
-                                returnedRecords, returnedBytes, range, target, result)
-                        : stopAtReadLimitOrFail(
-                                failure, batches, stats, coverageEndOffset))
+                                streamId,
+                                request,
+                                ranges,
+                                index,
+                                deadline,
+                                batches,
+                                stats,
+                                returnedRecords,
+                                returnedBytes,
+                                range,
+                                target,
+                                result)
+                        : stopAtReadLimitOrFail(failure, batches, stats, coverageEndOffset))
                 .thenCompose(next -> next);
     }
 
     private static CompletableFuture<PhysicalReadResult> stopAtReadLimitOrFail(
-            Throwable failure,
-            List<ReadBatch> batches,
-            List<PhysicalReadStats> stats,
-            long coverageEndOffset) {
+            Throwable failure, List<ReadBatch> batches, List<PhysicalReadStats> stats, long coverageEndOffset) {
         Throwable cause = unwrap(failure);
         if (!batches.isEmpty()
                 && cause instanceof NereusException nereus
                 && nereus.code() == ErrorCode.READ_LIMIT_TOO_SMALL) {
-            return CompletableFuture.completedFuture(new PhysicalReadResult(
-                    batches, stats, OptionalLong.of(coverageEndOffset)));
+            return CompletableFuture.completedFuture(
+                    new PhysicalReadResult(batches, stats, OptionalLong.of(coverageEndOffset)));
         }
         return CompletableFuture.failedFuture(cause);
     }
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while ((current instanceof CompletionException
-                        || current instanceof ExecutionException)
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -227,8 +260,15 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
         }
         addStats(stats, target, result.physicalBytesRead(), result.footerBytesRead(), rangeBytes);
         return continueAfter(
-                streamId, request, ranges, index, deadline, batches, stats,
-                Math.addExact(returnedRecords, rangeRecords), Math.addExact(returnedBytes, rangeBytes),
+                streamId,
+                request,
+                ranges,
+                index,
+                deadline,
+                batches,
+                stats,
+                Math.addExact(returnedRecords, rangeRecords),
+                Math.addExact(returnedBytes, rangeBytes),
                 result.sourceCoverageEndOffset());
     }
 
@@ -256,8 +296,15 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
         }
         addStats(stats, target, result.physicalBytesRead(), result.footerBytesRead(), rangeBytes);
         return continueAfter(
-                streamId, request, ranges, index, deadline, batches, stats,
-                Math.addExact(returnedRecords, rangeRecords), Math.addExact(returnedBytes, rangeBytes),
+                streamId,
+                request,
+                ranges,
+                index,
+                deadline,
+                batches,
+                stats,
+                Math.addExact(returnedRecords, rangeRecords),
+                Math.addExact(returnedBytes, rangeBytes),
                 result.sourceCoverageEndOffset());
     }
 
@@ -273,20 +320,24 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
             long returnedBytes,
             long coverageEndOffset) {
         if (coverageEndOffset < ranges.get(index).offsetRange().endOffset()) {
-            return CompletableFuture.completedFuture(new PhysicalReadResult(
-                    batches, stats, OptionalLong.of(coverageEndOffset)));
+            return CompletableFuture.completedFuture(
+                    new PhysicalReadResult(batches, stats, OptionalLong.of(coverageEndOffset)));
         }
         return readNext(
-                streamId, request, ranges, index + 1, deadline, batches, stats,
-                returnedRecords, returnedBytes, coverageEndOffset);
+                streamId,
+                request,
+                ranges,
+                index + 1,
+                deadline,
+                batches,
+                stats,
+                returnedRecords,
+                returnedBytes,
+                coverageEndOffset);
     }
 
     private static ReadBatch batch(
-            ResolvedRange range,
-            ObjectSliceReadTarget target,
-            long startOffset,
-            long endOffset,
-            byte[] payload) {
+            ResolvedRange range, ObjectSliceReadTarget target, long startOffset, long endOffset, byte[] payload) {
         return new ReadBatch(
                 new OffsetRange(startOffset, endOffset),
                 range.payloadFormat(),
@@ -294,7 +345,10 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
                 range.schemaRefs(),
                 range.projectionRef(),
                 new ReadSourceRef(
-                        range.offsetRange(), range.generation(), range.commitVersion(), target,
+                        range.offsetRange(),
+                        range.generation(),
+                        range.commitVersion(),
+                        target,
                         ReadTargetIdentities.sha256(target)),
                 target.objectOffset(),
                 target.objectLength());
@@ -348,17 +402,12 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
                 || !target.logicalFormat().equals(CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT)
                 || range.payloadFormat() != PayloadFormat.KAFKA_RECORD_BATCH) {
             throw new NereusException(
-                    ErrorCode.UNSUPPORTED_READ_TARGET,
-                    false,
-                    "V2 compacted reader received a non-exact target");
+                    ErrorCode.UNSUPPORTED_READ_TARGET, false, "V2 compacted reader received a non-exact target");
         }
         return target;
     }
 
-    private static void requireMetadata(
-            ResolvedRange range,
-            RangedCompactedObjectMetadata metadata,
-            ReadView view) {
+    private static void requireMetadata(ResolvedRange range, RangedCompactedObjectMetadata metadata, ReadView view) {
         if (metadata.view() != view
                 || !metadata.sourceCoverage().equals(range.offsetRange())
                 || metadata.payloadFormat() != range.payloadFormat()
@@ -366,8 +415,7 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
                 || metadata.entryCount() != range.entryCount()
                 || metadata.logicalBytes() != range.logicalBytes()
                 || (view == ReadView.COMMITTED && metadata.outputRecordCount() != range.recordCount())) {
-            throw new CompactedObjectFormatException(
-                    "V2 metadata does not match resolved generation index");
+            throw new CompactedObjectFormatException("V2 metadata does not match resolved generation index");
         }
     }
 
@@ -388,8 +436,7 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
     }
 
     private static NereusException invariant(String message, Throwable failure) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, failure);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, failure);
     }
 
     private static final class Deadline {
@@ -407,9 +454,7 @@ public final class ParquetV2CompactedTargetReader implements ReadTargetReader {
         }
 
         private Duration remaining() {
-            long nanos = deadlineNanos == Long.MAX_VALUE
-                    ? Long.MAX_VALUE
-                    : deadlineNanos - System.nanoTime();
+            long nanos = deadlineNanos == Long.MAX_VALUE ? Long.MAX_VALUE : deadlineNanos - System.nanoTime();
             if (nanos <= 0) {
                 throw new NereusException(ErrorCode.TIMEOUT, true, "V2 compacted read deadline expired");
             }

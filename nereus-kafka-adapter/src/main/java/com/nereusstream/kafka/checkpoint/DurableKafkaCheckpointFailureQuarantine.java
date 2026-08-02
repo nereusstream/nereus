@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.checkpoint;
 
 import com.nereusstream.api.ErrorCode;
@@ -9,7 +10,6 @@ import com.nereusstream.metadata.oxia.VersionedKafkaCheckpointFailure;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureRecord;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
-
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -20,9 +20,10 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-/** Oxia-backed immutable quarantine and redacted first-failure audit. */
-public final class DurableKafkaCheckpointFailureQuarantine
-        implements KafkaCheckpointFailureQuarantine {
+/**
+ * Oxia-backed immutable quarantine and redacted first-failure audit.
+ */
+public final class DurableKafkaCheckpointFailureQuarantine implements KafkaCheckpointFailureQuarantine {
     private static final byte[] REFERENCE_DOMAIN =
             "nereus-kafka-checkpoint-reference-v1\0".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] FAILURE_DOMAIN =
@@ -31,35 +32,26 @@ public final class DurableKafkaCheckpointFailureQuarantine
     private final KafkaCheckpointFailureMetadataStore failures;
     private final Clock clock;
 
-    public DurableKafkaCheckpointFailureQuarantine(
-            KafkaCheckpointFailureMetadataStore failures, Clock clock) {
+    public DurableKafkaCheckpointFailureQuarantine(KafkaCheckpointFailureMetadataStore failures, Clock clock) {
         this.failures = Objects.requireNonNull(failures, "failures");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Override
     public CompletableFuture<Boolean> isQuarantined(
-            KafkaPartitionId identity,
-            long partitionIncarnation,
-            KafkaCheckpointReferenceRecord reference) {
+            KafkaPartitionId identity, long partitionIncarnation, KafkaCheckpointReferenceRecord reference) {
         KafkaPartitionId exactIdentity = Objects.requireNonNull(identity, "identity");
-        KafkaCheckpointReferenceRecord exactReference =
-                Objects.requireNonNull(reference, "reference");
+        KafkaCheckpointReferenceRecord exactReference = Objects.requireNonNull(reference, "reference");
         byte[] expectedSha = referenceSha256(exactReference);
         return failures.get(exactIdentity, partitionIncarnation, exactReference.objectId())
-                .thenApply(
-                        optional -> {
-                            if (optional.isEmpty()) {
-                                return false;
-                            }
-                            requireExact(
-                                    exactIdentity,
-                                    partitionIncarnation,
-                                    exactReference,
-                                    expectedSha,
-                                    optional.orElseThrow());
-                            return true;
-                        });
+                .thenApply(optional -> {
+                    if (optional.isEmpty()) {
+                        return false;
+                    }
+                    requireExact(
+                            exactIdentity, partitionIncarnation, exactReference, expectedSha, optional.orElseThrow());
+                    return true;
+                });
     }
 
     @Override
@@ -70,34 +62,26 @@ public final class DurableKafkaCheckpointFailureQuarantine
             KafkaCheckpointFailureSource source,
             Throwable failure) {
         KafkaPartitionId exactIdentity = Objects.requireNonNull(identity, "identity");
-        KafkaCheckpointReferenceRecord exactReference =
-                Objects.requireNonNull(reference, "reference");
+        KafkaCheckpointReferenceRecord exactReference = Objects.requireNonNull(reference, "reference");
         KafkaCheckpointFailureSource exactSource = Objects.requireNonNull(source, "source");
         NereusException exactFailure = requireQuarantinable(failure);
         long now = clock.millis();
-        KafkaCheckpointFailureRecord requested =
-                new KafkaCheckpointFailureRecord(
-                        1,
-                        exactIdentity.kafkaClusterId(),
-                        exactIdentity.topicId(),
-                        exactIdentity.partitionId(),
-                        partitionIncarnation,
-                        exactReference.objectId(),
-                        referenceSha256(exactReference),
-                        exactSource.wireId(),
-                        exactFailure.code().name(),
-                        failureSha256(exactFailure),
-                        now,
-                        0);
+        KafkaCheckpointFailureRecord requested = new KafkaCheckpointFailureRecord(
+                1,
+                exactIdentity.kafkaClusterId(),
+                exactIdentity.topicId(),
+                exactIdentity.partitionId(),
+                partitionIncarnation,
+                exactReference.objectId(),
+                referenceSha256(exactReference),
+                exactSource.wireId(),
+                exactFailure.code().name(),
+                failureSha256(exactFailure),
+                now,
+                0);
         return failures.putIfAbsent(requested)
-                .thenAccept(
-                        stored ->
-                                requireExact(
-                                        exactIdentity,
-                                        partitionIncarnation,
-                                        exactReference,
-                                        requested.referenceSha256(),
-                                        stored));
+                .thenAccept(stored -> requireExact(
+                        exactIdentity, partitionIncarnation, exactReference, requested.referenceSha256(), stored));
     }
 
     private static void requireExact(
@@ -118,16 +102,12 @@ public final class DurableKafkaCheckpointFailureQuarantine
     private static NereusException requireQuarantinable(Throwable supplied) {
         Throwable exact = unwrap(Objects.requireNonNull(supplied, "failure"));
         if (!(exact instanceof NereusException nereus)) {
-            throw new IllegalArgumentException(
-                    "checkpoint quarantine requires a classified Nereus failure", exact);
+            throw new IllegalArgumentException("checkpoint quarantine requires a classified Nereus failure", exact);
         }
         boolean allowed =
                 switch (nereus.code()) {
-                    case OBJECT_NOT_FOUND,
-                            OBJECT_CHECKSUM_MISMATCH,
-                            UNSUPPORTED_FORMAT,
-                            METADATA_INVARIANT_VIOLATION ->
-                            true;
+                    case OBJECT_NOT_FOUND, OBJECT_CHECKSUM_MISMATCH, UNSUPPORTED_FORMAT, METADATA_INVARIANT_VIOLATION ->
+                        true;
                     default -> false;
                 };
         if (!allowed) {

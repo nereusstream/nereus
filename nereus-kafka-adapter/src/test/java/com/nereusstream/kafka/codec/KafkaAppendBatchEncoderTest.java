@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
@@ -50,14 +50,10 @@ class KafkaAppendBatchEncoderTest {
         byte[] first = KafkaRecordBatchTestSupport.batch(10, CompressionType.NONE, 1_000, "a");
         byte[] gap = KafkaRecordBatchTestSupport.batch(12, CompressionType.NONE, 2_000, "b");
 
-        assertThatThrownBy(() -> encoder.encode(ByteBuffer.wrap(first), 9))
-                .hasMessageContaining("expected base 9");
-        assertThatThrownBy(() -> encoder.encode(
-                        ByteBuffer.wrap(KafkaRecordBatchTestSupport.concat(first, gap)), 10))
+        assertThatThrownBy(() -> encoder.encode(ByteBuffer.wrap(first), 9)).hasMessageContaining("expected base 9");
+        assertThatThrownBy(() -> encoder.encode(ByteBuffer.wrap(KafkaRecordBatchTestSupport.concat(first, gap)), 10))
                 .hasMessageContaining("not dense");
-        assertThatThrownBy(() -> encoder.encode(ByteBuffer.allocate(0), 0))
-                .hasMessageContaining("cannot be empty");
-
+        assertThatThrownBy(() -> encoder.encode(ByteBuffer.allocate(0), 0)).hasMessageContaining("cannot be empty");
     }
 
     @Test
@@ -71,15 +67,11 @@ class KafkaAppendBatchEncoderTest {
                 2,
                 new SimpleRecord(1_000, "v".getBytes()));
         byte[] idempotentBytes = KafkaRecordBatchTestSupport.bytes(idempotent);
-        EncodedKafkaAppend encodedIdempotent =
-                encoder.encode(ByteBuffer.wrap(idempotentBytes), 10);
+        EncodedKafkaAppend encodedIdempotent = encoder.encode(ByteBuffer.wrap(idempotentBytes), 10);
 
-        assertThat(encodedIdempotent.range())
-                .isEqualTo(new OffsetRange(10, 11));
-        assertThat(encodedIdempotent.recordBatches().get(0).producerId())
-                .isEqualTo(7);
-        assertThat(encodedIdempotent.appendBatch().entries().get(0).payload())
-                .isEqualTo(idempotentBytes);
+        assertThat(encodedIdempotent.range()).isEqualTo(new OffsetRange(10, 11));
+        assertThat(encodedIdempotent.recordBatches().get(0).producerId()).isEqualTo(7);
+        assertThat(encodedIdempotent.appendBatch().entries().get(0).payload()).isEqualTo(idempotentBytes);
 
         MemoryRecords transactional = MemoryRecords.withTransactionalRecords(
                 11,
@@ -90,32 +82,18 @@ class KafkaAppendBatchEncoderTest {
                 3,
                 new SimpleRecord(2_000, "txn".getBytes()));
         MemoryRecords marker = MemoryRecords.withEndTransactionMarker(
-                12,
-                2_001,
-                3,
-                8,
-                (short) 2,
-                new EndTransactionMarker(ControlRecordType.ABORT, 4));
-        byte[] transactionalBytes =
-                KafkaRecordBatchTestSupport.bytes(transactional);
+                12, 2_001, 3, 8, (short) 2, new EndTransactionMarker(ControlRecordType.ABORT, 4));
+        byte[] transactionalBytes = KafkaRecordBatchTestSupport.bytes(transactional);
         byte[] markerBytes = KafkaRecordBatchTestSupport.bytes(marker);
         EncodedKafkaAppend encodedTransaction = encoder.encode(
-                ByteBuffer.wrap(KafkaRecordBatchTestSupport.concat(
-                        transactionalBytes, markerBytes)),
-                11);
+                ByteBuffer.wrap(KafkaRecordBatchTestSupport.concat(transactionalBytes, markerBytes)), 11);
 
-        assertThat(encodedTransaction.range())
-                .isEqualTo(new OffsetRange(11, 13));
-        assertThat(encodedTransaction.recordBatches().get(0).transactional())
-                .isTrue();
-        assertThat(encodedTransaction.recordBatches().get(1).controlBatch())
-                .isTrue();
-        assertThat(encodedTransaction.recordBatches().get(1).baseSequence())
-                .isEqualTo(RecordBatch.NO_SEQUENCE);
-        assertThat(encodedTransaction.appendBatch().entries().get(0).payload())
-                .isEqualTo(transactionalBytes);
-        assertThat(encodedTransaction.appendBatch().entries().get(1).payload())
-                .isEqualTo(markerBytes);
+        assertThat(encodedTransaction.range()).isEqualTo(new OffsetRange(11, 13));
+        assertThat(encodedTransaction.recordBatches().get(0).transactional()).isTrue();
+        assertThat(encodedTransaction.recordBatches().get(1).controlBatch()).isTrue();
+        assertThat(encodedTransaction.recordBatches().get(1).baseSequence()).isEqualTo(RecordBatch.NO_SEQUENCE);
+        assertThat(encodedTransaction.appendBatch().entries().get(0).payload()).isEqualTo(transactionalBytes);
+        assertThat(encodedTransaction.appendBatch().entries().get(1).payload()).isEqualTo(markerBytes);
     }
 
     @Test
@@ -125,7 +103,8 @@ class KafkaAppendBatchEncoderTest {
         StreamId streamId = new StreamId("kafka-stream");
         AppendResult valid = result(streamId, encoded, encoded.encodedBytes());
 
-        assertThat(KafkaAppendResultValidator.validate(streamId, encoded, valid)).isSameAs(valid);
+        assertThat(KafkaAppendResultValidator.validate(streamId, encoded, valid))
+                .isSameAs(valid);
 
         AppendResult wrongBytes = result(streamId, encoded, encoded.encodedBytes() + 1);
         assertThatThrownBy(() -> KafkaAppendResultValidator.validate(streamId, encoded, wrongBytes))
@@ -141,9 +120,9 @@ class KafkaAppendBatchEncoderTest {
                 logicalBytes,
                 0,
                 KafkaRecordBatchTestSupport.readBatch(
-                        encoded.range(),
-                        encoded.recordBatches().get(0).encodedBytes(),
-                        "append-target").source().target(),
+                                encoded.range(), encoded.recordBatches().get(0).encodedBytes(), "append-target")
+                        .source()
+                        .target(),
                 PayloadFormat.KAFKA_RECORD_BATCH,
                 encoded.appendBatch().recordCount(),
                 encoded.appendBatch().entryCount(),

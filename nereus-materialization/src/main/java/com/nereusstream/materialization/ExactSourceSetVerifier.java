@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadSourceRef;
 import java.util.Objects;
 
-/** Streaming proof that decoded batches came from every frozen source exactly once and in order. */
+/**
+ * Streaming proof that decoded batches came from every frozen source exactly once and in order.
+ */
 public final class ExactSourceSetVerifier {
     private final ExactSourceSet sourceSet;
     private int sourceIndex;
@@ -40,8 +43,7 @@ public final class ExactSourceSetVerifier {
                 || batch.payloadFormat() != expected.payloadFormat()
                 || !batch.projectionRef().equals(expected.projectionRef())
                 || !batch.schemaRefs().equals(expected.schemaRefs())) {
-            throw new IllegalArgumentException(
-                    "read batch does not match the frozen exact source identity");
+            throw new IllegalArgumentException("read batch does not match the frozen exact source identity");
         }
         nextOffset = batch.range().endOffset();
         sourceEntries = Math.addExact(sourceEntries, 1);
@@ -51,8 +53,7 @@ public final class ExactSourceSetVerifier {
             if (sourceEntries != expected.entryCount()
                     || sourceRecords != expected.recordCount()
                     || sourceBytes != expected.logicalBytes()) {
-                throw new IllegalArgumentException(
-                        "read batches do not match frozen exact source accounting");
+                throw new IllegalArgumentException("read batches do not match frozen exact source accounting");
             }
             sourceIndex++;
             sourceEntries = 0;
@@ -71,8 +72,7 @@ public final class ExactSourceSetVerifier {
                 || sourceEntries != 0
                 || sourceRecords != 0
                 || sourceBytes != 0) {
-            throw new IllegalArgumentException(
-                    "exact source-set verification ended before frozen coverage");
+            throw new IllegalArgumentException("exact source-set verification ended before frozen coverage");
         }
     }
 }

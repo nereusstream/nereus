@@ -18,7 +18,9 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.OptionalLong;
 
-/** One leader-fenced ListOffsets request with hard committed-tail scan limits. */
+/**
+ * One leader-fenced ListOffsets request with hard committed-tail scan limits.
+ */
 public record KafkaListOffsetsRequest(
         KafkaListOffsetQuery query,
         OptionalLong targetTimestampMillis,

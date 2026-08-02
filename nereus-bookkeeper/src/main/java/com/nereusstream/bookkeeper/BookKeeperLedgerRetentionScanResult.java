@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
-/** Accounting for one complete all-256-shard BookKeeper ledger-retention pass. */
+/**
+ * Accounting for one complete all-256-shard BookKeeper ledger-retention pass.
+ */
 public record BookKeeperLedgerRetentionScanResult(
         boolean mutationEnabled,
         int shardsScanned,

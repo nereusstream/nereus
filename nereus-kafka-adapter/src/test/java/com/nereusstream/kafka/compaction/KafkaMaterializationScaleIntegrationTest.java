@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.compaction;
 
 import static com.nereusstream.kafka.codec.KafkaRecordBatchTestSupport.bytes;
 import static com.nereusstream.kafka.codec.KafkaRecordBatchTestSupport.readBatch;
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.OffsetRange;
@@ -66,7 +66,8 @@ class KafkaMaterializationScaleIntegrationTest {
     private static final int DISTINCT_KEYS = 2_048;
     private static final long WINNER_MEMORY_BYTES = 64L << 10;
 
-    @TempDir Path temporaryDirectory;
+    @TempDir
+    Path temporaryDirectory;
 
     @Test
     @Timeout(value = 3, unit = TimeUnit.MINUTES)
@@ -74,98 +75,66 @@ class KafkaMaterializationScaleIntegrationTest {
         assertThat(RECORD_COUNT % SOURCE_COUNT).isZero();
         List<ReadBatch> batches = batches();
         ExactSourceSet sources = sourceSet(batches);
-        MaterializationPolicy policy =
-                MaterializationPolicyFactory.kafkaTopicCompacted(
-                        new TopicCompactionSpec(
-                                KafkaCompactionStrategyV1.STRATEGY_ID,
-                                KafkaCompactionStrategyV1.STRATEGY_VERSION,
-                                "KCK2"),
-                        2,
-                        SOURCE_COUNT,
-                        RECORD_COUNT,
-                        64L << 20,
-                        8_192,
-                        "UNCOMPRESSED");
-        MaterializationTask task =
-                MaterializationTask.create(
-                        new StreamId("stream-f9-kafka-scale-materialization"),
-                        sources.coverage(),
-                        sources.sources(),
-                        policy);
-        Policy kafkaPolicy =
-                new Policy(
-                        1,
-                        new Checksum(ChecksumType.SHA256, "e".repeat(64)),
-                        0,
-                        60_000,
-                        1_000,
-                        LogConfigHistoryEntry.CLEANUP_COMPACT_FLAG);
+        MaterializationPolicy policy = MaterializationPolicyFactory.kafkaTopicCompacted(
+                new TopicCompactionSpec(
+                        KafkaCompactionStrategyV1.STRATEGY_ID, KafkaCompactionStrategyV1.STRATEGY_VERSION, "KCK2"),
+                2,
+                SOURCE_COUNT,
+                RECORD_COUNT,
+                64L << 20,
+                8_192,
+                "UNCOMPRESSED");
+        MaterializationTask task = MaterializationTask.create(
+                new StreamId("stream-f9-kafka-scale-materialization"), sources.coverage(), sources.sources(), policy);
+        Policy kafkaPolicy = new Policy(
+                1,
+                new Checksum(ChecksumType.SHA256, "e".repeat(64)),
+                0,
+                60_000,
+                1_000,
+                LogConfigHistoryEntry.CLEANUP_COMPACT_FLAG);
         Candidate candidate =
-                new Candidate(
-                        sources.coverage(),
-                        sources.coverage(),
-                        1,
-                        kafkaPolicy,
-                        Optional.empty(),
-                        1_000);
-        Snapshot snapshot =
-                new Snapshot(
-                        sources.coverage(),
-                        sources.coverage(),
-                        RECORD_COUNT,
-                        candidate.evaluatedAtMillis(),
-                        kafkaPolicy.deleteRetentionMs(),
-                        RECORD_COUNT,
-                        64,
-                        WINNER_MEMORY_BYTES,
-                        List.of(),
-                        List.of(),
-                        List.of());
+                new Candidate(sources.coverage(), sources.coverage(), 1, kafkaPolicy, Optional.empty(), 1_000);
+        Snapshot snapshot = new Snapshot(
+                sources.coverage(),
+                sources.coverage(),
+                RECORD_COUNT,
+                candidate.evaluatedAtMillis(),
+                kafkaPolicy.deleteRetentionMs(),
+                RECORD_COUNT,
+                64,
+                WINNER_MEMORY_BYTES,
+                List.of(),
+                List.of(),
+                List.of());
         KafkaCompactionPlan plan =
-                KafkaCompactionPlan.create(
-                        task,
-                        17,
-                        RECORD_COUNT,
-                        RECORD_COUNT,
-                        candidate,
-                        sources,
-                        snapshot);
+                KafkaCompactionPlan.create(task, 17, RECORD_COUNT, RECORD_COUNT, candidate, sources, snapshot);
         AtomicInteger sourceCloses = new AtomicInteger();
         Map<Long, ReadBatch> batchByStart = new HashMap<>(SOURCE_COUNT);
         batches.forEach(batch -> batchByStart.put(batch.range().startOffset(), batch));
-        ExactSourceRangeReader reader =
-                exactReader(batchByStart, sourceCloses);
+        ExactSourceRangeReader reader = exactReader(batchByStart, sourceCloses);
         Path stagingPath = Files.createDirectory(temporaryDirectory.resolve("staging"));
-        Files.setPosixFilePermissions(
-                stagingPath, PosixFilePermissions.fromString("rwx------"));
+        Files.setPosixFilePermissions(stagingPath, PosixFilePermissions.fromString("rwx------"));
 
-        try (StagingFileManager staging =
-                new StagingFileManager(
-                        stagingPath,
-                        256L << 20,
-                        StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
-                        Duration.ofHours(1),
-                        Runnable::run)) {
-            KafkaCompactionStreamingExecutor executor =
-                    new KafkaCompactionStreamingExecutor(
-                            new KafkaTopicCompactionCodecV1(),
-                            new KafkaCompactionStrategyV1(),
-                            new KafkaCompactionRowMapper(),
-                            new Limits(SOURCE_COUNT, DISTINCT_KEYS + 1, 64L << 20),
-                            staging,
-                            Runnable::run);
-            KafkaCompactionBatchSource batchSource =
-                    new KafkaCompactionBatchSource(
-                            reader,
-                            new ReadOptions(
-                                    RECORDS_PER_SOURCE,
-                                    16 << 20,
-                                    ReadIsolation.COMMITTED,
-                                    Duration.ofMinutes(1)),
-                            Runnable::run);
+        try (StagingFileManager staging = new StagingFileManager(
+                stagingPath,
+                256L << 20,
+                StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
+                Duration.ofHours(1),
+                Runnable::run)) {
+            KafkaCompactionStreamingExecutor executor = new KafkaCompactionStreamingExecutor(
+                    new KafkaTopicCompactionCodecV1(),
+                    new KafkaCompactionStrategyV1(),
+                    new KafkaCompactionRowMapper(),
+                    new Limits(SOURCE_COUNT, DISTINCT_KEYS + 1, 64L << 20),
+                    staging,
+                    Runnable::run);
+            KafkaCompactionBatchSource batchSource = new KafkaCompactionBatchSource(
+                    reader,
+                    new ReadOptions(RECORDS_PER_SOURCE, 16 << 20, ReadIsolation.COMMITTED, Duration.ofMinutes(1)),
+                    Runnable::run);
             KafkaCompactionStreamingExecutor.StreamingResult result =
-                    executor.execute(plan, batchSource.open(plan), false)
-                            .get(2, TimeUnit.MINUTES);
+                    executor.execute(plan, batchSource.open(plan), false).get(2, TimeUnit.MINUTES);
             try (result) {
                 assertThat(task.coverage().recordCount()).isEqualTo(RECORD_COUNT);
                 assertThat(task.sources()).hasSize(SOURCE_COUNT);
@@ -178,8 +147,7 @@ class KafkaMaterializationScaleIntegrationTest {
                 assertThat(result.outputRecordCount()).isEqualTo(DISTINCT_KEYS);
                 assertThat(result.outputBatchCount()).isEqualTo(DISTINCT_KEYS);
                 assertThat(result.spillRunCount()).isPositive();
-                assertThat(result.peakInMemoryKeyBytes())
-                        .isLessThanOrEqualTo(WINNER_MEMORY_BYTES);
+                assertThat(result.peakInMemoryKeyBytes()).isLessThanOrEqualTo(WINNER_MEMORY_BYTES);
                 assertThat(staging.reservedBytes()).isPositive();
 
                 RowAccounting rows = consume(result.rows()).get(30, TimeUnit.SECONDS);
@@ -205,26 +173,12 @@ class KafkaMaterializationScaleIntegrationTest {
             SimpleRecord[] records = new SimpleRecord[RECORDS_PER_SOURCE];
             for (int index = 0; index < records.length; index++) {
                 long offset = baseOffset + index;
-                int key =
-                        offset < DISTINCT_KEYS
-                                ? Math.toIntExact(offset)
-                                : DISTINCT_KEYS - 1;
-                records[index] =
-                        new SimpleRecord(1_000 + offset, keys[key], value);
+                int key = offset < DISTINCT_KEYS ? Math.toIntExact(offset) : DISTINCT_KEYS - 1;
+                records[index] = new SimpleRecord(1_000 + offset, keys[key], value);
             }
-            byte[] payload =
-                    bytes(
-                            MemoryRecords.withRecords(
-                                    baseOffset,
-                                    Compression.NONE,
-                                    records));
-            result.add(
-                    readBatch(
-                            new OffsetRange(
-                                    baseOffset,
-                                    baseOffset + RECORDS_PER_SOURCE),
-                            payload,
-                            "scale-" + source));
+            byte[] payload = bytes(MemoryRecords.withRecords(baseOffset, Compression.NONE, records));
+            result.add(readBatch(
+                    new OffsetRange(baseOffset, baseOffset + RECORDS_PER_SOURCE), payload, "scale-" + source));
         }
         return List.copyOf(result);
     }
@@ -233,162 +187,137 @@ class KafkaMaterializationScaleIntegrationTest {
         ArrayList<SourceGeneration> sources = new ArrayList<>(SOURCE_COUNT);
         long cumulativeBytes = 0;
         for (ReadBatch batch : batches) {
-            long nextCumulative =
-                    Math.addExact(cumulativeBytes, batch.payload().length);
-            sources.add(
-                    new SourceGeneration(
-                            ReadView.COMMITTED,
-                            batch.range(),
-                            batch.source().generation(),
-                            batch.source().commitVersion(),
-                            "f9/kafka/scale/" + batch.range().startOffset(),
-                            batch.range().startOffset(),
-                            new Checksum(ChecksumType.SHA256, "d".repeat(64)),
-                            batch.source().target(),
-                            batch.source().targetIdentity(),
-                            Optional.empty(),
-                            batch.payloadFormat(),
-                            batch.projectionRef(),
-                            Math.toIntExact(batch.range().recordCount()),
-                            1,
-                            batch.payload().length,
-                            batch.schemaRefs(),
-                            cumulativeBytes,
-                            nextCumulative));
+            long nextCumulative = Math.addExact(cumulativeBytes, batch.payload().length);
+            sources.add(new SourceGeneration(
+                    ReadView.COMMITTED,
+                    batch.range(),
+                    batch.source().generation(),
+                    batch.source().commitVersion(),
+                    "f9/kafka/scale/" + batch.range().startOffset(),
+                    batch.range().startOffset(),
+                    new Checksum(ChecksumType.SHA256, "d".repeat(64)),
+                    batch.source().target(),
+                    batch.source().targetIdentity(),
+                    Optional.empty(),
+                    batch.payloadFormat(),
+                    batch.projectionRef(),
+                    Math.toIntExact(batch.range().recordCount()),
+                    1,
+                    batch.payload().length,
+                    batch.schemaRefs(),
+                    cumulativeBytes,
+                    nextCumulative));
             cumulativeBytes = nextCumulative;
         }
-        return ExactSourceSet.create(
-                ReadView.COMMITTED,
-                new OffsetRange(0, RECORD_COUNT),
-                sources);
+        return ExactSourceSet.create(ReadView.COMMITTED, new OffsetRange(0, RECORD_COUNT), sources);
     }
 
-    private static ExactSourceRangeReader exactReader(
-            Map<Long, ReadBatch> batches,
-            AtomicInteger closes) {
+    private static ExactSourceRangeReader exactReader(Map<Long, ReadBatch> batches, AtomicInteger closes) {
         return (source, options) -> {
-            ReadBatch original =
-                    Optional.ofNullable(batches.get(source.range().startOffset()))
-                            .orElseThrow();
-            ReadBatch exact =
-                    new ReadBatch(
+            ReadBatch original = Optional.ofNullable(batches.get(source.range().startOffset()))
+                    .orElseThrow();
+            ReadBatch exact = new ReadBatch(
+                    source.range(),
+                    source.payloadFormat(),
+                    original.payload(),
+                    source.schemaRefs(),
+                    source.projectionRef(),
+                    new ReadSourceRef(
                             source.range(),
-                            source.payloadFormat(),
-                            original.payload(),
-                            source.schemaRefs(),
-                            source.projectionRef(),
-                            new ReadSourceRef(
-                                    source.range(),
-                                    source.generation(),
-                                    source.commitVersion(),
-                                    source.readTarget(),
-                                    source.targetIdentitySha256()));
-            return CompletableFuture.completedFuture(
-                    new ExactSourceRead() {
-                        @Override
-                        public SourceGeneration source() {
-                            return source;
-                        }
+                            source.generation(),
+                            source.commitVersion(),
+                            source.readTarget(),
+                            source.targetIdentitySha256()));
+            return CompletableFuture.completedFuture(new ExactSourceRead() {
+                @Override
+                public SourceGeneration source() {
+                    return source;
+                }
 
-                        @Override
-                        public Flow.Publisher<ReadBatch> batches() {
-                            return one(exact);
-                        }
+                @Override
+                public Flow.Publisher<ReadBatch> batches() {
+                    return one(exact);
+                }
 
-                        @Override
-                        public CompletableFuture<ExactSourceReadSummary> completion() {
-                            return CompletableFuture.completedFuture(
-                                    new ExactSourceReadSummary(
-                                            source.range(),
-                                            source.recordCount(),
-                                            source.entryCount(),
-                                            source.logicalBytes(),
-                                            new Checksum(
-                                                    ChecksumType.SHA256,
-                                                    "f".repeat(64))));
-                        }
+                @Override
+                public CompletableFuture<ExactSourceReadSummary> completion() {
+                    return CompletableFuture.completedFuture(new ExactSourceReadSummary(
+                            source.range(),
+                            source.recordCount(),
+                            source.entryCount(),
+                            source.logicalBytes(),
+                            new Checksum(ChecksumType.SHA256, "f".repeat(64))));
+                }
 
-                        @Override
-                        public void close() {
-                            closes.incrementAndGet();
-                        }
-                    });
+                @Override
+                public void close() {
+                    closes.incrementAndGet();
+                }
+            });
         };
     }
 
     private static <T> Flow.Publisher<T> one(T value) {
-        return subscriber ->
-                subscriber.onSubscribe(
-                        new Flow.Subscription() {
-                            private boolean terminal;
+        return subscriber -> subscriber.onSubscribe(new Flow.Subscription() {
+            private boolean terminal;
 
-                            @Override
-                            public void request(long count) {
-                                if (terminal) {
-                                    return;
-                                }
-                                terminal = true;
-                                if (count <= 0) {
-                                    subscriber.onError(
-                                            new IllegalArgumentException("demand"));
-                                    return;
-                                }
-                                subscriber.onNext(value);
-                                subscriber.onComplete();
-                            }
+            @Override
+            public void request(long count) {
+                if (terminal) {
+                    return;
+                }
+                terminal = true;
+                if (count <= 0) {
+                    subscriber.onError(new IllegalArgumentException("demand"));
+                    return;
+                }
+                subscriber.onNext(value);
+                subscriber.onComplete();
+            }
 
-                            @Override
-                            public void cancel() {
-                                terminal = true;
-                            }
-                        });
+            @Override
+            public void cancel() {
+                terminal = true;
+            }
+        });
     }
 
-    private static CompletableFuture<RowAccounting> consume(
-            Flow.Publisher<KafkaTopicCompactedObjectRow> publisher) {
+    private static CompletableFuture<RowAccounting> consume(Flow.Publisher<KafkaTopicCompactedObjectRow> publisher) {
         CompletableFuture<RowAccounting> result = new CompletableFuture<>();
-        publisher.subscribe(
-                new Flow.Subscriber<>() {
-                    private final AtomicInteger rows = new AtomicInteger();
-                    private final AtomicLong records = new AtomicLong();
-                    private long firstOffset = -1;
-                    private long previousOffset = -1;
+        publisher.subscribe(new Flow.Subscriber<>() {
+            private final AtomicInteger rows = new AtomicInteger();
+            private final AtomicLong records = new AtomicLong();
+            private long firstOffset = -1;
+            private long previousOffset = -1;
 
-                    @Override
-                    public void onSubscribe(Flow.Subscription subscription) {
-                        subscription.request(Long.MAX_VALUE);
-                    }
+            @Override
+            public void onSubscribe(Flow.Subscription subscription) {
+                subscription.request(Long.MAX_VALUE);
+            }
 
-                    @Override
-                    public void onNext(KafkaTopicCompactedObjectRow row) {
-                        if (firstOffset < 0) {
-                            firstOffset = row.streamOffsetStart();
-                        }
-                        assertThat(row.streamOffsetStart())
-                                .isGreaterThan(previousOffset);
-                        previousOffset = row.streamOffsetStart();
-                        rows.incrementAndGet();
-                        records.addAndGet(row.recordCount());
-                    }
+            @Override
+            public void onNext(KafkaTopicCompactedObjectRow row) {
+                if (firstOffset < 0) {
+                    firstOffset = row.streamOffsetStart();
+                }
+                assertThat(row.streamOffsetStart()).isGreaterThan(previousOffset);
+                previousOffset = row.streamOffsetStart();
+                rows.incrementAndGet();
+                records.addAndGet(row.recordCount());
+            }
 
-                    @Override
-                    public void onError(Throwable failure) {
-                        result.completeExceptionally(failure);
-                    }
+            @Override
+            public void onError(Throwable failure) {
+                result.completeExceptionally(failure);
+            }
 
-                    @Override
-                    public void onComplete() {
-                        result.complete(
-                                new RowAccounting(
-                                        rows.get(),
-                                        records.get(),
-                                        firstOffset,
-                                        previousOffset));
-                    }
-                });
+            @Override
+            public void onComplete() {
+                result.complete(new RowAccounting(rows.get(), records.get(), firstOffset, previousOffset));
+            }
+        });
         return result;
     }
 
-    private record RowAccounting(
-            int rows, long records, long firstOffset, long lastOffset) {}
+    private record RowAccounting(int rows, long records, long firstOffset, long lastOffset) {}
 }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.api.ErrorCode;
@@ -38,7 +39,9 @@ import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 
-/** Default F3 durable cursor storage with owner fencing and single-root CAS authority. */
+/**
+ * Default F3 durable cursor storage with owner fencing and single-root CAS authority.
+ */
 public final class DefaultCursorStorage implements CursorStorage {
     private final String cluster;
     private final StreamStorage streamStorage;
@@ -55,8 +58,7 @@ public final class DefaultCursorStorage implements CursorStorage {
     private final LongSupplier nanoTime;
     private final CursorStateHydrator hydrator;
     private final ConcurrentHashMap<CursorIdentity, CursorHandle> handles = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<CursorLedgerIdentity, CompletableFuture<TopicProjectionRecord>>
-            activationFlights =
+    private final ConcurrentHashMap<CursorLedgerIdentity, CompletableFuture<TopicProjectionRecord>> activationFlights =
             new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -108,18 +110,15 @@ public final class DefaultCursorStorage implements CursorStorage {
         this.projectionStore = Objects.requireNonNull(projectionStore, "projectionStore");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         this.snapshotStore = Objects.requireNonNull(snapshotStore, "snapshotStore");
-        this.retentionCoordinator = Objects.requireNonNull(
-                retentionCoordinator, "retentionCoordinator");
+        this.retentionCoordinator = Objects.requireNonNull(retentionCoordinator, "retentionCoordinator");
         this.activationGuard = Objects.requireNonNull(activationGuard, "activationGuard");
         this.stateMachine = Objects.requireNonNull(stateMachine, "stateMachine");
-        this.persistencePlanner = Objects.requireNonNull(
-                persistencePlanner, "persistencePlanner");
+        this.persistencePlanner = Objects.requireNonNull(persistencePlanner, "persistencePlanner");
         this.config = Objects.requireNonNull(config, "config");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
-        this.hydrator = new CursorStateHydrator(
-                this.cluster, metadataStore, snapshotStore, persistencePlanner, config);
+        this.hydrator = new CursorStateHydrator(this.cluster, metadataStore, snapshotStore, persistencePlanner, config);
     }
 
     @Override
@@ -138,25 +137,25 @@ public final class DefaultCursorStorage implements CursorStorage {
             return CompletableFuture.failedFuture(error);
         }
         Deadline deadline = Deadline.start(config.cursorMetadataOperationTimeout(), nanoTime);
-        return retentionCoordinator.claimAndRecover(owner)
+        return retentionCoordinator
+                .claimAndRecover(owner)
                 .thenCompose(ignored -> openAttempt(owner, exactName, request, deadline, 0));
     }
 
     @Override
-    public CompletableFuture<List<CursorHandle>> claimAndLoadActiveCursors(
-            CursorOwnerSession owner) {
+    public CompletableFuture<List<CursorHandle>> claimAndLoadActiveCursors(CursorOwnerSession owner) {
         Objects.requireNonNull(owner, "owner");
         if (closed.get()) {
             return closedFuture();
         }
         Deadline deadline = Deadline.start(config.cursorMetadataOperationTimeout(), nanoTime);
-        return retentionCoordinator.claimAndRecover(owner)
+        return retentionCoordinator
+                .claimAndRecover(owner)
                 .thenCompose(ignored -> claimAndLoadAttempt(owner, deadline, 0));
     }
 
     @Override
-    public CompletableFuture<CursorMutationResult> cumulativeAck(
-            CursorHandle handle, CursorAckRequest request) {
+    public CompletableFuture<CursorMutationResult> cumulativeAck(CursorHandle handle, CursorAckRequest request) {
         Objects.requireNonNull(handle, "handle");
         Objects.requireNonNull(request, "request");
         return submit(handle, () -> {
@@ -167,8 +166,7 @@ public final class DefaultCursorStorage implements CursorStorage {
     }
 
     @Override
-    public CompletableFuture<CursorMutationResult> individualAck(
-            CursorHandle handle, List<CursorAckRequest> requests) {
+    public CompletableFuture<CursorMutationResult> individualAck(CursorHandle handle, List<CursorAckRequest> requests) {
         Objects.requireNonNull(handle, "handle");
         Objects.requireNonNull(requests, "requests");
         final List<CursorAckRequest> copied;
@@ -185,8 +183,7 @@ public final class DefaultCursorStorage implements CursorStorage {
     }
 
     @Override
-    public CompletableFuture<CursorMutationResult> reset(
-            CursorHandle handle, CursorResetRequest request) {
+    public CompletableFuture<CursorMutationResult> reset(CursorHandle handle, CursorResetRequest request) {
         Objects.requireNonNull(handle, "handle");
         Objects.requireNonNull(request, "request");
         return submit(handle, () -> {
@@ -197,14 +194,12 @@ public final class DefaultCursorStorage implements CursorStorage {
     }
 
     @Override
-    public CompletableFuture<CursorMutationResult> clearBacklog(
-            CursorHandle handle, long observedCommittedEndOffset) {
+    public CompletableFuture<CursorMutationResult> clearBacklog(CursorHandle handle, long observedCommittedEndOffset) {
         Objects.requireNonNull(handle, "handle");
         return submit(handle, () -> {
             long capturedEpoch = handle.state().ackStateEpoch();
             Deadline deadline = Deadline.start(config.cursorMetadataOperationTimeout(), nanoTime);
-            return clearBacklogAttempt(
-                    handle, observedCommittedEndOffset, capturedEpoch, deadline, 0);
+            return clearBacklogAttempt(handle, observedCommittedEndOffset, capturedEpoch, deadline, 0);
         });
     }
 
@@ -213,11 +208,10 @@ public final class DefaultCursorStorage implements CursorStorage {
             CursorHandle handle, CursorPropertyMutation mutation) {
         Objects.requireNonNull(handle, "handle");
         Objects.requireNonNull(mutation, "mutation");
-        return submit(handle, () -> mutatePropertiesAttempt(
+        return submit(
                 handle,
-                mutation,
-                Deadline.start(config.cursorMetadataOperationTimeout(), nanoTime),
-                0));
+                () -> mutatePropertiesAttempt(
+                        handle, mutation, Deadline.start(config.cursorMetadataOperationTimeout(), nanoTime), 0));
     }
 
     @Override
@@ -231,11 +225,10 @@ public final class DefaultCursorStorage implements CursorStorage {
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
         }
-        return submit(handle, () -> flushPropertiesAttempt(
+        return submit(
                 handle,
-                copied,
-                Deadline.start(config.cursorMetadataOperationTimeout(), nanoTime),
-                0));
+                () -> flushPropertiesAttempt(
+                        handle, copied, Deadline.start(config.cursorMetadataOperationTimeout(), nanoTime), 0));
     }
 
     @Override
@@ -251,11 +244,7 @@ public final class DefaultCursorStorage implements CursorStorage {
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
         }
-        return deleteAttempt(
-                owner,
-                exactName,
-                Deadline.start(config.cursorMetadataOperationTimeout(), nanoTime),
-                0);
+        return deleteAttempt(owner, exactName, Deadline.start(config.cursorMetadataOperationTimeout(), nanoTime), 0);
     }
 
     @Override
@@ -269,8 +258,7 @@ public final class DefaultCursorStorage implements CursorStorage {
                 return CompletableFuture.failedFuture(invariant("cursor retention root is missing"));
             }
             try {
-                return CompletableFuture.completedFuture(toRetentionView(
-                        owner, retention.orElseThrow()));
+                return CompletableFuture.completedFuture(toRetentionView(owner, retention.orElseThrow()));
             } catch (Throwable error) {
                 return CompletableFuture.failedFuture(error);
             }
@@ -286,154 +274,141 @@ public final class DefaultCursorStorage implements CursorStorage {
         }
     }
 
-    private <T> CompletableFuture<T> submit(
-            CursorHandle handle, Supplier<CompletableFuture<T>> operation) {
+    private <T> CompletableFuture<T> submit(CursorHandle handle, Supplier<CompletableFuture<T>> operation) {
         if (closed.get()) {
             return closedFuture();
         }
         if (handle.isClosed()) {
             return CompletableFuture.failedFuture(
-                    new ManagedLedgerException.CursorAlreadyClosedException(
-                            "durable cursor handle is closed"));
+                    new ManagedLedgerException.CursorAlreadyClosedException("durable cursor handle is closed"));
         }
         return handle.mutationLane().submit(operation);
     }
 
     private CompletableFuture<CursorHandle> openAttempt(
-            CursorOwnerSession owner,
-            String cursorName,
-            CursorOpenRequest request,
-            Deadline deadline,
-            int attempt) {
+            CursorOwnerSession owner, String cursorName, CursorOpenRequest request, Deadline deadline, int attempt) {
         CompletableFuture<Void> admitted = requireAttempt(deadline, attempt, "open durable cursor");
         if (admitted != null) {
             return admitted.thenApply(ignored -> null);
         }
-        return loadProjection(owner).thenCompose(projection ->
-                metadataStore.getCursor(cluster, streamId(owner), cursorName).thenCompose(root -> {
-                    if (root.isPresent()
-                            && root.orElseThrow().value().lifecycle()
-                                    == CursorRecordLifecycle.ACTIVE) {
+        return loadProjection(owner).thenCompose(projection -> metadataStore
+                .getCursor(cluster, streamId(owner), cursorName)
+                .thenCompose(root -> {
+                    if (root.isPresent() && root.orElseThrow().value().lifecycle() == CursorRecordLifecycle.ACTIVE) {
                         if (!ManagedLedgerCursorProtocol.isActivated(projection)) {
-                            return CompletableFuture.failedFuture(invariant(
-                                    "ACTIVE cursor exists before cursor protocol activation"));
+                            return CompletableFuture.failedFuture(
+                                    invariant("ACTIVE cursor exists before cursor protocol activation"));
                         }
                         try {
-                            validateCursorRoot(owner.ledger(), cursorName, root.orElseThrow().value());
+                            validateCursorRoot(
+                                    owner.ledger(),
+                                    cursorName,
+                                    root.orElseThrow().value());
                             requireCursorOwner(owner, root.orElseThrow().value());
                         } catch (Throwable error) {
                             return CompletableFuture.failedFuture(error);
                         }
                         return hydrateOpenHandle(owner, root.orElseThrow());
                     }
-                    return ensureActivated(owner, projection).thenCompose(activated ->
-                            streamStorage.getStreamMetadata(streamId(owner)).thenCompose(stream ->
-                                    metadataStore.getCursor(
-                                                    cluster, streamId(owner), cursorName)
-                                            .thenCompose(revalidated -> {
-                                                if (!sameRoot(root, revalidated)) {
-                                                    return openAttempt(
-                                                            owner,
-                                                            cursorName,
-                                                            request,
-                                                            deadline,
-                                                            attempt + 1);
-                                                }
-                                                CursorOpenRequest actual = new CursorOpenRequest(
-                                                        request.initialPosition(),
-                                                        request.initialPositionProperties(),
-                                                        request.initialCursorProperties(),
-                                                        stream.trimOffset(),
-                                                        stream.committedEndOffset());
-                                                boolean recreate = revalidated.isPresent();
-                                                long expectedGeneration = recreate
-                                                        ? revalidated.orElseThrow()
-                                                                .value()
-                                                                .cursorGeneration()
-                                                        : 0;
-                                                long targetGeneration = recreate
-                                                        ? Math.addExact(expectedGeneration, 1)
-                                                        : 1;
-                                                CursorRetentionCoordinator.ProtectionRequest protection =
-                                                        new CursorRetentionCoordinator.ProtectionRequest(
-                                                                recreate
-                                                                        ? CursorRetentionView.PendingProtection.Kind
-                                                                                .RECREATE
-                                                                        : CursorRetentionView.PendingProtection.Kind
-                                                                                .CREATE,
-                                                                cursorName,
-                                                                CursorNames.cursorNameHash(cursorName),
-                                                                expectedGeneration,
-                                                                targetGeneration,
-                                                                actual.initialMarkDeleteOffset(),
-                                                                Optional.empty(),
-                                                                actual.initialPositionProperties(),
-                                                                actual.initialCursorProperties());
-                                                return retentionCoordinator
-                                                        .beginProtection(owner, protection)
-                                                        .thenCompose(lease -> retentionCoordinator
-                                                                .completeProtection(lease)
-                                                                .thenCompose(ignored -> hydrator.load(
-                                                                        owner.ledger(), cursorName))
-                                                                .thenCompose(hydrated -> {
-                                                                    CursorState state = hydrated.state();
-                                                                    if (state.lifecycle()
-                                                                                    != CursorLifecycle.ACTIVE
-                                                                            || state.identity()
-                                                                                            .cursorGeneration()
-                                                                                    != targetGeneration
-                                                                            || !state.lastProtectionAttemptId()
-                                                                                    .equals(lease.attemptId())
-                                                                            || !state.ownerSessionId()
-                                                                                    .equals(owner.ownerSessionId())) {
-                                                                        return CompletableFuture.failedFuture(
-                                                                                invariant(
-                                                                                        "protected cursor create is not proved by the root"));
-                                                                    }
-                                                                    try {
-                                                                        validateStateBounds(state, stream);
-                                                                        return retentionCoordinator
-                                                                                .reconcileFloor(owner)
-                                                                                .thenApply(view -> {
-                                                                                    requireRetentionViewOwner(
-                                                                                            owner, view);
-                                                                                    return newHandle(
-                                                                                            owner, state);
-                                                                                });
-                                                                    } catch (Throwable error) {
-                                                                        return CompletableFuture.failedFuture(error);
-                                                                    }
-                                                                }))
-                                                        .handle((value, error) -> {
-                                                            if (error == null) {
-                                                                return CompletableFuture.completedFuture(value);
+                    return ensureActivated(owner, projection).thenCompose(activated -> streamStorage
+                            .getStreamMetadata(streamId(owner))
+                            .thenCompose(stream -> metadataStore
+                                    .getCursor(cluster, streamId(owner), cursorName)
+                                    .thenCompose(revalidated -> {
+                                        if (!sameRoot(root, revalidated)) {
+                                            return openAttempt(owner, cursorName, request, deadline, attempt + 1);
+                                        }
+                                        CursorOpenRequest actual = new CursorOpenRequest(
+                                                request.initialPosition(),
+                                                request.initialPositionProperties(),
+                                                request.initialCursorProperties(),
+                                                stream.trimOffset(),
+                                                stream.committedEndOffset());
+                                        boolean recreate = revalidated.isPresent();
+                                        long expectedGeneration = recreate
+                                                ? revalidated
+                                                        .orElseThrow()
+                                                        .value()
+                                                        .cursorGeneration()
+                                                : 0;
+                                        long targetGeneration = recreate ? Math.addExact(expectedGeneration, 1) : 1;
+                                        CursorRetentionCoordinator.ProtectionRequest protection =
+                                                new CursorRetentionCoordinator.ProtectionRequest(
+                                                        recreate
+                                                                ? CursorRetentionView.PendingProtection.Kind.RECREATE
+                                                                : CursorRetentionView.PendingProtection.Kind.CREATE,
+                                                        cursorName,
+                                                        CursorNames.cursorNameHash(cursorName),
+                                                        expectedGeneration,
+                                                        targetGeneration,
+                                                        actual.initialMarkDeleteOffset(),
+                                                        Optional.empty(),
+                                                        actual.initialPositionProperties(),
+                                                        actual.initialCursorProperties());
+                                        return retentionCoordinator
+                                                .beginProtection(owner, protection)
+                                                .thenCompose(lease -> retentionCoordinator
+                                                        .completeProtection(lease)
+                                                        .thenCompose(
+                                                                ignored -> hydrator.load(owner.ledger(), cursorName))
+                                                        .thenCompose(hydrated -> {
+                                                            CursorState state = hydrated.state();
+                                                            if (state.lifecycle() != CursorLifecycle.ACTIVE
+                                                                    || state.identity()
+                                                                                    .cursorGeneration()
+                                                                            != targetGeneration
+                                                                    || !state.lastProtectionAttemptId()
+                                                                            .equals(lease.attemptId())
+                                                                    || !state.ownerSessionId()
+                                                                            .equals(owner.ownerSessionId())) {
+                                                                return CompletableFuture.failedFuture(invariant(
+                                                                        "protected cursor create is "
+                                                                                + "not proved by the "
+                                                                                + "root"));
                                                             }
-                                                            Throwable cause = unwrap(error);
-                                                            if (cause instanceof ManagedLedgerException
-                                                                            .ConcurrentFindCursorPositionException
-                                                                    || cause
-                                                                            instanceof CursorMetadataConditionFailedException) {
+                                                            try {
+                                                                validateStateBounds(state, stream);
                                                                 return retentionCoordinator
-                                                                        .claimAndRecover(owner)
-                                                                        .thenCompose(ignored -> openAttempt(
-                                                                                owner,
-                                                                                cursorName,
-                                                                                request,
-                                                                                deadline,
-                                                                                attempt + 1));
+                                                                        .reconcileFloor(owner)
+                                                                        .thenApply(view -> {
+                                                                            requireRetentionViewOwner(owner, view);
+                                                                            return newHandle(owner, state);
+                                                                        });
+                                                            } catch (Throwable error) {
+                                                                return CompletableFuture.failedFuture(error);
                                                             }
-                                                            return CompletableFuture
-                                                                    .<CursorHandle>failedFuture(cause);
-                                                        })
-                                                        .thenCompose(future -> future);
-                                            })));
+                                                        }))
+                                                .handle((value, error) -> {
+                                                    if (error == null) {
+                                                        return CompletableFuture.completedFuture(value);
+                                                    }
+                                                    Throwable cause = unwrap(error);
+                                                    if (cause
+                                                                    instanceof
+                                                                    ManagedLedgerException
+                                                                            .ConcurrentFindCursorPositionException
+                                                            || cause
+                                                                    instanceof CursorMetadataConditionFailedException) {
+                                                        return retentionCoordinator
+                                                                .claimAndRecover(owner)
+                                                                .thenCompose(ignored -> openAttempt(
+                                                                        owner,
+                                                                        cursorName,
+                                                                        request,
+                                                                        deadline,
+                                                                        attempt + 1));
+                                                    }
+                                                    return CompletableFuture.<CursorHandle>failedFuture(cause);
+                                                })
+                                                .thenCompose(future -> future);
+                                    })));
                 }));
     }
 
-    private CompletableFuture<CursorHandle> hydrateOpenHandle(
-            CursorOwnerSession owner, VersionedCursorState root) {
-        return hydrator.hydrate(owner.ledger(), root).thenCompose(hydrated ->
-                streamStorage.getStreamMetadata(streamId(owner)).thenCompose(stream -> {
+    private CompletableFuture<CursorHandle> hydrateOpenHandle(CursorOwnerSession owner, VersionedCursorState root) {
+        return hydrator.hydrate(owner.ledger(), root).thenCompose(hydrated -> streamStorage
+                .getStreamMetadata(streamId(owner))
+                .thenCompose(stream -> {
                     try {
                         validateStateBounds(hydrated.state(), stream);
                     } catch (Throwable error) {
@@ -463,7 +438,8 @@ public final class DefaultCursorStorage implements CursorStorage {
         }
         CompletableFuture<TopicProjectionRecord> activation;
         try {
-            activation = activationGuard.acquireFirstActivationPermit(owner.ledger())
+            activation = activationGuard
+                    .acquireFirstActivationPermit(owner.ledger())
                     .thenCompose(ignored -> projectionStore.activateCursorProtocol(
                             cluster,
                             owner.ledger().managedLedgerName(),
@@ -471,14 +447,12 @@ public final class DefaultCursorStorage implements CursorStorage {
                             projection.metadataVersion()))
                     .handle((activated, error) -> {
                         if (error == null) {
-                            return CompletableFuture.completedFuture(
-                                    requireActivatedProjection(owner, activated));
+                            return CompletableFuture.completedFuture(requireActivatedProjection(owner, activated));
                         }
                         Throwable cause = unwrap(error);
                         return loadProjection(owner).thenCompose(reloaded -> {
                             if (ManagedLedgerCursorProtocol.isActivated(reloaded)) {
-                                return CompletableFuture.completedFuture(
-                                        requireActivatedProjection(owner, reloaded));
+                                return CompletableFuture.completedFuture(requireActivatedProjection(owner, reloaded));
                             }
                             return CompletableFuture.failedFuture(cause);
                         });
@@ -501,8 +475,7 @@ public final class DefaultCursorStorage implements CursorStorage {
     private static TopicProjectionRecord requireActivatedProjection(
             CursorOwnerSession owner, TopicProjectionRecord activated) {
         if (!activated.managedLedgerName().equals(owner.ledger().managedLedgerName())
-                || !activated.managedLedgerNameHash()
-                        .equals(owner.ledger().managedLedgerNameHash())
+                || !activated.managedLedgerNameHash().equals(owner.ledger().managedLedgerNameHash())
                 || !activated.projectionIdentity().equals(owner.ledger().projection())
                 || !ManagedLedgerCursorProtocol.isActivated(activated)) {
             throw invariant("cursor activation did not preserve the exact projection");
@@ -516,72 +489,64 @@ public final class DefaultCursorStorage implements CursorStorage {
         if (admitted != null) {
             return admitted.thenApply(ignored -> null);
         }
-        return loadProjection(owner).thenCompose(projection ->
-                scanAll(owner.ledger()).thenCompose(first -> {
+        return loadProjection(owner)
+                .thenCompose(projection -> scanAll(owner.ledger()).thenCompose(first -> {
                     if (!ManagedLedgerCursorProtocol.isActivated(projection) && !first.isEmpty()) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "cursor records exist before protocol activation"));
+                        return CompletableFuture.failedFuture(
+                                invariant("cursor records exist before protocol activation"));
                     }
-                    return claimActiveRoots(owner, first, 0).handle((ignored, claimError) -> {
-                        if (claimError == null) {
-                            return scanAll(owner.ledger()).thenCompose(second -> {
-                                if (!fingerprint(first).equals(fingerprint(second))) {
+                    return claimActiveRoots(owner, first, 0)
+                            .handle((ignored, claimError) -> {
+                                if (claimError == null) {
+                                    return scanAll(owner.ledger()).thenCompose(second -> {
+                                        if (!fingerprint(first).equals(fingerprint(second))) {
+                                            return claimAndLoadAttempt(owner, deadline, attempt + 1);
+                                        }
+                                        for (VersionedCursorState record : second) {
+                                            if (record.value().lifecycle() == CursorRecordLifecycle.ACTIVE
+                                                    && !record.value()
+                                                            .ownerSessionId()
+                                                            .equals(owner.ownerSessionId())) {
+                                                return claimAndLoadAttempt(owner, deadline, attempt + 1);
+                                            }
+                                        }
+                                        return streamStorage
+                                                .getStreamMetadata(streamId(owner))
+                                                .thenCompose(stream -> hydrateActiveRoots(
+                                                                owner, second, stream, 0, new ArrayList<>())
+                                                        .thenCompose(states -> scanAll(owner.ledger())
+                                                                .thenCompose(third -> {
+                                                                    if (!fingerprint(second)
+                                                                            .equals(fingerprint(third))) {
+                                                                        return claimAndLoadAttempt(
+                                                                                owner, deadline, attempt + 1);
+                                                                    }
+                                                                    return reconcileRetentionAndCreateHandles(
+                                                                            owner, states);
+                                                                })));
+                                    });
+                                }
+                                Throwable cause = unwrap(claimError);
+                                if (cause instanceof CursorMetadataConditionFailedException) {
                                     return claimAndLoadAttempt(owner, deadline, attempt + 1);
                                 }
-                                for (VersionedCursorState record : second) {
-                                    if (record.value().lifecycle()
-                                                    == CursorRecordLifecycle.ACTIVE
-                                            && !record.value().ownerSessionId()
-                                                    .equals(owner.ownerSessionId())) {
-                                        return claimAndLoadAttempt(owner, deadline, attempt + 1);
-                                    }
-                                }
-                                return streamStorage.getStreamMetadata(streamId(owner))
-                                        .thenCompose(stream -> hydrateActiveRoots(
-                                                        owner,
-                                                        second,
-                                                        stream,
-                                                        0,
-                                                        new ArrayList<>())
-                                                .thenCompose(states -> scanAll(owner.ledger())
-                                                        .thenCompose(third -> {
-                                                            if (!fingerprint(second)
-                                                                    .equals(fingerprint(third))) {
-                                                                return claimAndLoadAttempt(
-                                                                        owner,
-                                                                        deadline,
-                                                                        attempt + 1);
-                                                            }
-                                                            return retentionView(owner)
-                                                                    .thenCompose(view -> {
-                                                                        if (view.lifecycle()
-                                                                                != CursorRetentionView.Lifecycle
-                                                                                        .ACTIVE) {
-                                                                            return CompletableFuture.failedFuture(
-                                                                                    invariant(
-                                                                                            "pending retention survived open recovery"));
-                                                                        }
-                                                                        return retentionCoordinator
-                                                                                .reconcileFloor(owner)
-                                                                                .thenApply(floor -> {
-                                                                                    requireRetentionViewOwner(
-                                                                                            owner, floor);
-                                                                                    return states.stream()
-                                                                                            .map(state -> newHandle(
-                                                                                                    owner, state))
-                                                                                            .toList();
-                                                                                });
-                                                                    });
-                                                        })));
-                            });
-                        }
-                        Throwable cause = unwrap(claimError);
-                        if (cause instanceof CursorMetadataConditionFailedException) {
-                            return claimAndLoadAttempt(owner, deadline, attempt + 1);
-                        }
-                        return CompletableFuture.<List<CursorHandle>>failedFuture(cause);
-                    }).thenCompose(future -> future);
+                                return CompletableFuture.<List<CursorHandle>>failedFuture(cause);
+                            })
+                            .thenCompose(future -> future);
                 }));
+    }
+
+    private CompletableFuture<List<CursorHandle>> reconcileRetentionAndCreateHandles(
+            CursorOwnerSession owner, List<CursorState> states) {
+        return retentionView(owner).thenCompose(view -> {
+            if (view.lifecycle() != CursorRetentionView.Lifecycle.ACTIVE) {
+                return CompletableFuture.failedFuture(invariant("pending retention survived open recovery"));
+            }
+            return retentionCoordinator.reconcileFloor(owner).thenApply(floor -> {
+                requireRetentionViewOwner(owner, floor);
+                return states.stream().map(state -> newHandle(owner, state)).toList();
+            });
+        });
     }
 
     private CompletableFuture<Void> claimActiveRoots(
@@ -589,22 +554,18 @@ public final class DefaultCursorStorage implements CursorStorage {
         if (index >= records.size()) {
             return CompletableFuture.completedFuture(null);
         }
-        int end = Math.min(
-                records.size(), Math.addExact(index, config.cursorOwnerClaimConcurrency()));
+        int end = Math.min(records.size(), Math.addExact(index, config.cursorOwnerClaimConcurrency()));
         List<CompletableFuture<?>> writes = new ArrayList<>();
         try {
             for (int cursor = index; cursor < end; cursor++) {
                 VersionedCursorState current = records.get(cursor);
-                validateCursorRoot(
-                        owner.ledger(), current.value().cursorName(), current.value());
+                validateCursorRoot(owner.ledger(), current.value().cursorName(), current.value());
                 if (current.value().lifecycle() == CursorRecordLifecycle.DELETED
                         || current.value().ownerSessionId().equals(owner.ownerSessionId())) {
                     continue;
                 }
-                CursorStateRecord claimed = claimCursorRecord(
-                        current.value(), owner.ownerSessionId(), nowMillis());
-                writes.add(metadataStore.compareAndSetCursor(
-                        cluster, claimed, current.metadataVersion()));
+                CursorStateRecord claimed = claimCursorRecord(current.value(), owner.ownerSessionId(), nowMillis());
+                writes.add(metadataStore.compareAndSetCursor(cluster, claimed, current.metadataVersion()));
             }
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
@@ -625,8 +586,8 @@ public final class DefaultCursorStorage implements CursorStorage {
             if (root.value().lifecycle() == CursorRecordLifecycle.DELETED) {
                 continue;
             }
-            hydration = hydration.thenCompose(ignored ->
-                    hydrator.hydrate(owner.ledger(), root).thenCompose(hydrated -> {
+            hydration = hydration.thenCompose(
+                    ignored -> hydrator.hydrate(owner.ledger(), root).thenCompose(hydrated -> {
                         try {
                             requireStateOwner(owner, hydrated.state());
                             validateStateBounds(hydrated.state(), stream);
@@ -641,11 +602,7 @@ public final class DefaultCursorStorage implements CursorStorage {
     }
 
     private CompletableFuture<CursorMutationResult> cumulativeAckAttempt(
-            CursorHandle handle,
-            CursorAckRequest request,
-            long capturedEpoch,
-            Deadline deadline,
-            int attempt) {
+            CursorHandle handle, CursorAckRequest request, long capturedEpoch, Deadline deadline, int attempt) {
         CompletableFuture<Void> admitted = requireAttempt(deadline, attempt, "cumulative cursor ack");
         if (admitted != null) {
             return admitted.thenApply(ignored -> null);
@@ -663,41 +620,26 @@ public final class DefaultCursorStorage implements CursorStorage {
                 final CursorMutationResult transition;
                 try {
                     transition = stateMachine.cumulativeAck(
-                            current.state(),
-                            request,
-                            stream.trimOffset(),
-                            stream.committedEndOffset(),
-                            nowMillis());
+                            current.state(), request, stream.trimOffset(), stream.committedEndOffset(), nowMillis());
                     if (transition.outcome() == CursorMutationOutcome.ALREADY_APPLIED) {
-                        return completedMutation(
-                                handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
+                        return completedMutation(handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
                     }
                 } catch (Throwable error) {
                     return CompletableFuture.failedFuture(error);
                 }
                 return persistMutation(current, transition.state())
-                        .thenCompose(state -> completedMutation(
-                                handle, CursorMutationOutcome.APPLIED, state))
+                        .thenCompose(state -> completedMutation(handle, CursorMutationOutcome.APPLIED, state))
                         .handle((value, error) -> retryMutation(
                                 value,
                                 error,
-                                () -> cumulativeAckAttempt(
-                                        handle,
-                                        request,
-                                        capturedEpoch,
-                                        deadline,
-                                        attempt + 1)))
+                                () -> cumulativeAckAttempt(handle, request, capturedEpoch, deadline, attempt + 1)))
                         .thenCompose(future -> future);
             });
         });
     }
 
     private CompletableFuture<CursorMutationResult> individualAckAttempt(
-            CursorHandle handle,
-            List<CursorAckRequest> requests,
-            long capturedEpoch,
-            Deadline deadline,
-            int attempt) {
+            CursorHandle handle, List<CursorAckRequest> requests, long capturedEpoch, Deadline deadline, int attempt) {
         CompletableFuture<Void> admitted = requireAttempt(deadline, attempt, "individual cursor ack");
         if (admitted != null) {
             return admitted.thenApply(ignored -> null);
@@ -715,47 +657,33 @@ public final class DefaultCursorStorage implements CursorStorage {
                 final CursorMutationResult transition;
                 try {
                     transition = stateMachine.individualAck(
-                            current.state(),
-                            requests,
-                            stream.trimOffset(),
-                            stream.committedEndOffset(),
-                            nowMillis());
+                            current.state(), requests, stream.trimOffset(), stream.committedEndOffset(), nowMillis());
                     if (transition.outcome() == CursorMutationOutcome.ALREADY_APPLIED) {
-                        return completedMutation(
-                                handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
+                        return completedMutation(handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
                     }
                 } catch (Throwable error) {
                     return CompletableFuture.failedFuture(error);
                 }
                 return persistMutation(current, transition.state())
-                        .thenCompose(state -> completedMutation(
-                                handle, CursorMutationOutcome.APPLIED, state))
+                        .thenCompose(state -> completedMutation(handle, CursorMutationOutcome.APPLIED, state))
                         .handle((value, error) -> retryMutation(
                                 value,
                                 error,
-                                () -> individualAckAttempt(
-                                        handle,
-                                        requests,
-                                        capturedEpoch,
-                                        deadline,
-                                        attempt + 1)))
+                                () -> individualAckAttempt(handle, requests, capturedEpoch, deadline, attempt + 1)))
                         .thenCompose(future -> future);
             });
         });
     }
 
     private CompletableFuture<CursorMutationResult> resetAttempt(
-            CursorHandle handle,
-            CursorResetRequest request,
-            long capturedEpoch,
-            Deadline deadline,
-            int attempt) {
+            CursorHandle handle, CursorResetRequest request, long capturedEpoch, Deadline deadline, int attempt) {
         CompletableFuture<Void> admitted = requireAttempt(deadline, attempt, "reset durable cursor");
         if (admitted != null) {
             return admitted.thenApply(ignored -> null);
         }
-        return loadForMutation(handle).thenCompose(current ->
-                streamStorage.getStreamMetadata(streamId(handle.owner())).thenCompose(stream -> {
+        return loadForMutation(handle).thenCompose(current -> streamStorage
+                .getStreamMetadata(streamId(handle.owner()))
+                .thenCompose(stream -> {
                     final CursorResetRequest actual;
                     final CursorAckState normalizedTarget;
                     try {
@@ -771,47 +699,28 @@ public final class DefaultCursorStorage implements CursorStorage {
                                 stream.trimOffset(),
                                 stream.committedEndOffset());
                         TreeMap<Long, BatchAckState> partial = new TreeMap<>();
-                        actual.targetBatchAck().ifPresent(state ->
-                                partial.put(actual.nextReadOffset(), state));
-                        normalizedTarget = new CursorAckState(
-                                actual.nextReadOffset(), List.of(), partial);
+                        actual.targetBatchAck().ifPresent(state -> partial.put(actual.nextReadOffset(), state));
+                        normalizedTarget = new CursorAckState(actual.nextReadOffset(), List.of(), partial);
                     } catch (Throwable error) {
                         return CompletableFuture.failedFuture(error);
                     }
                     if (normalizedTarget.markDeleteOffset()
                             < current.state().acknowledgements().markDeleteOffset()) {
-                        return protectedReset(
-                                handle,
-                                current,
-                                normalizedTarget,
-                                actual,
-                                deadline,
-                                attempt);
+                        return protectedReset(handle, current, normalizedTarget, actual, deadline, attempt);
                     }
                     try {
-                        if (stateMachine.isExactResetResult(
-                                current.state(), actual, capturedEpoch)) {
-                            return completedMutation(
-                                    handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
+                        if (stateMachine.isExactResetResult(current.state(), actual, capturedEpoch)) {
+                            return completedMutation(handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
                         }
                         requireAckEpoch(current.state(), capturedEpoch);
                         CursorMutationResult transition = stateMachine.reset(
-                                current.state(),
-                                actual,
-                                current.state().lastProtectionAttemptId(),
-                                nowMillis());
+                                current.state(), actual, current.state().lastProtectionAttemptId(), nowMillis());
                         return persistMutation(current, transition.state())
-                                .thenCompose(state -> completedMutation(
-                                        handle, CursorMutationOutcome.APPLIED, state))
+                                .thenCompose(state -> completedMutation(handle, CursorMutationOutcome.APPLIED, state))
                                 .handle((value, error) -> retryMutation(
                                         value,
                                         error,
-                                        () -> resetAttempt(
-                                                handle,
-                                                request,
-                                                capturedEpoch,
-                                                deadline,
-                                                attempt + 1)))
+                                        () -> resetAttempt(handle, request, capturedEpoch, deadline, attempt + 1)))
                                 .thenCompose(future -> future);
                     } catch (Throwable error) {
                         return CompletableFuture.failedFuture(error);
@@ -826,25 +735,27 @@ public final class DefaultCursorStorage implements CursorStorage {
             CursorResetRequest actual,
             Deadline deadline,
             int attempt) {
-        Optional<BatchAckState> partial = Optional.ofNullable(
-                normalizedTarget.partialBatchAcks().get(normalizedTarget.markDeleteOffset()));
-        CursorRetentionCoordinator.ProtectionRequest protection =
-                new CursorRetentionCoordinator.ProtectionRequest(
-                        CursorRetentionView.PendingProtection.Kind.BACKWARD_RESET,
-                        current.state().identity().cursorName(),
-                        current.state().identity().cursorNameHash(),
-                        current.state().identity().cursorGeneration(),
-                        current.state().identity().cursorGeneration(),
-                        normalizedTarget.markDeleteOffset(),
-                        partial,
-                        Map.of(),
-                        Map.of());
-        return retentionCoordinator.beginProtection(handle.owner(), protection)
-                .thenCompose(lease -> retentionCoordinator.completeProtection(lease)
-                        .handle((view, completionError) -> new ProtectionCompletion(
-                                lease, unwrapNullable(completionError)))
-                        .thenCompose(completion -> hydrator
-                                .load(handle.owner().ledger(), handle.identity().cursorName())
+        Optional<BatchAckState> partial =
+                Optional.ofNullable(normalizedTarget.partialBatchAcks().get(normalizedTarget.markDeleteOffset()));
+        CursorRetentionCoordinator.ProtectionRequest protection = new CursorRetentionCoordinator.ProtectionRequest(
+                CursorRetentionView.PendingProtection.Kind.BACKWARD_RESET,
+                current.state().identity().cursorName(),
+                current.state().identity().cursorNameHash(),
+                current.state().identity().cursorGeneration(),
+                current.state().identity().cursorGeneration(),
+                normalizedTarget.markDeleteOffset(),
+                partial,
+                Map.of(),
+                Map.of());
+        return retentionCoordinator
+                .beginProtection(handle.owner(), protection)
+                .thenCompose(lease -> retentionCoordinator
+                        .completeProtection(lease)
+                        .handle((view, completionError) ->
+                                new ProtectionCompletion(lease, unwrapNullable(completionError)))
+                        .thenCompose(completion -> hydrator.load(
+                                        handle.owner().ledger(),
+                                        handle.identity().cursorName())
                                 .thenCompose(hydrated -> {
                                     CursorState state = hydrated.state();
                                     if (state.lifecycle() == CursorLifecycle.DELETED) {
@@ -860,11 +771,10 @@ public final class DefaultCursorStorage implements CursorStorage {
                                                     .equals(handle.owner().ownerSessionId())
                                             || !state.lastProtectionAttemptId()
                                                     .equals(completion.lease().attemptId())) {
-                                        return CompletableFuture.failedFuture(invariant(
-                                                "backward reset completion lacks durable attempt proof"));
+                                        return CompletableFuture.failedFuture(
+                                                invariant("backward reset completion lacks durable attempt proof"));
                                     }
-                                    return completedMutation(
-                                            handle, CursorMutationOutcome.APPLIED, state);
+                                    return completedMutation(handle, CursorMutationOutcome.APPLIED, state);
                                 })))
                 .handle((value, error) -> {
                     if (error == null) {
@@ -872,13 +782,10 @@ public final class DefaultCursorStorage implements CursorStorage {
                     }
                     Throwable cause = unwrap(error);
                     if (cause instanceof CursorMetadataConditionFailedException) {
-                        return retentionCoordinator.claimAndRecover(handle.owner())
+                        return retentionCoordinator
+                                .claimAndRecover(handle.owner())
                                 .thenCompose(ignored -> resetAttempt(
-                                        handle,
-                                        actual,
-                                        handle.state().ackStateEpoch(),
-                                        deadline,
-                                        attempt + 1));
+                                        handle, actual, handle.state().ackStateEpoch(), deadline, attempt + 1));
                     }
                     return CompletableFuture.<CursorMutationResult>failedFuture(cause);
                 })
@@ -886,11 +793,7 @@ public final class DefaultCursorStorage implements CursorStorage {
     }
 
     private CompletableFuture<CursorMutationResult> clearBacklogAttempt(
-            CursorHandle handle,
-            long capturedEnd,
-            long capturedEpoch,
-            Deadline deadline,
-            int attempt) {
+            CursorHandle handle, long capturedEnd, long capturedEpoch, Deadline deadline, int attempt) {
         CompletableFuture<Void> admitted = requireAttempt(deadline, attempt, "clear durable cursor backlog");
         if (admitted != null) {
             return admitted.thenApply(ignored -> null);
@@ -899,34 +802,27 @@ public final class DefaultCursorStorage implements CursorStorage {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("observedCommittedEndOffset must be non-negative"));
         }
-        return loadForMutation(handle).thenCompose(current ->
-                streamStorage.getStreamMetadata(streamId(handle.owner())).thenCompose(stream -> {
+        return loadForMutation(handle).thenCompose(current -> streamStorage
+                .getStreamMetadata(streamId(handle.owner()))
+                .thenCompose(stream -> {
                     try {
-                        if (capturedEnd < stream.trimOffset()
-                                || capturedEnd > stream.committedEndOffset()) {
+                        if (capturedEnd < stream.trimOffset() || capturedEnd > stream.committedEndOffset()) {
                             throw new ManagedLedgerException.InvalidCursorPositionException(
                                     "captured clear-backlog end is outside current L0 bounds");
                         }
-                        if (stateMachine.isExactClearResult(
-                                current.state(), capturedEnd, capturedEpoch)) {
-                            return completedMutation(
-                                    handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
+                        if (stateMachine.isExactClearResult(current.state(), capturedEnd, capturedEpoch)) {
+                            return completedMutation(handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
                         }
                         requireAckEpoch(current.state(), capturedEpoch);
-                        CursorMutationResult transition = stateMachine.clearBacklog(
-                                current.state(), capturedEnd, nowMillis());
+                        CursorMutationResult transition =
+                                stateMachine.clearBacklog(current.state(), capturedEnd, nowMillis());
                         return persistMutation(current, transition.state())
-                                .thenCompose(state -> completedMutation(
-                                        handle, CursorMutationOutcome.APPLIED, state))
+                                .thenCompose(state -> completedMutation(handle, CursorMutationOutcome.APPLIED, state))
                                 .handle((value, error) -> retryMutation(
                                         value,
                                         error,
                                         () -> clearBacklogAttempt(
-                                                handle,
-                                                capturedEnd,
-                                                capturedEpoch,
-                                                deadline,
-                                                attempt + 1)))
+                                                handle, capturedEnd, capturedEpoch, deadline, attempt + 1)))
                                 .thenCompose(future -> future);
                     } catch (Throwable error) {
                         return CompletableFuture.failedFuture(error);
@@ -935,10 +831,7 @@ public final class DefaultCursorStorage implements CursorStorage {
     }
 
     private CompletableFuture<CursorMutationResult> mutatePropertiesAttempt(
-            CursorHandle handle,
-            CursorPropertyMutation mutation,
-            Deadline deadline,
-            int attempt) {
+            CursorHandle handle, CursorPropertyMutation mutation, Deadline deadline, int attempt) {
         CompletableFuture<Void> admitted = requireAttempt(deadline, attempt, "mutate cursor properties");
         if (admitted != null) {
             return admitted.thenApply(ignored -> null);
@@ -946,45 +839,34 @@ public final class DefaultCursorStorage implements CursorStorage {
         return loadForMutation(handle).thenCompose(current -> {
             final CursorMutationResult transition;
             try {
-                transition = stateMachine.mutateCursorProperties(
-                        current.state(), mutation, nowMillis());
+                transition = stateMachine.mutateCursorProperties(current.state(), mutation, nowMillis());
                 if (transition.outcome() == CursorMutationOutcome.ALREADY_APPLIED) {
-                    return completedMutation(
-                            handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
+                    return completedMutation(handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
                 }
                 if (attempt > 0 && mutation instanceof CursorPropertyMutation.ReplaceExternal) {
-                    return CompletableFuture.failedFuture(
-                            new ManagedLedgerException.BadVersionException(
-                                    "concurrent cursor root change conflicts with property replacement"));
+                    return CompletableFuture.failedFuture(new ManagedLedgerException.BadVersionException(
+                            "concurrent cursor root change conflicts with property replacement"));
                 }
             } catch (Throwable error) {
                 return CompletableFuture.failedFuture(error);
             }
             return persistMutation(current, transition.state())
-                    .thenCompose(state -> completedMutation(
-                            handle, CursorMutationOutcome.APPLIED, state))
+                    .thenCompose(state -> completedMutation(handle, CursorMutationOutcome.APPLIED, state))
                     .handle((value, error) -> retryMutation(
-                            value,
-                            error,
-                            () -> mutatePropertiesAttempt(
-                                    handle, mutation, deadline, attempt + 1)))
+                            value, error, () -> mutatePropertiesAttempt(handle, mutation, deadline, attempt + 1)))
                     .thenCompose(future -> future);
         });
     }
 
     private CompletableFuture<CursorMutationResult> flushPropertiesAttempt(
-            CursorHandle handle,
-            Map<String, Long> properties,
-            Deadline deadline,
-            int attempt) {
+            CursorHandle handle, Map<String, Long> properties, Deadline deadline, int attempt) {
         CompletableFuture<Void> admitted = requireAttempt(deadline, attempt, "flush cursor position properties");
         if (admitted != null) {
             return admitted.thenApply(ignored -> null);
         }
         return loadForMutation(handle).thenCompose(current -> {
             if (current.state().positionProperties().equals(properties)) {
-                return completedMutation(
-                        handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
+                return completedMutation(handle, CursorMutationOutcome.ALREADY_APPLIED, current.state());
             }
             if (attempt > 0) {
                 return CompletableFuture.failedFuture(new ManagedLedgerException.BadVersionException(
@@ -992,25 +874,19 @@ public final class DefaultCursorStorage implements CursorStorage {
             }
             final CursorMutationResult transition;
             try {
-                transition = stateMachine.flushPositionProperties(
-                        current.state(), properties, nowMillis());
+                transition = stateMachine.flushPositionProperties(current.state(), properties, nowMillis());
             } catch (Throwable error) {
                 return CompletableFuture.failedFuture(error);
             }
             return persistMutation(current, transition.state())
-                    .thenCompose(state -> completedMutation(
-                            handle, CursorMutationOutcome.APPLIED, state))
+                    .thenCompose(state -> completedMutation(handle, CursorMutationOutcome.APPLIED, state))
                     .handle((value, error) -> retryMutation(
-                            value,
-                            error,
-                            () -> flushPropertiesAttempt(
-                                    handle, properties, deadline, attempt + 1)))
+                            value, error, () -> flushPropertiesAttempt(handle, properties, deadline, attempt + 1)))
                     .thenCompose(future -> future);
         });
     }
 
-    private CompletableFuture<CursorStatePersistencePlanner.HydratedState> loadForMutation(
-            CursorHandle handle) {
+    private CompletableFuture<CursorStatePersistencePlanner.HydratedState> loadForMutation(CursorHandle handle) {
         return hydrator.load(handle.owner().ledger(), handle.identity().cursorName())
                 .thenCompose(current -> {
                     try {
@@ -1018,18 +894,18 @@ public final class DefaultCursorStorage implements CursorStorage {
                     } catch (Throwable error) {
                         return CompletableFuture.failedFuture(error);
                     }
-                    return metadataStore.getRetention(
-                                    cluster, streamId(handle.owner()))
+                    return metadataStore
+                            .getRetention(cluster, streamId(handle.owner()))
                             .thenCompose(retention -> {
                                 if (retention.isEmpty()) {
-                                    return CompletableFuture.failedFuture(invariant(
-                                            "cursor mutation found no retention root"));
+                                    return CompletableFuture.failedFuture(
+                                            invariant("cursor mutation found no retention root"));
                                 }
-                                CursorRetentionRecord value = retention.orElseThrow().value();
+                                CursorRetentionRecord value =
+                                        retention.orElseThrow().value();
                                 try {
                                     requireRetentionOwner(handle.owner(), value);
-                                    if (value.lifecycle()
-                                                    == CursorRetentionLifecycle.PROTECTION_PENDING
+                                    if (value.lifecycle() == CursorRetentionLifecycle.PROTECTION_PENDING
                                             && value.pendingProtectionIntent()
                                                     .orElseThrow()
                                                     .cursorName()
@@ -1037,10 +913,8 @@ public final class DefaultCursorStorage implements CursorStorage {
                                             && !value.pendingProtectionIntent()
                                                     .orElseThrow()
                                                     .attemptId()
-                                                    .equals(current.state()
-                                                            .lastProtectionAttemptId())) {
-                                        throw new ManagedLedgerException
-                                                .ConcurrentFindCursorPositionException(
+                                                    .equals(current.state().lastProtectionAttemptId())) {
+                                        throw new ManagedLedgerException.ConcurrentFindCursorPositionException(
                                                 "cursor is the target of a pending protected transition");
                                     }
                                     return CompletableFuture.completedFuture(current);
@@ -1052,8 +926,7 @@ public final class DefaultCursorStorage implements CursorStorage {
     }
 
     private CompletableFuture<CursorState> persistMutation(
-            CursorStatePersistencePlanner.HydratedState current,
-            CursorState candidate) {
+            CursorStatePersistencePlanner.HydratedState current, CursorState candidate) {
         final CursorStatePersistencePlanner.PersistencePlan plan;
         try {
             plan = persistencePlanner.plan(current, candidate);
@@ -1067,30 +940,22 @@ public final class DefaultCursorStorage implements CursorStorage {
                     candidate.snapshotReference(),
                     current.root().metadataVersion());
         }
-        CursorStatePersistencePlanner.SnapshotPlan snapshot =
-                (CursorStatePersistencePlanner.SnapshotPlan) plan;
+        CursorStatePersistencePlanner.SnapshotPlan snapshot = (CursorStatePersistencePlanner.SnapshotPlan) plan;
         CursorSnapshotWriteAuthority authority = new CursorSnapshotWriteAuthority(
-                current.root(),
-                candidate.ownerSessionId(),
-                candidate.mutationSequence());
+                current.root(), candidate.ownerSessionId(), candidate.mutationSequence());
         return snapshotStore.prepareWrite(snapshot.request(), authority).thenCompose(publication -> {
             final CursorStateRecord root;
             try {
-                root = persistencePlanner.afterSnapshot(
-                        candidate, publication.reference());
+                root = persistencePlanner.afterSnapshot(candidate, publication.reference());
             } catch (Throwable error) {
                 return CompletableFuture.failedFuture(error);
             }
-            return metadataStore.compareAndSetCursor(
-                            cluster,
-                            root,
-                            current.root().metadataVersion())
-                    .thenCompose(published -> snapshotStore.completeWrite(
-                                    publication, published)
+            return metadataStore
+                    .compareAndSetCursor(cluster, root, current.root().metadataVersion())
+                    .thenCompose(published -> snapshotStore
+                            .completeWrite(publication, published)
                             .thenApply(ignored -> persistencePlanner.persisted(
-                                    candidate,
-                                    Optional.of(publication.reference()),
-                                    published.metadataVersion())));
+                                    candidate, Optional.of(publication.reference()), published.metadataVersion())));
         });
     }
 
@@ -1099,24 +964,20 @@ public final class DefaultCursorStorage implements CursorStorage {
             CursorState candidate,
             Optional<CursorSnapshotReference> reference,
             long expectedVersion) {
-        return metadataStore.compareAndSetCursor(cluster, root, expectedVersion)
-                .thenApply(updated -> persistencePlanner.persisted(
-                        candidate, reference, updated.metadataVersion()));
+        return metadataStore
+                .compareAndSetCursor(cluster, root, expectedVersion)
+                .thenApply(updated -> persistencePlanner.persisted(candidate, reference, updated.metadataVersion()));
     }
 
     private CompletableFuture<Void> deleteAttempt(
-            CursorOwnerSession owner,
-            String cursorName,
-            Deadline deadline,
-            int attempt) {
+            CursorOwnerSession owner, String cursorName, Deadline deadline, int attempt) {
         CompletableFuture<Void> admitted = requireAttempt(deadline, attempt, "delete durable cursor");
         if (admitted != null) {
             return admitted;
         }
         return metadataStore.getRetention(cluster, streamId(owner)).thenCompose(retention -> {
             if (retention.isEmpty()) {
-                return CompletableFuture.failedFuture(invariant(
-                        "cursor delete found no retention root"));
+                return CompletableFuture.failedFuture(invariant("cursor delete found no retention root"));
             }
             try {
                 requireRetentionOwner(owner, retention.orElseThrow().value());
@@ -1164,8 +1025,8 @@ public final class DefaultCursorStorage implements CursorStorage {
                 } catch (Throwable error) {
                     return CompletableFuture.failedFuture(error);
                 }
-                return metadataStore.compareAndSetCursor(
-                                cluster, tombstone, current.metadataVersion())
+                return metadataStore
+                        .compareAndSetCursor(cluster, tombstone, current.metadataVersion())
                         .thenCompose(updated -> {
                             closeHandle(owner, updated.value());
                             retentionCoordinator.reconcileFloor(owner).exceptionally(error -> null);
@@ -1187,11 +1048,8 @@ public final class DefaultCursorStorage implements CursorStorage {
     }
 
     private void closeHandle(CursorOwnerSession owner, CursorStateRecord root) {
-        CursorIdentity identity = new CursorIdentity(
-                owner.ledger(),
-                root.cursorName(),
-                root.cursorNameHash(),
-                root.cursorGeneration());
+        CursorIdentity identity =
+                new CursorIdentity(owner.ledger(), root.cursorName(), root.cursorNameHash(), root.cursorGeneration());
         CursorHandle removed = handles.remove(identity);
         if (removed != null) {
             removed.closeAsync();
@@ -1203,8 +1061,8 @@ public final class DefaultCursorStorage implements CursorStorage {
                 .getProjection(cluster, owner.ledger().managedLedgerName())
                 .thenCompose(projection -> {
                     if (projection.isEmpty()) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "managed-ledger projection is missing for cursor storage"));
+                        return CompletableFuture.failedFuture(
+                                invariant("managed-ledger projection is missing for cursor storage"));
                     }
                     TopicProjectionRecord value = projection.orElseThrow();
                     if (!value.managedLedgerName().equals(owner.ledger().managedLedgerName())
@@ -1227,7 +1085,8 @@ public final class DefaultCursorStorage implements CursorStorage {
             CursorLedgerIdentity ledger,
             Optional<CursorScanToken> continuation,
             ArrayList<VersionedCursorState> records) {
-        return metadataStore.scanCursors(
+        return metadataStore
+                .scanCursors(
                         cluster,
                         new StreamId(ledger.projection().streamId()),
                         continuation,
@@ -1254,27 +1113,21 @@ public final class DefaultCursorStorage implements CursorStorage {
     private synchronized CursorHandle newHandle(CursorOwnerSession owner, CursorState state) {
         if (closed.get()) {
             throw new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    "cursor storage closed before handle publication");
+                    ErrorCode.STORAGE_CLOSED, false, "cursor storage closed before handle publication");
         }
         return handles.compute(state.identity(), (identity, existing) -> {
-            if (existing != null
-                    && !existing.isClosed()
-                    && existing.owner().equals(owner)) {
+            if (existing != null && !existing.isClosed() && existing.owner().equals(owner)) {
                 existing.publish(state);
                 return existing;
             }
             if (existing != null) {
                 existing.closeAsync();
             }
-            return new CursorHandle(
-                    state, owner, config.cursorMutationQueueMax(), scheduler);
+            return new CursorHandle(state, owner, config.cursorMutationQueueMax(), scheduler);
         });
     }
 
-    private static void validateCursorRoot(
-            CursorLedgerIdentity ledger, String cursorName, CursorStateRecord root) {
+    private static void validateCursorRoot(CursorLedgerIdentity ledger, String cursorName, CursorStateRecord root) {
         if (!root.projection().equals(ledger.projection())
                 || !root.cursorName().equals(cursorName)
                 || !root.cursorNameHash().equals(CursorNames.cursorNameHash(cursorName))) {
@@ -1282,16 +1135,14 @@ public final class DefaultCursorStorage implements CursorStorage {
         }
     }
 
-    private static void requireCursorOwner(
-            CursorOwnerSession owner, CursorStateRecord root)
+    private static void requireCursorOwner(CursorOwnerSession owner, CursorStateRecord root)
             throws ManagedLedgerException.ManagedLedgerFencedException {
         if (!root.ownerSessionId().equals(owner.ownerSessionId())) {
             throw fenced("cursor root is owned by another writable session");
         }
     }
 
-    private static void requireStateOwner(
-            CursorOwnerSession owner, CursorState state)
+    private static void requireStateOwner(CursorOwnerSession owner, CursorState state)
             throws ManagedLedgerException.ManagedLedgerFencedException {
         if (!state.identity().ledger().equals(owner.ledger())
                 || !state.ownerSessionId().equals(owner.ownerSessionId())) {
@@ -1299,23 +1150,20 @@ public final class DefaultCursorStorage implements CursorStorage {
         }
     }
 
-    private static void requireHandleState(CursorHandle handle, CursorState state)
-            throws ManagedLedgerException {
+    private static void requireHandleState(CursorHandle handle, CursorState state) throws ManagedLedgerException {
         if (!state.identity().equals(handle.identity())) {
             throw new ManagedLedgerException.CursorAlreadyClosedException(
                     "cursor generation changed under a stale handle");
         }
         if (state.lifecycle() != CursorLifecycle.ACTIVE) {
-            throw new ManagedLedgerException.CursorAlreadyClosedException(
-                    "durable cursor was deleted");
+            throw new ManagedLedgerException.CursorAlreadyClosedException("durable cursor was deleted");
         }
         if (!state.ownerSessionId().equals(handle.owner().ownerSessionId())) {
             throw fenced("durable cursor handle was fenced by a newer owner");
         }
     }
 
-    private static void requireRetentionOwner(
-            CursorOwnerSession owner, CursorRetentionRecord retention)
+    private static void requireRetentionOwner(CursorOwnerSession owner, CursorRetentionRecord retention)
             throws ManagedLedgerException.ManagedLedgerFencedException {
         if (!retention.projection().equals(owner.ledger().projection())) {
             throw invariant("cursor retention projection identity mismatch");
@@ -1325,18 +1173,18 @@ public final class DefaultCursorStorage implements CursorStorage {
         }
     }
 
-    private static void requireRetentionViewOwner(
-            CursorOwnerSession owner, CursorRetentionView retention) {
+    private static void requireRetentionViewOwner(CursorOwnerSession owner, CursorRetentionView retention) {
         if (!retention.ledger().equals(owner.ledger())
                 || !retention.ownerSessionId().equals(owner.ownerSessionId())) {
-            throw new CompletionException(fenced(
-                    "cursor retention view changed before handle publication"));
+            throw new CompletionException(fenced("cursor retention view changed before handle publication"));
         }
     }
 
     private static void validateStateBounds(CursorState state, StreamMetadata stream) {
         CursorAckState ack = state.acknowledgements();
-        if (!stream.streamId().value().equals(state.identity().ledger().projection().streamId())
+        if (!stream.streamId()
+                        .value()
+                        .equals(state.identity().ledger().projection().streamId())
                 || ack.markDeleteOffset() < stream.trimOffset()
                 || ack.markDeleteOffset() > stream.committedEndOffset()) {
             throw invariant("cursor mark-delete is outside authoritative L0 bounds");
@@ -1346,8 +1194,7 @@ public final class DefaultCursorStorage implements CursorStorage {
                 throw invariant("cursor whole-ack range exceeds committed end");
             }
         }
-        if (!ack.partialBatchAcks().isEmpty()
-                && ack.partialBatchAcks().lastKey() >= stream.committedEndOffset()) {
+        if (!ack.partialBatchAcks().isEmpty() && ack.partialBatchAcks().lastKey() >= stream.committedEndOffset()) {
             throw invariant("cursor partial batch offset exceeds committed end");
         }
     }
@@ -1371,9 +1218,7 @@ public final class DefaultCursorStorage implements CursorStorage {
     }
 
     private static CompletableFuture<CursorMutationResult> retryMutation(
-            CursorMutationResult value,
-            Throwable error,
-            Supplier<CompletableFuture<CursorMutationResult>> retry) {
+            CursorMutationResult value, Throwable error, Supplier<CompletableFuture<CursorMutationResult>> retry) {
         if (error == null) {
             return CompletableFuture.completedFuture(value);
         }
@@ -1401,22 +1246,20 @@ public final class DefaultCursorStorage implements CursorStorage {
         return false;
     }
 
-    private CursorRetentionView toRetentionView(
-            CursorOwnerSession owner, VersionedCursorRetention versioned)
+    private CursorRetentionView toRetentionView(CursorOwnerSession owner, VersionedCursorRetention versioned)
             throws ManagedLedgerException.ManagedLedgerFencedException {
         CursorRetentionRecord value = versioned.value();
         requireRetentionOwner(owner, value);
-        Optional<CursorRetentionView.PendingProtection> protection =
-                value.pendingProtectionIntent().map(intent ->
-                        new CursorRetentionView.PendingProtection(
-                                intent.attemptId(),
-                                CursorRetentionView.PendingProtection.Kind.valueOf(
-                                        intent.kind().name()),
-                                intent.cursorNameHash(),
-                                intent.targetCursorGeneration(),
-                                intent.targetMarkDeleteOffset()));
-        Optional<CursorRetentionView.PendingTrim> trim = value.pendingTrimAttemptId().map(attempt ->
-                new CursorRetentionView.PendingTrim(
+        Optional<CursorRetentionView.PendingProtection> protection = value.pendingProtectionIntent()
+                .map(intent -> new CursorRetentionView.PendingProtection(
+                        intent.attemptId(),
+                        CursorRetentionView.PendingProtection.Kind.valueOf(
+                                intent.kind().name()),
+                        intent.cursorNameHash(),
+                        intent.targetCursorGeneration(),
+                        intent.targetMarkDeleteOffset()));
+        Optional<CursorRetentionView.PendingTrim> trim = value.pendingTrimAttemptId()
+                .map(attempt -> new CursorRetentionView.PendingTrim(
                         attempt,
                         value.pendingTrimOffset().orElseThrow(),
                         value.pendingTrimReason().orElseThrow()));
@@ -1459,8 +1302,7 @@ public final class DefaultCursorStorage implements CursorStorage {
                 current.deletedAtMillis());
     }
 
-    private static boolean sameRoot(
-            Optional<VersionedCursorState> left, Optional<VersionedCursorState> right) {
+    private static boolean sameRoot(Optional<VersionedCursorState> left, Optional<VersionedCursorState> right) {
         if (left.isEmpty() || right.isEmpty()) {
             return left.isEmpty() && right.isEmpty();
         }
@@ -1491,16 +1333,13 @@ public final class DefaultCursorStorage implements CursorStorage {
         return new StreamId(owner.ledger().projection().streamId());
     }
 
-    private CompletableFuture<Void> requireAttempt(
-            Deadline deadline, int attempt, String operation) {
+    private CompletableFuture<Void> requireAttempt(Deadline deadline, int attempt, String operation) {
         if (closed.get()) {
             return closedFuture();
         }
         if (attempt >= config.cursorMaxCasAttempts() || deadline.expired()) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.TIMEOUT,
-                    true,
-                    operation + " exhausted its bounded CAS/deadline budget"));
+                    ErrorCode.TIMEOUT, true, operation + " exhausted its bounded CAS/deadline budget"));
         }
         return null;
     }
@@ -1528,8 +1367,7 @@ public final class DefaultCursorStorage implements CursorStorage {
 
     private static <T> CompletableFuture<T> closedFuture() {
         return CompletableFuture.failedFuture(
-                new ManagedLedgerException.ManagedLedgerAlreadyClosedException(
-                        "cursor storage is closed"));
+                new ManagedLedgerException.ManagedLedgerAlreadyClosedException("cursor storage is closed"));
     }
 
     private record CursorFingerprint(
@@ -1537,13 +1375,9 @@ public final class DefaultCursorStorage implements CursorStorage {
             long cursorGeneration,
             CursorRecordLifecycle lifecycle,
             String ownerSessionId,
-            long metadataVersion) {
-    }
+            long metadataVersion) {}
 
-    private record ProtectionCompletion(
-            CursorRetentionCoordinator.ProtectionLease lease,
-            Throwable error) {
-    }
+    private record ProtectionCompletion(CursorRetentionCoordinator.ProtectionLease lease, Throwable error) {}
 
     private static final class Deadline {
         private final long deadlineNanos;

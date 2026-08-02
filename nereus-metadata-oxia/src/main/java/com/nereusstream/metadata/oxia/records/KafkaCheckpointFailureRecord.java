@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.metadata.oxia.KafkaPartitionId;
-
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -94,18 +94,17 @@ public record KafkaCheckpointFailureRecord(
 
     @Override
     public int hashCode() {
-        int result =
-                Objects.hash(
-                        formatVersion,
-                        kafkaClusterId,
-                        topicId,
-                        partitionId,
-                        partitionIncarnation,
-                        objectId,
-                        sourceId,
-                        failureCode,
-                        quarantinedAtMillis,
-                        metadataVersion);
+        int result = Objects.hash(
+                formatVersion,
+                kafkaClusterId,
+                topicId,
+                partitionId,
+                partitionIncarnation,
+                objectId,
+                sourceId,
+                failureCode,
+                quarantinedAtMillis,
+                metadataVersion);
         result = 31 * result + Arrays.hashCode(referenceSha256);
         return 31 * result + Arrays.hashCode(failureSha256);
     }

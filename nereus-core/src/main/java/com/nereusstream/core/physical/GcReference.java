@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.Checksum;
@@ -16,7 +17,6 @@ public record GcReference(
         if (ownerMetadataVersion < 0) {
             throw new IllegalArgumentException("ownerMetadataVersion must be non-negative");
         }
-        ownerIdentitySha256 = GcReferenceQuery.requireSha256(
-                ownerIdentitySha256, "ownerIdentitySha256");
+        ownerIdentitySha256 = GcReferenceQuery.requireSha256(ownerIdentitySha256, "ownerIdentitySha256");
     }
 }

@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.OptionalLong;
 
-/** One exact source entry represented by one dense NCP2 row. */
+/**
+ * One exact source entry represented by one dense NCP2 row.
+ */
 public record RangedCompactedObjectRow(
         long streamOffsetStart,
         int recordCount,

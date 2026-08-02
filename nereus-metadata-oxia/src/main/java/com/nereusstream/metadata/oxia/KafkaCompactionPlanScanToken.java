@@ -1,16 +1,18 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import java.util.Objects;
 
-/** Opaque process-local continuation for one partition's compaction-plan children. */
+/**
+ * Opaque process-local continuation for one partition's compaction-plan children.
+ */
 public final class KafkaCompactionPlanScanToken {
     private final KafkaPartitionId partition;
     private final String scanPrefix;
     private final String exclusiveLastKey;
 
-    KafkaCompactionPlanScanToken(
-            KafkaPartitionId partition, String scanPrefix, String exclusiveLastKey) {
+    KafkaCompactionPlanScanToken(KafkaPartitionId partition, String scanPrefix, String exclusiveLastKey) {
         this.partition = Objects.requireNonNull(partition, "partition");
         this.scanPrefix = requireText(scanPrefix, "scanPrefix");
         this.exclusiveLastKey = requireText(exclusiveLastKey, "exclusiveLastKey");

@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.capability;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.core.physical.GcReferenceQuery;
-
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -12,7 +12,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Objects;
 
-/** Short-lived proof that must be revalidated immediately before an F4 mutation CAS. */
+/**
+ * Short-lived proof that must be revalidated immediately before an F4 mutation CAS.
+ */
 public record GenerationActivationProof(
         GenerationOperation operation,
         GenerationActivationSubject subject,
@@ -29,27 +31,21 @@ public record GenerationActivationProof(
         Objects.requireNonNull(subject, "subject");
         subjectSha256 = GcReferenceQuery.requireSha256(subjectSha256, "subjectSha256");
         if (!subjectSha256.equals(subjectSha256(subject))) {
-            throw new IllegalArgumentException(
-                    "subjectSha256 does not match canonical subject fields");
+            throw new IllegalArgumentException("subjectSha256 does not match canonical subject fields");
         }
         if (subjectValidationVersion < 0
                 || clusterActivationMetadataVersion < 0
                 || brokerCapabilityReadinessEpoch < 0
                 || provedAtMillis < 0) {
-            throw new IllegalArgumentException(
-                    "activation proof versions/times must be non-negative");
+            throw new IllegalArgumentException("activation proof versions/times must be non-negative");
         }
-        referenceDomainSetSha256 =
-                GcReferenceQuery.requireSha256(
-                        referenceDomainSetSha256, "referenceDomainSetSha256");
+        referenceDomainSetSha256 = GcReferenceQuery.requireSha256(referenceDomainSetSha256, "referenceDomainSetSha256");
         if (subject instanceof DomainValidatedDeletionSubject) {
             if (operation != GenerationOperation.PHYSICAL_DELETE || subjectValidationVersion != 0) {
-                throw new IllegalArgumentException(
-                        "domain-validated subjects are only legal for physical delete");
+                throw new IllegalArgumentException("domain-validated subjects are only legal for physical delete");
             }
         } else if (operation == GenerationOperation.PHYSICAL_DELETE) {
-            throw new IllegalArgumentException(
-                    "physical delete requires a domain-validated subject");
+            throw new IllegalArgumentException("physical delete requires a domain-validated subject");
         }
         boolean requiresDeletion = operation == GenerationOperation.PHYSICAL_DELETE;
         if ((requiresDeletion && !deletionEnabled) || (!requiresDeletion && !publicationEnabled)) {
@@ -116,7 +112,8 @@ public record GenerationActivationProof(
 
         private void text(String value) {
             byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-            digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+            digest.update(
+                    ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
             digest.update(bytes);
         }
 

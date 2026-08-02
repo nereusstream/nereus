@@ -17,10 +17,10 @@ package com.nereusstream.api;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Acquired append session and the exact external authority durably bound to it. */
-public record AcquiredAppendSession(
-        AppendSession session,
-        Optional<AppendAuthority> authority) {
+/**
+ * Acquired append session and the exact external authority durably bound to it.
+ */
+public record AcquiredAppendSession(AppendSession session, Optional<AppendAuthority> authority) {
     public AcquiredAppendSession {
         Objects.requireNonNull(session, "session");
         authority = Objects.requireNonNull(authority, "authority");

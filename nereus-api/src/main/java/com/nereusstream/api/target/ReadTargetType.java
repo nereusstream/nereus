@@ -5,9 +5,12 @@
  *
  *   https://www.apache.org/licenses/LICENSE-2.0
  */
+
 package com.nereusstream.api.target;
 
-/** Durable physical target discriminator. A value does not imply that an IO adapter is installed. */
+/**
+ * Durable physical target discriminator. A value does not imply that an IO adapter is installed.
+ */
 public enum ReadTargetType {
     OBJECT_SLICE,
     BOOKKEEPER_ENTRY_RANGE

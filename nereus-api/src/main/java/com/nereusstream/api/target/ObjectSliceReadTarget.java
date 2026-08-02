@@ -5,6 +5,7 @@
  *
  *   https://www.apache.org/licenses/LICENSE-2.0
  */
+
 package com.nereusstream.api.target;
 
 import com.nereusstream.api.Checksum;
@@ -16,7 +17,9 @@ import com.nereusstream.api.ObjectType;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** Immutable selection of one stream slice stored in an object. */
+/**
+ * Immutable selection of one stream slice stored in an object.
+ */
 public record ObjectSliceReadTarget(
         int version,
         ObjectId objectId,
@@ -28,7 +31,8 @@ public record ObjectSliceReadTarget(
         long objectOffset,
         long objectLength,
         Checksum sliceChecksum,
-        EntryIndexRef entryIndexRef) implements ReadTarget {
+        EntryIndexRef entryIndexRef)
+        implements ReadTarget {
     public ObjectSliceReadTarget {
         if (version != 1) {
             throw new IllegalArgumentException("object target version must be 1");
@@ -52,7 +56,7 @@ public record ObjectSliceReadTarget(
         if (entryIndexRef.location() == EntryIndexLocation.OBJECT_FOOTER
                 && entryIndexRef.objectId().isPresent()
                 && (!entryIndexRef.objectId().orElseThrow().equals(objectId)
-                || !entryIndexRef.objectKey().orElseThrow().equals(objectKey))) {
+                        || !entryIndexRef.objectKey().orElseThrow().equals(objectKey))) {
             throw new IllegalArgumentException("OBJECT_FOOTER entry index must reference the target object");
         }
     }

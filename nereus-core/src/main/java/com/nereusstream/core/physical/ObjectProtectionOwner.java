@@ -1,14 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.Checksum;
 import java.util.Objects;
 
-/** Exact authoritative metadata owner that can re-prove one physical-object reference. */
-public record ObjectProtectionOwner(
-        String ownerKey,
-        long metadataVersion,
-        Checksum identitySha256) {
+/**
+ * Exact authoritative metadata owner that can re-prove one physical-object reference.
+ */
+public record ObjectProtectionOwner(String ownerKey, long metadataVersion, Checksum identitySha256) {
     public ObjectProtectionOwner {
         Objects.requireNonNull(ownerKey, "ownerKey");
         if (ownerKey.isBlank()) {

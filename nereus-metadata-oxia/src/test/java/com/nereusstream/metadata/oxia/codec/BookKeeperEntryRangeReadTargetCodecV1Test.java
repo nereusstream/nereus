@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.target.BookKeeperEntryMapping;
@@ -39,22 +39,21 @@ class BookKeeperEntryRangeReadTargetCodecV1Test {
 
         byte[] truncated = Arrays.copyOf(encoded.payload(), encoded.payload().length - 1);
         assertThatThrownBy(() -> codecs.decode(new ReadTargetRecord(
-                encoded.targetType(),
-                encoded.targetVersion(),
-                encoded.payloadEncoding(),
-                truncated,
-                encoded.identityChecksumType(),
-                ReadTargetCodecRegistry.identity(
-                        encoded.targetType(), encoded.targetVersion(), truncated))))
+                        encoded.targetType(),
+                        encoded.targetVersion(),
+                        encoded.payloadEncoding(),
+                        truncated,
+                        encoded.identityChecksumType(),
+                        ReadTargetCodecRegistry.identity(encoded.targetType(), encoded.targetVersion(), truncated))))
                 .isInstanceOf(MetadataCodecException.class);
         assertThatThrownBy(() -> new BookKeeperEntryRangeReadTarget(
-                1,
-                "primary",
-                3,
-                Long.MAX_VALUE,
-                2,
-                BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
-                target.rangeChecksum()))
+                        1,
+                        "primary",
+                        3,
+                        Long.MAX_VALUE,
+                        2,
+                        BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
+                        target.rangeChecksum()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import java.io.ByteArrayInputStream;
@@ -11,13 +12,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Deterministic NBKA1 binary codec for the durable BookKeeper rollout authority. */
+/**
+ * Deterministic NBKA1 binary codec for the durable BookKeeper rollout authority.
+ */
 public final class BookKeeperProtocolActivationCodecV1 {
     private static final byte[] MAGIC = "NBKA1".getBytes(StandardCharsets.US_ASCII);
     private static final int MAX_TEXT_BYTES = 16 * 1024;
 
-    private BookKeeperProtocolActivationCodecV1() {
-    }
+    private BookKeeperProtocolActivationCodecV1() {}
 
     public static byte[] encode(BookKeeperProtocolActivationValue value) {
         BookKeeperProtocolActivationValue exact = Objects.requireNonNull(value, "value");

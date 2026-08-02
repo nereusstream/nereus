@@ -14,16 +14,15 @@
 
 package com.nereusstream.core.recovery;
 
-/** Metrics hook for metadata-driven object-reference repair and diagnostics. */
+/**
+ * Metrics hook for metadata-driven object-reference repair and diagnostics.
+ */
 public interface RecoveryMetricsObserver {
-    default void onObjectReferenceRepair(int reachableSliceCount) {
-    }
+    default void onObjectReferenceRepair(int reachableSliceCount) {}
 
-    default void onObjectAssessed(OrphanObjectStatus status) {
-    }
+    default void onObjectAssessed(OrphanObjectStatus status) {}
 
     static RecoveryMetricsObserver noop() {
-        return new RecoveryMetricsObserver() {
-        };
+        return new RecoveryMetricsObserver() {};
     }
 }

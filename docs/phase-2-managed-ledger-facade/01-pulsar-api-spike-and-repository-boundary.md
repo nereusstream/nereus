@@ -9,35 +9,35 @@ Target: `nereusstream/pulsar@100d3ef0ff7c7da36d497453b141ddff6f34a9d3`,
 `version=5.0.0-M1-SNAPSHOT`。This is the fork source project's Gradle version and a composite-build selector，not a
 published Maven snapshot coordinate。
 
-| File | Locked Git blob |
-| --- | --- |
-| `ManagedLedgerStorage.java` | `720798123e7b41d19c69a1863ec45389627325af` |
-| `ManagedLedgerStorageClass.java` | `8cbe5c3b411e5fe37c5db1ff35321a7d5e9186be` |
-| `ManagedLedgerFactory.java` | `b9adbe3b353fd92e541f9fd75b5c788b0468a859` |
-| `ManagedLedger.java` | `0455f0efa8bb6d0ef248b870b1a68166cdcef2c8` |
-| `ManagedCursor.java` | `1e6ab76c80c939cd51a29a590a50b2d079fa1c80` |
-| `ManagedLedgerClientFactory.java` | `3dece00e89a7f0d2f72bff71eabe9d2dff519d37` |
-| `ReadOnlyCursor.java` | `016298cb108bb2f3abc3e9b9a48c0c45486dcfef` |
-| `ReadOnlyManagedLedger.java` | `91b8f92eb637e6350c659f4a44df24800696c88b` |
-| `Entry.java` | `24ea5c17c0d66c324e73b60d3c53bf991cd456fd` |
-| `Position.java` | `d0d6d865c9558a7a02707c48fb19b09d7fc1014b` |
-| `PositionFactory.java` | `481619b8db7a60ff8d7e70a5e211f606eba71c65` |
-| `ImmutablePositionImpl.java` | `06245a6b5f33af1c4d38ca9da73655a5e1bb0165` |
-| `AckSetState.java` | `03ff50c1c7fe5487812fbe6485eed66debfe4b74` |
-| `AsyncCallbacks.java` | `70db427afce4f811670dd018c6dd98d44230d4bc` |
-| `ManagedLedgerException.java` | `1fa565d6ec788df22f5fe725afdaea73141e024a` |
-| `ManagedLedgerInfo.java` | `3e4e56187e5eed531a33e1d0cf8d9bab0c94116c` |
-| `EntryCacheManager.java` | `816ccd4a3e459f296a7b5775bd3d48bcd163f463` |
-| `EntryCache.java` | `b2ebf7430560cb37f420ff5cd21984ba04b00c96` |
-| `ManagedLedgerFactoryMXBean.java` | `43e8196daa9ae4cb1e4299abe2b5f3425009445c` |
-| `ManagedLedgerMXBean.java` | `1d978e23785690bd17c2f0a9a898397361c933cb` |
-| `ManagedCursorMXBean.java` | `7402bd65f793eddab8b34b0ac5ed0c40c24cf6a1` |
-| `ManagedLedgerInternalStats.java` | `c109e269202115ada9c032c6168d9f6420a3eeec` |
-| `ManagedLedgerConfig.java` | `9dd5ced2dc787cae110b535fa89e91af40ba03f1` |
-| `ManagedLedgerFactoryConfig.java` | `a915d651bd6b2bf01eb9aadb26d1c82fa6f60a0b` |
-| `ScanOutcome.java` | `c679c40e85e9174da793cc99ebd73009a55e7dfe` |
+| File                               | Locked Git blob                            |
+|------------------------------------|--------------------------------------------|
+| `ManagedLedgerStorage.java`        | `720798123e7b41d19c69a1863ec45389627325af` |
+| `ManagedLedgerStorageClass.java`   | `8cbe5c3b411e5fe37c5db1ff35321a7d5e9186be` |
+| `ManagedLedgerFactory.java`        | `b9adbe3b353fd92e541f9fd75b5c788b0468a859` |
+| `ManagedLedger.java`               | `0455f0efa8bb6d0ef248b870b1a68166cdcef2c8` |
+| `ManagedCursor.java`               | `1e6ab76c80c939cd51a29a590a50b2d079fa1c80` |
+| `ManagedLedgerClientFactory.java`  | `3dece00e89a7f0d2f72bff71eabe9d2dff519d37` |
+| `ReadOnlyCursor.java`              | `016298cb108bb2f3abc3e9b9a48c0c45486dcfef` |
+| `ReadOnlyManagedLedger.java`       | `91b8f92eb637e6350c659f4a44df24800696c88b` |
+| `Entry.java`                       | `24ea5c17c0d66c324e73b60d3c53bf991cd456fd` |
+| `Position.java`                    | `d0d6d865c9558a7a02707c48fb19b09d7fc1014b` |
+| `PositionFactory.java`             | `481619b8db7a60ff8d7e70a5e211f606eba71c65` |
+| `ImmutablePositionImpl.java`       | `06245a6b5f33af1c4d38ca9da73655a5e1bb0165` |
+| `AckSetState.java`                 | `03ff50c1c7fe5487812fbe6485eed66debfe4b74` |
+| `AsyncCallbacks.java`              | `70db427afce4f811670dd018c6dd98d44230d4bc` |
+| `ManagedLedgerException.java`      | `1fa565d6ec788df22f5fe725afdaea73141e024a` |
+| `ManagedLedgerInfo.java`           | `3e4e56187e5eed531a33e1d0cf8d9bab0c94116c` |
+| `EntryCacheManager.java`           | `816ccd4a3e459f296a7b5775bd3d48bcd163f463` |
+| `EntryCache.java`                  | `b2ebf7430560cb37f420ff5cd21984ba04b00c96` |
+| `ManagedLedgerFactoryMXBean.java`  | `43e8196daa9ae4cb1e4299abe2b5f3425009445c` |
+| `ManagedLedgerMXBean.java`         | `1d978e23785690bd17c2f0a9a898397361c933cb` |
+| `ManagedCursorMXBean.java`         | `7402bd65f793eddab8b34b0ac5ed0c40c24cf6a1` |
+| `ManagedLedgerInternalStats.java`  | `c109e269202115ada9c032c6168d9f6420a3eeec` |
+| `ManagedLedgerConfig.java`         | `9dd5ced2dc787cae110b535fa89e91af40ba03f1` |
+| `ManagedLedgerFactoryConfig.java`  | `a915d651bd6b2bf01eb9aadb26d1c82fa6f60a0b` |
+| `ScanOutcome.java`                 | `c679c40e85e9174da793cc99ebd73009a55e7dfe` |
 | `PersistentOfflineTopicStats.java` | `f1cb0dfd088803be1cf4c9b88525d31c0af6ddc8` |
-| `Commands.java` | `a9626a3b4cb669a3aba481446be926aaf1fa9128` |
+| `Commands.java`                    | `a9626a3b4cb669a3aba481446be926aaf1fa9128` |
 
 F2-M0R2 verified these blobs directly in the clean target checkout
 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar@100d3ef0...`。There is no longer a compatible-checkout delta in
@@ -49,21 +49,21 @@ compares all rows.
 
 `javap -public` reports the following total declared API members, including default/static members:
 
-| Interface | Declared members | Consequence |
-| --- | ---: | --- |
-| `ManagedLedgerStorage` | 6 | Broker-private provider lifecycle must be implemented in the fork |
-| `ManagedLedgerStorageClass` | 2 | Name and factory only |
-| `ManagedLedgerFactory` | 26 | A facade must cover admin/cache/properties methods, not only `open` |
-| `ManagedLedger` | 87 | Many BookKeeper-shaped compatibility methods need explicit behavior |
-| `ManagedCursor` | 89 methods plus one constant | F2 cannot claim a full cursor implementation |
-| `ReadOnlyCursor` | 11 | Every method is implemented in F2 |
-| `ReadOnlyManagedLedger` | 4 | Read-only open returns a concrete read-only type, not a writable cast |
-| `Entry` | 13 including defaults | Buffer ownership and metadata parsing are broker compatibility contracts |
-| `Position` | 10 including defaults/bridge | One-ledger ordering and sentinels require an explicit audit |
-| `EntryCacheManager` / `EntryCache` | 11 / 8 | Zero-capacity compatibility objects still need exact invalidation/read behavior |
-| factory / ledger / cursor MXBeans | 16 / 37 / 13 | Stats cannot fabricate BookKeeper replication or cursor-ledger persistence |
-| `ManagedLedgerInternalStats` | mutable admin DTO | Every BookKeeper-shaped field needs a Nereus meaning or neutral value |
-| config / scan / offline-stats values | locked source | Mutable config and admin behavior must be re-audited on target drift |
+| Interface                            |             Declared members | Consequence                                                                     |
+|--------------------------------------|-----------------------------:|---------------------------------------------------------------------------------|
+| `ManagedLedgerStorage`               |                            6 | Broker-private provider lifecycle must be implemented in the fork               |
+| `ManagedLedgerStorageClass`          |                            2 | Name and factory only                                                           |
+| `ManagedLedgerFactory`               |                           26 | A facade must cover admin/cache/properties methods, not only `open`             |
+| `ManagedLedger`                      |                           87 | Many BookKeeper-shaped compatibility methods need explicit behavior             |
+| `ManagedCursor`                      | 89 methods plus one constant | F2 cannot claim a full cursor implementation                                    |
+| `ReadOnlyCursor`                     |                           11 | Every method is implemented in F2                                               |
+| `ReadOnlyManagedLedger`              |                            4 | Read-only open returns a concrete read-only type, not a writable cast           |
+| `Entry`                              |        13 including defaults | Buffer ownership and metadata parsing are broker compatibility contracts        |
+| `Position`                           | 10 including defaults/bridge | One-ledger ordering and sentinels require an explicit audit                     |
+| `EntryCacheManager` / `EntryCache`   |                       11 / 8 | Zero-capacity compatibility objects still need exact invalidation/read behavior |
+| factory / ledger / cursor MXBeans    |                 16 / 37 / 13 | Stats cannot fabricate BookKeeper replication or cursor-ledger persistence      |
+| `ManagedLedgerInternalStats`         |            mutable admin DTO | Every BookKeeper-shaped field needs a Nereus meaning or neutral value           |
+| config / scan / offline-stats values |                locked source | Mutable config and admin behavior must be re-audited on target drift            |
 
 Counts are drift detectors, not acceptance criteria. A default method can still be semantically wrong
 for Nereus, and a source-compatible signature can still change broker behavior.
@@ -73,37 +73,37 @@ for Nereus, and a source-compatible signature can still change broker behavior.
 F2-M0R also changes fork-private call paths, so compilation against the managed-ledger interfaces alone is
 insufficient. The target commit source audit locks:
 
-| File | Locked Git blob | F2 reason |
-| --- | --- | --- |
-| `ServiceConfiguration.java` | `8b2e28f80f25a09ce2d079712a392f8f5a001a3e` | typed broker config/default feature inputs |
-| `PulsarService.java` | `f80465ed3c65dad72fd4fad06a4483ef99fb706d` | storage initialization order、late broker ID and capability startup hook |
-| `BrokerService.java` | `f618ed206b613e005bf6948930c1f7624fd04cc8` | config/storage-class selection path |
-| `AbstractTopic.java` | `3975b180cf6cae9c78ceaf971323366800f40e5e` | effective policy hierarchy/update ordering |
-| `PersistentTopic.java` | `5eba52c8da50383bf28c5267eb454b6277269687` | open, producer, publish, subscribe, txn and delete hooks |
-| `Topic.java` | `684e5c6c83a102d77a8c10b02547d622bcebe643` | `PublishContext`/topic operation signatures |
-| `Producer.java` | `3649da70c2ab97f9f80d340f88c730428f7de106` | remote producer and publish metadata behavior |
-| `Consumer.java` | `fdad3200482d023cd41186dbb5d04064a1c65899` | ack admission before counters/txn/cursor mutation |
-| `PersistentSubscription.java` | `e77ced8da168faffa73f39eb3fc900c77a5fe6b6` | cumulative/individual cursor mutation call path |
-| `MessageDeduplication.java` | `a980556f49baad059a0e57460cd8649ab78dcc17` | dedup cursor/state mutation boundary |
-| `TopicPolicyListenerWrapper.java` | `da22b44a632c2375db321202d5966c047418477f` | live policy listener admission ordering |
-| `ManagedLedgerInterceptorImpl.java` | `f598b3ebf6a302d0ec09dfe1ebfde73343b12881` | broker metadata/payload processor composition |
-| `TransactionBufferDisable.java` | `0184a5af3afd51fe8e6d0000ebe6b663e0d68384` | Nereus non-transactional topic behavior |
-| `PersistentTopicsBase.java` | `a991ca715d8a10c8db348ba4fd5fe0778954196b` | topic admin mutation gates |
-| `NamespacesBase.java` | `911d3de2b04c26100f7da9b6fc1eeb594393ed46` | namespace policy/storage-class gates |
-| `Policies.java` | `df3cf53a3ca59c809df07a4287d3ba39dedf1d93` | namespace effective feature inputs |
-| `TopicPolicies.java` | `356e2a4e072f84fa795092de2f42c6d302d0533e` | topic local/global feature inputs |
-| `HierarchyTopicPolicies.java` | `b476c9d290052b510ff4ff4b96b1a4a76dcee330` | effective precedence parity oracle |
-| `PersistencePolicies.java` | `684c202f15852edec092772974b1c1be9bc0c404` | selected storage-class field |
-| `BrokerRegistry.java` | `d154edfbb320ea30486735d899f5462860b1c3a4` | active-broker set for rollout convergence |
-| `BrokerRegistryImpl.java` | `dbc3c52be5cc805ef035220451b76ded72bdfbde` | broker visibility ordering |
-| `BrokerLookupData.java` | `f3dbec5fadd7d705cd8c51de1e6faecc0f58812a` | capability evidence carried by active broker data |
-| `MetadataStore.java` | `00c8e205e0e0ef6fdfd13f6a21adabbd71c6c4e6` | binding sync/get/conditional-put contract |
-| `MetadataStoreExtended.java` | `22838154098b23828023f118680fd3faa9d55a79` | broker-supplied shared metadata handle |
-| `CoordinationService.java` | `708f91f4a33cacc423afae8938a78d77fe9ce17c` | namespace first-create lock-manager factory |
-| `LockManager.java` | `cb6601b170135465d3ae27f6eef35080e79780f6` | bounded namespace resource-lock acquisition |
-| `ResourceLock.java` | `c85b13cdc1440986859dec61ec9458fcb74e0fae` | async permit release/session-loss behavior |
-| `GetResult.java` | `6bb42202b1d2254506912c73c0e59d70265a027c` | binding bytes plus stat |
-| `Stat.java` | `36874e5bc387a0205215248178e2487f507d4cbe` | binding expected-version source |
+| File                                | Locked Git blob                            | F2 reason                                                               |
+|-------------------------------------|--------------------------------------------|-------------------------------------------------------------------------|
+| `ServiceConfiguration.java`         | `8b2e28f80f25a09ce2d079712a392f8f5a001a3e` | typed broker config/default feature inputs                              |
+| `PulsarService.java`                | `f80465ed3c65dad72fd4fad06a4483ef99fb706d` | storage initialization order、late broker ID and capability startup hook |
+| `BrokerService.java`                | `f618ed206b613e005bf6948930c1f7624fd04cc8` | config/storage-class selection path                                     |
+| `AbstractTopic.java`                | `3975b180cf6cae9c78ceaf971323366800f40e5e` | effective policy hierarchy/update ordering                              |
+| `PersistentTopic.java`              | `5eba52c8da50383bf28c5267eb454b6277269687` | open, producer, publish, subscribe, txn and delete hooks                |
+| `Topic.java`                        | `684e5c6c83a102d77a8c10b02547d622bcebe643` | `PublishContext`/topic operation signatures                             |
+| `Producer.java`                     | `3649da70c2ab97f9f80d340f88c730428f7de106` | remote producer and publish metadata behavior                           |
+| `Consumer.java`                     | `fdad3200482d023cd41186dbb5d04064a1c65899` | ack admission before counters/txn/cursor mutation                       |
+| `PersistentSubscription.java`       | `e77ced8da168faffa73f39eb3fc900c77a5fe6b6` | cumulative/individual cursor mutation call path                         |
+| `MessageDeduplication.java`         | `a980556f49baad059a0e57460cd8649ab78dcc17` | dedup cursor/state mutation boundary                                    |
+| `TopicPolicyListenerWrapper.java`   | `da22b44a632c2375db321202d5966c047418477f` | live policy listener admission ordering                                 |
+| `ManagedLedgerInterceptorImpl.java` | `f598b3ebf6a302d0ec09dfe1ebfde73343b12881` | broker metadata/payload processor composition                           |
+| `TransactionBufferDisable.java`     | `0184a5af3afd51fe8e6d0000ebe6b663e0d68384` | Nereus non-transactional topic behavior                                 |
+| `PersistentTopicsBase.java`         | `a991ca715d8a10c8db348ba4fd5fe0778954196b` | topic admin mutation gates                                              |
+| `NamespacesBase.java`               | `911d3de2b04c26100f7da9b6fc1eeb594393ed46` | namespace policy/storage-class gates                                    |
+| `Policies.java`                     | `df3cf53a3ca59c809df07a4287d3ba39dedf1d93` | namespace effective feature inputs                                      |
+| `TopicPolicies.java`                | `356e2a4e072f84fa795092de2f42c6d302d0533e` | topic local/global feature inputs                                       |
+| `HierarchyTopicPolicies.java`       | `b476c9d290052b510ff4ff4b96b1a4a76dcee330` | effective precedence parity oracle                                      |
+| `PersistencePolicies.java`          | `684c202f15852edec092772974b1c1be9bc0c404` | selected storage-class field                                            |
+| `BrokerRegistry.java`               | `d154edfbb320ea30486735d899f5462860b1c3a4` | active-broker set for rollout convergence                               |
+| `BrokerRegistryImpl.java`           | `dbc3c52be5cc805ef035220451b76ded72bdfbde` | broker visibility ordering                                              |
+| `BrokerLookupData.java`             | `f3dbec5fadd7d705cd8c51de1e6faecc0f58812a` | capability evidence carried by active broker data                       |
+| `MetadataStore.java`                | `00c8e205e0e0ef6fdfd13f6a21adabbd71c6c4e6` | binding sync/get/conditional-put contract                               |
+| `MetadataStoreExtended.java`        | `22838154098b23828023f118680fd3faa9d55a79` | broker-supplied shared metadata handle                                  |
+| `CoordinationService.java`          | `708f91f4a33cacc423afae8938a78d77fe9ce17c` | namespace first-create lock-manager factory                             |
+| `LockManager.java`                  | `cb6601b170135465d3ae27f6eef35080e79780f6` | bounded namespace resource-lock acquisition                             |
+| `ResourceLock.java`                 | `c85b13cdc1440986859dec61ec9458fcb74e0fae` | async permit release/session-loss behavior                              |
+| `GetResult.java`                    | `6bb42202b1d2254506912c73c0e59d70265a027c` | binding bytes plus stat                                                 |
+| `Stat.java`                         | `36874e5bc387a0205215248178e2487f507d4cbe` | binding expected-version source                                         |
 
 These are source locks, not claims that private broker classes are stable APIs. Any changed blob requires re-auditing
 the exact hook ordering in `07` and updating broker integration tests even when the facade probe still compiles.

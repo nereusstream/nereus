@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -95,8 +95,7 @@ class CursorSnapshotGcScaleTest {
     private static final int FULL_PAGE_COUNT = 40;
     private static final int LIVE_REFERENCE_COUNT = 9_997;
     private static final Checksum STORAGE_CHECKSUM = Crc32cChecksums.checksum(new byte[] {1});
-    private static final Checksum AUTHORITY_SHA = new Checksum(
-            ChecksumType.SHA256, "a".repeat(64));
+    private static final Checksum AUTHORITY_SHA = new Checksum(ChecksumType.SHA256, "a".repeat(64));
 
     @Test
     void visitsTenThousandCandidatesSequentiallyWithoutStackGrowthOrDeadlineRetention() {
@@ -108,15 +107,14 @@ class CursorSnapshotGcScaleTest {
             AtomicInteger maximumVisitors = new AtomicInteger();
             AtomicInteger visited = new AtomicInteger();
 
-            CursorSnapshotGcScanner.ScanResult result = context.scanner.scan(
-                            context.ledger,
-                            candidate -> {
-                                int active = activeVisitors.incrementAndGet();
-                                maximumVisitors.accumulateAndGet(active, Math::max);
-                                visited.incrementAndGet();
-                                activeVisitors.decrementAndGet();
-                                return CompletableFuture.completedFuture(null);
-                            })
+            CursorSnapshotGcScanner.ScanResult result = context.scanner
+                    .scan(context.ledger, candidate -> {
+                        int active = activeVisitors.incrementAndGet();
+                        maximumVisitors.accumulateAndGet(active, Math::max);
+                        visited.incrementAndGet();
+                        activeVisitors.decrementAndGet();
+                        return CompletableFuture.completedFuture(null);
+                    })
                     .join();
 
             assertThat(result.listedObjects()).isEqualTo(ROOT_COUNT);
@@ -139,9 +137,8 @@ class CursorSnapshotGcScaleTest {
         try (Context context = new Context()) {
             MixedFixture fixture = context.populateMixedInventory();
 
-            CursorSnapshotGcExecutor.ScanExecutionReport report = context.executor
-                    .scan(context.ledger)
-                    .join();
+            CursorSnapshotGcExecutor.ScanExecutionReport report =
+                    context.executor.scan(context.ledger).join();
 
             assertThat(report.scan().listedObjects()).isEqualTo(ROOT_COUNT);
             assertThat(report.scan().liveReferences()).isEqualTo(LIVE_REFERENCE_COUNT);
@@ -170,14 +167,11 @@ class CursorSnapshotGcScaleTest {
                 VersionedPhysicalObjectRoot marked = context.currentRoot(candidate);
                 assertThat(marked.value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.MARKED);
 
-                CursorSnapshotGcExecutor.CandidateExecutionResult recovered = context.executor
-                        .recoverMarked(context.ledger, marked)
-                        .join();
+                CursorSnapshotGcExecutor.CandidateExecutionResult recovered =
+                        context.executor.recoverMarked(context.ledger, marked).join();
 
-                assertThat(recovered.advance().orElseThrow().status())
-                        .isEqualTo(PhysicalGcAdvanceStatus.DELETE_INTENT);
-                assertThat(recovered.deletion().orElseThrow().status())
-                        .isEqualTo(PhysicalGcDeletionStatus.DELETED);
+                assertThat(recovered.advance().orElseThrow().status()).isEqualTo(PhysicalGcAdvanceStatus.DELETE_INTENT);
+                assertThat(recovered.deletion().orElseThrow().status()).isEqualTo(PhysicalGcDeletionStatus.DELETED);
                 assertThat(context.currentRoot(candidate).value().lifecycle())
                         .isEqualTo(PhysicalObjectLifecycle.DELETED);
             }
@@ -185,18 +179,19 @@ class CursorSnapshotGcScaleTest {
             assertThat(context.objectStore.size()).isEqualTo(LIVE_REFERENCE_COUNT);
             assertThat(context.objectStore.deleteCalls()).isEqualTo(3);
             assertThat(context.objectStore.deletedKeys())
-                    .containsExactlyInAnyOrderElementsOf(fixture.candidates().stream()
-                            .map(Snapshot::key)
-                            .toList());
+                    .containsExactlyInAnyOrderElementsOf(
+                            fixture.candidates().stream().map(Snapshot::key).toList());
             assertThat(context.objectStore.contains(fixture.current())).isTrue();
             assertThat(context.currentRoot(fixture.current()).value().lifecycle())
                     .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
-            assertThat(context.physicalStore.scanProtections(
-                            CLUSTER,
-                            ObjectKeyHash.from(fixture.current().key()),
-                            Optional.empty(),
-                            PAGE_SIZE)
-                    .join().values())
+            assertThat(context.physicalStore
+                            .scanProtections(
+                                    CLUSTER,
+                                    ObjectKeyHash.from(fixture.current().key()),
+                                    Optional.empty(),
+                                    PAGE_SIZE)
+                            .join()
+                            .values())
                     .hasSize(1);
             assertThat(context.cursorStore.scanCalls()).isGreaterThan(FULL_PAGE_COUNT);
             assertThat(context.objectStore.listCalls()).isGreaterThan(FULL_PAGE_COUNT);
@@ -207,8 +202,7 @@ class CursorSnapshotGcScaleTest {
     private static final class Context implements AutoCloseable {
         private final CountingCursorMetadataStore cursorStore =
                 new CountingCursorMetadataStore(new FakeCursorMetadataStore());
-        private final FakePhysicalObjectMetadataStore physicalStore =
-                new FakePhysicalObjectMetadataStore();
+        private final FakePhysicalObjectMetadataStore physicalStore = new FakePhysicalObjectMetadataStore();
         private final ScaleObjectStore objectStore = new ScaleObjectStore();
         private final ScheduledThreadPoolExecutor scheduler =
                 MaterializationSchedulers.newSingleThreadScheduler(runnable -> {
@@ -216,8 +210,8 @@ class CursorSnapshotGcScaleTest {
                     thread.setDaemon(true);
                     return thread;
                 });
-        private final MutableClock clock = new MutableClock(
-                Instant.parse("2035-01-02T00:00:00Z").toEpochMilli());
+        private final MutableClock clock =
+                new MutableClock(Instant.parse("2035-01-02T00:00:00Z").toEpochMilli());
         private final ManagedLedgerProjectionIdentity projection;
         private final CursorLedgerIdentity ledger;
         private final CursorSnapshotGcScanner scanner;
@@ -226,27 +220,26 @@ class CursorSnapshotGcScaleTest {
         private Context() {
             StreamId streamId = ManagedLedgerProjectionNames.streamId(TOPIC, 1);
             projection = new ManagedLedgerProjectionIdentity(
-                    1,
-                    1,
-                    streamId.value(),
-                    ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID + 1);
+                    1, 1, streamId.value(), ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID + 1);
             ledger = new CursorLedgerIdentity(
-                    TOPIC,
-                    ManagedLedgerProjectionNames.managedLedgerNameHash(TOPIC),
-                    projection);
-            cursorStore.createRetention(CLUSTER, new CursorRetentionRecord(
-                    0,
-                    projection,
-                    OWNER,
-                    CursorRetentionLifecycle.ACTIVE,
-                    1,
-                    0,
-                    0,
-                    Optional.empty(),
-                    Optional.empty(),
-                    OptionalLong.empty(),
-                    Optional.empty(),
-                    0)).join();
+                    TOPIC, ManagedLedgerProjectionNames.managedLedgerNameHash(TOPIC), projection);
+            cursorStore
+                    .createRetention(
+                            CLUSTER,
+                            new CursorRetentionRecord(
+                                    0,
+                                    projection,
+                                    OWNER,
+                                    CursorRetentionLifecycle.ACTIVE,
+                                    1,
+                                    0,
+                                    0,
+                                    Optional.empty(),
+                                    Optional.empty(),
+                                    OptionalLong.empty(),
+                                    Optional.empty(),
+                                    0))
+                    .join();
             PhysicalGcConfig gcConfig = enabledConfig();
             scanner = new CursorSnapshotGcScanner(
                     CLUSTER,
@@ -268,11 +261,8 @@ class CursorSnapshotGcScaleTest {
             GcReferenceDomainRegistry domains = new GcReferenceDomainRegistry(
                     gcConfig,
                     scheduler,
-                    List.of(
-                            new EmptyDomain("generation-v1"),
-                            new EmptyDomain("projection-generation-v1")));
-            DefaultGcRetirementJournal journal = new DefaultGcRetirementJournal(
-                    CLUSTER, physicalStore, gcConfig);
+                    List.of(new EmptyDomain("generation-v1"), new EmptyDomain("projection-generation-v1")));
+            DefaultGcRetirementJournal journal = new DefaultGcRetirementJournal(CLUSTER, physicalStore, gcConfig);
             PhysicalObjectGarbageCollector collector = new PhysicalObjectGarbageCollector(
                     CLUSTER,
                     gcConfig,
@@ -281,8 +271,8 @@ class CursorSnapshotGcScaleTest {
                     activationGuard(),
                     (candidate, expected) -> expected.isEmpty()
                             ? CompletableFuture.completedFuture(List.of())
-                            : CompletableFuture.failedFuture(new AssertionError(
-                                    "cursor candidate must not carry metadata removals")),
+                            : CompletableFuture.failedFuture(
+                                    new AssertionError("cursor candidate must not carry metadata removals")),
                     journal,
                     () -> "b".repeat(52),
                     clock,
@@ -298,18 +288,14 @@ class CursorSnapshotGcScaleTest {
                     scheduler);
             AtomicInteger candidateId = new AtomicInteger();
             executor = new CursorSnapshotGcExecutor(
-                    gcConfig,
-                    scanner,
-                    domains,
-                    collector,
-                    retirement,
-                    () -> Character.toString('c' + candidateId.getAndIncrement()).repeat(52));
+                    gcConfig, scanner, domains, collector, retirement, () -> Character.toString(
+                                    'c' + candidateId.getAndIncrement())
+                            .repeat(52));
         }
 
         private MixedFixture populateMixedInventory() {
             Snapshot old = createSnapshot(cursorName(0), randomId(20_001));
-            VersionedCursorState oldOwner = createActiveCursor(
-                    cursorName(0), Optional.of(old.reference(1)), 1);
+            VersionedCursorState oldOwner = createActiveCursor(cursorName(0), Optional.of(old.reference(1)), 1);
             createProtection(oldOwner, old, ObjectProtectionType.CURSOR_SNAPSHOT_ROOT, 0);
             Snapshot current = createSnapshot(cursorName(0), randomId(20_002));
             VersionedCursorState currentOwner = replaceSnapshot(oldOwner, current);
@@ -324,16 +310,14 @@ class CursorSnapshotGcScaleTest {
                     clock.millis() - Duration.ofSeconds(10).toMillis());
 
             Snapshot deleted = createSnapshot(cursorName(2), randomId(20_004));
-            VersionedCursorState deletedOwner = createActiveCursor(
-                    cursorName(2), Optional.of(deleted.reference(1)), 1);
+            VersionedCursorState deletedOwner = createActiveCursor(cursorName(2), Optional.of(deleted.reference(1)), 1);
             createProtection(deletedOwner, deleted, ObjectProtectionType.CURSOR_SNAPSHOT_ROOT, 0);
             deleteCursor(deletedOwner);
 
             createActiveCursor(cursorName(3), Optional.empty(), 1);
             for (int index = 4; index < ROOT_COUNT; index++) {
                 Snapshot live = createSnapshot(cursorName(index), randomId(index + 1));
-                VersionedCursorState owner = createActiveCursor(
-                        cursorName(index), Optional.of(live.reference(1)), 1);
+                VersionedCursorState owner = createActiveCursor(cursorName(index), Optional.of(live.reference(1)), 1);
                 createProtection(owner, live, ObjectProtectionType.CURSOR_SNAPSHOT_ROOT, 0);
             }
 
@@ -342,11 +326,7 @@ class CursorSnapshotGcScaleTest {
         }
 
         private Snapshot createSnapshot(String cursorName, String snapshotId) {
-            CursorIdentity identity = new CursorIdentity(
-                    ledger,
-                    cursorName,
-                    CursorNames.cursorNameHash(cursorName),
-                    1);
+            CursorIdentity identity = new CursorIdentity(ledger, cursorName, CursorNames.cursorNameHash(cursorName), 1);
             ObjectKey key = CursorSnapshotKeys.objectKey(CLUSTER, identity, snapshotId);
             String etag = "etag-" + snapshotId;
             Instant lastModified = clock.instant().minus(Duration.ofHours(26));
@@ -384,43 +364,47 @@ class CursorSnapshotGcScaleTest {
         }
 
         private VersionedCursorState createActiveCursor(
-                String cursorName,
-                Optional<CursorSnapshotReferenceRecord> reference,
-                long mutationSequence) {
-            return cursorStore.createCursor(CLUSTER, cursorRecord(
-                    cursorName,
-                    CursorRecordLifecycle.ACTIVE,
-                    mutationSequence,
-                    reference,
-                    OptionalLong.empty())).join();
+                String cursorName, Optional<CursorSnapshotReferenceRecord> reference, long mutationSequence) {
+            return cursorStore
+                    .createCursor(
+                            CLUSTER,
+                            cursorRecord(
+                                    cursorName,
+                                    CursorRecordLifecycle.ACTIVE,
+                                    mutationSequence,
+                                    reference,
+                                    OptionalLong.empty()))
+                    .join();
         }
 
-        private VersionedCursorState replaceSnapshot(
-                VersionedCursorState current,
-                Snapshot replacement) {
+        private VersionedCursorState replaceSnapshot(VersionedCursorState current, Snapshot replacement) {
             long nextSequence = current.value().mutationSequence() + 1;
-            return cursorStore.compareAndSetCursor(
-                    CLUSTER,
-                    cursorRecord(
-                            current.value().cursorName(),
-                            CursorRecordLifecycle.ACTIVE,
-                            nextSequence,
-                            Optional.of(replacement.reference(nextSequence)),
-                            OptionalLong.empty()),
-                    current.metadataVersion()).join();
+            return cursorStore
+                    .compareAndSetCursor(
+                            CLUSTER,
+                            cursorRecord(
+                                    current.value().cursorName(),
+                                    CursorRecordLifecycle.ACTIVE,
+                                    nextSequence,
+                                    Optional.of(replacement.reference(nextSequence)),
+                                    OptionalLong.empty()),
+                            current.metadataVersion())
+                    .join();
         }
 
         private VersionedCursorState deleteCursor(VersionedCursorState current) {
             long nextSequence = current.value().mutationSequence() + 1;
-            return cursorStore.compareAndSetCursor(
-                    CLUSTER,
-                    cursorRecord(
-                            current.value().cursorName(),
-                            CursorRecordLifecycle.DELETED,
-                            nextSequence,
-                            Optional.empty(),
-                            OptionalLong.of(clock.millis() - 1)),
-                    current.metadataVersion()).join();
+            return cursorStore
+                    .compareAndSetCursor(
+                            CLUSTER,
+                            cursorRecord(
+                                    current.value().cursorName(),
+                                    CursorRecordLifecycle.DELETED,
+                                    nextSequence,
+                                    Optional.empty(),
+                                    OptionalLong.of(clock.millis() - 1)),
+                            current.metadataVersion())
+                    .join();
         }
 
         private CursorStateRecord cursorRecord(
@@ -454,32 +438,37 @@ class CursorSnapshotGcScaleTest {
         }
 
         private void createProtection(
-                VersionedCursorState owner,
-                Snapshot snapshot,
-                ObjectProtectionType type,
-                long expiresAtMillis) {
+                VersionedCursorState owner, Snapshot snapshot, ObjectProtectionType type, long expiresAtMillis) {
             long createdAt = type == ObjectProtectionType.CURSOR_SNAPSHOT_PENDING
                     ? expiresAtMillis - 1_000
                     : snapshot.createdAtMillis();
-            physicalStore.createProtection(CLUSTER, new ObjectProtectionRecord(
-                    1,
-                    snapshot.root().value().objectKeyHash(),
-                    type.wireId(),
-                    snapshot.snapshotId(),
-                    new CursorKeyspace(CLUSTER).cursorStateKey(
-                            new StreamId(projection.streamId()),
-                            owner.value().cursorName()),
-                    owner.metadataVersion(),
-                    CursorMetadataDigests.durableValueSha256(owner.value()).value(),
-                    snapshot.root().value().lifecycleEpoch(),
-                    createdAt,
-                    expiresAtMillis,
-                    0)).join();
+            physicalStore
+                    .createProtection(
+                            CLUSTER,
+                            new ObjectProtectionRecord(
+                                    1,
+                                    snapshot.root().value().objectKeyHash(),
+                                    type.wireId(),
+                                    snapshot.snapshotId(),
+                                    new CursorKeyspace(CLUSTER)
+                                            .cursorStateKey(
+                                                    new StreamId(projection.streamId()),
+                                                    owner.value().cursorName()),
+                                    owner.metadataVersion(),
+                                    CursorMetadataDigests.durableValueSha256(owner.value())
+                                            .value(),
+                                    snapshot.root().value().lifecycleEpoch(),
+                                    createdAt,
+                                    expiresAtMillis,
+                                    0))
+                    .join();
         }
 
         private VersionedPhysicalObjectRoot currentRoot(Snapshot snapshot) {
-            return physicalStore.getRoot(CLUSTER, ObjectKeyHash.from(snapshot.key()))
-                    .join().orElseThrow();
+            return physicalStore
+                    .getRoot(CLUSTER, ObjectKeyHash.from(snapshot.key()))
+                    .join()
+                    .orElseThrow();
         }
 
         @Override
@@ -540,11 +529,7 @@ class CursorSnapshotGcScaleTest {
         };
     }
 
-    private record Snapshot(
-            ObjectKey key,
-            String snapshotId,
-            long createdAtMillis,
-            VersionedPhysicalObjectRoot root) {
+    private record Snapshot(ObjectKey key, String snapshotId, long createdAtMillis, VersionedPhysicalObjectRoot root) {
         private CursorSnapshotReferenceRecord reference(long sourceMutationSequence) {
             return new CursorSnapshotReferenceRecord(
                     key.value(),
@@ -583,17 +568,12 @@ class CursorSnapshotGcScaleTest {
                     false,
                     1,
                     0,
-                    List.of(new GcAuthorityToken(
-                            "/authority/" + domainId,
-                            1,
-                            AUTHORITY_SHA)),
+                    List.of(new GcAuthorityToken("/authority/" + domainId, 1, AUTHORITY_SHA)),
                     List.of()));
         }
 
         @Override
-        public CompletableFuture<Boolean> stillMatches(
-                GcReferenceQuery query,
-                GcReferenceSnapshot snapshot) {
+        public CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot) {
             return snapshot(query).thenApply(snapshot::equals);
         }
     }
@@ -622,25 +602,19 @@ class CursorSnapshotGcScaleTest {
         }
 
         @Override
-        public CompletableFuture<VersionedCursorState> createCursor(
-                String cluster, CursorStateRecord value) {
+        public CompletableFuture<VersionedCursorState> createCursor(String cluster, CursorStateRecord value) {
             return delegate.createCursor(cluster, value);
         }
 
         @Override
         public CompletableFuture<VersionedCursorState> compareAndSetCursor(
-                String cluster,
-                CursorStateRecord value,
-                long expectedMetadataVersion) {
+                String cluster, CursorStateRecord value, long expectedMetadataVersion) {
             return delegate.compareAndSetCursor(cluster, value, expectedMetadataVersion);
         }
 
         @Override
         public CompletableFuture<CursorScanPage> scanCursors(
-                String cluster,
-                StreamId streamId,
-                Optional<CursorScanToken> continuation,
-                int pageSize) {
+                String cluster, StreamId streamId, Optional<CursorScanToken> continuation, int pageSize) {
             scanCalls.incrementAndGet();
             if (continuation.isPresent()) {
                 continuationCalls.incrementAndGet();
@@ -649,8 +623,7 @@ class CursorSnapshotGcScaleTest {
         }
 
         @Override
-        public CompletableFuture<Optional<VersionedCursorRetention>> getRetention(
-                String cluster, StreamId streamId) {
+        public CompletableFuture<Optional<VersionedCursorRetention>> getRetention(String cluster, StreamId streamId) {
             return delegate.getRetention(cluster, streamId);
         }
 
@@ -662,15 +635,12 @@ class CursorSnapshotGcScaleTest {
 
         @Override
         public CompletableFuture<VersionedCursorRetention> compareAndSetRetention(
-                String cluster,
-                CursorRetentionRecord value,
-                long expectedMetadataVersion) {
+                String cluster, CursorRetentionRecord value, long expectedMetadataVersion) {
             return delegate.compareAndSetRetention(cluster, value, expectedMetadataVersion);
         }
 
         @Override
-        public WatchRegistration watchStreamCursors(
-                String cluster, StreamId streamId, Runnable invalidation) {
+        public WatchRegistration watchStreamCursors(String cluster, StreamId streamId, Runnable invalidation) {
             return delegate.watchStreamCursors(cluster, streamId, invalidation);
         }
 
@@ -688,13 +658,9 @@ class CursorSnapshotGcScaleTest {
         private final AtomicInteger deleteCalls = new AtomicInteger();
         private boolean closed;
 
-        private synchronized void add(
-                ObjectKey key,
-                String etag,
-                Instant lastModified) {
+        private synchronized void add(ObjectKey key, String etag, Instant lastModified) {
             ensureOpen();
-            StoredObject prior = objects.putIfAbsent(
-                    key.value(), new StoredObject(key, etag, lastModified));
+            StoredObject prior = objects.putIfAbsent(key.value(), new StoredObject(key, etag, lastModified));
             if (prior != null) {
                 throw new AssertionError("duplicate scale object: " + key.value());
             }
@@ -726,9 +692,7 @@ class CursorSnapshotGcScaleTest {
 
         @Override
         public synchronized CompletableFuture<ListObjectsResult> listObjects(
-                ObjectKeyPrefix prefix,
-                Optional<String> continuationToken,
-                ListObjectsOptions options) {
+                ObjectKeyPrefix prefix, Optional<String> continuationToken, ListObjectsOptions options) {
             ensureOpen();
             listCalls.incrementAndGet();
             if (continuationToken.isPresent()) {
@@ -752,55 +716,46 @@ class CursorSnapshotGcScaleTest {
                 }
                 page.add(stored.listed());
             }
-            Optional<String> next = hasMore
-                    ? Optional.of(page.get(page.size() - 1).key().value())
-                    : Optional.empty();
-            return CompletableFuture.completedFuture(
-                    new ListObjectsResult(prefix, page, next));
+            Optional<String> next =
+                    hasMore ? Optional.of(page.get(page.size() - 1).key().value()) : Optional.empty();
+            return CompletableFuture.completedFuture(new ListObjectsResult(prefix, page, next));
         }
 
         @Override
-        public synchronized CompletableFuture<HeadObjectResult> headObject(
-                ObjectKey key,
-                HeadObjectOptions options) {
+        public synchronized CompletableFuture<HeadObjectResult> headObject(ObjectKey key, HeadObjectOptions options) {
             ensureOpen();
             StoredObject stored = objects.get(key.value());
             if (stored == null) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.OBJECT_NOT_FOUND, true, "scale object not found"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.OBJECT_NOT_FOUND, true, "scale object not found"));
             }
             return CompletableFuture.completedFuture(stored.head());
         }
 
         @Override
         public synchronized CompletableFuture<DeleteObjectResult> deleteObject(
-                ObjectKey key,
-                DeleteObjectOptions options) {
+                ObjectKey key, DeleteObjectOptions options) {
             ensureOpen();
             deleteCalls.incrementAndGet();
             StoredObject stored = objects.get(key.value());
             if (stored == null) {
-                return CompletableFuture.completedFuture(new DeleteObjectResult(
-                        key, DeleteObjectResult.Status.ALREADY_ABSENT));
+                return CompletableFuture.completedFuture(
+                        new DeleteObjectResult(key, DeleteObjectResult.Status.ALREADY_ABSENT));
             }
             if (options.expectedLength() != 1
                     || !options.expectedStorageChecksum().equals(STORAGE_CHECKSUM)
                     || !options.expectedEtag().equals(Optional.of(stored.etag()))) {
-                return CompletableFuture.failedFuture(new AssertionError(
-                        "cursor GC delete did not carry the exact scale-object identity"));
+                return CompletableFuture.failedFuture(
+                        new AssertionError("cursor GC delete did not carry the exact scale-object identity"));
             }
             objects.remove(key.value());
             deletedKeys.add(key);
-            return CompletableFuture.completedFuture(new DeleteObjectResult(
-                    key, DeleteObjectResult.Status.DELETED));
+            return CompletableFuture.completedFuture(new DeleteObjectResult(key, DeleteObjectResult.Status.DELETED));
         }
 
         @Override
         public CompletableFuture<RangeReadResult> readRange(
-                ObjectKey key,
-                long offset,
-                long length,
-                RangeReadOptions options) {
+                ObjectKey key, long offset, long length, RangeReadOptions options) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         }
 
@@ -818,13 +773,11 @@ class CursorSnapshotGcScaleTest {
 
     private record StoredObject(ObjectKey key, String etag, Instant lastModified) {
         private ListedObject listed() {
-            return new ListedObject(
-                    key, 1, Optional.of(etag), Optional.of(lastModified));
+            return new ListedObject(key, 1, Optional.of(etag), Optional.of(lastModified));
         }
 
         private HeadObjectResult head() {
-            return new HeadObjectResult(
-                    key, 1, STORAGE_CHECKSUM, Optional.of(etag), Map.of());
+            return new HeadObjectResult(key, 1, STORAGE_CHECKSUM, Optional.of(etag), Map.of());
         }
     }
 

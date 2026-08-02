@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Durable lifecycle state for a stream. */
+/**
+ * Durable lifecycle state for a stream.
+ */
 public enum StreamState {
     CREATING,
     ACTIVE,

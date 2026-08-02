@@ -25,18 +25,18 @@ Pulsar ManagedCursor API
 
 ## 1. Locked Inputs
 
-| Input | F3 lock |
-| --- | --- |
-| Nereus baseline | `nereusstream/nereus@623662d9796af1bf2ff929f41df1a8c946a02279`；F2 final-gated |
-| Pulsar fork checkout | `/Users/liusinan/apps/ideaproject/nereusstream/pulsar` |
-| Pulsar M0 source/API audit baseline | local `master@7efae25af39a15407c1397d9e1f4ac4658d09daa`；historical blob/member evidence remains pinned |
-| Pulsar F3 final implementation/source lock | local `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；historical F3-M6 MessageId/property/incarnation gate、unloaded binding-aware admin validation and M5 recovery evidence |
-| Current compatibility source lock | local `master@2f9c1eb93be96e2036fbdc8c5e39545f21fa6200`；preserves the F3 contract and adds the F1-BK production ownership filter、capability rollover and mixed-profile rollout above the BQ lock；the TTL policy-triggered expiry evidence itself remains pinned to BQ |
-| Pulsar version interpretation | checkout 中的 `5.0.0-M1-SNAPSHOT` 只是本地 master 的 source-project selector，不是已发布的 M1 snapshot |
-| Executable Nereus profile inherited from F2 | `OBJECT_WAL_SYNC_OBJECT` only |
-| Coordinate contract | one Pulsar Entry = one Nereus stream offset；`Position.entryId == offset` |
-| Metadata primitive | Oxia 单 key version-CAS、range scan、watch；不假设 multi-key transaction |
-| Snapshot primitive | immutable `ObjectStore.put/read/head`；当前没有 delete API |
+| Input                                       | F3 lock                                                                                                                                                                                                                                                               |
+|---------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Nereus baseline                             | `nereusstream/nereus@623662d9796af1bf2ff929f41df1a8c946a02279`；F2 final-gated                                                                                                                                                                                         |
+| Pulsar fork checkout                        | `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`                                                                                                                                                                                                                |
+| Pulsar M0 source/API audit baseline         | local `master@7efae25af39a15407c1397d9e1f4ac4658d09daa`；historical blob/member evidence remains pinned                                                                                                                                                                |
+| Pulsar F3 final implementation/source lock  | local `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；historical F3-M6 MessageId/property/incarnation gate、unloaded binding-aware admin validation and M5 recovery evidence                                                                                         |
+| Current compatibility source lock           | local `master@2f9c1eb93be96e2036fbdc8c5e39545f21fa6200`；preserves the F3 contract and adds the F1-BK production ownership filter、capability rollover and mixed-profile rollout above the BQ lock；the TTL policy-triggered expiry evidence itself remains pinned to BQ |
+| Pulsar version interpretation               | checkout 中的 `5.0.0-M1-SNAPSHOT` 只是本地 master 的 source-project selector，不是已发布的 M1 snapshot                                                                                                                                                                              |
+| Executable Nereus profile inherited from F2 | `OBJECT_WAL_SYNC_OBJECT` only                                                                                                                                                                                                                                         |
+| Coordinate contract                         | one Pulsar Entry = one Nereus stream offset；`Position.entryId == offset`                                                                                                                                                                                              |
+| Metadata primitive                          | Oxia 单 key version-CAS、range scan、watch；不假设 multi-key transaction                                                                                                                                                                                                     |
+| Snapshot primitive                          | immutable `ObjectStore.put/read/head`；当前没有 delete API                                                                                                                                                                                                                 |
 
 升级任一锁定 commit 后，必须重新执行文档 01 的 source/member/call-path audit；不能只依赖 Java
 编译是否成功。
@@ -88,7 +88,7 @@ M0R 已关闭会锁死 F4 或破坏 Pulsar 兼容性的选择：
    post-barrier missing-create/backward-reset race；pending root 还保存 exact composed L0 reason，crash recovery
    不会猜测或改变 trim audit identity。
 10. F3 支持 durable/non-durable Exclusive、Failover、Shared；Key_Shared、transaction pending ack、
-   replicated subscription、read-compacted、delayed delivery 继续 fail closed。
+    replicated subscription、read-compacted、delayed delivery 继续 fail closed。
 11. projection 只解释 F2/L0 已提交事实；它不拥有 append、fencing、visibility 或 physical GC correctness。
 12. rollout 使用独立 capability `nereus.cursor-protocol=1`；未全量具备能力时不得创建首个 F3
     durable cursor；首个创建前还必须 CAS 同名 topic projection 的保留 activation marker，使锁定的 F2
@@ -146,27 +146,27 @@ Phase 4 F4-M0 已在
 
 ## 5. Document Map
 
-| Document | Purpose |
-| --- | --- |
-| [01-pulsar-api-and-call-path-audit.md](01-pulsar-api-and-call-path-audit.md) | M0 source lock、exact API、broker call path、repository boundary |
-| [02-cursor-domain-and-api-contract.md](02-cursor-domain-and-api-contract.md) | Java domain/API、ManagedCursor method semantics、callbacks、errors、limits |
-| [03-oxia-metadata-and-snapshot-format.md](03-oxia-metadata-and-snapshot-format.md) | keyspace、single-key CAS record、binary codec、snapshot bytes、strict validation |
-| [04-state-machines-recovery-and-retention.md](04-state-machines-recovery-and-retention.md) | create/ack/reset/delete/snapshot/trim state machine 与 crash recovery |
-| [05-facade-broker-and-future-compatibility.md](05-facade-broker-and-future-compatibility.md) | Pulsar facade/fork changes、rollout、F4/F5/F8 boundary |
-| [06-implementation-plan-and-gates.md](06-implementation-plan-and-gates.md) | M1-M6 file/test plan、M0/M0R decision matrix、final gates |
+| Document                                                                                     | Purpose                                                                      |
+|----------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| [01-pulsar-api-and-call-path-audit.md](01-pulsar-api-and-call-path-audit.md)                 | M0 source lock、exact API、broker call path、repository boundary                |
+| [02-cursor-domain-and-api-contract.md](02-cursor-domain-and-api-contract.md)                 | Java domain/API、ManagedCursor method semantics、callbacks、errors、limits       |
+| [03-oxia-metadata-and-snapshot-format.md](03-oxia-metadata-and-snapshot-format.md)           | keyspace、single-key CAS record、binary codec、snapshot bytes、strict validation |
+| [04-state-machines-recovery-and-retention.md](04-state-machines-recovery-and-retention.md)   | create/ack/reset/delete/snapshot/trim state machine 与 crash recovery         |
+| [05-facade-broker-and-future-compatibility.md](05-facade-broker-and-future-compatibility.md) | Pulsar facade/fork changes、rollout、F4/F5/F8 boundary                         |
+| [06-implementation-plan-and-gates.md](06-implementation-plan-and-gates.md)                   | M1-M6 file/test plan、M0/M0R decision matrix、final gates                      |
 
 ## 6. Planned Milestones
 
-| Milestone | Deliverable | Status |
-| --- | --- | --- |
-| F3-M0 | locked local Pulsar API/source/call-path audit | complete, design-only |
-| F3-M0R | code-level protocol and narrow Future 4 compatibility gate | complete, design-only |
-| F3-M1 | metadata records/codecs/store + snapshot codec/store | complete/final-gated；真实 Oxia 与 LocalStack conditional-create/restart 证据通过 |
-| F3-M2 | CursorStorage ack/reset/property/retention state machines | complete/final-gated；deterministic failure/concurrency models 与真实 Oxia + LocalStack S3 跨 runtime 恢复通过 |
-| F3-M3 | durable `NereusManagedCursor` and ledger hydration/enumeration | complete/gated；runtime/provider cursor resources、checked/trusted ownership guard、writable claim/hydration publication boundary、storage-backed exact-name durable open、dual-mode ack/read facade、tombstone delete/recreate、registry/admission/async close drain、完整 public API classification 与全部 12 个计划专项 suites 已实现；`phase3M3Check` 通过 locked Pulsar source/API、managed-ledger 与 adapter gates |
-| F3-M4 | Pulsar fork durable subscribe/ack/admin/capability integration | complete/gated；独立 cursor capability、two-stable-snapshot activation、canonical typed cursor config/context、F3 topic/ack/admin admission、durable ack completion ordering、hydrated subscription recreation 与 8 个 fork focused suites 已实现；`phase3M4Check` 通过 exact clean fork source lock、M1-M3 chain 与 spotless/test gates |
-| F3-M5 | two-broker/Oxia/ObjectStore recovery and retention barrier gates | complete/final-gated；all 16 required scenarios are covered by deterministic failure models、the exact 10,000-root scale fixture and the real two-broker acceptance gate |
-| F3-M6 | compatibility/failure/final gate and F4 handoff | complete/final-gated；stable ordinary/middle-batch MessageIds、reset/property/limit/rollout/incarnation contracts、read-only F4 snapshot inventory、code-level production/test inventory、loaded/unloaded/namespace route and documentation-link audits、callback rejection safety and full Phase 1/1.5/2/3 aggregate gates pass |
+| Milestone | Deliverable                                                      | Status                                                                                                                                                                                                                                                                                                                                                                                         |
+|-----------|------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| F3-M0     | locked local Pulsar API/source/call-path audit                   | complete, design-only                                                                                                                                                                                                                                                                                                                                                                          |
+| F3-M0R    | code-level protocol and narrow Future 4 compatibility gate       | complete, design-only                                                                                                                                                                                                                                                                                                                                                                          |
+| F3-M1     | metadata records/codecs/store + snapshot codec/store             | complete/final-gated；真实 Oxia 与 LocalStack conditional-create/restart 证据通过                                                                                                                                                                                                                                                                                                                      |
+| F3-M2     | CursorStorage ack/reset/property/retention state machines        | complete/final-gated；deterministic failure/concurrency models 与真实 Oxia + LocalStack S3 跨 runtime 恢复通过                                                                                                                                                                                                                                                                                          |
+| F3-M3     | durable `NereusManagedCursor` and ledger hydration/enumeration   | complete/gated；runtime/provider cursor resources、checked/trusted ownership guard、writable claim/hydration publication boundary、storage-backed exact-name durable open、dual-mode ack/read facade、tombstone delete/recreate、registry/admission/async close drain、完整 public API classification 与全部 12 个计划专项 suites 已实现；`phase3M3Check` 通过 locked Pulsar source/API、managed-ledger 与 adapter gates |
+| F3-M4     | Pulsar fork durable subscribe/ack/admin/capability integration   | complete/gated；独立 cursor capability、two-stable-snapshot activation、canonical typed cursor config/context、F3 topic/ack/admin admission、durable ack completion ordering、hydrated subscription recreation 与 8 个 fork focused suites 已实现；`phase3M4Check` 通过 exact clean fork source lock、M1-M3 chain 与 spotless/test gates                                                                         |
+| F3-M5     | two-broker/Oxia/ObjectStore recovery and retention barrier gates | complete/final-gated；all 16 required scenarios are covered by deterministic failure models、the exact 10,000-root scale fixture and the real two-broker acceptance gate                                                                                                                                                                                                                         |
+| F3-M6     | compatibility/failure/final gate and F4 handoff                  | complete/final-gated；stable ordinary/middle-batch MessageIds、reset/property/limit/rollout/incarnation contracts、read-only F4 snapshot inventory、code-level production/test inventory、loaded/unloaded/namespace route and documentation-link audits、callback rejection safety and full Phase 1/1.5/2/3 aggregate gates pass                                                                     |
 
 后续里程碑不得以“先写一个多 key cursor schema”或“先持久化 readPosition”作为临时实现；这两种临时路径
 都会形成不可安全升级的 durable state。

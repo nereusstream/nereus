@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendCompletionPolicy;
 import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.StorageProfile;
@@ -13,18 +13,19 @@ import org.junit.jupiter.api.Test;
 class KafkaStorageProfilePolicyTest {
     @Test
     void preservesTheExactDefaultSuccessPredicateForAllFiveActivatedProfiles() {
-        assertThat(KafkaStorageProfilePolicy.activatedProfiles()).containsExactlyInAnyOrderElementsOf(Set.of(
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
-                StorageProfile.BOOKKEEPER_WAL_ONLY,
-                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
-                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT));
+        assertThat(KafkaStorageProfilePolicy.activatedProfiles())
+                .containsExactlyInAnyOrderElementsOf(Set.of(
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
+                        StorageProfile.BOOKKEEPER_WAL_ONLY,
+                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                        StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT));
         for (StorageProfile profile : new StorageProfile[] {
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
-                StorageProfile.BOOKKEEPER_WAL_ONLY,
-                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
-                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT
+            StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+            StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
+            StorageProfile.BOOKKEEPER_WAL_ONLY,
+            StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+            StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT
         }) {
             KafkaStorageProfilePolicy policy = KafkaStorageProfilePolicy.forProfile(profile);
             assertThat(policy.storageProfile()).isEqualTo(profile);

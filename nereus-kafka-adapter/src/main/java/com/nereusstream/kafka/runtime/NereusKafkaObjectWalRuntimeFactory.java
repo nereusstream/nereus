@@ -1,8 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
-import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.StorageProfile;
+import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.bookkeeper.BookKeeperLedgerRetentionService;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryPhysicalReferenceAdapter;
@@ -17,10 +18,13 @@ import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.append.RequiredObjectGenerationCompletion;
 import com.nereusstream.core.backpressure.MaterializationLagGate;
 import com.nereusstream.core.backpressure.MaterializationLagThresholds;
-import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
-import com.nereusstream.core.physical.ObjectReadPinManager;
+import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
+import com.nereusstream.core.physical.ObjectReadPinManager;
+import com.nereusstream.core.profile.Phase4StorageProfileResolver;
+import com.nereusstream.core.profile.StorageProfileResolver;
+import com.nereusstream.core.profile.StorageProfileResolverRegistry;
 import com.nereusstream.core.read.GenerationReadResolver;
 import com.nereusstream.core.read.MetadataGenerationReadFailureHandler;
 import com.nereusstream.core.read.MetadataPhysicalObjectIdentityResolver;
@@ -28,18 +32,15 @@ import com.nereusstream.core.read.ParquetV2CompactedTargetReader;
 import com.nereusstream.core.read.Phase4ReadComponents;
 import com.nereusstream.core.read.ReadTargetReader;
 import com.nereusstream.core.read.ReadTargetReaderRegistry;
-import com.nereusstream.core.profile.Phase4StorageProfileResolver;
-import com.nereusstream.core.profile.StorageProfileResolver;
-import com.nereusstream.core.profile.StorageProfileResolverRegistry;
 import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
 import com.nereusstream.core.wal.object.ObjectWalReaderAdapter;
-import com.nereusstream.kafka.activation.KafkaStorageActivationRuntime;
-import com.nereusstream.kafka.activation.KafkaStorageActivationVerifier;
-import com.nereusstream.kafka.activation.KafkaStorageBindingAwareClusterSnapshotProvider;
 import com.nereusstream.kafka.activation.KafkaAsyncAppendAdmissionGuard;
 import com.nereusstream.kafka.activation.KafkaBookKeeperStreamCoverageProofProducer;
 import com.nereusstream.kafka.activation.KafkaGenerationProtocolActivationGuard;
+import com.nereusstream.kafka.activation.KafkaStorageActivationRuntime;
+import com.nereusstream.kafka.activation.KafkaStorageActivationVerifier;
+import com.nereusstream.kafka.activation.KafkaStorageBindingAwareClusterSnapshotProvider;
 import com.nereusstream.kafka.checkpoint.DurableKafkaCheckpointFailureQuarantine;
 import com.nereusstream.kafka.checkpoint.KafkaCanonicalCheckpointPublicationFactory;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointFailureQuarantine;
@@ -89,16 +90,19 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** Real Oxia/Object provider bootstrap for the strict synchronous Object-WAL Kafka profile. */
+/**
+ * Real Oxia/Object provider bootstrap for the strict synchronous Object-WAL Kafka profile.
+ */
 public final class NereusKafkaObjectWalRuntimeFactory {
     private static final String WRITER_VERSION = "nereus-kafka-f9";
 
-    private NereusKafkaObjectWalRuntimeFactory() { }
+    private NereusKafkaObjectWalRuntimeFactory() {}
 
-    /** Provider-bootstrap-only path retained package-private for failure-cut tests. */
+    /**
+     * Provider-bootstrap-only path retained package-private for failure-cut tests.
+     */
     static NereusKafkaRuntime createUnactivatedForTesting(
-            NereusKafkaObjectWalRuntimeConfiguration configuration,
-            NereusKafkaObjectWalRuntimeContext context) {
+            NereusKafkaObjectWalRuntimeConfiguration configuration, NereusKafkaObjectWalRuntimeContext context) {
         return create(configuration, context, null);
     }
 
@@ -110,22 +114,20 @@ public final class NereusKafkaObjectWalRuntimeFactory {
             NereusKafkaObjectWalRuntimeConfiguration configuration,
             NereusKafkaObjectWalRuntimeContext context,
             NereusKafkaObjectWalActivationContext activationContext) {
-        return create(
-                configuration,
-                context,
-                Objects.requireNonNull(activationContext, "activationContext"));
+        return create(configuration, context, Objects.requireNonNull(activationContext, "activationContext"));
     }
 
     private static NereusKafkaRuntime create(
             NereusKafkaObjectWalRuntimeConfiguration configuration,
             NereusKafkaObjectWalRuntimeContext context,
             NereusKafkaObjectWalActivationContext activationContext) {
-        NereusKafkaObjectWalRuntimeConfiguration exactConfiguration = Objects.requireNonNull(
-                configuration, "configuration");
+        NereusKafkaObjectWalRuntimeConfiguration exactConfiguration =
+                Objects.requireNonNull(configuration, "configuration");
         NereusKafkaObjectWalRuntimeContext exactContext = Objects.requireNonNull(context, "context");
         ObjectStoreProvider provider = exactContext.objectStoreProvider();
-        if (!provider.getClass().getName().equals(
-                exactConfiguration.objectStore().providerClassName())) {
+        if (!provider.getClass()
+                .getName()
+                .equals(exactConfiguration.objectStore().providerClassName())) {
             throw new IllegalArgumentException(
                     "ObjectStore provider instance does not match configured providerClassName");
         }
@@ -140,48 +142,33 @@ public final class NereusKafkaObjectWalRuntimeFactory {
         KafkaActivatedGenerationAuthority activatedGenerations;
         KafkaMaterializationStreamRegistration materializations = null;
         KafkaStorageActivationVerifier activationVerifier = null;
-        List<KafkaRuntimeBackgroundServiceFactory> backgroundServiceFactories =
-                new ArrayList<>();
+        List<KafkaRuntimeBackgroundServiceFactory> backgroundServiceFactories = new ArrayList<>();
         Optional<KafkaPartitionMaintenanceFactory> maintenanceFactory = Optional.empty();
         KafkaRuntimeStartup startup = KafkaRuntimeStartup.from(exactContext.startupAction());
         try {
-            providerResources.add(registerOwned(
-                    constructedResources, "object-store-provider", provider));
-            ObjectStore objectStore = provider.create(
-                    exactConfiguration.objectStore(), exactContext.secretResolver());
-            providerResources.add(registerOwned(
-                    constructedResources, "object-store", objectStore));
-            SharedOxiaClientRuntime oxiaRuntime = SharedOxiaClientRuntime.connect(
-                    exactConfiguration.oxia(), exactContext.clock());
-            providerResources.add(registerOwned(
-                    constructedResources, "shared-oxia-runtime", oxiaRuntime));
-            OxiaMetadataStore l0MetadataStore =
-                    exactConfiguration.bookKeeper().isPresent()
-                            ? OxiaJavaClientMetadataStore.usingSharedRuntime(
-                                    exactConfiguration.oxia(),
-                                    oxiaRuntime,
-                                    exactContext.clock(),
-                                    exactConfiguration.bookKeeper()
-                                            .orElseThrow()
-                                            .metadataStore())
-                            : OxiaJavaClientMetadataStore.usingSharedRuntime(
-                                    exactConfiguration.oxia(),
-                                    oxiaRuntime,
-                                    exactContext.clock());
-            providerResources.add(registerOwned(
-                    constructedResources, "l0-metadata-store", l0MetadataStore));
-            GenerationMetadataStore generationMetadataStore =
-                    OxiaJavaGenerationMetadataStore.usingSharedRuntime(
+            providerResources.add(registerOwned(constructedResources, "object-store-provider", provider));
+            ObjectStore objectStore = provider.create(exactConfiguration.objectStore(), exactContext.secretResolver());
+            providerResources.add(registerOwned(constructedResources, "object-store", objectStore));
+            SharedOxiaClientRuntime oxiaRuntime =
+                    SharedOxiaClientRuntime.connect(exactConfiguration.oxia(), exactContext.clock());
+            providerResources.add(registerOwned(constructedResources, "shared-oxia-runtime", oxiaRuntime));
+            OxiaMetadataStore l0MetadataStore = exactConfiguration.bookKeeper().isPresent()
+                    ? OxiaJavaClientMetadataStore.usingSharedRuntime(
+                            exactConfiguration.oxia(),
+                            oxiaRuntime,
+                            exactContext.clock(),
+                            exactConfiguration.bookKeeper().orElseThrow().metadataStore())
+                    : OxiaJavaClientMetadataStore.usingSharedRuntime(
                             exactConfiguration.oxia(), oxiaRuntime, exactContext.clock());
-            providerResources.add(registerOwned(
-                    constructedResources,
-                    "generation-metadata-store",
-                    generationMetadataStore));
-            PhysicalObjectMetadataStore physicalMetadataStore =
-                    OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
-                            exactConfiguration.oxia(), oxiaRuntime, exactContext.clock());
-            providerResources.add(registerOwned(
-                    constructedResources, "physical-object-metadata-store", physicalMetadataStore));
+            providerResources.add(registerOwned(constructedResources, "l0-metadata-store", l0MetadataStore));
+            GenerationMetadataStore generationMetadataStore = OxiaJavaGenerationMetadataStore.usingSharedRuntime(
+                    exactConfiguration.oxia(), oxiaRuntime, exactContext.clock());
+            providerResources.add(
+                    registerOwned(constructedResources, "generation-metadata-store", generationMetadataStore));
+            PhysicalObjectMetadataStore physicalMetadataStore = OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
+                    exactConfiguration.oxia(), oxiaRuntime, exactContext.clock());
+            providerResources.add(
+                    registerOwned(constructedResources, "physical-object-metadata-store", physicalMetadataStore));
             ObjectProtectionManager protections = new DefaultObjectProtectionManager(
                     exactConfiguration.runtime().nereusCluster(),
                     physicalMetadataStore,
@@ -189,21 +176,17 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     exactConfiguration.maximumClockSkew(),
                     exactConfiguration.orphanGrace(),
                     exactContext.clock());
-            providerResources.add(registerOwned(
-                    constructedResources, "object-protection-manager", protections));
+            providerResources.add(registerOwned(constructedResources, "object-protection-manager", protections));
             ExecutorService callbackExecutor = Executors.newFixedThreadPool(
                     exactConfiguration.callbackThreads(), daemonFactory("nereus-kafka-callback"));
             providerResources.add(registerOwned(
-                    constructedResources,
-                    "stream-callback-executor",
-                    new ExecutorResource(callbackExecutor)));
+                    constructedResources, "stream-callback-executor", new ExecutorResource(callbackExecutor)));
             partitionMetadataStore = OxiaJavaKafkaPartitionMetadataStore.usingSharedRuntime(
                     exactConfiguration.oxia(),
                     oxiaRuntime,
                     exactConfiguration.runtime().nereusCluster(),
                     exactConfiguration.runtime().kafkaClusterId());
-            registerOwned(
-                    constructedResources, "kafka-partition-metadata-store", partitionMetadataStore);
+            registerOwned(constructedResources, "kafka-partition-metadata-store", partitionMetadataStore);
             KafkaCheckpointFailureMetadataStore checkpointFailures =
                     KafkaCheckpointFailureMetadataStore.usingSharedRuntime(
                             exactConfiguration.oxia(),
@@ -211,13 +194,9 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                             exactConfiguration.runtime().nereusCluster(),
                             exactConfiguration.runtime().kafkaClusterId());
             providerResources.add(
-                    registerOwned(
-                            constructedResources,
-                            "kafka-checkpoint-failure-metadata-store",
-                            checkpointFailures));
+                    registerOwned(constructedResources, "kafka-checkpoint-failure-metadata-store", checkpointFailures));
             KafkaCheckpointFailureQuarantine checkpointQuarantine =
-                    new DurableKafkaCheckpointFailureQuarantine(
-                            checkpointFailures, exactContext.clock());
+                    new DurableKafkaCheckpointFailureQuarantine(checkpointFailures, exactContext.clock());
             if (activationContext != null) {
                 KafkaStorageActivationMetadataStore activationStore =
                         KafkaStorageActivationMetadataStore.usingSharedRuntime(
@@ -226,9 +205,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                                 exactConfiguration.runtime().nereusCluster(),
                                 exactConfiguration.runtime().kafkaClusterId());
                 providerResources.add(registerOwned(
-                        constructedResources,
-                        "kafka-storage-activation-metadata-store",
-                        activationStore));
+                        constructedResources, "kafka-storage-activation-metadata-store", activationStore));
                 KafkaStorageBindingAwareClusterSnapshotProvider clusterSnapshots =
                         new KafkaStorageBindingAwareClusterSnapshotProvider(
                                 activationContext.clusterSnapshots(), partitionMetadataStore);
@@ -241,62 +218,44 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                         activationContext.activationWaitTimeout(),
                         activationContext.activationPollInterval(),
                         exactContext.startupAction());
-                providerResources.add(registerOwned(
-                        constructedResources,
-                        "kafka-storage-activation-runtime",
-                        activationRuntime));
+                providerResources.add(
+                        registerOwned(constructedResources, "kafka-storage-activation-runtime", activationRuntime));
                 startup = activationRuntime;
                 activationVerifier = new KafkaStorageActivationVerifier(
-                                activationStore,
-                                activationContext.capability(),
-                                clusterSnapshots,
-                                exactContext.clock());
+                        activationStore, activationContext.capability(), clusterSnapshots, exactContext.clock());
                 materializations = new KafkaMaterializationStreamRegistration(
-                        exactConfiguration.runtime().nereusCluster(),
-                        generationMetadataStore,
-                        exactContext.clock());
+                        exactConfiguration.runtime().nereusCluster(), generationMetadataStore, exactContext.clock());
             }
             BookKeeperPrimaryWalRuntime bookKeeperRuntime = null;
             KafkaObjectMaterializationRuntime objectMaterializationRuntime = null;
-            List<BookKeeperPrimaryPhysicalReferenceAdapter> additionalPhysicalReferences =
-                    List.of();
+            List<BookKeeperPrimaryPhysicalReferenceAdapter> additionalPhysicalReferences = List.of();
             if (exactConfiguration.bookKeeper().isPresent()) {
                 NereusKafkaBookKeeperWalRuntimeConfiguration bookKeeperConfiguration =
                         exactConfiguration.bookKeeper().orElseThrow();
                 NereusKafkaBookKeeperWalRuntimeContext bookKeeperContext =
                         exactContext.bookKeeper().orElseThrow();
-                providerResources.add(registerBorrowed(
-                        constructedResources,
-                        "bookkeeper-client",
-                        bookKeeperContext.client()));
-                bookKeeperRuntime = BookKeeperPrimaryWalRuntime
-                        .createWithOperations(
-                                bookKeeperConfiguration.deploymentId(),
-                                exactConfiguration.runtime().nereusCluster(),
-                                exactConfiguration.streamStorage().processRunId(),
-                                bookKeeperConfiguration.wal(),
-                                exactConfiguration.oxia(),
-                                oxiaRuntime,
-                                bookKeeperContext.operations(),
-                                new OxiaBookKeeperLedgerIdNamespaceReservationStore(
-                                        exactConfiguration.oxia(),
-                                        oxiaRuntime),
-                                new OxiaBookKeeperProtocolActivationStore(
-                                        exactConfiguration.oxia(),
-                                        oxiaRuntime),
-                                bookKeeperContext.brokerReadiness(),
-                                bookKeeperContext.passwords(),
-                                exactContext.clock());
-                providerResources.add(registerOwned(
-                        constructedResources,
-                        "bookkeeper-primary-wal-runtime",
-                        bookKeeperRuntime));
+                providerResources.add(
+                        registerBorrowed(constructedResources, "bookkeeper-client", bookKeeperContext.client()));
+                bookKeeperRuntime = BookKeeperPrimaryWalRuntime.createWithOperations(
+                        bookKeeperConfiguration.deploymentId(),
+                        exactConfiguration.runtime().nereusCluster(),
+                        exactConfiguration.streamStorage().processRunId(),
+                        bookKeeperConfiguration.wal(),
+                        exactConfiguration.oxia(),
+                        oxiaRuntime,
+                        bookKeeperContext.operations(),
+                        new OxiaBookKeeperLedgerIdNamespaceReservationStore(exactConfiguration.oxia(), oxiaRuntime),
+                        new OxiaBookKeeperProtocolActivationStore(exactConfiguration.oxia(), oxiaRuntime),
+                        bookKeeperContext.brokerReadiness(),
+                        bookKeeperContext.passwords(),
+                        exactContext.clock());
+                providerResources.add(
+                        registerOwned(constructedResources, "bookkeeper-primary-wal-runtime", bookKeeperRuntime));
                 if (bookKeeperRuntime.capabilityBinding().isEmpty()) {
                     throw new IllegalStateException(
                             "BookKeeper WAL-only runtime requires an ACTIVE exact publication activation");
                 }
-                additionalPhysicalReferences =
-                        List.of(bookKeeperRuntime.physicalReferences());
+                additionalPhysicalReferences = List.of(bookKeeperRuntime.physicalReferences());
             }
             GenerationZeroPhysicalReferencePublisher physicalReferences =
                     new DefaultGenerationZeroPhysicalReferencePublisher(
@@ -313,8 +272,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     exactConfiguration.maximumClockSkew(),
                     exactConfiguration.orphanGrace(),
                     exactContext.clock());
-            providerResources.add(registerOwned(
-                    constructedResources, "kafka-checkpoint-read-pins", readPins));
+            providerResources.add(registerOwned(constructedResources, "kafka-checkpoint-read-pins", readPins));
             DefaultWalObjectReader walObjectReader = new DefaultWalObjectReader(objectStore);
             List<ReadTargetReader> installedReaders = new ArrayList<>();
             installedReaders.add(new ObjectWalReaderAdapter(walObjectReader));
@@ -322,16 +280,11 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                 installedReaders.add(bookKeeperRuntime.walRuntime().primaryWalReader());
             }
             installedReaders.add(new ParquetV2CompactedTargetReader(
-                    new ParquetRangedCompactedObjectReader(
-                            objectStore, callbackExecutor),
-                    new ParquetKafkaTopicCompactedReader(
-                            objectStore, callbackExecutor)));
+                    new ParquetRangedCompactedObjectReader(objectStore, callbackExecutor),
+                    new ParquetKafkaTopicCompactedReader(objectStore, callbackExecutor)));
             ReadTargetReaderRegistry readers = new ReadTargetReaderRegistry(installedReaders);
-            MetadataPhysicalObjectIdentityResolver identities =
-                    new MetadataPhysicalObjectIdentityResolver(
-                            exactConfiguration.runtime().nereusCluster(),
-                            l0MetadataStore,
-                            physicalMetadataStore);
+            MetadataPhysicalObjectIdentityResolver identities = new MetadataPhysicalObjectIdentityResolver(
+                    exactConfiguration.runtime().nereusCluster(), l0MetadataStore, physicalMetadataStore);
             GenerationReadResolver generationResolver = new GenerationReadResolver(
                     exactConfiguration.runtime().nereusCluster(),
                     l0MetadataStore,
@@ -340,9 +293,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     readers,
                     identities,
                     readPins,
-                    exactConfiguration
-                            .streamStorage()
-                            .maxDerivedIndexRepairCommitsPerCall(),
+                    exactConfiguration.streamStorage().maxDerivedIndexRepairCommitsPerCall(),
                     exactContext.clock(),
                     callbackExecutor);
             Phase4ReadComponents readComponents = new Phase4ReadComponents(
@@ -353,116 +304,62 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                             generationMetadataStore,
                             physicalMetadataStore,
                             exactContext.clock()));
-            AppendAdmissionGuard appendAdmissionGuard =
-                    AppendAdmissionGuard.noOp();
-            RequiredObjectGenerationCompletion
-                    requiredObjectGeneration = null;
+            AppendAdmissionGuard appendAdmissionGuard = AppendAdmissionGuard.noOp();
+            RequiredObjectGenerationCompletion requiredObjectGeneration = null;
             if (activationContext != null) {
-                KafkaStorageActivationVerifier
-                        exactActivationVerifier =
-                                Objects.requireNonNull(
-                                        activationVerifier,
-                                        "Kafka materialization requires an activation verifier");
-                KafkaGenerationProtocolActivationGuard
-                        generationActivation =
-                                new KafkaGenerationProtocolActivationGuard(
-                                        exactConfiguration
-                                                .runtime()
-                                                .nereusCluster(),
-                                        generationMetadataStore,
-                                        exactActivationVerifier,
-                                        exactContext.clock());
-                List<MaterializationSourceProvider>
-                        additionalMaterializationSources =
-                                bookKeeperRuntime == null
-                                        ? List.of()
-                                        : List.of(
-                                                bookKeeperRuntime
-                                                        .materializationSourceProvider());
-                ExecutorService materializationWorkers =
-                        Executors.newFixedThreadPool(
-                                exactConfiguration
-                                        .materialization()
-                                        .maxConcurrentWorkers(),
-                                daemonFactory(
-                                        "nereus-kafka-materialization"));
-                KafkaObjectMaterializationRuntime
-                        exactMaterialization =
-                                new KafkaObjectMaterializationRuntime(
-                                        exactConfiguration
-                                                .runtime()
-                                                .nereusCluster(),
-                                        durableProcessRunId(
-                                                exactConfiguration
-                                                        .streamStorage()
-                                                        .processRunId()),
-                                        exactConfiguration
-                                                .streamStorage()
-                                                .maxCommitChainScan(),
-                                        exactConfiguration
-                                                .materialization(),
-                                        l0MetadataStore,
-                                        generationMetadataStore,
-                                        physicalMetadataStore,
-                                        objectStore,
-                                        identities,
-                                        protections,
-                                        readPins,
-                                        readComponents,
-                                        generationActivation,
-                                        additionalMaterializationSources,
-                                        exactContext
-                                                .renewalScheduler(),
-                                        materializationWorkers,
-                                        callbackExecutor,
-                                        exactContext.clock());
+                KafkaStorageActivationVerifier exactActivationVerifier = Objects.requireNonNull(
+                        activationVerifier, "Kafka materialization requires an activation verifier");
+                KafkaGenerationProtocolActivationGuard generationActivation =
+                        new KafkaGenerationProtocolActivationGuard(
+                                exactConfiguration.runtime().nereusCluster(),
+                                generationMetadataStore,
+                                exactActivationVerifier,
+                                exactContext.clock());
+                List<MaterializationSourceProvider> additionalMaterializationSources = bookKeeperRuntime == null
+                        ? List.of()
+                        : List.of(bookKeeperRuntime.materializationSourceProvider());
+                ExecutorService materializationWorkers = Executors.newFixedThreadPool(
+                        exactConfiguration.materialization().maxConcurrentWorkers(),
+                        daemonFactory("nereus-kafka-materialization"));
+                KafkaObjectMaterializationRuntime exactMaterialization = new KafkaObjectMaterializationRuntime(
+                        exactConfiguration.runtime().nereusCluster(),
+                        durableProcessRunId(exactConfiguration.streamStorage().processRunId()),
+                        exactConfiguration.streamStorage().maxCommitChainScan(),
+                        exactConfiguration.materialization(),
+                        l0MetadataStore,
+                        generationMetadataStore,
+                        physicalMetadataStore,
+                        objectStore,
+                        identities,
+                        protections,
+                        readPins,
+                        readComponents,
+                        generationActivation,
+                        additionalMaterializationSources,
+                        exactContext.renewalScheduler(),
+                        materializationWorkers,
+                        callbackExecutor,
+                        exactContext.clock());
                 objectMaterializationRuntime = exactMaterialization;
-                providerResources.add(
-                        registerOwned(
-                                constructedResources,
-                                "kafka-object-materialization-runtime",
-                                exactMaterialization));
-                backgroundServiceFactories.add(
-                        ignored -> exactMaterialization);
-                MaterializationLagThresholds thresholds =
-                        new MaterializationLagThresholds(
-                                exactConfiguration
-                                        .materialization()
-                                        .lagThrottleRecords(),
-                                exactConfiguration
-                                        .materialization()
-                                        .lagRejectRecords(),
-                                exactConfiguration
-                                        .materialization()
-                                        .lagThrottleBytes(),
-                                exactConfiguration
-                                        .materialization()
-                                        .lagRejectBytes(),
-                                exactConfiguration
-                                        .materialization()
-                                        .lagRejectAge(),
-                                exactConfiguration
-                                        .materialization()
-                                        .lagThrottleDelay());
-                appendAdmissionGuard =
-                        new KafkaAsyncAppendAdmissionGuard(
-                                generationActivation,
-                                new MaterializationLagGate(
-                                        exactMaterialization
-                                                .lagSnapshotReader(),
-                                        thresholds,
-                                        exactContext
-                                                .renewalScheduler()));
-                requiredObjectGeneration =
-                        exactMaterialization
-                                .requiredObjectGenerationCompletion();
+                providerResources.add(registerOwned(
+                        constructedResources, "kafka-object-materialization-runtime", exactMaterialization));
+                backgroundServiceFactories.add(ignored -> exactMaterialization);
+                MaterializationLagThresholds thresholds = new MaterializationLagThresholds(
+                        exactConfiguration.materialization().lagThrottleRecords(),
+                        exactConfiguration.materialization().lagRejectRecords(),
+                        exactConfiguration.materialization().lagThrottleBytes(),
+                        exactConfiguration.materialization().lagRejectBytes(),
+                        exactConfiguration.materialization().lagRejectAge(),
+                        exactConfiguration.materialization().lagThrottleDelay());
+                appendAdmissionGuard = new KafkaAsyncAppendAdmissionGuard(
+                        generationActivation,
+                        new MaterializationLagGate(
+                                exactMaterialization.lagSnapshotReader(), thresholds, exactContext.renewalScheduler()));
+                requiredObjectGeneration = exactMaterialization.requiredObjectGenerationCompletion();
             }
             if (bookKeeperRuntime != null) {
-                NereusKafkaBookKeeperWalRuntimeConfiguration
-                        bookKeeperConfiguration =
-                                exactConfiguration
-                                        .bookKeeper()
-                                        .orElseThrow();
+                NereusKafkaBookKeeperWalRuntimeConfiguration bookKeeperConfiguration =
+                        exactConfiguration.bookKeeper().orElseThrow();
                 if (bookKeeperConfiguration.ledgerGc().enabled()
                         && !bookKeeperConfiguration.ledgerGc().dryRun()
                         && objectMaterializationRuntime == null) {
@@ -470,8 +367,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                             "enabled BookKeeper ledger GC requires the activated Kafka materialization runtime");
                 }
                 if (objectMaterializationRuntime != null) {
-                    KafkaObjectMaterializationRuntime exactMaterialization =
-                            objectMaterializationRuntime;
+                    KafkaObjectMaterializationRuntime exactMaterialization = objectMaterializationRuntime;
                     if (bookKeeperConfiguration.ledgerGc().enabled()
                             && !bookKeeperConfiguration.ledgerGc().dryRun()) {
                         KafkaBookKeeperDeletionActivationService deletionActivation =
@@ -479,12 +375,8 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                                         bookKeeperRuntime,
                                         bookKeeperConfiguration.ledgerGc(),
                                         new KafkaBookKeeperStreamCoverageProofProducer(
-                                                exactConfiguration
-                                                        .runtime()
-                                                        .nereusCluster(),
-                                                exactConfiguration
-                                                        .runtime()
-                                                        .kafkaClusterId(),
+                                                exactConfiguration.runtime().nereusCluster(),
+                                                exactConfiguration.runtime().kafkaClusterId(),
                                                 bookKeeperConfiguration.wal(),
                                                 bookKeeperRuntime
                                                         .namespace()
@@ -494,65 +386,41 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                                                 l0MetadataStore,
                                                 partitionMetadataStore),
                                         "kafka-gc-"
-                                                + durableProcessRunId(
-                                                        exactConfiguration
-                                                                .streamStorage()
-                                                                .processRunId()),
-                                        bookKeeperConfiguration
-                                                .wal()
-                                                .operationTimeout());
-                        backgroundServiceFactories.add(
-                                ignored -> deletionActivation);
+                                                + durableProcessRunId(exactConfiguration
+                                                        .streamStorage()
+                                                        .processRunId()),
+                                        bookKeeperConfiguration.wal().operationTimeout());
+                        backgroundServiceFactories.add(ignored -> deletionActivation);
                     }
                     bookKeeperRuntime
                             .createRetentionService(
                                     bookKeeperConfiguration.ledgerGc(),
                                     l0MetadataStore,
-                                    exactMaterialization
-                                            .committedGenerationRetirementAuthority(),
+                                    exactMaterialization.committedGenerationRetirementAuthority(),
                                     exactMaterialization.streamTrigger(),
                                     exactContext.renewalScheduler(),
                                     callbackExecutor)
-                            .ifPresent(
-                                    retention -> {
-                                        providerResources.add(
-                                                registerOwned(
-                                                        constructedResources,
-                                                        "bookkeeper-ledger-retention-service",
-                                                        retention));
-                                        backgroundServiceFactories.add(
-                                                ignored ->
-                                                        retentionBackgroundService(
-                                                                retention));
-                                    });
+                            .ifPresent(retention -> {
+                                providerResources.add(registerOwned(
+                                        constructedResources, "bookkeeper-ledger-retention-service", retention));
+                                backgroundServiceFactories.add(ignored -> retentionBackgroundService(retention));
+                            });
                 }
             }
-            PrimaryWalRegistry objectWalRegistry =
-                    AppendCoordinator.productionObjectWalRegistry(
-                            exactConfiguration.streamStorage(),
-                            l0MetadataStore,
-                            new DefaultWalObjectWriter(
-                                    objectStore,
-                                    WRITER_VERSION,
-                                    exactContext.clock()),
-                            walObjectReader,
-                            physicalReferences,
-                            exactContext.clock());
-            List<PrimaryWalRegistry> primaryWalRegistries =
-                    new ArrayList<>(List.of(objectWalRegistry));
-            EnumMap<StorageProfile, StorageProfileResolver> profileResolvers =
-                    new EnumMap<>(StorageProfile.class);
-            Phase4StorageProfileResolver objectProfiles =
-                    new Phase4StorageProfileResolver();
-            profileResolvers.put(
-                    StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                    objectProfiles);
-            profileResolvers.put(
-                    StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
-                    objectProfiles);
+            PrimaryWalRegistry objectWalRegistry = AppendCoordinator.productionObjectWalRegistry(
+                    exactConfiguration.streamStorage(),
+                    l0MetadataStore,
+                    new DefaultWalObjectWriter(objectStore, WRITER_VERSION, exactContext.clock()),
+                    walObjectReader,
+                    physicalReferences,
+                    exactContext.clock());
+            List<PrimaryWalRegistry> primaryWalRegistries = new ArrayList<>(List.of(objectWalRegistry));
+            EnumMap<StorageProfile, StorageProfileResolver> profileResolvers = new EnumMap<>(StorageProfile.class);
+            Phase4StorageProfileResolver objectProfiles = new Phase4StorageProfileResolver();
+            profileResolvers.put(StorageProfile.OBJECT_WAL_SYNC_OBJECT, objectProfiles);
+            profileResolvers.put(StorageProfile.OBJECT_WAL_ASYNC_OBJECT, objectProfiles);
             if (bookKeeperRuntime != null) {
-                primaryWalRegistries.add(
-                        bookKeeperRuntime.walRuntime().primaryWalRegistry());
+                primaryWalRegistries.add(bookKeeperRuntime.walRuntime().primaryWalRegistry());
                 profileResolvers.put(
                         StorageProfile.BOOKKEEPER_WAL_ONLY,
                         bookKeeperRuntime.walRuntime().profileResolver());
@@ -569,8 +437,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     PrimaryWalRegistry.combine(primaryWalRegistries),
                     physicalReferences,
                     new MetadataAppendRecoverySearcher(
-                            exactConfiguration.runtime().nereusCluster(),
-                            l0MetadataStore),
+                            exactConfiguration.runtime().nereusCluster(), l0MetadataStore),
                     new StorageProfileResolverRegistry(profileResolvers),
                     appendAdmissionGuard,
                     requiredObjectGeneration,
@@ -588,43 +455,37 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     objectStore,
                     exactContext.clock());
             KafkaCheckpointCodecV1 checkpointCodec = new KafkaCheckpointCodecV1();
-            KafkaCheckpointReader checkpointReader =
-                    new KafkaCheckpointReader(objectStore, checkpointCodec);
+            KafkaCheckpointReader checkpointReader = new KafkaCheckpointReader(objectStore, checkpointCodec);
             KafkaCheckpointVerifier checkpointVerifier = new KafkaCheckpointVerifier();
-            KafkaCheckpointRecoveryCoordinator checkpoints =
-                    new KafkaCheckpointRecoveryCoordinator(
-                            exactConfiguration.runtime().nereusCluster(),
-                            partitionMetadataStore,
-                            physicalMetadataStore,
-                            readPins,
-                            checkpointReader,
-                            checkpointVerifier,
-                            exactContext.clock(),
-                            checkpointQuarantine);
-            recoveryLauncher =
-                    new DefaultKafkaPartitionRecoveryLauncher(
-                            checkpoints,
-                            streamStorage,
-                            exactContext.recoveryStateFactory(),
-                            exactConfiguration.runtime().recoveryChunkRecords(),
-                            exactConfiguration.runtime().recoveryChunkBytes(),
-                            callbackExecutor,
-                            exactContext.clock());
+            KafkaCheckpointRecoveryCoordinator checkpoints = new KafkaCheckpointRecoveryCoordinator(
+                    exactConfiguration.runtime().nereusCluster(),
+                    partitionMetadataStore,
+                    physicalMetadataStore,
+                    readPins,
+                    checkpointReader,
+                    checkpointVerifier,
+                    exactContext.clock(),
+                    checkpointQuarantine);
+            recoveryLauncher = new DefaultKafkaPartitionRecoveryLauncher(
+                    checkpoints,
+                    streamStorage,
+                    exactContext.recoveryStateFactory(),
+                    exactConfiguration.runtime().recoveryChunkRecords(),
+                    exactConfiguration.runtime().recoveryChunkBytes(),
+                    callbackExecutor,
+                    exactContext.clock());
             if (activationContext != null && activationContext.maintenance().isPresent()) {
                 NereusKafkaMaintenanceContext maintenanceContext =
                         activationContext.maintenance().orElseThrow();
-                NereusKafkaMaintenanceConfiguration maintenance =
-                        maintenanceContext.configuration();
+                NereusKafkaMaintenanceConfiguration maintenance = maintenanceContext.configuration();
                 StagingFileManager checkpointStaging = new StagingFileManager(
                         maintenance.stagingDirectory(),
                         maintenance.maxStagingBytes(),
                         maintenance.uploadChunkBytes(),
                         maintenance.stagingOrphanGrace(),
                         callbackExecutor);
-                providerResources.add(registerOwned(
-                        constructedResources,
-                        "kafka-checkpoint-staging-files",
-                        checkpointStaging));
+                providerResources.add(
+                        registerOwned(constructedResources, "kafka-checkpoint-staging-files", checkpointStaging));
                 KafkaCheckpointWriter checkpointWriter = new KafkaCheckpointWriter(
                         objectStore,
                         checkpointStaging,
@@ -632,13 +493,12 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                         checkpointCodec,
                         checkpointReader,
                         checkpointVerifier);
-                KafkaCheckpointPublicationCoordinator publication =
-                        new KafkaCheckpointPublicationCoordinator(
-                                partitionMetadataStore,
-                                checkpointWriter,
-                                checkpointVerifier,
-                                protections,
-                                exactContext.clock());
+                KafkaCheckpointPublicationCoordinator publication = new KafkaCheckpointPublicationCoordinator(
+                        partitionMetadataStore,
+                        checkpointWriter,
+                        checkpointVerifier,
+                        protections,
+                        exactContext.clock());
                 KafkaCanonicalCheckpointPublicationFactory publicationFactory =
                         new KafkaCanonicalCheckpointPublicationFactory(
                                 exactConfiguration.runtime().nereusCluster(),
@@ -646,78 +506,66 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                                 maintenance.checkpointObjectTimeout(),
                                 maintenance.pendingProtectionTtl(),
                                 maintenance.writerBuild());
-                maintenanceFactory =
-                        Optional.of(
-                                (identity, leaderEpoch, streamId, sourceValidator) ->
-                                        new DefaultKafkaPartitionMaintenance(
-                                                identity,
-                                                leaderEpoch,
-                                                streamId,
-                                                sourceValidator,
-                                                partitionMetadataStore,
-                                                streamStorage,
-                                                checkpoints,
-                                                publicationFactory,
-                                                publication,
-                                                checkpointQuarantine,
-                                                maintenance.checkpointVerificationTimeout(),
-                                                maintenance.trimTimeout(),
-                                                exactContext.clock()));
-                backgroundServiceFactories.add(
-                        partitions ->
-                                new KafkaPartitionMaintenanceRuntime(
-                                        partitions,
-                                        maintenanceContext.ownedPartitions(),
-                                        maintenance.retentionInterval(),
-                                        maintenance.maxConcurrentPartitions(),
-                                        maintenance.maxPartitionsPerPass(),
-                                        exactContext.renewalScheduler(),
-                                        callbackExecutor));
+                maintenanceFactory = Optional.of(
+                        (identity, leaderEpoch, streamId, sourceValidator) -> new DefaultKafkaPartitionMaintenance(
+                                identity,
+                                leaderEpoch,
+                                streamId,
+                                sourceValidator,
+                                partitionMetadataStore,
+                                streamStorage,
+                                checkpoints,
+                                publicationFactory,
+                                publication,
+                                checkpointQuarantine,
+                                maintenance.checkpointVerificationTimeout(),
+                                maintenance.trimTimeout(),
+                                exactContext.clock()));
+                backgroundServiceFactories.add(partitions -> new KafkaPartitionMaintenanceRuntime(
+                        partitions,
+                        maintenanceContext.ownedPartitions(),
+                        maintenance.retentionInterval(),
+                        maintenance.maxConcurrentPartitions(),
+                        maintenance.maxPartitionsPerPass(),
+                        exactContext.renewalScheduler(),
+                        callbackExecutor));
             }
             if (activationContext != null && activationContext.compaction().isPresent()) {
                 NereusKafkaCompactionContext compaction =
                         activationContext.compaction().orElseThrow();
                 KafkaStorageActivationVerifier exactActivationVerifier =
-                        Objects.requireNonNull(
-                                activationVerifier,
-                                "Kafka compaction requires an activation verifier");
+                        Objects.requireNonNull(activationVerifier, "Kafka compaction requires an activation verifier");
                 StagingFileManager stagingFiles = new StagingFileManager(
                         compaction.configuration().stagingDirectory(),
                         compaction.configuration().maxStagingBytes(),
                         compaction.configuration().uploadChunkBytes(),
                         compaction.configuration().stagingOrphanGrace(),
                         callbackExecutor);
-                providerResources.add(registerOwned(
-                        constructedResources,
-                        "kafka-compaction-staging-files",
-                        stagingFiles));
-                List<MaterializationSourceProvider> compactionSources =
-                        bookKeeperRuntime == null
-                                ? List.of()
-                                : List.of(
-                                        bookKeeperRuntime
-                                                .materializationSourceProvider());
-                backgroundServiceFactories.add(
-                        partitions -> KafkaCompactionProductionRuntimeFactory.create(
-                                compaction,
-                                exactConfiguration.runtime().nereusCluster(),
-                                exactConfiguration.streamStorage().processRunId(),
-                                partitions,
-                                l0MetadataStore,
-                                generationMetadataStore,
-                                physicalMetadataStore,
-                                partitionMetadataStore,
-                                partitionMetadataStore,
-                                protections,
-                                readPins,
-                                readers,
-                                compactionSources,
-                                objectStore,
-                                stagingFiles,
-                                exactActivationVerifier,
-                                exactContext.renewalScheduler(),
-                                callbackExecutor,
-                                exactContext.clock()));
+                providerResources.add(
+                        registerOwned(constructedResources, "kafka-compaction-staging-files", stagingFiles));
+                List<MaterializationSourceProvider> compactionSources = bookKeeperRuntime == null
+                        ? List.of()
+                        : List.of(bookKeeperRuntime.materializationSourceProvider());
+                backgroundServiceFactories.add(partitions -> KafkaCompactionProductionRuntimeFactory.create(
+                        compaction,
+                        exactConfiguration.runtime().nereusCluster(),
+                        exactConfiguration.streamStorage().processRunId(),
+                        partitions,
+                        l0MetadataStore,
+                        generationMetadataStore,
+                        physicalMetadataStore,
+                        partitionMetadataStore,
+                        partitionMetadataStore,
+                        protections,
+                        readPins,
+                        readers,
+                        compactionSources,
+                        objectStore,
+                        stagingFiles,
+                        exactActivationVerifier,
+                        exactContext.renewalScheduler(),
+                        callbackExecutor,
+                        exactContext.clock()));
             }
         } catch (Throwable failure) {
             closeAfterFailure(constructedResources, failure);
@@ -735,14 +583,11 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                 exactContext.clock(),
                 exactContext.startupAction(),
                 providerResources);
-        List<KafkaRuntimeBackgroundServiceFactory> exactBackgroundFactories =
-                List.copyOf(backgroundServiceFactories);
+        List<KafkaRuntimeBackgroundServiceFactory> exactBackgroundFactories = List.copyOf(backgroundServiceFactories);
         KafkaRuntimeBackgroundServiceFactory backgroundServices =
-                partitions ->
-                        KafkaRuntimeBackgroundService.composite(
-                                exactBackgroundFactories.stream()
-                                        .map(factory -> factory.create(partitions))
-                                        .toList());
+                partitions -> KafkaRuntimeBackgroundService.composite(exactBackgroundFactories.stream()
+                        .map(factory -> factory.create(partitions))
+                        .toList());
         return NereusKafkaRuntimeFactory.create(
                 exactConfiguration.runtime(),
                 dependencies,
@@ -762,8 +607,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
 
     private static KafkaRuntimeBackgroundService retentionBackgroundService(
             BookKeeperLedgerRetentionService retention) {
-        BookKeeperLedgerRetentionService exact =
-                Objects.requireNonNull(retention, "retention");
+        BookKeeperLedgerRetentionService exact = Objects.requireNonNull(retention, "retention");
         return new KafkaRuntimeBackgroundService() {
             @Override
             public CompletionStage<Void> start() {
@@ -780,34 +624,34 @@ public final class NereusKafkaObjectWalRuntimeFactory {
     private static void validateActivationContext(
             NereusKafkaObjectWalRuntimeConfiguration configuration,
             NereusKafkaObjectWalActivationContext activationContext) {
-        if (activationContext == null) return;
-        if (!activationContext.capability().kafkaClusterId().equals(
-                configuration.runtime().kafkaClusterId())) {
-            throw new IllegalArgumentException(
-                    "activation capability Kafka cluster must match the runtime");
+        if (activationContext == null) {
+            return;
         }
-        List<String> executableProfiles = configuration.runtime().executableProfiles()
-                .stream().map(Enum::name).sorted().toList();
+        if (!activationContext
+                .capability()
+                .kafkaClusterId()
+                .equals(configuration.runtime().kafkaClusterId())) {
+            throw new IllegalArgumentException("activation capability Kafka cluster must match the runtime");
+        }
+        List<String> executableProfiles = configuration.runtime().executableProfiles().stream()
+                .map(Enum::name)
+                .sorted()
+                .toList();
         if (!activationContext.capability().supportedStorageProfiles().equals(executableProfiles)) {
-            throw new IllegalArgumentException(
-                    "activation capability profiles must match executable runtime profiles");
+            throw new IllegalArgumentException("activation capability profiles must match executable runtime profiles");
         }
     }
 
     private static void validateProviderContexts(
-            NereusKafkaObjectWalRuntimeConfiguration configuration,
-            NereusKafkaObjectWalRuntimeContext context) {
-        if (configuration.bookKeeper().isPresent()
-                != context.bookKeeper().isPresent()) {
+            NereusKafkaObjectWalRuntimeConfiguration configuration, NereusKafkaObjectWalRuntimeContext context) {
+        if (configuration.bookKeeper().isPresent() != context.bookKeeper().isPresent()) {
             throw new IllegalArgumentException(
                     "BookKeeper runtime configuration and context must be installed together");
         }
     }
 
     private static KafkaRuntimeResources.Resource registerOwned(
-            List<KafkaRuntimeResources.Resource> resources,
-            String name,
-            AutoCloseable value) {
+            List<KafkaRuntimeResources.Resource> resources, String name, AutoCloseable value) {
         KafkaRuntimeResources.Resource resource = KafkaRuntimeResources.Resource.owned(name, value);
         for (KafkaRuntimeResources.Resource registered : resources) {
             if (registered.value() == value) {
@@ -820,24 +664,19 @@ public final class NereusKafkaObjectWalRuntimeFactory {
     }
 
     private static KafkaRuntimeResources.Resource registerBorrowed(
-            List<KafkaRuntimeResources.Resource> resources,
-            String name,
-            AutoCloseable value) {
-        KafkaRuntimeResources.Resource resource =
-                KafkaRuntimeResources.Resource.borrowed(name, value);
+            List<KafkaRuntimeResources.Resource> resources, String name, AutoCloseable value) {
+        KafkaRuntimeResources.Resource resource = KafkaRuntimeResources.Resource.borrowed(name, value);
         for (KafkaRuntimeResources.Resource registered : resources) {
             if (registered.value() == value) {
                 throw new IllegalArgumentException(
-                        "Kafka runtime resource " + name
-                                + " duplicates " + registered.name());
+                        "Kafka runtime resource " + name + " duplicates " + registered.name());
             }
         }
         resources.add(resource);
         return resource;
     }
 
-    private static void closeAfterFailure(
-            List<KafkaRuntimeResources.Resource> resources, Throwable failure) {
+    private static void closeAfterFailure(List<KafkaRuntimeResources.Resource> resources, Throwable failure) {
         try {
             new KafkaRuntimeResources(resources).close();
         } catch (Throwable closeFailure) {

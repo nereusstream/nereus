@@ -21,7 +21,9 @@ import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.api.keys.KeyComponentCodec;
 import java.util.Objects;
 
-/** Durable Oxia key builder for Phase 1 metadata. */
+/**
+ * Durable Oxia key builder for Phase 1 metadata.
+ */
 public final class OxiaKeyspace {
     private static final String ROOT = "/nereus/clusters/";
 
@@ -59,22 +61,21 @@ public final class OxiaKeyspace {
         return streamPrefix(streamId) + "/commit-log/" + KeyComponentCodec.encodeComponent(commitId);
     }
 
-    /** Strict restart router for an exact L0 commit-log owner key. */
+    /**
+     * Strict restart router for an exact L0 commit-log owner key.
+     */
     public StreamCommitKeyIdentity parseStreamCommitKey(String suppliedKey) {
         String key = requireNonBlank(suppliedKey, "streamCommitKey");
         String streamsPrefix = prefix + "/streams/";
         if (!key.startsWith(streamsPrefix)) {
-            throw new IllegalArgumentException(
-                    "stream commit key belongs to another cluster namespace");
+            throw new IllegalArgumentException("stream commit key belongs to another cluster namespace");
         }
         String remainder = key.substring(streamsPrefix.length());
         int streamEnd = remainder.indexOf('/');
         if (streamEnd <= 0 || streamEnd == remainder.length() - 1) {
-            throw new IllegalArgumentException(
-                    "stream commit key is missing its canonical stream scope");
+            throw new IllegalArgumentException("stream commit key is missing its canonical stream scope");
         }
-        StreamId streamId = new StreamId(KeyComponentCodec.decodeComponent(
-                remainder.substring(0, streamEnd)));
+        StreamId streamId = new StreamId(KeyComponentCodec.decodeComponent(remainder.substring(0, streamEnd)));
         String suffix = remainder.substring(streamEnd + 1);
         String commitPrefix = "commit-log/";
         if (!suffix.startsWith(commitPrefix)) {
@@ -101,10 +102,7 @@ public final class OxiaKeyspace {
     }
 
     public String offsetIndexScanFromExclusive(StreamId streamId, long targetOffset) {
-        return offsetIndexPrefix(streamId)
-                + "/"
-                + KeyComponentCodec.encodeNonNegativeLong(targetOffset)
-                + "/~";
+        return offsetIndexPrefix(streamId) + "/" + KeyComponentCodec.encodeNonNegativeLong(targetOffset) + "/~";
     }
 
     public String offsetIndexScanFromBeginning(StreamId streamId) {
@@ -112,15 +110,13 @@ public final class OxiaKeyspace {
     }
 
     public String offsetIndexScanToExclusive(StreamId streamId) {
-        return offsetIndexPrefix(streamId)
-                + "/"
-                + KeyComponentCodec.encodeNonNegativeLong(Long.MAX_VALUE)
-                + "/~";
+        return offsetIndexPrefix(streamId) + "/" + KeyComponentCodec.encodeNonNegativeLong(Long.MAX_VALUE) + "/~";
     }
 
     public String committedSliceKey(StreamId streamId, ObjectId objectId, String sliceId) {
         Objects.requireNonNull(objectId, "objectId");
-        String sliceComponent = DeterministicIds.stableHashComponent(objectId.value() + "\0" + requireNonBlank(sliceId, "sliceId"));
+        String sliceComponent =
+                DeterministicIds.stableHashComponent(objectId.value() + "\0" + requireNonBlank(sliceId, "sliceId"));
         return streamPrefix(streamId)
                 + "/committed-slices/"
                 + KeyComponentCodec.encodeComponent(objectId.value())

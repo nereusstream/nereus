@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
 import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
 import java.util.List;
 import java.util.Objects;
 
-/** Immutable KRaft facts consumed by activation without exposing Kafka implementation types. */
+/**
+ * Immutable KRaft facts consumed by activation without exposing Kafka implementation types.
+ */
 public record KafkaStorageClusterSnapshot(
         String kafkaClusterId,
         long metadataOffset,

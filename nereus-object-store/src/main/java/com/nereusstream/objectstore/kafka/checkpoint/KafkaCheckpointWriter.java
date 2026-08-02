@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.kafka.checkpoint;
 
 import com.nereusstream.api.ErrorCode;
@@ -14,7 +15,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 
-/** Private-staging immutable NKC1 writer with exact response-loss reconciliation. */
+/**
+ * Private-staging immutable NKC1 writer with exact response-loss reconciliation.
+ */
 public final class KafkaCheckpointWriter {
     @FunctionalInterface
     public interface PreUploadGuard {
@@ -55,23 +58,24 @@ public final class KafkaCheckpointWriter {
         }
         Objects.requireNonNull(preUploadGuard, "preUploadGuard");
         return CompletableFuture.supplyAsync(
-                        () -> codec.encodeToStaging(stagingFiles, request.header(), request.sections()),
-                        codecExecutor)
+                        () -> codec.encodeToStaging(stagingFiles, request.header(), request.sections()), codecExecutor)
                 .thenCompose(encoded -> uploadAndVerify(request, encoded, preUploadGuard)
                         .whenComplete((ignored, failure) -> encoded.close()))
                 .handle((value, failure) -> {
-                    if (failure == null) return value;
+                    if (failure == null) {
+                        return value;
+                    }
                     Throwable cause = unwrap(failure);
-                    if (cause instanceof NereusException nereus) throw new CompletionException(nereus);
+                    if (cause instanceof NereusException nereus) {
+                        throw new CompletionException(nereus);
+                    }
                     throw new CompletionException(new NereusException(
                             ErrorCode.OBJECT_UPLOAD_FAILED, true, "failed to publish NKC1 object", cause));
                 });
     }
 
     private CompletableFuture<KafkaCheckpointObject> uploadAndVerify(
-            KafkaCheckpointWriteRequest request,
-            EncodedKafkaCheckpoint encoded,
-            PreUploadGuard preUploadGuard) {
+            KafkaCheckpointWriteRequest request, EncodedKafkaCheckpoint encoded, PreUploadGuard preUploadGuard) {
         ObjectKey key = KafkaCheckpointFormatV1.objectKey(
                 request.nereusCluster(), request.header(), request.contentPolicySha256());
         String attempt = KafkaCheckpointFormatV1.attemptId(request.header(), request.contentPolicySha256());
@@ -80,37 +84,40 @@ public final class KafkaCheckpointWriter {
                 encoded.storageCrc32c(),
                 true,
                 Map.of(
-                        "nereus.format", "NKC1",
-                        "nereus.object.sha256", encoded.objectSha256().value(),
-                        "nereus.checkpoint.attempt", attempt),
+                        "nereus.format",
+                        "NKC1",
+                        "nereus.object.sha256",
+                        encoded.objectSha256().value(),
+                        "nereus.checkpoint.attempt",
+                        attempt),
                 request.timeout());
         KafkaCheckpointUploadIdentity physical = new KafkaCheckpointUploadIdentity(
-                KafkaCheckpointFormatV1.objectId(key), key,
+                KafkaCheckpointFormatV1.objectId(key),
+                key,
                 encoded.objectLength(),
                 encoded.storageCrc32c(),
                 encoded.objectSha256());
         return preUploadGuard.authorize(physical).thenCompose(ignored -> {
             CompletableFuture<KafkaCheckpointObject> primary = objectStore
-                .putObject(key, encoded.stagingFile(), options)
-                .thenCompose(result -> {
-                    validatePut(result, key, encoded);
-                    return openExpected(request, encoded, key);
-                });
-            return primary.exceptionallyCompose(original -> openExpected(request, encoded, key)
-                    .handle((reconciled, recoveryFailure) -> {
-                        if (recoveryFailure == null) return reconciled;
+                    .putObject(key, encoded.stagingFile(), options)
+                    .thenCompose(result -> {
+                        validatePut(result, key, encoded);
+                        return openExpected(request, encoded, key);
+                    });
+            return primary.exceptionallyCompose(
+                    original -> openExpected(request, encoded, key).handle((reconciled, recoveryFailure) -> {
+                        if (recoveryFailure == null) {
+                            return reconciled;
+                        }
                         throw new CompletionException(unwrap(original));
                     }));
         });
     }
 
     private CompletableFuture<KafkaCheckpointObject> openExpected(
-            KafkaCheckpointWriteRequest request,
-            EncodedKafkaCheckpoint encoded,
-            ObjectKey key) {
+            KafkaCheckpointWriteRequest request, EncodedKafkaCheckpoint encoded, ObjectKey key) {
         return reader.openAndVerify(
-                        key, encoded.objectLength(), encoded.storageCrc32c(),
-                        encoded.objectSha256(), request.timeout())
+                        key, encoded.objectLength(), encoded.storageCrc32c(), encoded.objectSha256(), request.timeout())
                 .thenApply(object -> {
                     verifier.verifyExpected(
                             object, request.nereusCluster(), request.header(), request.contentPolicySha256());
@@ -118,19 +125,19 @@ public final class KafkaCheckpointWriter {
                 });
     }
 
-    private static void validatePut(
-            PutObjectResult result, ObjectKey key, EncodedKafkaCheckpoint encoded) {
+    private static void validatePut(PutObjectResult result, ObjectKey key, EncodedKafkaCheckpoint encoded) {
         if (!result.key().equals(key)
                 || result.objectLength() != encoded.objectLength()
                 || !result.checksum().equals(encoded.storageCrc32c())) {
-            throw new NereusException(
-                    ErrorCode.OBJECT_UPLOAD_FAILED, false, "NKC1 PUT result identity mismatch");
+            throw new NereusException(ErrorCode.OBJECT_UPLOAD_FAILED, false, "NKC1 PUT result identity mismatch");
         }
     }
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while (current instanceof CompletionException && current.getCause() != null) current = current.getCause();
+        while (current instanceof CompletionException && current.getCause() != null) {
+            current = current.getCause();
+        }
         return current;
     }
 }

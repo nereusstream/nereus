@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.errors;
 
 import com.nereusstream.api.ErrorCode;
@@ -10,7 +11,9 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 
-/** Stable translation from provider-neutral L0 errors to locked Pulsar managed-ledger channels. */
+/**
+ * Stable translation from provider-neutral L0 errors to locked Pulsar managed-ledger channels.
+ */
 public final class ManagedLedgerErrorMapper {
     public static final String UNSUPPORTED_PREFIX = "NEREUS_UNSUPPORTED_OPERATION:";
 
@@ -47,8 +50,7 @@ public final class ManagedLedgerErrorMapper {
                 return new ManagedLedgerException.ManagedLedgerAlreadyClosedException(nereus.getMessage());
             }
         }
-        if (code == ErrorCode.OFFSET_TRIMMED
-                || (code == ErrorCode.OFFSET_NOT_AVAILABLE && context.directRead())) {
+        if (code == ErrorCode.OFFSET_TRIMMED || (code == ErrorCode.OFFSET_NOT_AVAILABLE && context.directRead())) {
             return new ManagedLedgerException.InvalidCursorPositionException(nereus.getMessage());
         }
         if (code == ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND
@@ -66,8 +68,8 @@ public final class ManagedLedgerErrorMapper {
             return unsupported(context.operation());
         }
         return new ManagedLedgerException(
-                "Nereus " + context.operation() + " failed [" + code + ", retriable=" + nereus.retriable()
-                        + "]: " + nereus.getMessage(),
+                "Nereus " + context.operation() + " failed [" + code + ", retriable=" + nereus.retriable() + "]: "
+                        + nereus.getMessage(),
                 nereus);
     }
 

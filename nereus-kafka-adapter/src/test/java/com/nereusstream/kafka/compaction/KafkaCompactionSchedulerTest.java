@@ -16,7 +16,6 @@ package com.nereusstream.kafka.compaction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.kafka.compaction.KafkaCompactionScheduler.Trigger;
@@ -35,214 +34,209 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class KafkaCompactionSchedulerTest {
-  @Test
-  void runsStartupAndFixedDelayPassWithoutClosingBorrowedScheduler() {
-    ManualScheduler borrowed = new ManualScheduler();
-    List<TriggerBatch> batches = new ArrayList<>();
-    List<CompletableFuture<Void>> sources = new ArrayList<>();
-    KafkaCompactionScheduler owner =
-        new KafkaCompactionScheduler(
-            triggers -> {
-              batches.add(triggers);
-              CompletableFuture<Void> source = new CompletableFuture<>();
-              sources.add(source);
-              return source;
-            },
-            Duration.ofSeconds(30),
-            borrowed,
-            Runnable::run);
+    @Test
+    void runsStartupAndFixedDelayPassWithoutClosingBorrowedScheduler() {
+        ManualScheduler borrowed = new ManualScheduler();
+        List<TriggerBatch> batches = new ArrayList<>();
+        List<CompletableFuture<Void>> sources = new ArrayList<>();
+        KafkaCompactionScheduler owner = new KafkaCompactionScheduler(
+                triggers -> {
+                    batches.add(triggers);
+                    CompletableFuture<Void> source = new CompletableFuture<>();
+                    sources.add(source);
+                    return source;
+                },
+                Duration.ofSeconds(30),
+                borrowed,
+                Runnable::run);
 
-    try {
-      owner.start().join();
-      assertThat(borrowed.lastDelayNanos()).isZero();
+        try {
+            owner.start().join();
+            assertThat(borrowed.lastDelayNanos()).isZero();
 
-      borrowed.fire();
-      assertThat(batches).hasSize(1);
-      assertThat(batches.get(0).reasons()).containsExactly(Trigger.STARTUP);
-      sources.get(0).complete(null);
+            borrowed.fire();
+            assertThat(batches).hasSize(1);
+            assertThat(batches.get(0).reasons()).containsExactly(Trigger.STARTUP);
+            sources.get(0).complete(null);
 
-      assertThat(borrowed.lastDelayNanos()).isEqualTo(Duration.ofSeconds(30).toNanos());
-      borrowed.fire();
-      assertThat(batches).hasSize(2);
-      assertThat(batches.get(1).reasons()).containsExactly(Trigger.PERIODIC);
-      sources.get(1).complete(null);
+            assertThat(borrowed.lastDelayNanos())
+                    .isEqualTo(Duration.ofSeconds(30).toNanos());
+            borrowed.fire();
+            assertThat(batches).hasSize(2);
+            assertThat(batches.get(1).reasons()).containsExactly(Trigger.PERIODIC);
+            sources.get(1).complete(null);
 
-      owner.closeAsync().join();
-      assertThat(owner.isRunning()).isFalse();
-      assertThat(borrowed.isShutdown()).isFalse();
-      assertThat(borrowed.current().isCancelled()).isTrue();
-    } finally {
-      borrowed.shutdownNow();
-    }
-  }
-
-  @Test
-  void coalescesTriggersBehindActivePassAndIsolatesCallerCancellation() {
-    ManualScheduler borrowed = new ManualScheduler();
-    List<TriggerBatch> batches = new ArrayList<>();
-    List<CompletableFuture<Void>> sources = new ArrayList<>();
-    AtomicInteger concurrent = new AtomicInteger();
-    AtomicInteger maximumConcurrent = new AtomicInteger();
-    KafkaCompactionScheduler owner =
-        new KafkaCompactionScheduler(
-            triggers -> {
-              batches.add(triggers);
-              maximumConcurrent.accumulateAndGet(concurrent.incrementAndGet(), Math::max);
-              CompletableFuture<Void> source = new CompletableFuture<>();
-              sources.add(source);
-              return source;
-            },
-            Duration.ofMinutes(1),
-            borrowed,
-            Runnable::run);
-
-    try {
-      owner.start().join();
-      borrowed.fire();
-
-      CompletableFuture<Void> cancelled = owner.trigger(Trigger.DIRTY_BYTES);
-      CompletableFuture<Void> survivor = owner.trigger(Trigger.POLICY_CHANGE);
-      assertThat(cancelled.cancel(false)).isTrue();
-      assertThat(sources).hasSize(1);
-
-      concurrent.decrementAndGet();
-      sources.get(0).complete(null);
-      assertThat(batches).hasSize(2);
-      assertThat(batches.get(1).reasons())
-          .containsExactlyInAnyOrder(Trigger.DIRTY_BYTES, Trigger.POLICY_CHANGE);
-      assertThat(batches.get(1).primary()).isEqualTo(Trigger.POLICY_CHANGE);
-      assertThat(survivor).isNotDone();
-
-      concurrent.decrementAndGet();
-      sources.get(1).complete(null);
-      survivor.join();
-      assertThat(cancelled).isCancelled();
-      assertThat(maximumConcurrent).hasValue(1);
-      owner.closeAsync().join();
-    } finally {
-      borrowed.shutdownNow();
-    }
-  }
-
-  @Test
-  void closeCancelsActiveSourceAndFailsPendingPassWithoutClosingBorrowedResources() {
-    ManualScheduler borrowed = new ManualScheduler();
-    CompletableFuture<Void> activeSource = new CompletableFuture<>();
-    AtomicInteger calls = new AtomicInteger();
-    KafkaCompactionScheduler owner =
-        new KafkaCompactionScheduler(
-            triggers -> {
-              calls.incrementAndGet();
-              return activeSource;
-            },
-            Duration.ofMinutes(1),
-            borrowed,
-            Runnable::run);
-
-    try {
-      owner.start().join();
-      borrowed.fire();
-      CompletableFuture<Void> pending = owner.trigger(Trigger.ADMIN);
-
-      owner.closeAsync().join();
-
-      assertThat(activeSource).isCancelled();
-      assertThat(calls).hasValue(1);
-      assertThatThrownBy(pending::join)
-          .isInstanceOf(CompletionException.class)
-          .hasRootCauseInstanceOf(NereusException.class)
-          .rootCause()
-          .extracting(value -> ((NereusException) value).code())
-          .isEqualTo(ErrorCode.STORAGE_CLOSED);
-      assertThat(borrowed.isShutdown()).isFalse();
-    } finally {
-      borrowed.shutdownNow();
-    }
-  }
-
-  @Test
-  void rejectsTriggerBeforeStartAndRestartAfterClose() {
-    ManualScheduler borrowed = new ManualScheduler();
-    AtomicInteger calls = new AtomicInteger();
-    KafkaCompactionScheduler owner =
-        new KafkaCompactionScheduler(
-            triggers -> {
-              calls.incrementAndGet();
-              return CompletableFuture.completedFuture(null);
-            },
-            Duration.ofSeconds(1),
-            borrowed,
-            Runnable::run);
-
-    try {
-      assertCode(owner.trigger(Trigger.ADMIN), ErrorCode.METADATA_CONDITION_FAILED);
-      owner.start().join();
-      owner.closeAsync().join();
-      assertThat(calls).hasValue(0);
-      assertThat(borrowed.current().isCancelled()).isTrue();
-      assertCode(owner.start(), ErrorCode.STORAGE_CLOSED);
-    } finally {
-      borrowed.shutdownNow();
-    }
-  }
-
-  private static void assertCode(CompletableFuture<?> future, ErrorCode expected) {
-    assertThatThrownBy(future::join)
-        .isInstanceOf(CompletionException.class)
-        .hasRootCauseInstanceOf(NereusException.class)
-        .rootCause()
-        .extracting(value -> ((NereusException) value).code())
-        .isEqualTo(expected);
-  }
-
-  private static final class ManualScheduler extends ScheduledThreadPoolExecutor {
-    private ManualScheduledFuture current;
-    private long lastDelayNanos = -1;
-
-    private ManualScheduler() {
-      super(1);
+            owner.closeAsync().join();
+            assertThat(owner.isRunning()).isFalse();
+            assertThat(borrowed.isShutdown()).isFalse();
+            assertThat(borrowed.current().isCancelled()).isTrue();
+        } finally {
+            borrowed.shutdownNow();
+        }
     }
 
-    @Override
-    public synchronized ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
-      if (current != null && !current.isDone()) {
-        throw new AssertionError("only one Kafka compaction deadline may be scheduled");
-      }
-      lastDelayNanos = unit.toNanos(delay);
-      current = new ManualScheduledFuture(command);
-      return current;
+    @Test
+    void coalescesTriggersBehindActivePassAndIsolatesCallerCancellation() {
+        ManualScheduler borrowed = new ManualScheduler();
+        List<TriggerBatch> batches = new ArrayList<>();
+        List<CompletableFuture<Void>> sources = new ArrayList<>();
+        AtomicInteger concurrent = new AtomicInteger();
+        AtomicInteger maximumConcurrent = new AtomicInteger();
+        KafkaCompactionScheduler owner = new KafkaCompactionScheduler(
+                triggers -> {
+                    batches.add(triggers);
+                    maximumConcurrent.accumulateAndGet(concurrent.incrementAndGet(), Math::max);
+                    CompletableFuture<Void> source = new CompletableFuture<>();
+                    sources.add(source);
+                    return source;
+                },
+                Duration.ofMinutes(1),
+                borrowed,
+                Runnable::run);
+
+        try {
+            owner.start().join();
+            borrowed.fire();
+
+            CompletableFuture<Void> cancelled = owner.trigger(Trigger.DIRTY_BYTES);
+            CompletableFuture<Void> survivor = owner.trigger(Trigger.POLICY_CHANGE);
+            assertThat(cancelled.cancel(false)).isTrue();
+            assertThat(sources).hasSize(1);
+
+            concurrent.decrementAndGet();
+            sources.get(0).complete(null);
+            assertThat(batches).hasSize(2);
+            assertThat(batches.get(1).reasons()).containsExactlyInAnyOrder(Trigger.DIRTY_BYTES, Trigger.POLICY_CHANGE);
+            assertThat(batches.get(1).primary()).isEqualTo(Trigger.POLICY_CHANGE);
+            assertThat(survivor).isNotDone();
+
+            concurrent.decrementAndGet();
+            sources.get(1).complete(null);
+            survivor.join();
+            assertThat(cancelled).isCancelled();
+            assertThat(maximumConcurrent).hasValue(1);
+            owner.closeAsync().join();
+        } finally {
+            borrowed.shutdownNow();
+        }
     }
 
-    private synchronized void fire() {
-      if (current == null || current.isDone()) {
-        throw new AssertionError("Kafka compaction deadline was not scheduled");
-      }
-      current.run();
+    @Test
+    void closeCancelsActiveSourceAndFailsPendingPassWithoutClosingBorrowedResources() {
+        ManualScheduler borrowed = new ManualScheduler();
+        CompletableFuture<Void> activeSource = new CompletableFuture<>();
+        AtomicInteger calls = new AtomicInteger();
+        KafkaCompactionScheduler owner = new KafkaCompactionScheduler(
+                triggers -> {
+                    calls.incrementAndGet();
+                    return activeSource;
+                },
+                Duration.ofMinutes(1),
+                borrowed,
+                Runnable::run);
+
+        try {
+            owner.start().join();
+            borrowed.fire();
+            CompletableFuture<Void> pending = owner.trigger(Trigger.ADMIN);
+
+            owner.closeAsync().join();
+
+            assertThat(activeSource).isCancelled();
+            assertThat(calls).hasValue(1);
+            assertThatThrownBy(pending::join)
+                    .isInstanceOf(CompletionException.class)
+                    .hasRootCauseInstanceOf(NereusException.class)
+                    .rootCause()
+                    .extracting(value -> ((NereusException) value).code())
+                    .isEqualTo(ErrorCode.STORAGE_CLOSED);
+            assertThat(borrowed.isShutdown()).isFalse();
+        } finally {
+            borrowed.shutdownNow();
+        }
     }
 
-    private synchronized long lastDelayNanos() {
-      return lastDelayNanos;
+    @Test
+    void rejectsTriggerBeforeStartAndRestartAfterClose() {
+        ManualScheduler borrowed = new ManualScheduler();
+        AtomicInteger calls = new AtomicInteger();
+        KafkaCompactionScheduler owner = new KafkaCompactionScheduler(
+                triggers -> {
+                    calls.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                },
+                Duration.ofSeconds(1),
+                borrowed,
+                Runnable::run);
+
+        try {
+            assertCode(owner.trigger(Trigger.ADMIN), ErrorCode.METADATA_CONDITION_FAILED);
+            owner.start().join();
+            owner.closeAsync().join();
+            assertThat(calls).hasValue(0);
+            assertThat(borrowed.current().isCancelled()).isTrue();
+            assertCode(owner.start(), ErrorCode.STORAGE_CLOSED);
+        } finally {
+            borrowed.shutdownNow();
+        }
     }
 
-    private synchronized ManualScheduledFuture current() {
-      return current;
-    }
-  }
-
-  private static final class ManualScheduledFuture extends FutureTask<Void>
-      implements ScheduledFuture<Void> {
-    private ManualScheduledFuture(Runnable command) {
-      super(command, null);
+    private static void assertCode(CompletableFuture<?> future, ErrorCode expected) {
+        assertThatThrownBy(future::join)
+                .isInstanceOf(CompletionException.class)
+                .hasRootCauseInstanceOf(NereusException.class)
+                .rootCause()
+                .extracting(value -> ((NereusException) value).code())
+                .isEqualTo(expected);
     }
 
-    @Override
-    public long getDelay(TimeUnit unit) {
-      return 0;
+    private static final class ManualScheduler extends ScheduledThreadPoolExecutor {
+        private ManualScheduledFuture current;
+        private long lastDelayNanos = -1;
+
+        private ManualScheduler() {
+            super(1);
+        }
+
+        @Override
+        public synchronized ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
+            if (current != null && !current.isDone()) {
+                throw new AssertionError("only one Kafka compaction deadline may be scheduled");
+            }
+            lastDelayNanos = unit.toNanos(delay);
+            current = new ManualScheduledFuture(command);
+            return current;
+        }
+
+        private synchronized void fire() {
+            if (current == null || current.isDone()) {
+                throw new AssertionError("Kafka compaction deadline was not scheduled");
+            }
+            current.run();
+        }
+
+        private synchronized long lastDelayNanos() {
+            return lastDelayNanos;
+        }
+
+        private synchronized ManualScheduledFuture current() {
+            return current;
+        }
     }
 
-    @Override
-    public int compareTo(Delayed other) {
-      return 0;
+    private static final class ManualScheduledFuture extends FutureTask<Void> implements ScheduledFuture<Void> {
+        private ManualScheduledFuture(Runnable command) {
+            super(command, null);
+        }
+
+        @Override
+        public long getDelay(TimeUnit unit) {
+            return 0;
+        }
+
+        @Override
+        public int compareTo(Delayed other) {
+            return 0;
+        }
     }
-  }
 }

@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
@@ -21,7 +21,9 @@ class BookKeeperAppenderDeadlineTest {
             long createBudget = runtime.operations.observedDeadlineNanos.get(0);
             long writeBudget = runtime.operations.observedDeadlineNanos.get(1);
             assertThat(createBudget).isPositive().isLessThanOrEqualTo(timeout.toNanos());
-            assertThat(writeBudget).isPositive().isLessThan(createBudget - Duration.ofMillis(20).toNanos());
+            assertThat(writeBudget)
+                    .isPositive()
+                    .isLessThan(createBudget - Duration.ofMillis(20).toNanos());
         }
     }
 }

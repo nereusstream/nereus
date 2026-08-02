@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.checkpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -15,19 +15,16 @@ import com.nereusstream.metadata.oxia.codec.KafkaMetadataCodecs;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureRecord;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
-
-import org.junit.jupiter.api.Test;
-
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import org.junit.jupiter.api.Test;
 
 class DurableKafkaCheckpointFailureQuarantineTest {
-    private static final KafkaPartitionId IDENTITY =
-            new KafkaPartitionId("kraft", "AAAAAAAAAAAAAAAAAAAAAQ", 3);
+    private static final KafkaPartitionId IDENTITY = new KafkaPartitionId("kraft", "AAAAAAAAAAAAAAAAAAAAAQ", 3);
     private static final KafkaCheckpointReferenceRecord REFERENCE =
             reference("checkpoint-object", "objects/checkpoint");
     private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(5_000), ZoneOffset.UTC);
@@ -35,8 +32,7 @@ class DurableKafkaCheckpointFailureQuarantineTest {
     @Test
     void persistsRedactedFirstFailureAndSkipsTheExactReferenceAfterRestart() {
         FakeStore store = new FakeStore();
-        DurableKafkaCheckpointFailureQuarantine first =
-                new DurableKafkaCheckpointFailureQuarantine(store, CLOCK);
+        DurableKafkaCheckpointFailureQuarantine first = new DurableKafkaCheckpointFailureQuarantine(store, CLOCK);
 
         first.quarantine(
                         IDENTITY,
@@ -44,9 +40,7 @@ class DurableKafkaCheckpointFailureQuarantineTest {
                         REFERENCE,
                         KafkaCheckpointFailureSource.RECOVERY,
                         new NereusException(
-                                ErrorCode.OBJECT_CHECKSUM_MISMATCH,
-                                false,
-                                "secret object path must not be persisted"))
+                                ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "secret object path must not be persisted"))
                 .join();
 
         KafkaCheckpointFailureRecord durable = store.current.orElseThrow().value();
@@ -54,24 +48,20 @@ class DurableKafkaCheckpointFailureQuarantineTest {
         assertThat(durable.source()).isEqualTo(KafkaCheckpointFailureSource.RECOVERY);
         assertThat(durable.referenceSha256())
                 .isEqualTo(DurableKafkaCheckpointFailureQuarantine.referenceSha256(REFERENCE));
-        assertThat(
-                        new String(
-                                KafkaMetadataCodecs.encodeEnvelope(
-                                        durable.withMetadataVersion(0),
-                                        KafkaCheckpointFailureRecord.class),
-                                StandardCharsets.UTF_8))
+        assertThat(new String(
+                        KafkaMetadataCodecs.encodeEnvelope(
+                                durable.withMetadataVersion(0), KafkaCheckpointFailureRecord.class),
+                        StandardCharsets.UTF_8))
                 .doesNotContain("secret object path");
 
-        DurableKafkaCheckpointFailureQuarantine restarted =
-                new DurableKafkaCheckpointFailureQuarantine(store, CLOCK);
+        DurableKafkaCheckpointFailureQuarantine restarted = new DurableKafkaCheckpointFailureQuarantine(store, CLOCK);
         assertThat(restarted.isQuarantined(IDENTITY, 7, REFERENCE).join()).isTrue();
     }
 
     @Test
     void existingObjectIdCannotAliasChangedReferenceBytes() {
         FakeStore store = new FakeStore();
-        DurableKafkaCheckpointFailureQuarantine quarantine =
-                new DurableKafkaCheckpointFailureQuarantine(store, CLOCK);
+        DurableKafkaCheckpointFailureQuarantine quarantine = new DurableKafkaCheckpointFailureQuarantine(store, CLOCK);
         quarantine
                 .quarantine(
                         IDENTITY,
@@ -80,12 +70,10 @@ class DurableKafkaCheckpointFailureQuarantineTest {
                         KafkaCheckpointFailureSource.RECOVERY,
                         new NereusException(ErrorCode.OBJECT_NOT_FOUND, true, "missing"))
                 .join();
-        KafkaCheckpointReferenceRecord changed =
-                reference(REFERENCE.objectId(), "objects/different-checkpoint");
+        KafkaCheckpointReferenceRecord changed = reference(REFERENCE.objectId(), "objects/different-checkpoint");
 
         assertThatThrownBy(() -> quarantine.isQuarantined(IDENTITY, 7, changed).join())
-                .hasRootCauseMessage(
-                        "durable Kafka checkpoint quarantine conflicts with exact reference");
+                .hasRootCauseMessage("durable Kafka checkpoint quarantine conflicts with exact reference");
     }
 
     @Test
@@ -93,19 +81,14 @@ class DurableKafkaCheckpointFailureQuarantineTest {
         DurableKafkaCheckpointFailureQuarantine quarantine =
                 new DurableKafkaCheckpointFailureQuarantine(new FakeStore(), CLOCK);
 
-        assertThatThrownBy(
-                        () ->
-                                quarantine
-                                        .quarantine(
-                                                IDENTITY,
-                                                7,
-                                                REFERENCE,
-                                                KafkaCheckpointFailureSource.RETENTION,
-                                                new NereusException(
-                                                        ErrorCode.TIMEOUT,
-                                                        true,
-                                                        "temporary timeout"))
-                                        .join())
+        assertThatThrownBy(() -> quarantine
+                        .quarantine(
+                                IDENTITY,
+                                7,
+                                REFERENCE,
+                                KafkaCheckpointFailureSource.RETENTION,
+                                new NereusException(ErrorCode.TIMEOUT, true, "temporary timeout"))
+                        .join())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("not quarantine-eligible");
     }
@@ -133,17 +116,11 @@ class DurableKafkaCheckpointFailureQuarantineTest {
         }
 
         @Override
-        public CompletableFuture<VersionedKafkaCheckpointFailure> putIfAbsent(
-                KafkaCheckpointFailureRecord value) {
+        public CompletableFuture<VersionedKafkaCheckpointFailure> putIfAbsent(KafkaCheckpointFailureRecord value) {
             if (current.isEmpty()) {
                 KafkaCheckpointFailureRecord stored = value.withMetadataVersion(1);
-                current =
-                        Optional.of(
-                                new VersionedKafkaCheckpointFailure(
-                                        "checkpoint-failure",
-                                        stored,
-                                        1,
-                                        new Checksum(ChecksumType.SHA256, "00".repeat(32))));
+                current = Optional.of(new VersionedKafkaCheckpointFailure(
+                        "checkpoint-failure", stored, 1, new Checksum(ChecksumType.SHA256, "00".repeat(32))));
             }
             return CompletableFuture.completedFuture(current.orElseThrow());
         }

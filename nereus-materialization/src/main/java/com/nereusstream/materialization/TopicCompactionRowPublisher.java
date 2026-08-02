@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -22,9 +23,10 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Pass-two source replay that emits only pass-one survivors and re-proves every decoded fact. */
-final class TopicCompactionRowPublisher
-        implements Flow.Publisher<CompactedObjectRow>, AutoCloseable {
+/**
+ * Pass-two source replay that emits only pass-one survivors and re-proves every decoded fact.
+ */
+final class TopicCompactionRowPublisher implements Flow.Publisher<CompactedObjectRow>, AutoCloseable {
     private final MaterializationTask task;
     private final TopicCompactionRegistry.Binding binding;
     private final BitSet survivors;
@@ -33,8 +35,7 @@ final class TopicCompactionRowPublisher
     private final int maxKeyBytes;
     private final ExactSourceBatchPublisher batches;
     private final SerialExecutor serial;
-    private final DefaultTopicCompactionEngine.FactDigest facts =
-            new DefaultTopicCompactionEngine.FactDigest();
+    private final DefaultTopicCompactionEngine.FactDigest facts = new DefaultTopicCompactionEngine.FactDigest();
     private final AtomicBoolean subscribed = new AtomicBoolean();
     private final AtomicBoolean closeRequested = new AtomicBoolean();
 
@@ -59,8 +60,7 @@ final class TopicCompactionRowPublisher
         this.binding = Objects.requireNonNull(binding, "binding");
         this.survivors = (BitSet) Objects.requireNonNull(survivors, "survivors").clone();
         this.expectedFactSha256 = Objects.requireNonNull(expectedFactSha256, "expectedFactSha256");
-        if (expectedOutputRecords < 0
-                || expectedOutputRecords != this.survivors.cardinality()) {
+        if (expectedOutputRecords < 0 || expectedOutputRecords != this.survivors.cardinality()) {
             throw new IllegalArgumentException("topic-compaction output count is inconsistent");
         }
         if (maxKeyBytes <= 0 || maxKeyBytes > DefaultTopicCompactionEngine.MAX_KEY_BYTES) {
@@ -96,10 +96,10 @@ final class TopicCompactionRowPublisher
                     @Override
                     public void cancel() {
                         closeRequested.set(true);
-                        submit(() -> fail(new NereusException(
-                                ErrorCode.CANCELLED,
-                                false,
-                                "topic-compaction row subscriber cancelled"), false));
+                        submit(() -> fail(
+                                new NereusException(
+                                        ErrorCode.CANCELLED, false, "topic-compaction row subscriber cancelled"),
+                                false));
                     }
                 });
                 batches.subscribe(new BatchSubscriber());
@@ -112,8 +112,8 @@ final class TopicCompactionRowPublisher
     @Override
     public void close() {
         closeRequested.set(true);
-        submit(() -> fail(new NereusException(
-                ErrorCode.CANCELLED, false, "topic-compaction row publisher closed"), false));
+        submit(() ->
+                fail(new NereusException(ErrorCode.CANCELLED, false, "topic-compaction row publisher closed"), false));
     }
 
     private void requestOnSerial(long count) {
@@ -130,8 +130,7 @@ final class TopicCompactionRowPublisher
 
     private void advance() {
         if (closeRequested.get() && !terminal) {
-            fail(new NereusException(
-                    ErrorCode.CANCELLED, false, "topic-compaction row publisher closed"), false);
+            fail(new NereusException(ErrorCode.CANCELLED, false, "topic-compaction row publisher closed"), false);
             return;
         }
         if (terminal || demand == 0 || upstream == null || upstreamRequested) {
@@ -158,8 +157,8 @@ final class TopicCompactionRowPublisher
         try {
             long offset = batch.range().startOffset();
             byte[] exactPayload = batch.payload();
-            Optional<CompactionRecord> decoded = DefaultTopicCompactionEngine.decode(
-                    binding.decoder(), offset, exactPayload);
+            Optional<CompactionRecord> decoded =
+                    DefaultTopicCompactionEngine.decode(binding.decoder(), offset, exactPayload);
             facts.add(offset, decoded);
             int relative = DefaultTopicCompactionEngine.relativeOffset(task, offset);
             if (survivors.get(relative)) {
@@ -178,10 +177,7 @@ final class TopicCompactionRowPublisher
         advance();
     }
 
-    private CompactedObjectRow row(
-            long offset,
-            byte[] exactPayload,
-            Optional<CompactionRecord> decoded) {
+    private CompactedObjectRow row(long offset, byte[] exactPayload, Optional<CompactionRecord> decoded) {
         ByteBuffer encodedKey;
         CompactionDisposition disposition;
         OptionalLong publishTime;
@@ -192,8 +188,7 @@ final class TopicCompactionRowPublisher
             publishTime = OptionalLong.empty();
             eventTime = OptionalLong.empty();
         } else {
-            CompactionRecord record = DefaultTopicCompactionEngine.validateDecoded(
-                    decoded.orElseThrow(), offset);
+            CompactionRecord record = DefaultTopicCompactionEngine.validateDecoded(decoded.orElseThrow(), offset);
             byte[] rawKey = DefaultTopicCompactionEngine.bytes(record.compactionKey());
             if (rawKey.length > maxKeyBytes) {
                 throw execution(
@@ -208,9 +203,7 @@ final class TopicCompactionRowPublisher
             publishTime = record.publishTimeMillis();
             eventTime = record.eventTimeMillis();
         }
-        byte[] payload = disposition == CompactionDisposition.VALUE
-                ? exactPayload
-                : new byte[0];
+        byte[] payload = disposition == CompactionDisposition.VALUE ? exactPayload : new byte[0];
         return new CompactedObjectRow(
                 offset,
                 ByteBuffer.wrap(payload),
@@ -271,22 +264,27 @@ final class TopicCompactionRowPublisher
         try {
             serial.execute(action);
         } catch (RejectedExecutionException failure) {
-            fail(new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    "topic-compaction callback executor rejected admitted work",
-                    failure), true);
+            fail(
+                    new NereusException(
+                            ErrorCode.STORAGE_CLOSED,
+                            false,
+                            "topic-compaction callback executor rejected admitted work",
+                            failure),
+                    true);
         }
     }
 
     private static void reject(Flow.Subscriber<?> subscriber) {
         try {
             subscriber.onSubscribe(new Flow.Subscription() {
-                @Override public void request(long count) { }
-                @Override public void cancel() { }
+                @Override
+                public void request(long count) {}
+
+                @Override
+                public void cancel() {}
             });
-            subscriber.onError(new IllegalStateException(
-                    "topic-compaction row publisher permits exactly one subscriber"));
+            subscriber.onError(
+                    new IllegalStateException("topic-compaction row publisher permits exactly one subscriber"));
         } catch (Throwable ignored) {
         }
     }
@@ -297,18 +295,12 @@ final class TopicCompactionRowPublisher
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static MaterializationExecutionException execution(
-            TaskFailureClass failureClass,
-            ErrorCode code,
-            boolean retriable,
-            String message,
-            Throwable cause) {
-        return new MaterializationExecutionException(
-                failureClass, code, retriable, message, cause);
+            TaskFailureClass failureClass, ErrorCode code, boolean retriable, String message, Throwable cause) {
+        return new MaterializationExecutionException(failureClass, code, retriable, message, cause);
     }
 
     private final class BatchSubscriber implements Flow.Subscriber<ReadBatch> {
@@ -318,8 +310,7 @@ final class TopicCompactionRowPublisher
                 if (terminal || upstream != null) {
                     subscription.cancel();
                     if (!terminal) {
-                        fail(new IllegalStateException(
-                                "topic-compaction pass two subscribed more than once"), true);
+                        fail(new IllegalStateException("topic-compaction pass two subscribed more than once"), true);
                     }
                     return;
                 }

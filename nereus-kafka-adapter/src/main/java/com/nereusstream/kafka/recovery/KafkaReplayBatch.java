@@ -1,9 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.recovery;
 
 import java.util.Arrays;
 
-/** One exact committed Kafka batch supplied to the recovery state codec. */
+/**
+ * One exact committed Kafka batch supplied to the recovery state codec.
+ */
 public record KafkaReplayBatch(long baseOffset, long lastOffset, byte[] encodedBatch) {
     public KafkaReplayBatch {
         if (baseOffset < 0 || lastOffset < baseOffset || encodedBatch == null || encodedBatch.length == 0) {
@@ -19,10 +22,11 @@ public record KafkaReplayBatch(long baseOffset, long lastOffset, byte[] encodedB
 
     @Override
     public boolean equals(Object other) {
-        return this == other || other instanceof KafkaReplayBatch that
-                && baseOffset == that.baseOffset
-                && lastOffset == that.lastOffset
-                && Arrays.equals(encodedBatch, that.encodedBatch);
+        return this == other
+                || other instanceof KafkaReplayBatch that
+                        && baseOffset == that.baseOffset
+                        && lastOffset == that.lastOffset
+                        && Arrays.equals(encodedBatch, that.encodedBatch);
     }
 
     @Override

@@ -17,7 +17,6 @@ package com.nereusstream.objectstore.wal;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectId;
-import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.SchemaRef;
 import com.nereusstream.api.StreamId;
@@ -44,8 +43,7 @@ public final class WalObjectLayout {
     static final int CHECKSUM_ZERO_OFFSET = 36;
     static final int OBJECT_CHECKSUM_OFFSET = 40;
 
-    private WalObjectLayout() {
-    }
+    private WalObjectLayout() {}
 
     public record Section(int type, byte[] payload) {
         public Section {
@@ -67,10 +65,7 @@ public final class WalObjectLayout {
     }
 
     public record DecodedObject(
-            ObjectId objectId,
-            long objectLength,
-            Checksum objectChecksum,
-            List<StreamSliceDescriptor> slices) {
+            ObjectId objectId, long objectLength, Checksum objectChecksum, List<StreamSliceDescriptor> slices) {
         public DecodedObject {
             Objects.requireNonNull(objectId, "objectId");
             Objects.requireNonNull(objectChecksum, "objectChecksum");
@@ -81,10 +76,7 @@ public final class WalObjectLayout {
         }
     }
 
-    static EncodedObject encodeObject(
-            List<Section> sections,
-            long footerOffset,
-            int footerLength) {
+    static EncodedObject encodeObject(List<Section> sections, long footerOffset, int footerLength) {
         Objects.requireNonNull(sections, "sections");
         int objectLength = checkedIntLength(footerOffset, footerLength);
         byte[] bytes = assemble(sections, footerOffset, footerLength, 0, 0, objectLength);
@@ -92,10 +84,7 @@ public final class WalObjectLayout {
         bytes = assemble(sections, footerOffset, footerLength, headerChecksum, 0, objectLength);
         int objectChecksum = objectChecksum(bytes);
         bytes = assemble(sections, footerOffset, footerLength, headerChecksum, objectChecksum, objectLength);
-        return new EncodedObject(
-                bytes,
-                Crc32cChecksums.checksum(objectChecksum),
-                Crc32cChecksums.checksum(bytes));
+        return new EncodedObject(bytes, Crc32cChecksums.checksum(objectChecksum), Crc32cChecksums.checksum(bytes));
     }
 
     public static DecodedObject decode(byte[] bytes) {
@@ -138,8 +127,10 @@ public final class WalObjectLayout {
         if (headerLength != COMMON_HEADER_LENGTH || encryptionLength != 0) {
             throw WalBinary.corrupt("unsupported WAL object header shape");
         }
-        if (footerOffset < COMMON_HEADER_LENGTH || footerLength <= SECTION_HEADER_LENGTH
-                || footerOffset > bytes.length || footerLength > bytes.length - footerOffset) {
+        if (footerOffset < COMMON_HEADER_LENGTH
+                || footerLength <= SECTION_HEADER_LENGTH
+                || footerOffset > bytes.length
+                || footerLength > bytes.length - footerOffset) {
             throw WalBinary.corrupt("footer bounds exceed object length");
         }
         if (storedHeaderChecksum != headerChecksum(bytes)) {
@@ -175,11 +166,7 @@ public final class WalObjectLayout {
             descriptors.add(descriptor);
         }
         footerReader.requireFullyConsumed();
-        return new DecodedObject(
-                objectId,
-                bytes.length,
-                Crc32cChecksums.checksum(storedObjectChecksum),
-                descriptors);
+        return new DecodedObject(objectId, bytes.length, Crc32cChecksums.checksum(storedObjectChecksum), descriptors);
     }
 
     static byte[] encodeWalObjectHeader(
@@ -280,11 +267,7 @@ public final class WalObjectLayout {
     }
 
     private static void putCommonHeader(
-            byte[] bytes,
-            long footerOffset,
-            int footerLength,
-            int headerChecksum,
-            int objectChecksum) {
+            byte[] bytes, long footerOffset, int footerLength, int headerChecksum, int objectChecksum) {
         System.arraycopy(MAGIC, 0, bytes, 0, MAGIC.length);
         putInt(bytes, 4, FORMAT_MAJOR);
         putInt(bytes, 8, FORMAT_MINOR);
@@ -318,7 +301,8 @@ public final class WalObjectLayout {
             if (bytes.length - offset < SECTION_HEADER_LENGTH) {
                 throw WalBinary.corrupt("truncated section header");
             }
-            ByteBuffer sectionHeader = ByteBuffer.wrap(bytes, offset, SECTION_HEADER_LENGTH).order(ByteOrder.LITTLE_ENDIAN);
+            ByteBuffer sectionHeader =
+                    ByteBuffer.wrap(bytes, offset, SECTION_HEADER_LENGTH).order(ByteOrder.LITTLE_ENDIAN);
             int type = sectionHeader.getInt();
             int version = sectionHeader.getInt();
             int length = sectionHeader.getInt();
@@ -326,10 +310,8 @@ public final class WalObjectLayout {
             if (version != 1 || length < 0 || length > bytes.length - offset - SECTION_HEADER_LENGTH) {
                 throw WalBinary.corrupt("invalid section header");
             }
-            byte[] payload = Arrays.copyOfRange(
-                    bytes,
-                    offset + SECTION_HEADER_LENGTH,
-                    offset + SECTION_HEADER_LENGTH + length);
+            byte[] payload =
+                    Arrays.copyOfRange(bytes, offset + SECTION_HEADER_LENGTH, offset + SECTION_HEADER_LENGTH + length);
             if (checksum != Crc32cChecksums.intValue(Crc32cChecksums.checksum(payload))) {
                 throw WalBinary.corrupt("section checksum mismatch");
             }
@@ -420,11 +402,15 @@ public final class WalObjectLayout {
     }
 
     private static void putInt(byte[] bytes, int offset, int value) {
-        ByteBuffer.wrap(bytes, offset, Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN).putInt(value);
+        ByteBuffer.wrap(bytes, offset, Integer.BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .putInt(value);
     }
 
     private static void putLong(byte[] bytes, int offset, long value) {
-        ByteBuffer.wrap(bytes, offset, Long.BYTES).order(ByteOrder.LITTLE_ENDIAN).putLong(value);
+        ByteBuffer.wrap(bytes, offset, Long.BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .putLong(value);
     }
 
     private record SectionWithOffset(int offset, int type, byte[] payload) {

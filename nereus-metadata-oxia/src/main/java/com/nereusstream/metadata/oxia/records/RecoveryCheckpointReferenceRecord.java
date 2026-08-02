@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectKeyHash;
 
-/** One immutable NRC1 object referenced by the per-stream recovery root. */
+/**
+ * One immutable NRC1 object referenced by the per-stream recovery root.
+ */
 public record RecoveryCheckpointReferenceRecord(
         long checkpointSequence,
         String checkpointAttemptId,
@@ -45,8 +48,8 @@ public record RecoveryCheckpointReferenceRecord(
         if (sourceHeadCommitVersion < lastCommitVersion) {
             throw new IllegalArgumentException("source head version cannot precede checkpoint coverage");
         }
-        projectionIdentitySha256 = F4RecordValidation.requireSha256(
-                projectionIdentitySha256, "projectionIdentitySha256");
+        projectionIdentitySha256 =
+                F4RecordValidation.requireSha256(projectionIdentitySha256, "projectionIdentitySha256");
         objectId = F4RecordValidation.requireText(objectId, "objectId");
         objectKey = F4RecordValidation.requireText(objectKey, "objectKey");
         objectKeyHash = F4RecordValidation.requireText(objectKeyHash, "objectKeyHash");

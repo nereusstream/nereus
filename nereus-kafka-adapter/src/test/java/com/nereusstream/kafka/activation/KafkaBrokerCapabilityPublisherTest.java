@@ -1,6 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import java.time.Clock;
@@ -14,9 +17,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 class KafkaBrokerCapabilityPublisherTest {
     private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
 
@@ -27,11 +27,7 @@ class KafkaBrokerCapabilityPublisherTest {
         CountDownLatch failureObserved = new CountDownLatch(1);
         AtomicReference<Throwable> failure = new AtomicReference<>();
         KafkaBrokerCapabilityPublisher publisher = new KafkaBrokerCapabilityPublisher(
-                store,
-                KafkaActivationTestSupport.specification(3),
-                scheduler,
-                CLOCK,
-                exact -> {
+                store, KafkaActivationTestSupport.specification(3), scheduler, CLOCK, exact -> {
                     failure.set(exact);
                     failureObserved.countDown();
                 });
@@ -39,7 +35,8 @@ class KafkaBrokerCapabilityPublisherTest {
             long initialVersion = publisher.start().toCompletableFuture().join().metadataVersion();
             awaitHeartbeats(store, 2);
             assertThat(publisher.current().orElseThrow().metadataVersion()).isGreaterThan(initialVersion);
-            assertThat(publisher.current().orElseThrow().value().heartbeatAtMillis()).isGreaterThan(10_000);
+            assertThat(publisher.current().orElseThrow().value().heartbeatAtMillis())
+                    .isGreaterThan(10_000);
 
             store.failHeartbeats();
             assertThat(failureObserved.await(2, TimeUnit.SECONDS)).isTrue();
@@ -56,7 +53,8 @@ class KafkaBrokerCapabilityPublisherTest {
     @Test
     void rejectsASecondRuntimeUsingTheSameBrokerEpoch() {
         InMemoryKafkaStorageActivationStore store = new InMemoryKafkaStorageActivationStore();
-        store.createCapability(KafkaActivationTestSupport.specification(3).initialRecord(10_000)).join();
+        store.createCapability(KafkaActivationTestSupport.specification(3).initialRecord(10_000))
+                .join();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         KafkaBrokerCapabilitySpecification conflicting = new KafkaBrokerCapabilitySpecification(
                 KafkaActivationTestSupport.CLUSTER,
@@ -72,15 +70,14 @@ class KafkaBrokerCapabilityPublisherTest {
                 KafkaActivationTestSupport.bytes(3),
                 java.time.Duration.ofMillis(10),
                 java.time.Duration.ofMillis(100));
-        KafkaBrokerCapabilityPublisher publisher = new KafkaBrokerCapabilityPublisher(
-                store, conflicting, scheduler, CLOCK, ignored -> { });
+        KafkaBrokerCapabilityPublisher publisher =
+                new KafkaBrokerCapabilityPublisher(store, conflicting, scheduler, CLOCK, ignored -> {});
         try {
             assertThatThrownBy(() -> publisher.start().toCompletableFuture().join())
                     .satisfies(failure -> {
                         Throwable exact = unwrap(failure);
                         assertThat(exact).isInstanceOf(NereusException.class);
-                        assertThat(((NereusException) exact).code())
-                                .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION);
+                        assertThat(((NereusException) exact).code()).isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION);
                     });
         } finally {
             publisher.close();

@@ -17,7 +17,9 @@ package com.nereusstream.objectstore.staging;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.objectstore.ReplayableObjectUpload;
 
-/** Sealed, close-owned private file that can be replayed for provider upload attempts. */
+/**
+ * Sealed, close-owned private file that can be replayed for provider upload attempts.
+ */
 public interface StagedObjectFile extends ReplayableObjectUpload {
     long sealedLength();
 

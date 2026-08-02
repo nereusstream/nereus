@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -6,7 +7,9 @@ import com.nereusstream.api.ReadView;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable policy identity copied into every planned task and publication. */
+/**
+ * Immutable policy identity copied into every planned task and publication.
+ */
 public record MaterializationPolicy(
         String policyId,
         long policyVersion,
@@ -27,8 +30,7 @@ public record MaterializationPolicy(
     public static final String COMMITTED_FORMAT = "NEREUS_COMPACTED_PARQUET_V1";
     public static final String KAFKA_COMMITTED_FORMAT = "NEREUS_COMPACTED_PARQUET_V2";
     public static final String TOPIC_COMPACTED_FORMAT = "NEREUS_TOPIC_COMPACTED_PARQUET_V1";
-    public static final String KAFKA_TOPIC_COMPACTED_FORMAT =
-            "NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2";
+    public static final String KAFKA_TOPIC_COMPACTED_FORMAT = "NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2";
 
     public MaterializationPolicy {
         policyId = requireText(policyId, "policyId");
@@ -40,13 +42,18 @@ public record MaterializationPolicy(
         targetPhysicalFormat = requireText(targetPhysicalFormat, "targetPhysicalFormat");
         compression = requireText(compression, "compression");
         topicCompaction = Objects.requireNonNull(topicCompaction, "topicCompaction");
-        if (maxSourceRanges <= 0 || maxSourceRanges > MAX_SOURCE_RANGES
-                || minMergeSourceRanges < 2 || minMergeSourceRanges > maxSourceRanges) {
+        if (maxSourceRanges <= 0
+                || maxSourceRanges > MAX_SOURCE_RANGES
+                || minMergeSourceRanges < 2
+                || minMergeSourceRanges > maxSourceRanges) {
             throw new IllegalArgumentException("source range limits are invalid");
         }
-        if (maxRangeRecords <= 0 || maxRangeRecords > MAX_RANGE_RECORDS
-                || targetObjectBytes <= 0 || targetObjectBytes > MAX_TARGET_OBJECT_BYTES
-                || targetRowGroupRecords <= 0 || targetRowGroupRecords > MAX_ROW_GROUP_RECORDS) {
+        if (maxRangeRecords <= 0
+                || maxRangeRecords > MAX_RANGE_RECORDS
+                || targetObjectBytes <= 0
+                || targetObjectBytes > MAX_TARGET_OBJECT_BYTES
+                || targetRowGroupRecords <= 0
+                || targetRowGroupRecords > MAX_ROW_GROUP_RECORDS) {
             throw new IllegalArgumentException("materialization object/range limits are invalid");
         }
         if (!compression.equals("ZSTD") && !compression.equals("UNCOMPRESSED")) {
@@ -66,13 +73,11 @@ public record MaterializationPolicy(
     }
 
     public static boolean isLosslessCommittedFormat(String physicalFormat) {
-        return COMMITTED_FORMAT.equals(physicalFormat)
-                || KAFKA_COMMITTED_FORMAT.equals(physicalFormat);
+        return COMMITTED_FORMAT.equals(physicalFormat) || KAFKA_COMMITTED_FORMAT.equals(physicalFormat);
     }
 
     public static boolean isTopicCompactedFormat(String physicalFormat) {
-        return TOPIC_COMPACTED_FORMAT.equals(physicalFormat)
-                || KAFKA_TOPIC_COMPACTED_FORMAT.equals(physicalFormat);
+        return TOPIC_COMPACTED_FORMAT.equals(physicalFormat) || KAFKA_TOPIC_COMPACTED_FORMAT.equals(physicalFormat);
     }
 
     public Checksum digestSha256() {

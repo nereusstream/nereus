@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -23,7 +24,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Proves that a healthier current TOPIC_COMPACTED generation supersedes one source range. */
+/**
+ * Proves that a healthier current TOPIC_COMPACTED generation supersedes one source range.
+ */
 final class TopicCompactedReplacementVerifier {
     private final String cluster;
     private final GenerationMetadataStore generations;
@@ -43,32 +46,21 @@ final class TopicCompactedReplacementVerifier {
         this.keys = new F4Keyspace(cluster);
     }
 
-    CompletableFuture<ReplacementProof> prove(
-            GcReferenceQuery query,
-            VersionedGenerationIndex source) {
+    CompletableFuture<ReplacementProof> prove(GcReferenceQuery query, VersionedGenerationIndex source) {
         Objects.requireNonNull(query, "query");
         Objects.requireNonNull(source, "source");
         requireSource(source);
-        return scan(
-                        source,
-                        Optional.empty(),
-                        null,
-                        0,
-                        new ArrayList<>())
-                .thenCompose(candidates -> {
-                    List<VersionedGenerationIndex> preferred = candidates.stream()
-                            .sorted(Comparator
-                                    .comparingLong((VersionedGenerationIndex value) ->
-                                            value.value().generation())
-                                    .reversed()
-                                    .thenComparingLong(value ->
-                                            Math.subtractExact(
-                                                    value.value().offsetEnd(),
-                                                    value.value().offsetStart()))
-                                    .thenComparing(VersionedGenerationIndex::key))
-                            .toList();
-                    return select(query, source, preferred, 0);
-                });
+        return scan(source, Optional.empty(), null, 0, new ArrayList<>()).thenCompose(candidates -> {
+            List<VersionedGenerationIndex> preferred = candidates.stream()
+                    .sorted(Comparator.comparingLong((VersionedGenerationIndex value) ->
+                                    value.value().generation())
+                            .reversed()
+                            .thenComparingLong(value -> Math.subtractExact(
+                                    value.value().offsetEnd(), value.value().offsetStart()))
+                            .thenComparing(VersionedGenerationIndex::key))
+                    .toList();
+            return select(query, source, preferred, 0);
+        });
     }
 
     private CompletableFuture<List<VersionedGenerationIndex>> scan(
@@ -78,11 +70,10 @@ final class TopicCompactedReplacementVerifier {
             int observed,
             List<VersionedGenerationIndex> candidates) {
         int remaining = config.maxAuthoritiesPerDomainSnapshot() - observed;
-        int limit = remaining == 0
-                ? 1
-                : Math.min(config.metadataScanPageSize(), remaining);
+        int limit = remaining == 0 ? 1 : Math.min(config.metadataScanPageSize(), remaining);
         StreamId stream = new StreamId(source.value().streamId());
-        return generations.scanIndex(
+        return generations
+                .scanIndex(
                         cluster,
                         stream,
                         ReadView.TOPIC_COMPACTED,
@@ -94,13 +85,13 @@ final class TopicCompactedReplacementVerifier {
                     requireProgress(page, previousKey);
                     int nextObserved = Math.addExact(observed, page.values().size());
                     if (nextObserved > config.maxAuthoritiesPerDomainSnapshot()) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "TOPIC_COMPACTED replacement scan exceeded its authority bound"));
+                        return CompletableFuture.failedFuture(
+                                invariant("TOPIC_COMPACTED replacement scan exceeded its authority bound"));
                     }
                     for (VersionedGenerationCandidate candidate : page.values()) {
                         if (!(candidate instanceof VersionedGenerationIndex higher)) {
-                            return CompletableFuture.failedFuture(invariant(
-                                    "TOPIC_COMPACTED namespace returned a generation-zero index"));
+                            return CompletableFuture.failedFuture(
+                                    invariant("TOPIC_COMPACTED namespace returned a generation-zero index"));
                         }
                         requireScannedIdentity(stream, higher);
                         if (covers(source.value(), higher.value())) {
@@ -111,8 +102,8 @@ final class TopicCompactedReplacementVerifier {
                         return CompletableFuture.completedFuture(List.copyOf(candidates));
                     }
                     if (nextObserved >= config.maxAuthoritiesPerDomainSnapshot()) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "TOPIC_COMPACTED replacement scan exceeded its authority bound"));
+                        return CompletableFuture.failedFuture(
+                                invariant("TOPIC_COMPACTED replacement scan exceeded its authority bound"));
                     }
                     return scan(
                             source,
@@ -129,34 +120,28 @@ final class TopicCompactedReplacementVerifier {
             List<VersionedGenerationIndex> candidates,
             int index) {
         if (index == candidates.size()) {
-            return CompletableFuture.failedFuture(condition(
-                    "TOPIC_COMPACTED source has no current healthy same-view replacement"));
+            return CompletableFuture.failedFuture(
+                    condition("TOPIC_COMPACTED source has no current healthy same-view replacement"));
         }
         VersionedGenerationIndex candidate = candidates.get(index);
         return targets.loadCurrentHealthy(query, candidate).thenCompose(optional -> {
             if (optional.isEmpty()) {
                 return select(query, source, candidates, index + 1);
             }
-            RecoveryReplacementVerifier.HealthyReplacement replacement =
-                    optional.orElseThrow();
+            RecoveryReplacementVerifier.HealthyReplacement replacement = optional.orElseThrow();
             return targets.revalidateSameView(replacement)
                     .thenCompose(ignored -> reloadSource(source))
                     .thenApply(ignored -> new ReplacementProof(source, replacement));
         });
     }
 
-    private CompletableFuture<Void> reloadSource(
-            VersionedGenerationIndex source) {
+    private CompletableFuture<Void> reloadSource(VersionedGenerationIndex source) {
         GenerationIndexRecord value = source.value();
         GenerationIndexIdentity identity = new GenerationIndexIdentity(
-                new StreamId(value.streamId()),
-                ReadView.TOPIC_COMPACTED,
-                value.offsetEnd(),
-                value.generation());
+                new StreamId(value.streamId()), ReadView.TOPIC_COMPACTED, value.offsetEnd(), value.generation());
         return generations.getIndex(cluster, identity).thenAccept(reloaded -> {
             if (!reloaded.equals(Optional.of(source))) {
-                throw condition(
-                        "TOPIC_COMPACTED source changed while replacement facts were frozen");
+                throw condition("TOPIC_COMPACTED source changed while replacement facts were frozen");
             }
         });
     }
@@ -164,16 +149,12 @@ final class TopicCompactedReplacementVerifier {
     private void requireSource(VersionedGenerationIndex source) {
         GenerationIndexRecord value = source.value();
         StreamId stream = new StreamId(value.streamId());
-        String expectedKey = keys.generationIndexKey(
-                stream,
-                ReadView.TOPIC_COMPACTED,
-                value.offsetEnd(),
-                value.generation());
+        String expectedKey =
+                keys.generationIndexKey(stream, ReadView.TOPIC_COMPACTED, value.offsetEnd(), value.generation());
         if (value.readViewId() != ReadView.TOPIC_COMPACTED.wireId()
                 || !source.key().equals(expectedKey)
-                || !source.durableValueSha256().equals(
-                        GenerationIndexDigests.durableValueSha256(
-                                value.withMetadataVersion(0)))
+                || !source.durableValueSha256()
+                        .equals(GenerationIndexDigests.durableValueSha256(value.withMetadataVersion(0)))
                 || (value.lifecycle() != GenerationLifecycle.COMMITTED
                         && value.lifecycle() != GenerationLifecycle.QUARANTINED
                         && value.lifecycle() != GenerationLifecycle.DRAINING)) {
@@ -181,48 +162,36 @@ final class TopicCompactedReplacementVerifier {
         }
     }
 
-    private void requireScannedIdentity(
-            StreamId stream,
-            VersionedGenerationIndex candidate) {
+    private void requireScannedIdentity(StreamId stream, VersionedGenerationIndex candidate) {
         GenerationIndexRecord value = candidate.value();
-        String expectedKey = keys.generationIndexKey(
-                stream,
-                ReadView.TOPIC_COMPACTED,
-                value.offsetEnd(),
-                value.generation());
+        String expectedKey =
+                keys.generationIndexKey(stream, ReadView.TOPIC_COMPACTED, value.offsetEnd(), value.generation());
         if (!value.streamId().equals(stream.value())
                 || value.readViewId() != ReadView.TOPIC_COMPACTED.wireId()
                 || !candidate.key().equals(expectedKey)
-                || !candidate.durableValueSha256().equals(
-                        GenerationIndexDigests.durableValueSha256(
-                                value.withMetadataVersion(0)))) {
+                || !candidate
+                        .durableValueSha256()
+                        .equals(GenerationIndexDigests.durableValueSha256(value.withMetadataVersion(0)))) {
             throw invariant("TOPIC_COMPACTED replacement scan returned a non-canonical index");
         }
     }
 
-    private static boolean covers(
-            GenerationIndexRecord source,
-            GenerationIndexRecord candidate) {
+    private static boolean covers(GenerationIndexRecord source, GenerationIndexRecord candidate) {
         return candidate.lifecycle() == GenerationLifecycle.COMMITTED
                 && candidate.generation() > source.generation()
                 && candidate.offsetStart() <= source.offsetStart()
                 && candidate.offsetEnd() >= source.offsetEnd()
                 && candidate.firstCommitVersion() <= source.firstCommitVersion()
                 && candidate.lastCommitVersion() >= source.lastCommitVersion()
-                && candidate.cumulativeSizeAtStart()
-                        <= source.cumulativeSizeAtStart()
-                && candidate.cumulativeSizeAtEnd()
-                        >= source.cumulativeSizeAtEnd()
+                && candidate.cumulativeSizeAtStart() <= source.cumulativeSizeAtStart()
+                && candidate.cumulativeSizeAtEnd() >= source.cumulativeSizeAtEnd()
                 && candidate.payloadFormat().equals(source.payloadFormat())
                 && candidate.projectionRef().equals(source.projectionRef());
     }
 
-    private static void requireProgress(
-            GenerationScanPage page,
-            String previousKey) {
+    private static void requireProgress(GenerationScanPage page, String previousKey) {
         if (page.continuation().isPresent() && page.values().isEmpty()) {
-            throw invariant(
-                    "TOPIC_COMPACTED replacement scan returned an empty continuation page");
+            throw invariant("TOPIC_COMPACTED replacement scan returned an empty continuation page");
         }
         if (previousKey != null
                 && !page.values().isEmpty()
@@ -240,8 +209,7 @@ final class TopicCompactedReplacementVerifier {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static NereusException condition(String message) {
@@ -249,8 +217,7 @@ final class TopicCompactedReplacementVerifier {
     }
 
     record ReplacementProof(
-            VersionedGenerationIndex source,
-            RecoveryReplacementVerifier.HealthyReplacement replacement) {
+            VersionedGenerationIndex source, RecoveryReplacementVerifier.HealthyReplacement replacement) {
         ReplacementProof {
             Objects.requireNonNull(source, "source");
             Objects.requireNonNull(replacement, "replacement");

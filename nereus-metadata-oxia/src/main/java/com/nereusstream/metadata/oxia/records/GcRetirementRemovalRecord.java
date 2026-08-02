@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.ObjectKeyHash;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** One exact metadata-removal fact retained by a durable GC retirement journal. */
+/**
+ * One exact metadata-removal fact retained by a durable GC retirement journal.
+ */
 public record GcRetirementRemovalRecord(
         int schemaVersion,
         String objectKeyHash,
@@ -20,14 +23,13 @@ public record GcRetirementRemovalRecord(
         new ObjectKeyHash(objectKeyHash);
         gcAttemptId = F4RecordValidation.requireBase32Id(gcAttemptId, "gcAttemptId");
         Objects.requireNonNull(removalType, "removalType");
-        if (removalType.length() > 128
-                || !removalType.matches("[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?")) {
+        if (removalType.length() > 128 || !removalType.matches("[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?")) {
             throw new IllegalArgumentException("removalType is not canonical");
         }
         removalKey = boundedKey(removalKey, "removalKey");
         F4RecordValidation.requireMetadataVersion(removalMetadataVersion);
-        removalDurableValueSha256 = F4RecordValidation.requireSha256(
-                removalDurableValueSha256, "removalDurableValueSha256");
+        removalDurableValueSha256 =
+                F4RecordValidation.requireSha256(removalDurableValueSha256, "removalDurableValueSha256");
         F4RecordValidation.requireMetadataVersion(metadataVersion);
     }
 

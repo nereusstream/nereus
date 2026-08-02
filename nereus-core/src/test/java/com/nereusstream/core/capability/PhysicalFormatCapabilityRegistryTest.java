@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.capability;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.PayloadFormat;
@@ -27,19 +27,16 @@ class PhysicalFormatCapabilityRegistryTest {
                 PayloadFormat.KAFKA_RECORD_BATCH,
                 true,
                 true);
-        PhysicalFormatCapabilityRegistry required =
-                new PhysicalFormatCapabilityRegistry(List.of(ncp2, ntc2));
-        PhysicalFormatCapabilityRegistry reversed =
-                new PhysicalFormatCapabilityRegistry(List.of(ntc2, ncp2));
-        PhysicalFormatCapabilityRegistry oldBroker =
-                new PhysicalFormatCapabilityRegistry(List.of());
+        PhysicalFormatCapabilityRegistry required = new PhysicalFormatCapabilityRegistry(List.of(ncp2, ntc2));
+        PhysicalFormatCapabilityRegistry reversed = new PhysicalFormatCapabilityRegistry(List.of(ntc2, ncp2));
+        PhysicalFormatCapabilityRegistry oldBroker = new PhysicalFormatCapabilityRegistry(List.of());
 
         assertThat(required.digestSha256()).isEqualTo(reversed.digestSha256());
         assertThat(required.digestSha256().value())
                 .isEqualTo("3c99feb81221497e1e1e7401766ecad898ace0cce2a68312c91bbec25b09bace");
         assertThatThrownBy(() -> oldBroker.requireSupersetOf(required))
-                .isInstanceOfSatisfying(NereusException.class,
-                        error -> assertThat(error.code()).isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET));
+                .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                        .isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET));
         reversed.requireSupersetOf(required);
     }
 }

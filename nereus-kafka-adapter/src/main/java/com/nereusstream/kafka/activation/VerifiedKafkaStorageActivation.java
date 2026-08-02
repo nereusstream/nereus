@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
 import com.nereusstream.metadata.oxia.VersionedKafkaBrokerCapability;
@@ -7,7 +8,9 @@ import com.nereusstream.metadata.oxia.VersionedKafkaStorageReadiness;
 import java.util.List;
 import java.util.Objects;
 
-/** Exact authority bundle admitted against one KRaft snapshot. */
+/**
+ * Exact authority bundle admitted against one KRaft snapshot.
+ */
 public record VerifiedKafkaStorageActivation(
         KafkaStorageClusterSnapshot clusterSnapshot,
         VersionedKafkaStorageProtocolActivation activation,

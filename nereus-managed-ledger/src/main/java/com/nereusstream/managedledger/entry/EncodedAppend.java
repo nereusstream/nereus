@@ -17,11 +17,10 @@ package com.nereusstream.managedledger.entry;
 import com.nereusstream.api.AppendBatch;
 import java.util.Objects;
 
-/** Immutable F2 append input plus the exact bytes retained for the Pulsar callback. */
-public record EncodedAppend(
-        AppendBatch appendBatch,
-        byte[] callbackBytes,
-        int numberOfMessages) {
+/**
+ * Immutable F2 append input plus the exact bytes retained for the Pulsar callback.
+ */
+public record EncodedAppend(AppendBatch appendBatch, byte[] callbackBytes, int numberOfMessages) {
     public EncodedAppend {
         Objects.requireNonNull(appendBatch, "appendBatch");
         callbackBytes = Objects.requireNonNull(callbackBytes, "callbackBytes").clone();

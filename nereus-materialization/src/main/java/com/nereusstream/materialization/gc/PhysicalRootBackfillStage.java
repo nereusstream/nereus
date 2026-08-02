@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
-/** Stable machine stage attached to a bounded physical-root backfill failure. */
+/**
+ * Stable machine stage attached to a bounded physical-root backfill failure.
+ */
 public enum PhysicalRootBackfillStage {
     REGISTRY_SCAN,
     PROJECTION_READ,

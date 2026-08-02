@@ -32,7 +32,9 @@ import java.util.zip.CRC32C;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
 
-/** Byte-for-byte codec between one Pulsar managed-ledger Entry and one L0 offset. */
+/**
+ * Byte-for-byte codec between one Pulsar managed-ledger Entry and one L0 offset.
+ */
 public final class PulsarEntryCodec {
     public static final String NUMBER_OF_MESSAGES_ATTRIBUTE = "pulsar.numberOfMessages";
     public static final String ENTRY_FORMAT_VERSION_ATTRIBUTE = "pulsar.entryFormatVersion";
@@ -115,8 +117,6 @@ public final class PulsarEntryCodec {
     private static Checksum crc32c(byte[] payload) {
         CRC32C crc32c = new CRC32C();
         crc32c.update(payload, 0, payload.length);
-        return new Checksum(
-                ChecksumType.CRC32C,
-                String.format(Locale.ROOT, "%08x", crc32c.getValue()));
+        return new Checksum(ChecksumType.CRC32C, String.format(Locale.ROOT, "%08x", crc32c.getValue()));
     }
 }

@@ -1,13 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.compacted.CompactedObjectRow;
-import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.List;
@@ -22,9 +23,10 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Sequential concat-map from exact source batches to opaque NCP1 rows with one-source-at-a-time memory. */
-final class LosslessMaterializationRowPublisher
-        implements Flow.Publisher<CompactedObjectRow>, AutoCloseable {
+/**
+ * Sequential concat-map from exact source batches to opaque NCP1 rows with one-source-at-a-time memory.
+ */
+final class LosslessMaterializationRowPublisher implements Flow.Publisher<CompactedObjectRow>, AutoCloseable {
     private final List<SourceGeneration> sources;
     private final ExactSourceRangeReader reader;
     private final ReadOptions readOptions;
@@ -85,9 +87,7 @@ final class LosslessMaterializationRowPublisher
                     public void cancel() {
                         cancellationRequested.set(true);
                         submit(() -> LosslessMaterializationRowPublisher.this.cancel(new NereusException(
-                                ErrorCode.CANCELLED,
-                                false,
-                                "materialization row subscriber cancelled")));
+                                ErrorCode.CANCELLED, false, "materialization row subscriber cancelled")));
                     }
                 });
             } catch (Throwable failure) {
@@ -99,10 +99,7 @@ final class LosslessMaterializationRowPublisher
     @Override
     public void close() {
         cancellationRequested.set(true);
-        submit(() -> cancel(new NereusException(
-                ErrorCode.CANCELLED,
-                false,
-                "materialization row publisher closed")));
+        submit(() -> cancel(new NereusException(ErrorCode.CANCELLED, false, "materialization row publisher closed")));
     }
 
     private void requestOnSerial(long count) {
@@ -119,8 +116,7 @@ final class LosslessMaterializationRowPublisher
 
     private void advance() {
         if (cancellationRequested.get() && !terminal) {
-            cancel(new NereusException(
-                    ErrorCode.CANCELLED, false, "materialization row subscriber cancelled"));
+            cancel(new NereusException(ErrorCode.CANCELLED, false, "materialization row subscriber cancelled"));
             return;
         }
         if (terminal || demand == 0 || opening != null) {
@@ -160,10 +156,12 @@ final class LosslessMaterializationRowPublisher
             }
             current = Objects.requireNonNull(opened, "exact source read");
             if (!current.source().equals(source)) {
-                fail(new NereusException(
-                        ErrorCode.METADATA_INVARIANT_VIOLATION,
-                        false,
-                        "exact reader returned another source identity"), true);
+                fail(
+                        new NereusException(
+                                ErrorCode.METADATA_INVARIANT_VIOLATION,
+                                false,
+                                "exact reader returned another source identity"),
+                        true);
                 return;
             }
             try {
@@ -192,10 +190,12 @@ final class LosslessMaterializationRowPublisher
             return;
         }
         if (!source.equals(sources.get(sourceIndex)) || !upstreamRequested || demand == 0) {
-            fail(new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION,
-                    false,
-                    "exact source publisher emitted outside downstream demand"), true);
+            fail(
+                    new NereusException(
+                            ErrorCode.METADATA_INVARIANT_VIOLATION,
+                            false,
+                            "exact source publisher emitted outside downstream demand"),
+                    true);
             return;
         }
         upstreamRequested = false;
@@ -209,8 +209,7 @@ final class LosslessMaterializationRowPublisher
             return;
         }
         if (cancellationRequested.get()) {
-            cancel(new NereusException(
-                    ErrorCode.CANCELLED, false, "materialization row subscriber cancelled"));
+            cancel(new NereusException(ErrorCode.CANCELLED, false, "materialization row subscriber cancelled"));
             return;
         }
         advance();
@@ -221,32 +220,34 @@ final class LosslessMaterializationRowPublisher
             return;
         }
         ExactSourceRead completed = current;
-        completed.completion().whenComplete((summary, failure) -> submit(() -> {
-            if (terminal || current != completed) {
-                completed.close();
-                return;
-            }
-            if (failure != null) {
-                fail(unwrap(failure), true);
-                return;
-            }
-            try {
-                requireSummary(source, summary);
-            } catch (Throwable validationFailure) {
-                fail(validationFailure, true);
-                return;
-            }
-            completed.close();
-            current = null;
-            upstream = null;
-            upstreamRequested = false;
-            sourceIndex++;
-            if (sourceIndex == sources.size()) {
-                complete();
-            } else {
-                advance();
-            }
-        }));
+        completed
+                .completion()
+                .whenComplete((summary, failure) -> submit(() -> {
+                    if (terminal || current != completed) {
+                        completed.close();
+                        return;
+                    }
+                    if (failure != null) {
+                        fail(unwrap(failure), true);
+                        return;
+                    }
+                    try {
+                        requireSummary(source, summary);
+                    } catch (Throwable validationFailure) {
+                        fail(validationFailure, true);
+                        return;
+                    }
+                    completed.close();
+                    current = null;
+                    upstream = null;
+                    upstreamRequested = false;
+                    sourceIndex++;
+                    if (sourceIndex == sources.size()) {
+                        complete();
+                    } else {
+                        advance();
+                    }
+                }));
     }
 
     private void sourceError(Throwable failure) {
@@ -327,9 +328,7 @@ final class LosslessMaterializationRowPublisher
                 Optional.empty());
     }
 
-    private static void requireSummary(
-            SourceGeneration source,
-            ExactSourceReadSummary summary) {
+    private static void requireSummary(SourceGeneration source, ExactSourceReadSummary summary) {
         if (!summary.coverage().equals(source.range())
                 || summary.recordCount() != source.recordCount()
                 || summary.entryCount() != source.entryCount()
@@ -346,11 +345,13 @@ final class LosslessMaterializationRowPublisher
             serial.execute(action);
         } catch (RejectedExecutionException failure) {
             if (!terminal) {
-                fail(new NereusException(
-                        ErrorCode.STORAGE_CLOSED,
-                        false,
-                        "materialization row executor rejected admitted work",
-                        failure), true);
+                fail(
+                        new NereusException(
+                                ErrorCode.STORAGE_CLOSED,
+                                false,
+                                "materialization row executor rejected admitted work",
+                                failure),
+                        true);
             }
         }
     }
@@ -358,8 +359,8 @@ final class LosslessMaterializationRowPublisher
     private static void reject(Flow.Subscriber<? super CompactedObjectRow> subscriber) {
         try {
             subscriber.onSubscribe(NoopSubscription.INSTANCE);
-            subscriber.onError(new IllegalStateException(
-                    "materialization row publisher permits exactly one subscriber"));
+            subscriber.onError(
+                    new IllegalStateException("materialization row publisher permits exactly one subscriber"));
         } catch (Throwable ignored) {
         }
     }
@@ -371,8 +372,7 @@ final class LosslessMaterializationRowPublisher
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while ((current instanceof CompletionException
-                        || current instanceof java.util.concurrent.ExecutionException)
+        while ((current instanceof CompletionException || current instanceof java.util.concurrent.ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -383,12 +383,10 @@ final class LosslessMaterializationRowPublisher
         INSTANCE;
 
         @Override
-        public void request(long count) {
-        }
+        public void request(long count) {}
 
         @Override
-        public void cancel() {
-        }
+        public void cancel() {}
     }
 
     private final class SourceSubscriber implements Flow.Subscriber<ReadBatch> {

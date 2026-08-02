@@ -21,8 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 final class StrictUtf8 {
-    private StrictUtf8() {
-    }
+    private StrictUtf8() {}
 
     static byte[] encode(String value) {
         return Objects.requireNonNull(value, "value").getBytes(StandardCharsets.UTF_8);
@@ -31,7 +30,8 @@ final class StrictUtf8 {
     static String decode(byte[] bytes, String fieldName) {
         Objects.requireNonNull(bytes, "bytes");
         try {
-            return StandardCharsets.UTF_8.newDecoder()
+            return StandardCharsets.UTF_8
+                    .newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .decode(ByteBuffer.wrap(bytes))

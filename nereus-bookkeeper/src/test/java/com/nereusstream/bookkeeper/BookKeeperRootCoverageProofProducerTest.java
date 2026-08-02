@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.StreamId;
@@ -24,28 +24,18 @@ final class BookKeeperRootCoverageProofProducerTest {
         BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
         BookKeeperLedgerIdNamespaceReservation namespace = namespace(configuration);
         try (FakeBookKeeperMetadataStore metadata = metadata(configuration)) {
-            metadata.createRoot(
-                    CLUSTER,
-                    root(configuration, namespace, candidate(configuration, 7), true))
+            metadata.createRoot(CLUSTER, root(configuration, namespace, candidate(configuration, 7), true))
                     .join();
-            metadata.createRoot(
-                    CLUSTER,
-                    root(configuration, namespace, candidate(configuration, 11), false))
+            metadata.createRoot(CLUSTER, root(configuration, namespace, candidate(configuration, 11), false))
                     .join();
-            BookKeeperRootCoverageProofProducer producer =
-                    new BookKeeperRootCoverageProofProducer(
-                            CLUSTER,
-                            configuration,
-                            namespace.ledgerIdNamespaceSha256().value(),
-                            metadata);
+            BookKeeperRootCoverageProofProducer producer = new BookKeeperRootCoverageProofProducer(
+                    CLUSTER, configuration, namespace.ledgerIdNamespaceSha256().value(), metadata);
             BookKeeperBrokerReadiness readiness = readiness();
 
-            BookKeeperRootCoverageProof first = producer
-                    .produce(readiness, Duration.ofSeconds(10))
-                    .join();
-            BookKeeperRootCoverageProof second = producer
-                    .produce(readiness, Duration.ofSeconds(10))
-                    .join();
+            BookKeeperRootCoverageProof first =
+                    producer.produce(readiness, Duration.ofSeconds(10)).join();
+            BookKeeperRootCoverageProof second =
+                    producer.produce(readiness, Duration.ofSeconds(10)).join();
 
             assertThat(first.shardsScanned()).isEqualTo(256);
             assertThat(first.rootsScanned()).isEqualTo(2);
@@ -104,18 +94,12 @@ final class BookKeeperRootCoverageProofProducerTest {
                     valid.stateReason(),
                     0);
             metadata.createRoot(CLUSTER, corrupt).join();
-            BookKeeperRootCoverageProofProducer producer =
-                    new BookKeeperRootCoverageProofProducer(
-                            CLUSTER,
-                            configuration,
-                            namespace.ledgerIdNamespaceSha256().value(),
-                            metadata);
+            BookKeeperRootCoverageProofProducer producer = new BookKeeperRootCoverageProofProducer(
+                    CLUSTER, configuration, namespace.ledgerIdNamespaceSha256().value(), metadata);
 
-            assertThatThrownBy(() -> producer
-                            .produce(readiness(), Duration.ofSeconds(10))
+            assertThatThrownBy(() -> producer.produce(readiness(), Duration.ofSeconds(10))
                             .join())
-                    .hasRootCauseMessage(
-                            "BookKeeper root custom-metadata digest cannot be reconstructed");
+                    .hasRootCauseMessage("BookKeeper root custom-metadata digest cannot be reconstructed");
         }
     }
 
@@ -127,12 +111,7 @@ final class BookKeeperRootCoverageProofProducerTest {
         String stream = "coverage-stream-" + ledgerId;
         String allocation = "coverage-allocation-" + ledgerId;
         BookKeeperLedgerCustomMetadata custom = BookKeeperLedgerCustomMetadata.create(
-                CLUSTER,
-                configuration,
-                namespace,
-                new StreamId(stream),
-                0,
-                allocation);
+                CLUSTER, configuration, namespace, new StreamId(stream), 0, allocation);
         BookKeeperKeyspace keys = metadataConfig(configuration).keyspace(CLUSTER);
         return new BookKeeperLedgerRootRecord(
                 1,
@@ -144,9 +123,7 @@ final class BookKeeperRootCoverageProofProducerTest {
                 0,
                 allocation,
                 0,
-                exactBinding
-                        ? configuration.configurationBindingSha256().value()
-                        : "aa".repeat(32),
+                exactBinding ? configuration.configurationBindingSha256().value() : "aa".repeat(32),
                 namespace.ledgerIdNamespaceSha256().value(),
                 false,
                 "coverage-writer",
@@ -186,14 +163,10 @@ final class BookKeeperRootCoverageProofProducerTest {
     }
 
     private static BookKeeperBrokerReadiness readiness() {
-        return new BookKeeperBrokerReadiness(
-                9,
-                new Checksum(ChecksumType.SHA256, "88".repeat(32)),
-                2);
+        return new BookKeeperBrokerReadiness(9, new Checksum(ChecksumType.SHA256, "88".repeat(32)), 2);
     }
 
-    private static BookKeeperLedgerIdNamespaceReservation namespace(
-            BookKeeperWalConfiguration configuration) {
+    private static BookKeeperLedgerIdNamespaceReservation namespace(BookKeeperWalConfiguration configuration) {
         return new BookKeeperLedgerIdNamespaceReservation(
                 1,
                 configuration.ledgerIdNamespaceReservationId(),
@@ -212,8 +185,7 @@ final class BookKeeperRootCoverageProofProducerTest {
                 "/bookkeeper/coverage-reservation");
     }
 
-    private static BookKeeperMetadataStoreConfig metadataConfig(
-            BookKeeperWalConfiguration configuration) {
+    private static BookKeeperMetadataStoreConfig metadataConfig(BookKeeperWalConfiguration configuration) {
         return new BookKeeperMetadataStoreConfig(
                 configuration.maxAppendRangesPerLedger(),
                 configuration.protectionSlotsPerRange(),
@@ -221,8 +193,7 @@ final class BookKeeperRootCoverageProofProducerTest {
                 configuration.maxUncertainAllocations());
     }
 
-    private static FakeBookKeeperMetadataStore metadata(
-            BookKeeperWalConfiguration configuration) {
+    private static FakeBookKeeperMetadataStore metadata(BookKeeperWalConfiguration configuration) {
         return new FakeBookKeeperMetadataStore(metadataConfig(configuration));
     }
 }

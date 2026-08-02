@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.SchemaRef;
 import java.util.List;
 import java.util.Objects;
 
-/** Immutable source-index snapshot embedded in one materialization task. */
+/**
+ * Immutable source-index snapshot embedded in one materialization task.
+ */
 public record SourceGenerationRecord(
         int readViewId,
         long offsetStart,
@@ -38,8 +41,8 @@ public record SourceGenerationRecord(
         indexRecordSha256 = F4RecordValidation.requireSha256(indexRecordSha256, "indexRecordSha256");
         Objects.requireNonNull(readTarget, "readTarget");
         targetIdentitySha256 = F4RecordValidation.requireSha256(targetIdentitySha256, "targetIdentitySha256");
-        materializationPolicySha256 = F4RecordValidation.requireOptionalSha256(
-                materializationPolicySha256, "materializationPolicySha256");
+        materializationPolicySha256 =
+                F4RecordValidation.requireOptionalSha256(materializationPolicySha256, "materializationPolicySha256");
         if ((generation == 0) != materializationPolicySha256.isEmpty()) {
             throw new IllegalArgumentException("source policy digest presence must match generation zero");
         }

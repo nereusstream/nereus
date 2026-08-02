@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Stable source of the first durable checkpoint quarantine decision. */
+/**
+ * Stable source of the first durable checkpoint quarantine decision.
+ */
 public enum KafkaCheckpointFailureSource {
     RECOVERY(1),
     RETENTION(2);

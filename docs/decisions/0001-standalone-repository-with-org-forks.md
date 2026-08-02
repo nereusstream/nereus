@@ -8,7 +8,8 @@ is refined by ADR 0005.
 
 ## Context
 
-Nereus must integrate deeply with Apache Pulsar and KoP and, for F9, Apache Kafka, but the product should have its own GitHub
+Nereus must integrate deeply with Apache Pulsar and KoP and, for F9, Apache Kafka, but the product should have its own
+GitHub
 identity, contribution graph, release history, and commercial packaging boundary.
 
 Long-lived development directly inside an Apache Pulsar fork would make Nereus look like a Pulsar branch

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -33,7 +34,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Activates fixed BookKeeper range protections under the exact generic commit/index owner. */
+/**
+ * Activates fixed BookKeeper range protections under the exact generic commit/index owner.
+ */
 public final class BookKeeperPrimaryPhysicalReferenceAdapter
         implements PrimaryPhysicalReferenceAdapter<BookKeeperEntryRangeReadTarget> {
     private final String cluster;
@@ -67,105 +70,87 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
 
     @Override
     public CompletableFuture<ProtectedStableAppend> protectBeforeHead(
-            PreparedStableAppend append,
-            BookKeeperEntryRangeReadTarget target,
-            Duration timeout) {
+            PreparedStableAppend append, BookKeeperEntryRangeReadTarget target, Duration timeout) {
         PreparedStableAppend prepared = Objects.requireNonNull(append, "append");
         BookKeeperEntryRangeReadTarget exactTarget = exactTarget(target);
         BookKeeperOperationDeadline deadline = deadline(timeout);
         String referenceId = reachableReferenceId(prepared);
-        return loadRoot(exactTarget, deadline)
-                .thenCompose(root -> {
-                    requireRoot(
-                            root.value(),
-                            prepared.request().streamId(),
+        return loadRoot(exactTarget, deadline).thenCompose(root -> {
+            requireRoot(root.value(), prepared.request().streamId(), exactTarget, !prepared.replayWasReachable());
+            return locateProtection(
                             exactTarget,
-                            !prepared.replayWasReachable());
-                    return locateProtection(
-                                    exactTarget,
-                                    prepared.request().streamId(),
-                                    prepared.request().expectedStartOffset(),
-                                    prepared.request().recordCount(),
-                                    BookKeeperProtectionType.REACHABLE_APPEND,
+                            prepared.request().streamId(),
+                            prepared.request().expectedStartOffset(),
+                            prepared.request().recordCount(),
+                            BookKeeperProtectionType.REACHABLE_APPEND,
+                            0,
+                            deadline,
+                            Optional.empty())
+                    .thenCompose(protection -> prepareReservation(protection, prepared, exactTarget)
+                            .thenCompose(reservation -> activate(
+                                    protection,
+                                    referenceId,
                                     0,
-                                    deadline,
-                                    Optional.empty())
-                            .thenCompose(protection -> prepareReservation(
-                                            protection,
-                                            prepared,
-                                            exactTarget)
-                                    .thenCompose(reservation -> activate(
-                                            protection,
-                                            referenceId,
-                                            0,
-                                            prepared.commitKey(),
-                                            prepared.commitMetadataVersion(),
-                                            prepared.commitRecordSha256().value())))
-                            .thenCompose(protection -> loadRoot(exactTarget, deadline)
-                                    .thenApply(reloaded -> {
-                                        requireRoot(
-                                                reloaded.value(),
-                                                prepared.request().streamId(),
-                                                exactTarget,
-                                                !prepared.replayWasReachable());
-                                        return new ProtectedStableAppend(
-                                                prepared,
-                                                proof(
-                                                        PhysicalReferencePurpose.REACHABLE_APPEND,
-                                                        ReadTargetIdentities.sha256(exactTarget),
-                                                        referenceId,
-                                                        reloaded,
-                                                        protection));
-                                    }));
-                });
+                                    prepared.commitKey(),
+                                    prepared.commitMetadataVersion(),
+                                    prepared.commitRecordSha256().value())))
+                    .thenCompose(protection -> loadRoot(exactTarget, deadline).thenApply(reloaded -> {
+                        requireRoot(
+                                reloaded.value(),
+                                prepared.request().streamId(),
+                                exactTarget,
+                                !prepared.replayWasReachable());
+                        return new ProtectedStableAppend(
+                                prepared,
+                                proof(
+                                        PhysicalReferencePurpose.REACHABLE_APPEND,
+                                        ReadTargetIdentities.sha256(exactTarget),
+                                        referenceId,
+                                        reloaded,
+                                        protection));
+                    }));
+        });
     }
 
     @Override
     public CompletableFuture<ProtectedGenerationZero> protectVisibleIndex(
-            MaterializedGenerationZero append,
-            BookKeeperEntryRangeReadTarget target,
-            Duration timeout) {
+            MaterializedGenerationZero append, BookKeeperEntryRangeReadTarget target, Duration timeout) {
         MaterializedGenerationZero materialized = Objects.requireNonNull(append, "append");
         BookKeeperEntryRangeReadTarget exactTarget = exactTarget(target);
         BookKeeperOperationDeadline deadline = deadline(timeout);
         var committed = materialized.committedAppend();
         String referenceId = visibleReferenceId(materialized);
-        return loadRoot(exactTarget, deadline)
-                .thenCompose(root -> {
-                    requireRoot(root.value(), committed.streamId(), exactTarget, false);
-                    return locateProtection(
-                                    exactTarget,
-                                    committed.streamId(),
-                                    committed.range().startOffset(),
-                                    committed.recordCount(),
-                                    BookKeeperProtectionType.VISIBLE_GENERATION,
-                                    1,
-                                    deadline,
-                                    Optional.empty())
-                            .thenCompose(protection -> commitReservation(
-                                            protection,
-                                            materialized,
-                                            exactTarget)
-                                    .thenCompose(reservation -> activate(
-                                            protection,
-                                            referenceId,
-                                            committed.commitVersion(),
-                                            materialized.indexKey(),
-                                            materialized.indexMetadataVersion(),
-                                            materialized.indexRecordSha256().value())))
-                            .thenCompose(protection -> loadRoot(exactTarget, deadline)
-                                    .thenApply(reloaded -> {
-                                        requireRoot(reloaded.value(), committed.streamId(), exactTarget, false);
-                                        return new ProtectedGenerationZero(
-                                                materialized,
-                                                proof(
-                                                        PhysicalReferencePurpose.VISIBLE_GENERATION,
-                                                        ReadTargetIdentities.sha256(exactTarget),
-                                                        referenceId,
-                                                        reloaded,
-                                                        protection));
-                                    }));
-                });
+        return loadRoot(exactTarget, deadline).thenCompose(root -> {
+            requireRoot(root.value(), committed.streamId(), exactTarget, false);
+            return locateProtection(
+                            exactTarget,
+                            committed.streamId(),
+                            committed.range().startOffset(),
+                            committed.recordCount(),
+                            BookKeeperProtectionType.VISIBLE_GENERATION,
+                            1,
+                            deadline,
+                            Optional.empty())
+                    .thenCompose(protection -> commitReservation(protection, materialized, exactTarget)
+                            .thenCompose(reservation -> activate(
+                                    protection,
+                                    referenceId,
+                                    committed.commitVersion(),
+                                    materialized.indexKey(),
+                                    materialized.indexMetadataVersion(),
+                                    materialized.indexRecordSha256().value())))
+                    .thenCompose(protection -> loadRoot(exactTarget, deadline).thenApply(reloaded -> {
+                        requireRoot(reloaded.value(), committed.streamId(), exactTarget, false);
+                        return new ProtectedGenerationZero(
+                                materialized,
+                                proof(
+                                        PhysicalReferencePurpose.VISIBLE_GENERATION,
+                                        ReadTargetIdentities.sha256(exactTarget),
+                                        referenceId,
+                                        reloaded,
+                                        protection));
+                    }));
+        });
     }
 
     private CompletableFuture<BookKeeperVersionedValue<BookKeeperAppendReservationRecord>> prepareReservation(
@@ -180,14 +165,17 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
                     prepared.commitMetadataVersion(),
                     prepared.commitRecordSha256().value());
             return findReservationByRange(
-                            prepared.request().streamId(), target, protection.value().ledgerRangeSlot())
+                            prepared.request().streamId(),
+                            target,
+                            protection.value().ledgerRangeSlot())
                     .thenApply(reservation -> {
                         requirePreparedReservation(reservation.value(), prepared);
                         requireCommitOwner(reservation.value(), prepared);
                         return reservation;
                     });
         }
-        return writerMetadata.getReservation(
+        return writerMetadata
+                .getReservation(
                         cluster,
                         prepared.request().streamId(),
                         protection.value().referenceId())
@@ -206,13 +194,11 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
                         return CompletableFuture.completedFuture(reservation);
                     }
                     if (reservation.value().lifecycle() != AppendReservationLifecycle.DURABLE) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "BookKeeper reservation is not durable before commit preparation"));
+                        return CompletableFuture.failedFuture(
+                                invariant("BookKeeper reservation is not durable before commit preparation"));
                     }
                     return writerMetadata.compareAndSetReservation(
-                            cluster,
-                            withPreparedCommit(reservation.value(), prepared),
-                            reservation.metadataVersion());
+                            cluster, withPreparedCommit(reservation.value(), prepared), reservation.metadataVersion());
                 });
     }
 
@@ -223,23 +209,30 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
         StreamId stream = materialized.committedAppend().streamId();
         CompletableFuture<BookKeeperVersionedValue<BookKeeperAppendReservationRecord>> reservationFuture =
                 protection.value().lifecycle() == ProtectionLifecycle.RESERVED
-                        ? writerMetadata.getReservation(cluster, stream, protection.value().referenceId())
+                        ? writerMetadata
+                                .getReservation(
+                                        cluster, stream, protection.value().referenceId())
                                 .thenApply(optional -> optional.orElseThrow(
                                         () -> invariant("BookKeeper reservation is absent at generation zero")))
-                        : findReservationByRange(stream, target, protection.value().ledgerRangeSlot());
+                        : findReservationByRange(
+                                stream, target, protection.value().ledgerRangeSlot());
         return reservationFuture.thenCompose(reservation -> {
-            requireReservation(reservation.value(), stream, target, protection.value().ledgerRangeSlot());
-            if (!reservation.value().commitId().equals(materialized.committedAppend().commitId())) {
-                return CompletableFuture.failedFuture(invariant(
-                        "BookKeeper reservation commit does not match generation zero"));
+            requireReservation(
+                    reservation.value(), stream, target, protection.value().ledgerRangeSlot());
+            if (!reservation
+                    .value()
+                    .commitId()
+                    .equals(materialized.committedAppend().commitId())) {
+                return CompletableFuture.failedFuture(
+                        invariant("BookKeeper reservation commit does not match generation zero"));
             }
             requireCommittedReservation(reservation.value(), materialized, target);
             if (reservation.value().lifecycle() == AppendReservationLifecycle.HEAD_COMMITTED) {
                 return CompletableFuture.completedFuture(reservation);
             }
             if (reservation.value().lifecycle() != AppendReservationLifecycle.COMMIT_PREPARED) {
-                return CompletableFuture.failedFuture(invariant(
-                        "BookKeeper reservation did not reach COMMIT_PREPARED before generation zero"));
+                return CompletableFuture.failedFuture(
+                        invariant("BookKeeper reservation did not reach COMMIT_PREPARED before generation zero"));
             }
             return writerMetadata.compareAndSetReservation(
                     cluster,
@@ -256,23 +249,36 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
             long ownerMetadataVersion,
             String ownerIdentitySha256) {
         if (current.value().lifecycle() == ProtectionLifecycle.ACTIVE) {
-            requireActiveOwner(
-                    current.value(), referenceId, ownerKey, ownerMetadataVersion, ownerIdentitySha256);
+            requireActiveOwner(current.value(), referenceId, ownerKey, ownerMetadataVersion, ownerIdentitySha256);
             return CompletableFuture.completedFuture(current);
         }
         BookKeeperLedgerProtectionRecord before = current.value();
         BookKeeperLedgerProtectionRecord replacement = new BookKeeperLedgerProtectionRecord(
-                before.schemaVersion(), before.ledgerIdentitySha256(), before.clusterAlias(), before.ledgerId(),
-                before.rootLifecycleEpoch(), before.ledgerRangeSlot(), before.protectionSlot(),
-                before.protectionTypeId(), referenceId, before.firstEntryId(), before.entryCount(),
-                before.rangeChecksumSha256(), before.streamId(), before.offsetStart(), before.offsetEnd(),
-                commitVersion, ownerKey, ownerMetadataVersion, ownerIdentitySha256,
-                ProtectionLifecycle.ACTIVE, before.createdAtMillis(), before.expiresAtMillis(), 0);
+                before.schemaVersion(),
+                before.ledgerIdentitySha256(),
+                before.clusterAlias(),
+                before.ledgerId(),
+                before.rootLifecycleEpoch(),
+                before.ledgerRangeSlot(),
+                before.protectionSlot(),
+                before.protectionTypeId(),
+                referenceId,
+                before.firstEntryId(),
+                before.entryCount(),
+                before.rangeChecksumSha256(),
+                before.streamId(),
+                before.offsetStart(),
+                before.offsetEnd(),
+                commitVersion,
+                ownerKey,
+                ownerMetadataVersion,
+                ownerIdentitySha256,
+                ProtectionLifecycle.ACTIVE,
+                before.createdAtMillis(),
+                before.expiresAtMillis(),
+                0);
         return ledgerMetadata.compareAndSetProtection(
-                cluster,
-                configuration.providerScopeSha256(),
-                replacement,
-                current.metadataVersion());
+                cluster, configuration.providerScopeSha256(), replacement, current.metadataVersion());
     }
 
     private CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> locateProtection(
@@ -286,11 +292,7 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
             Optional<BookKeeperScanToken> continuation) {
         int pageSize = Math.min(configuration.retentionPageSize(), 1_024);
         return deadline.bound(ledgerMetadata.scanProtections(
-                        cluster,
-                        configuration.providerScopeSha256(),
-                        target.ledgerId(),
-                        continuation,
-                        pageSize))
+                        cluster, configuration.providerScopeSha256(), target.ledgerId(), continuation, pageSize))
                 .thenCompose(page -> {
                     BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> match = null;
                     long offsetEnd = Math.addExact(offsetStart, recordCount);
@@ -301,49 +303,38 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
                                 && value.ledgerId() == target.ledgerId()
                                 && value.firstEntryId() == target.firstEntryId()
                                 && value.entryCount() == target.entryCount()
-                                && value.rangeChecksumSha256().equals(target.rangeChecksum().value())
+                                && value.rangeChecksumSha256()
+                                        .equals(target.rangeChecksum().value())
                                 && value.streamId().equals(stream.value())
                                 && value.offsetStart() == offsetStart
                                 && value.offsetEnd() == offsetEnd) {
                             if (match != null) {
-                                return CompletableFuture.failedFuture(invariant(
-                                        "multiple BookKeeper protection rows describe one exact range"));
+                                return CompletableFuture.failedFuture(
+                                        invariant("multiple BookKeeper protection rows describe one exact range"));
                             }
                             match = candidate;
                         }
                     }
-                    if (match != null) return CompletableFuture.completedFuture(match);
+                    if (match != null) {
+                        return CompletableFuture.completedFuture(match);
+                    }
                     if (page.continuation().isPresent()) {
                         return locateProtection(
-                                target,
-                                stream,
-                                offsetStart,
-                                recordCount,
-                                type,
-                                slot,
-                                deadline,
-                                page.continuation());
+                                target, stream, offsetStart, recordCount, type, slot, deadline, page.continuation());
                     }
-                    return CompletableFuture.failedFuture(invariant(
-                            "mandatory BookKeeper protection row is absent for the exact range"));
+                    return CompletableFuture.failedFuture(
+                            invariant("mandatory BookKeeper protection row is absent for the exact range"));
                 });
     }
 
     private CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerRootRecord>> loadRoot(
-            BookKeeperEntryRangeReadTarget target,
-            BookKeeperOperationDeadline deadline) {
-        return deadline.bound(ledgerMetadata.getRoot(
-                        cluster,
-                        configuration.providerScopeSha256(),
-                        target.ledgerId()))
-                .thenApply(optional -> optional.orElseThrow(
-                        () -> invariant("BookKeeper ledger root is absent")));
+            BookKeeperEntryRangeReadTarget target, BookKeeperOperationDeadline deadline) {
+        return deadline.bound(ledgerMetadata.getRoot(cluster, configuration.providerScopeSha256(), target.ledgerId()))
+                .thenApply(optional -> optional.orElseThrow(() -> invariant("BookKeeper ledger root is absent")));
     }
 
     private CompletableFuture<BookKeeperVersionedValue<BookKeeperAppendReservationRecord>> findReservationByRange(
-            StreamId stream,
-            BookKeeperEntryRangeReadTarget target,
-            int rangeSlot) {
+            StreamId stream, BookKeeperEntryRangeReadTarget target, int rangeSlot) {
         return findReservationByRange(stream, target, rangeSlot, Optional.empty());
     }
 
@@ -353,28 +344,33 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
             int rangeSlot,
             Optional<BookKeeperScanToken> continuation) {
         int pageSize = Math.min(configuration.retentionPageSize(), 1_024);
-        return writerMetadata.scanReservations(cluster, stream, continuation, pageSize).thenCompose(page -> {
-            BookKeeperVersionedValue<BookKeeperAppendReservationRecord> match = null;
-            for (BookKeeperVersionedValue<BookKeeperAppendReservationRecord> candidate : page.values()) {
-                BookKeeperAppendReservationRecord value = candidate.value();
-                if (value.ledgerId() == target.ledgerId()
-                        && value.ledgerRangeSlot() == rangeSlot
-                        && value.firstEntryId() == target.firstEntryId()
-                        && value.entryCount() == target.entryCount()
-                        && value.rangeChecksumSha256().equals(target.rangeChecksum().value())) {
-                    if (match != null) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "multiple reservations describe one BookKeeper range"));
+        return writerMetadata
+                .scanReservations(cluster, stream, continuation, pageSize)
+                .thenCompose(page -> {
+                    BookKeeperVersionedValue<BookKeeperAppendReservationRecord> match = null;
+                    for (BookKeeperVersionedValue<BookKeeperAppendReservationRecord> candidate : page.values()) {
+                        BookKeeperAppendReservationRecord value = candidate.value();
+                        if (value.ledgerId() == target.ledgerId()
+                                && value.ledgerRangeSlot() == rangeSlot
+                                && value.firstEntryId() == target.firstEntryId()
+                                && value.entryCount() == target.entryCount()
+                                && value.rangeChecksumSha256()
+                                        .equals(target.rangeChecksum().value())) {
+                            if (match != null) {
+                                return CompletableFuture.failedFuture(
+                                        invariant("multiple reservations describe one BookKeeper range"));
+                            }
+                            match = candidate;
+                        }
                     }
-                    match = candidate;
-                }
-            }
-            if (match != null) return CompletableFuture.completedFuture(match);
-            if (page.continuation().isPresent()) {
-                return findReservationByRange(stream, target, rangeSlot, page.continuation());
-            }
-            return CompletableFuture.failedFuture(invariant("BookKeeper range reservation is absent"));
-        });
+                    if (match != null) {
+                        return CompletableFuture.completedFuture(match);
+                    }
+                    if (page.continuation().isPresent()) {
+                        return findReservationByRange(stream, target, rangeSlot, page.continuation());
+                    }
+                    return CompletableFuture.failedFuture(invariant("BookKeeper range reservation is absent"));
+                });
     }
 
     private BookKeeperPhysicalReferenceProof proof(
@@ -427,30 +423,31 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
                 || reservation.ledgerRangeSlot() != rangeSlot
                 || reservation.firstEntryId() != target.firstEntryId()
                 || reservation.entryCount() != target.entryCount()
-                || !reservation.rangeChecksumSha256().equals(target.rangeChecksum().value())) {
+                || !reservation
+                        .rangeChecksumSha256()
+                        .equals(target.rangeChecksum().value())) {
             throw invariant("BookKeeper reservation does not describe the protected range");
         }
     }
 
     private static void requireCommitOwner(
-            BookKeeperAppendReservationRecord reservation,
-            PreparedStableAppend prepared) {
+            BookKeeperAppendReservationRecord reservation, PreparedStableAppend prepared) {
         if (!reservation.commitId().equals(prepared.commitId())
                 || !reservation.commitKey().equals(prepared.commitKey())
                 || reservation.commitMetadataVersion() != prepared.commitMetadataVersion()
-                || !reservation.commitRecordSha256().equals(prepared.commitRecordSha256().value())) {
+                || !reservation
+                        .commitRecordSha256()
+                        .equals(prepared.commitRecordSha256().value())) {
             throw invariant("BookKeeper reservation commit owner changed");
         }
     }
 
     private static void requirePreparedReservation(
-            BookKeeperAppendReservationRecord reservation,
-            PreparedStableAppend prepared) {
+            BookKeeperAppendReservationRecord reservation, PreparedStableAppend prepared) {
         var request = prepared.request();
         if (!reservation.writerId().equals(request.writerId())
                 || reservation.appendSessionEpoch() != request.epoch()
-                || !reservation.fencingTokenHash().equals(
-                        BookKeeperIdentityDigests.sha256(request.fencingToken()))
+                || !reservation.fencingTokenHash().equals(BookKeeperIdentityDigests.sha256(request.fencingToken()))
                 || reservation.expectedStartOffset() != request.expectedStartOffset()
                 || !reservation.payloadFormat().equals(request.payloadFormat().name())
                 || reservation.recordCount() != request.recordCount()
@@ -498,8 +495,7 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
     }
 
     private BookKeeperAppendReservationRecord withPreparedCommit(
-            BookKeeperAppendReservationRecord before,
-            PreparedStableAppend prepared) {
+            BookKeeperAppendReservationRecord before, PreparedStableAppend prepared) {
         return replaceReservation(
                 before,
                 AppendReservationLifecycle.COMMIT_PREPARED,
@@ -510,8 +506,7 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
     }
 
     private BookKeeperAppendReservationRecord withLifecycle(
-            BookKeeperAppendReservationRecord before,
-            AppendReservationLifecycle lifecycle) {
+            BookKeeperAppendReservationRecord before, AppendReservationLifecycle lifecycle) {
         return replaceReservation(
                 before,
                 lifecycle,
@@ -529,28 +524,55 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
             long commitMetadataVersion,
             String commitRecordSha256) {
         return new BookKeeperAppendReservationRecord(
-                before.schemaVersion(), before.reservationId(), before.appendAttemptId(), before.streamId(),
-                before.writerId(), before.writerRunIdHash(), before.appendSessionEpoch(), before.fencingTokenHash(),
-                before.writerStateEpoch(), before.ledgerId(), before.ledgerRootEpoch(), before.ledgerRangeSlot(),
-                before.firstEntryId(), before.entryCount(), before.rangeChecksumSha256(),
-                before.expectedStartOffset(), before.payloadFormat(), before.recordCount(), before.logicalBytes(),
-                before.physicalBytes(), before.schemaRefs(), before.projectionIdentity(),
-                before.minEventTimeMillis(), before.maxEventTimeMillis(), lifecycle, commitId, commitKey,
-                commitMetadataVersion, commitRecordSha256, before.createdAtMillis(), clock.millis(), "", 0);
+                before.schemaVersion(),
+                before.reservationId(),
+                before.appendAttemptId(),
+                before.streamId(),
+                before.writerId(),
+                before.writerRunIdHash(),
+                before.appendSessionEpoch(),
+                before.fencingTokenHash(),
+                before.writerStateEpoch(),
+                before.ledgerId(),
+                before.ledgerRootEpoch(),
+                before.ledgerRangeSlot(),
+                before.firstEntryId(),
+                before.entryCount(),
+                before.rangeChecksumSha256(),
+                before.expectedStartOffset(),
+                before.payloadFormat(),
+                before.recordCount(),
+                before.logicalBytes(),
+                before.physicalBytes(),
+                before.schemaRefs(),
+                before.projectionIdentity(),
+                before.minEventTimeMillis(),
+                before.maxEventTimeMillis(),
+                lifecycle,
+                commitId,
+                commitKey,
+                commitMetadataVersion,
+                commitRecordSha256,
+                before.createdAtMillis(),
+                clock.millis(),
+                "",
+                0);
     }
 
     private static String reachableReferenceId(PreparedStableAppend prepared) {
-        return "ra1-" + DeterministicIds.stableHashComponent(
-                prepared.request().streamId().value()
-                        + prepared.commitId()
-                        + prepared.primaryTargetIdentitySha256().value());
+        return "ra1-"
+                + DeterministicIds.stableHashComponent(
+                        prepared.request().streamId().value()
+                                + prepared.commitId()
+                                + prepared.primaryTargetIdentitySha256().value());
     }
 
     private static String visibleReferenceId(MaterializedGenerationZero materialized) {
-        return "vg0-" + DeterministicIds.stableHashComponent(
-                materialized.committedAppend().streamId().value()
-                        + materialized.indexKey()
-                        + materialized.indexRecordSha256().value());
+        return "vg0-"
+                + DeterministicIds.stableHashComponent(
+                        materialized.committedAppend().streamId().value()
+                                + materialized.indexKey()
+                                + materialized.indexRecordSha256().value());
     }
 
     private BookKeeperEntryRangeReadTarget exactTarget(BookKeeperEntryRangeReadTarget target) {
@@ -562,9 +584,8 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
     }
 
     private BookKeeperOperationDeadline deadline(Duration timeout) {
-        return new BookKeeperOperationDeadline(min(
-                Objects.requireNonNull(timeout, "timeout"),
-                configuration.operationTimeout()));
+        return new BookKeeperOperationDeadline(
+                min(Objects.requireNonNull(timeout, "timeout"), configuration.operationTimeout()));
     }
 
     private static Duration min(Duration left, Duration right) {
@@ -577,7 +598,9 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
 
     private static String text(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 }

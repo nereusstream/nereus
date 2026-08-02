@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.FakeBookKeeperMetadataStore;
@@ -27,12 +27,12 @@ class BookKeeperLedgerRecoveryTest {
             ResponseLossPartitionedOxiaBackend backend = new ResponseLossPartitionedOxiaBackend();
             try (Fixture fixture = new Fixture(backend, "seal-cut-" + exactLostCas)) {
                 AppendSession oldOwner = BookKeeperPrimaryWalAppenderTest.session();
-                var allocated = fixture.allocator.allocate(new BookKeeperLedgerAllocationRequest(
+                var allocated = fixture.allocator
+                        .allocate(new BookKeeperLedgerAllocationRequest(
                                 BookKeeperPrimaryWalAppenderTest.STREAM, oldOwner, TIMEOUT))
                         .join();
                 long ledgerId = allocated.root().value().ledgerId();
-                AppendSession newOwner = new AppendSession(
-                        oldOwner.streamId(), "writer-2", 2, "token-2", 2, 20_000);
+                AppendSession newOwner = new AppendSession(oldOwner.streamId(), "writer-2", 2, "token-2", 2, 20_000);
 
                 backend.loseResponse(ResponseLossPartitionedOxiaBackend.Operation.PUT_IF_VERSION, exactLostCas);
                 var recovered = fixture.recovery
@@ -40,12 +40,12 @@ class BookKeeperLedgerRecoveryTest {
                         .join();
                 assertThat(backend.responseWasLost()).isTrue();
 
-                var convergedWriter = fixture.metadata.getWriter(
-                                BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                                BookKeeperPrimaryWalAppenderTest.STREAM)
+                var convergedWriter = fixture.metadata
+                        .getWriter(BookKeeperPrimaryWalAppenderTest.CLUSTER, BookKeeperPrimaryWalAppenderTest.STREAM)
                         .join()
                         .orElseThrow();
-                var sealed = fixture.metadata.getRoot(
+                var sealed = fixture.metadata
+                        .getRoot(
                                 BookKeeperPrimaryWalAppenderTest.CLUSTER,
                                 fixture.configuration.providerScopeSha256(),
                                 ledgerId)
@@ -66,14 +66,13 @@ class BookKeeperLedgerRecoveryTest {
     void serializesTwoRecoveryOwners() {
         try (Fixture fixture = new Fixture(new ResponseLossPartitionedOxiaBackend(), "recovery-contenders")) {
             AppendSession oldOwner = BookKeeperPrimaryWalAppenderTest.session();
-            var original = fixture.allocator.allocate(new BookKeeperLedgerAllocationRequest(
+            var original = fixture.allocator
+                    .allocate(new BookKeeperLedgerAllocationRequest(
                             BookKeeperPrimaryWalAppenderTest.STREAM, oldOwner, TIMEOUT))
                     .join();
-            AppendSession newOwner = new AppendSession(
-                    oldOwner.streamId(), "writer-2", 2, "token-2", 2, 20_000);
-            var observed = fixture.metadata.getWriter(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            BookKeeperPrimaryWalAppenderTest.STREAM)
+            AppendSession newOwner = new AppendSession(oldOwner.streamId(), "writer-2", 2, "token-2", 2, 20_000);
+            var observed = fixture.metadata
+                    .getWriter(BookKeeperPrimaryWalAppenderTest.CLUSTER, BookKeeperPrimaryWalAppenderTest.STREAM)
                     .join()
                     .orElseThrow();
             BookKeeperWriterStateMachine contenderA = fixture.writerState("contender-a");
@@ -81,22 +80,30 @@ class BookKeeperLedgerRecoveryTest {
 
             CompletableFuture<?> adoptionA = contenderA.adoptForRecovery(observed, newOwner, "contender a");
             CompletableFuture<?> adoptionB = contenderB.adoptForRecovery(observed, newOwner, "contender b");
-            assertThat(adoptionA.isCompletedExceptionally() ^ adoptionB.isCompletedExceptionally()).isTrue();
+            assertThat(adoptionA.isCompletedExceptionally() ^ adoptionB.isCompletedExceptionally())
+                    .isTrue();
             BookKeeperWriterStateMachine winner = adoptionA.isCompletedExceptionally() ? contenderB : contenderA;
             BookKeeperLedgerRecovery winningRecovery = fixture.recovery(winner);
-            winningRecovery.recoverWriter(newOwner, TIMEOUT, "winning recovery owner").join();
+            winningRecovery
+                    .recoverWriter(newOwner, TIMEOUT, "winning recovery owner")
+                    .join();
 
             BookKeeperLedgerAllocator winningAllocator = fixture.allocator(winner, "winner-allocation");
-            var replacement = winningAllocator.allocate(new BookKeeperLedgerAllocationRequest(
+            var replacement = winningAllocator
+                    .allocate(new BookKeeperLedgerAllocationRequest(
                             BookKeeperPrimaryWalAppenderTest.STREAM, newOwner, TIMEOUT))
                     .join();
-            assertThat(replacement.root().value().ledgerId()).isNotEqualTo(original.root().value().ledgerId());
-            assertThat(fixture.metadata.getWriter(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            BookKeeperPrimaryWalAppenderTest.STREAM)
-                    .join()).get().satisfies(writer -> {
+            assertThat(replacement.root().value().ledgerId())
+                    .isNotEqualTo(original.root().value().ledgerId());
+            assertThat(fixture.metadata
+                            .getWriter(
+                                    BookKeeperPrimaryWalAppenderTest.CLUSTER, BookKeeperPrimaryWalAppenderTest.STREAM)
+                            .join())
+                    .get()
+                    .satisfies(writer -> {
                         assertThat(writer.value().lifecycle()).isEqualTo(BookKeeperWriterLifecycle.ACTIVE);
-                        assertThat(writer.value().activeLedgerId()).isEqualTo(replacement.root().value().ledgerId());
+                        assertThat(writer.value().activeLedgerId())
+                                .isEqualTo(replacement.root().value().ledgerId());
                     });
         }
     }
@@ -122,8 +129,8 @@ class BookKeeperLedgerRecoveryTest {
                     BookKeeperPrimaryWalAppenderTest.CLOCK,
                     backend);
             verifier = new BookKeeperLedgerIdNamespaceReservationVerifier(
-                    (scope, bits, prefix, timeout) -> CompletableFuture.completedFuture(Optional.of(
-                            BookKeeperPrimaryWalAppenderTest.reservation(configuration))),
+                    (scope, bits, prefix, timeout) -> CompletableFuture.completedFuture(
+                            Optional.of(BookKeeperPrimaryWalAppenderTest.reservation(configuration))),
                     BookKeeperPrimaryWalAppenderTest.DEPLOYMENT);
             state = writerState(processRunId);
             allocator = allocator(state, processRunId + "-allocation");
@@ -139,8 +146,7 @@ class BookKeeperLedgerRecoveryTest {
                     processRunId);
         }
 
-        private BookKeeperLedgerAllocator allocator(
-                BookKeeperWriterStateMachine writerState, String allocationPrefix) {
+        private BookKeeperLedgerAllocator allocator(BookKeeperWriterStateMachine writerState, String allocationPrefix) {
             return new BookKeeperLedgerAllocator(
                     BookKeeperPrimaryWalAppenderTest.CLUSTER,
                     configuration,

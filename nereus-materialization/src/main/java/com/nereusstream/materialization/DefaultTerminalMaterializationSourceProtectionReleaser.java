@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -43,16 +44,12 @@ public final class DefaultTerminalMaterializationSourceProtectionReleaser
 
     @Override
     public CompletableFuture<Integer> release(
-            VersionedMaterializationTask terminalTask,
-            MaterializationTaskMutationGuard mutationGuard) {
+            VersionedMaterializationTask terminalTask, MaterializationTaskMutationGuard mutationGuard) {
         try {
-            VersionedMaterializationTask exact =
-                    Objects.requireNonNull(terminalTask, "terminalTask");
+            VersionedMaterializationTask exact = Objects.requireNonNull(terminalTask, "terminalTask");
             requireTerminal(exact.value().lifecycle());
             Operation operation = new Operation(
-                    exact,
-                    tasks.requireTask(exact),
-                    Objects.requireNonNull(mutationGuard, "mutationGuard"));
+                    exact, tasks.requireTask(exact), Objects.requireNonNull(mutationGuard, "mutationGuard"));
             CompletableFuture<Integer> result = operation.releaseAt(0, 0);
             result.whenComplete((ignored, failure) -> operation.close());
             return result;
@@ -82,22 +79,16 @@ public final class DefaultTerminalMaterializationSourceProtectionReleaser
                 return revalidateTerminal().thenApply(ignored -> released);
             }
             SourceGeneration source = task.sources().get(index);
-            String referenceId = MaterializationProtectionIdentities.sourceReferenceId(
-                    cluster, task, source);
+            String referenceId = MaterializationProtectionIdentities.sourceReferenceId(cluster, task, source);
             return revalidateTerminal()
                     .thenCompose(ignored -> deadline.bound(
-                            () -> sourceProtections.findExisting(
-                                    task.streamId(), source, referenceId),
+                            () -> sourceProtections.findExisting(task.streamId(), source, referenceId),
                             "find terminal materialization source protection"))
-                    .thenCompose(optional -> releaseIfPresent(
-                            optional, referenceId, index, released));
+                    .thenCompose(optional -> releaseIfPresent(optional, referenceId, index, released));
         }
 
         private CompletableFuture<Integer> releaseIfPresent(
-                Optional<MaterializationSourceProtection> optional,
-                String referenceId,
-                int index,
-                int released) {
+                Optional<MaterializationSourceProtection> optional, String referenceId, int index, int released) {
             if (optional.isEmpty()) {
                 return releaseAt(index + 1, released);
             }
@@ -105,24 +96,19 @@ public final class DefaultTerminalMaterializationSourceProtectionReleaser
             requireOwnedProtection(protection, referenceId);
             return deadline.bound(
                             () -> sourceProtections.release(
-                                    protection,
-                                    current -> authorizeRelease(current, referenceId)),
+                                    protection, current -> authorizeRelease(current, referenceId)),
                             "release terminal materialization source protection")
-                    .thenCompose(ignored -> releaseAt(
-                            index + 1, Math.addExact(released, 1)));
+                    .thenCompose(ignored -> releaseAt(index + 1, Math.addExact(released, 1)));
         }
 
-        private CompletableFuture<Void> authorizeRelease(
-                MaterializationSourceProtection current,
-                String referenceId) {
+        private CompletableFuture<Void> authorizeRelease(MaterializationSourceProtection current, String referenceId) {
             requireOwnedProtection(current, referenceId);
             return revalidateTerminal();
         }
 
         private CompletableFuture<Void> revalidateTerminal() {
             return deadline.bound(
-                            mutationGuard::revalidate,
-                            "revalidate terminal materialization source release authority")
+                            mutationGuard::revalidate, "revalidate terminal materialization source release authority")
                     .thenCompose(ignored -> deadline.bound(
                             () -> tasks.get(task.streamId(), task.taskId()),
                             "reload terminal materialization task before source release"))
@@ -130,21 +116,17 @@ public final class DefaultTerminalMaterializationSourceProtectionReleaser
                         if (optional.isEmpty()
                                 || !sameVersioned(terminalTask, optional.orElseThrow())
                                 || !isTerminal(optional.orElseThrow().value().lifecycle())) {
-                            throw condition(
-                                    "terminal materialization task changed before source release");
+                            throw condition("terminal materialization task changed before source release");
                         }
                     });
         }
 
-        private void requireOwnedProtection(
-                MaterializationSourceProtection protection,
-                String referenceId) {
+        private void requireOwnedProtection(MaterializationSourceProtection protection, String referenceId) {
             ObjectProtectionOwner owner = protection.owner();
             if (!protection.referenceId().equals(referenceId)
                     || !owner.ownerKey().equals(terminalTask.key())
                     || owner.metadataVersion() > terminalTask.metadataVersion()) {
-                throw invariant(
-                        "terminal materialization source protection has an invalid owner");
+                throw invariant("terminal materialization source protection has an invalid owner");
             }
         }
 
@@ -154,9 +136,7 @@ public final class DefaultTerminalMaterializationSourceProtectionReleaser
         }
     }
 
-    private static boolean sameVersioned(
-            VersionedMaterializationTask expected,
-            VersionedMaterializationTask actual) {
+    private static boolean sameVersioned(VersionedMaterializationTask expected, VersionedMaterializationTask actual) {
         return expected.key().equals(actual.key())
                 && expected.metadataVersion() == actual.metadataVersion()
                 && expected.durableValueSha256().equals(actual.durableValueSha256())
@@ -165,8 +145,7 @@ public final class DefaultTerminalMaterializationSourceProtectionReleaser
 
     private static void requireTerminal(TaskLifecycle lifecycle) {
         if (!isTerminal(lifecycle)) {
-            throw new IllegalArgumentException(
-                    "source-protection release requires a terminal task: " + lifecycle);
+            throw new IllegalArgumentException("source-protection release requires a terminal task: " + lifecycle);
         }
     }
 

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import java.nio.charset.StandardCharsets;
@@ -7,27 +8,19 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Objects;
 
-/** Canonical activation identity; a new physical binding receives a new immutable authority key. */
+/**
+ * Canonical activation identity; a new physical binding receives a new immutable authority key.
+ */
 public final class BookKeeperProtocolActivationKeys {
     private static final String ROOT = "/nereus/bookkeeper-primary-wal/v1/clusters/";
 
-    private BookKeeperProtocolActivationKeys() {
-    }
+    private BookKeeperProtocolActivationKeys() {}
 
-    public static String key(
-            String clusterAlias,
-            String configurationBindingSha256,
-            String ledgerIdNamespaceSha256) {
+    public static String key(String clusterAlias, String configurationBindingSha256, String ledgerIdNamespaceSha256) {
         String cluster = clusterSha256(clusterAlias);
         String configuration = sha(configurationBindingSha256, "configurationBindingSha256");
         String namespace = sha(ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256");
-        String key = ROOT
-                + cluster
-                + "/bindings/"
-                + configuration
-                + "/"
-                + namespace
-                + "/activation";
+        String key = ROOT + cluster + "/bindings/" + configuration + "/" + namespace + "/activation";
         requireExact(key, clusterAlias, configuration, namespace);
         return key;
     }
@@ -37,20 +30,11 @@ public final class BookKeeperProtocolActivationKeys {
     }
 
     public static void requireExact(
-            String supplied,
-            String clusterAlias,
-            String configurationBindingSha256,
-            String ledgerIdNamespaceSha256) {
+            String supplied, String clusterAlias, String configurationBindingSha256, String ledgerIdNamespaceSha256) {
         String cluster = clusterSha256(clusterAlias);
         String configuration = sha(configurationBindingSha256, "configurationBindingSha256");
         String namespace = sha(ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256");
-        String expected = ROOT
-                + cluster
-                + "/bindings/"
-                + configuration
-                + "/"
-                + namespace
-                + "/activation";
+        String expected = ROOT + cluster + "/bindings/" + configuration + "/" + namespace + "/activation";
         if (!expected.equals(Objects.requireNonNull(supplied, "supplied"))) {
             throw new IllegalArgumentException("BookKeeper activation key is not canonical");
         }
@@ -62,8 +46,8 @@ public final class BookKeeperProtocolActivationKeys {
             throw new IllegalArgumentException("clusterAlias cannot be blank");
         }
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(cluster.getBytes(StandardCharsets.UTF_8)));
+            return HexFormat.of()
+                    .formatHex(MessageDigest.getInstance("SHA-256").digest(cluster.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import java.util.List;
@@ -7,7 +8,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 
-/** Ordered lifecycle for multiple manager-bound services sharing the same borrowed executors. */
+/**
+ * Ordered lifecycle for multiple manager-bound services sharing the same borrowed executors.
+ */
 final class CompositeKafkaRuntimeBackgroundService implements KafkaRuntimeBackgroundService {
     private final Object guard = new Object();
     private final List<KafkaRuntimeBackgroundService> services;
@@ -62,9 +65,7 @@ final class CompositeKafkaRuntimeBackgroundService implements KafkaRuntimeBackgr
         }
         CompletionStage<Void> operation;
         try {
-            operation = Objects.requireNonNull(
-                    services.get(index).start(),
-                    "Kafka background-service start future");
+            operation = Objects.requireNonNull(services.get(index).start(), "Kafka background-service start future");
         } catch (Throwable failure) {
             rollbackStart(index - 1, unwrap(failure));
             return;
@@ -92,10 +93,7 @@ final class CompositeKafkaRuntimeBackgroundService implements KafkaRuntimeBackgr
         });
     }
 
-    private void closePrevious(
-            int index,
-            Throwable failure,
-            CompletableFuture<Void> result) {
+    private void closePrevious(int index, Throwable failure, CompletableFuture<Void> result) {
         if (index < 0) {
             if (failure == null) {
                 result.complete(null);
@@ -106,18 +104,14 @@ final class CompositeKafkaRuntimeBackgroundService implements KafkaRuntimeBackgr
         }
         CompletionStage<Void> operation;
         try {
-            operation = Objects.requireNonNull(
-                    services.get(index).closeAsync(),
-                    "Kafka background-service close future");
+            operation =
+                    Objects.requireNonNull(services.get(index).closeAsync(), "Kafka background-service close future");
         } catch (Throwable closeFailure) {
             closePrevious(index - 1, combine(failure, unwrap(closeFailure)), result);
             return;
         }
         operation.whenComplete((ignored, closeFailure) ->
-                closePrevious(
-                        index - 1,
-                        combine(failure, unwrapNullable(closeFailure)),
-                        result));
+                closePrevious(index - 1, combine(failure, unwrapNullable(closeFailure)), result));
     }
 
     private static Throwable combine(Throwable first, Throwable second) {

@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.ManagedLedgerCursorProtocol;
 import com.nereusstream.metadata.oxia.ProjectionCreateRequest;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
@@ -42,7 +42,7 @@ class F3ProjectionActivationGoldenTest {
         String encoded = F2MetadataCodecs.envelopeHex(activated, TopicProjectionRecord.class);
         assertThat(encoded).isEqualTo(golden.getProperty("projection.activated"));
         assertThat(F2MetadataCodecs.decodeEnvelope(
-                java.util.HexFormat.of().parseHex(encoded), TopicProjectionRecord.class))
+                        java.util.HexFormat.of().parseHex(encoded), TopicProjectionRecord.class))
                 .isEqualTo(activated);
         assertThatThrownBy(() -> ProjectionCreateRequest.canonicalProperties(activated.properties()))
                 .isInstanceOf(IllegalArgumentException.class)

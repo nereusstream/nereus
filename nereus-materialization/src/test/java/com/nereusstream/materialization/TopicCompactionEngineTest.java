@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.STREAM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.OffsetRange;
@@ -42,8 +42,7 @@ class TopicCompactionEngineTest {
         TrackingReader reader = new TrackingReader();
         DeterministicDecoder decoder = new DeterministicDecoder(false);
         TopicCompactionRegistry.Binding binding = new TopicCompactionRegistry(
-                        List.of(decoder),
-                        List.of(new RetainSelectedTombstone()))
+                        List.of(decoder), List.of(new RetainSelectedTombstone()))
                 .resolve(task.policy().topicCompaction().orElseThrow());
         Path stagingPath = Files.createDirectory(temporaryDirectory.resolve("staging"));
         Files.setPosixFilePermissions(stagingPath, PosixFilePermissions.fromString("rwx------"));
@@ -54,27 +53,18 @@ class TopicCompactionEngineTest {
                 Duration.ofHours(1),
                 Runnable::run)) {
             DefaultTopicCompactionEngine engine = new DefaultTopicCompactionEngine(
-                    staging,
-                    DefaultTopicCompactionEngine.MIN_IN_MEMORY_KEY_BYTES,
-                    32 << 10,
-                    2,
-                    Runnable::run);
+                    staging, DefaultTopicCompactionEngine.MIN_IN_MEMORY_KEY_BYTES, 32 << 10, 2, Runnable::run);
 
-            TopicCompactionPlan plan = engine.prepare(
-                            task,
-                            reader,
-                            readOptions(),
-                            binding,
-                            5_000)
-                    .join();
+            TopicCompactionPlan plan =
+                    engine.prepare(task, reader, readOptions(), binding, 5_000).join();
             assertThat(plan.outputRecordCount()).isEqualTo(5);
             assertThat(staging.reservedBytes()).isZero();
 
             List<CompactedObjectRow> rows = collect(plan).join();
 
-            assertThat(rows).extracting(CompactedObjectRow::streamOffset)
-                    .containsExactly(1L, 3L, 4L, 6L, 7L);
-            assertThat(rows).extracting(row -> row.sparseDisposition().orElseThrow())
+            assertThat(rows).extracting(CompactedObjectRow::streamOffset).containsExactly(1L, 3L, 4L, 6L, 7L);
+            assertThat(rows)
+                    .extracting(row -> row.sparseDisposition().orElseThrow())
                     .containsExactly(1, 1, 2, 1, 1);
             assertThat(rows.get(2).exactPayload().remaining()).isZero();
             assertThat(TopicCompactionKeyEncodingV1.decode(
@@ -97,8 +87,7 @@ class TopicCompactionEngineTest {
         TrackingReader reader = new TrackingReader();
         DeterministicDecoder decoder = new DeterministicDecoder(true);
         TopicCompactionRegistry.Binding binding = new TopicCompactionRegistry(
-                        List.of(decoder),
-                        List.of(new RetainSelectedTombstone()))
+                        List.of(decoder), List.of(new RetainSelectedTombstone()))
                 .resolve(task.policy().topicCompaction().orElseThrow());
         Path stagingPath = Files.createDirectory(temporaryDirectory.resolve("changed-staging"));
         Files.setPosixFilePermissions(stagingPath, PosixFilePermissions.fromString("rwx------"));
@@ -109,17 +98,12 @@ class TopicCompactionEngineTest {
                 Duration.ofHours(1),
                 Runnable::run)) {
             TopicCompactionPlan plan = new DefaultTopicCompactionEngine(
-                            staging,
-                            DefaultTopicCompactionEngine.MIN_IN_MEMORY_KEY_BYTES,
-                            32 << 10,
-                            2,
-                            Runnable::run)
+                            staging, DefaultTopicCompactionEngine.MIN_IN_MEMORY_KEY_BYTES, 32 << 10, 2, Runnable::run)
                     .prepare(task, reader, readOptions(), binding, 5_000)
                     .join();
 
             assertThatThrownBy(() -> collect(plan).join())
-                    .hasRootCauseMessage(
-                            "topic-compaction pass two differs from the pass-one survivor proof");
+                    .hasRootCauseMessage("topic-compaction pass two differs from the pass-one survivor proof");
             assertThat(staging.reservedBytes()).isZero();
             plan.close();
         }
@@ -129,8 +113,7 @@ class TopicCompactionEngineTest {
     void rejectsDecodedKeysBeyondTheConfiguredCapAndReleasesSpillBudget() throws Exception {
         MaterializationTask task = topicTask();
         TopicCompactionRegistry.Binding binding = new TopicCompactionRegistry(
-                        List.of(new DeterministicDecoder(false)),
-                        List.of(new RetainSelectedTombstone()))
+                        List.of(new DeterministicDecoder(false)), List.of(new RetainSelectedTombstone()))
                 .resolve(task.policy().topicCompaction().orElseThrow());
         Path stagingPath = Files.createDirectory(temporaryDirectory.resolve("oversized-staging"));
         Files.setPosixFilePermissions(stagingPath, PosixFilePermissions.fromString("rwx------"));
@@ -141,21 +124,11 @@ class TopicCompactionEngineTest {
                 Duration.ofHours(1),
                 Runnable::run)) {
             DefaultTopicCompactionEngine engine = new DefaultTopicCompactionEngine(
-                    staging,
-                    DefaultTopicCompactionEngine.MIN_IN_MEMORY_KEY_BYTES,
-                    1_024,
-                    2,
-                    Runnable::run);
+                    staging, DefaultTopicCompactionEngine.MIN_IN_MEMORY_KEY_BYTES, 1_024, 2, Runnable::run);
 
-            assertThatThrownBy(() -> engine.prepare(
-                            task,
-                            new TrackingReader(),
-                            readOptions(),
-                            binding,
-                            5_000)
-                    .join())
-                    .hasRootCauseMessage(
-                            "decoded topic-compaction key exceeds the configured byte cap");
+            assertThatThrownBy(() -> engine.prepare(task, new TrackingReader(), readOptions(), binding, 5_000)
+                            .join())
+                    .hasRootCauseMessage("decoded topic-compaction key exceeds the configured byte cap");
             assertThat(staging.reservedBytes()).isZero();
         }
     }
@@ -165,13 +138,7 @@ class TopicCompactionEngineTest {
                 MaterializationPlannerTestSupport.zero("/topic/source-4", 0, 4, 0, 100, 4),
                 MaterializationPlannerTestSupport.zero("/topic/source-8", 4, 8, 100, 100, 8));
         MaterializationPolicy policy = MaterializationPolicyFactory.topicCompacted(
-                new TopicCompactionSpec("latest", 1, "test-key-v1"),
-                2,
-                16,
-                1_000,
-                1_000_000,
-                128,
-                "ZSTD");
+                new TopicCompactionSpec("latest", 1, "test-key-v1"), 2, 16, 1_000, 1_000_000, 128, "ZSTD");
         return MaterializationPlannerTestSupport.planner(sources, List.of(), 0, 8)
                 .plan(STREAM, new OffsetRange(0, 8), policy, 1)
                 .join()
@@ -179,11 +146,7 @@ class TopicCompactionEngineTest {
     }
 
     private static ReadOptions readOptions() {
-        return new ReadOptions(
-                1,
-                64 << 10,
-                ReadIsolation.COMMITTED,
-                Duration.ofSeconds(10));
+        return new ReadOptions(1, 64 << 10, ReadIsolation.COMMITTED, Duration.ofSeconds(10));
     }
 
     private static CompletableFuture<List<CompactedObjectRow>> collect(TopicCompactionPlan plan) {
@@ -218,8 +181,7 @@ class TopicCompactionEngineTest {
     }
 
     private static byte[] keyedBytes(CompactedObjectRow row) {
-        var decoded = TopicCompactionKeyEncodingV1.decode(
-                row.compactionKey().orElseThrow());
+        var decoded = TopicCompactionKeyEncodingV1.decode(row.compactionKey().orElseThrow());
         var keyed = (TopicCompactionKeyEncodingV1.DecodedKey.Keyed) decoded;
         ByteBuffer key = keyed.decodedKey();
         byte[] bytes = new byte[key.remaining()];
@@ -246,21 +208,21 @@ class TopicCompactionEngineTest {
             if (offset == 1 || offset == 6) {
                 return Optional.empty();
             }
-            char key = switch ((int) offset) {
-                case 0, 3 -> 'a';
-                case 2, 5 -> 'b';
-                case 4 -> 'c';
-                case 7 -> 'd';
-                default -> throw new IllegalArgumentException("offset");
-            };
+            char key =
+                    switch ((int) offset) {
+                        case 0, 3 -> 'a';
+                        case 2, 5 -> 'b';
+                        case 4 -> 'c';
+                        case 7 -> 'd';
+                        default -> throw new IllegalArgumentException("offset");
+                    };
             if (mutateSecondPass && call > 8 && offset == 7) {
                 key = 'z';
             }
             byte[] largeKey = new byte[20 << 10];
             Arrays.fill(largeKey, (byte) key);
-            CompactionDisposition disposition = offset == 4 || offset == 5
-                    ? CompactionDisposition.TOMBSTONE
-                    : CompactionDisposition.VALUE;
+            CompactionDisposition disposition =
+                    offset == 4 || offset == 5 ? CompactionDisposition.TOMBSTONE : CompactionDisposition.VALUE;
             return Optional.of(new CompactionRecord(
                     offset,
                     ByteBuffer.wrap(largeKey),
@@ -293,15 +255,12 @@ class TopicCompactionEngineTest {
         private final AtomicInteger opened = new AtomicInteger();
 
         @Override
-        public CompletableFuture<ExactSourceRead> read(
-                SourceGeneration source,
-                ReadOptions options) {
+        public CompletableFuture<ExactSourceRead> read(SourceGeneration source, ReadOptions options) {
             int now = active.incrementAndGet();
             opened.incrementAndGet();
             maxActive.accumulateAndGet(now, Math::max);
             return CompletableFuture.completedFuture(new ExactSourceRead() {
-                private final CompletableFuture<ExactSourceReadSummary> completion =
-                        new CompletableFuture<>();
+                private final CompletableFuture<ExactSourceReadSummary> completion = new CompletableFuture<>();
 
                 @Override
                 public SourceGeneration source() {
@@ -328,8 +287,7 @@ class TopicCompactionEngineTest {
                             while (!terminal
                                     && emitted < count
                                     && cursor < source.range().endOffset()) {
-                                ObjectSliceReadTarget target =
-                                        (ObjectSliceReadTarget) source.readTarget();
+                                ObjectSliceReadTarget target = (ObjectSliceReadTarget) source.readTarget();
                                 subscriber.onNext(new ReadBatch(
                                         new OffsetRange(cursor, cursor + 1),
                                         source.payloadFormat(),
@@ -372,8 +330,7 @@ class TopicCompactionEngineTest {
                 }
 
                 @Override
-                public void close() {
-                }
+                public void close() {}
             });
         }
     }

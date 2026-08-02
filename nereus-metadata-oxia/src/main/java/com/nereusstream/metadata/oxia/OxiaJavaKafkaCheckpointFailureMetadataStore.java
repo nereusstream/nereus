@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -8,7 +9,6 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.codec.KafkaMetadataCodecs;
 import com.nereusstream.metadata.oxia.codec.MetadataCodecException;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureRecord;
-
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -19,9 +19,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Production immutable NKC1 quarantine store over a borrowed shared Oxia runtime. */
-public final class OxiaJavaKafkaCheckpointFailureMetadataStore
-        implements KafkaCheckpointFailureMetadataStore {
+/**
+ * Production immutable NKC1 quarantine store over a borrowed shared Oxia runtime.
+ */
+public final class OxiaJavaKafkaCheckpointFailureMetadataStore implements KafkaCheckpointFailureMetadataStore {
     private final PartitionedOxiaClient client;
     private final KafkaPartitionKeyspace keys;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -37,8 +38,7 @@ public final class OxiaJavaKafkaCheckpointFailureMetadataStore
                 runtime.client(), new KafkaPartitionKeyspace(nereusCluster, kafkaClusterId));
     }
 
-    OxiaJavaKafkaCheckpointFailureMetadataStore(
-            PartitionedOxiaClient client, KafkaPartitionKeyspace keys) {
+    OxiaJavaKafkaCheckpointFailureMetadataStore(PartitionedOxiaClient client, KafkaPartitionKeyspace keys) {
         this.client = Objects.requireNonNull(client, "client");
         this.keys = Objects.requireNonNull(keys, "keys");
     }
@@ -50,20 +50,12 @@ public final class OxiaJavaKafkaCheckpointFailureMetadataStore
         KafkaPartitionId exactIdentity = Objects.requireNonNull(identity, "identity");
         String key = keys.checkpointFailureKey(exactIdentity, partitionIncarnation, objectId);
         return client.get(key, keys.bindingPartitionKey(exactIdentity))
-                .thenApply(
-                        optional ->
-                                optional.map(
-                                        stored ->
-                                                failure(
-                                                        stored,
-                                                        exactIdentity,
-                                                        partitionIncarnation,
-                                                        objectId)));
+                .thenApply(optional ->
+                        optional.map(stored -> failure(stored, exactIdentity, partitionIncarnation, objectId)));
     }
 
     @Override
-    public CompletableFuture<VersionedKafkaCheckpointFailure> putIfAbsent(
-            KafkaCheckpointFailureRecord value) {
+    public CompletableFuture<VersionedKafkaCheckpointFailure> putIfAbsent(KafkaCheckpointFailureRecord value) {
         ensureOpen();
         KafkaCheckpointFailureRecord exact = Objects.requireNonNull(value, "value");
         if (exact.metadataVersion() != 0) {
@@ -71,42 +63,34 @@ public final class OxiaJavaKafkaCheckpointFailureMetadataStore
         }
         KafkaPartitionId identity = exact.identity();
         if (!identity.kafkaClusterId().equals(keys.kafkaClusterId())) {
-            throw new IllegalArgumentException(
-                    "checkpoint failure belongs to another Kafka cluster");
+            throw new IllegalArgumentException("checkpoint failure belongs to another Kafka cluster");
         }
-        String key =
-                keys.checkpointFailureKey(identity, exact.partitionIncarnation(), exact.objectId());
-        byte[] bytes =
-                KafkaMetadataCodecs.encodeEnvelope(exact, KafkaCheckpointFailureRecord.class);
-        CompletableFuture<VersionedKafkaCheckpointFailure> write =
-                client.putIfAbsent(key, bytes, keys.bindingPartitionKey(identity))
-                        .thenApply(result -> versioned(key, exact, result.version(), bytes));
+        String key = keys.checkpointFailureKey(identity, exact.partitionIncarnation(), exact.objectId());
+        byte[] bytes = KafkaMetadataCodecs.encodeEnvelope(exact, KafkaCheckpointFailureRecord.class);
+        CompletableFuture<VersionedKafkaCheckpointFailure> write = client.putIfAbsent(
+                        key, bytes, keys.bindingPartitionKey(identity))
+                .thenApply(result -> versioned(key, exact, result.version(), bytes));
         return write.exceptionallyCompose(failure -> reconcileCreate(exact, unwrap(failure)));
     }
 
     private CompletableFuture<VersionedKafkaCheckpointFailure> reconcileCreate(
             KafkaCheckpointFailureRecord requested, Throwable writeFailure) {
         return get(requested.identity(), requested.partitionIncarnation(), requested.objectId())
-                .handle(
-                        (optional, readFailure) -> {
-                            if (readFailure != null) {
-                                Throwable exactRead = unwrap(readFailure);
-                                writeFailure.addSuppressed(exactRead);
-                                throw new CompletionException(
-                                        metadataFailure(
-                                                "failed to reconcile Kafka checkpoint quarantine",
-                                                writeFailure));
-                            }
-                            if (optional.isEmpty()) {
-                                throw new CompletionException(
-                                        metadataFailure(
-                                                "failed to create Kafka checkpoint quarantine",
-                                                writeFailure));
-                            }
-                            VersionedKafkaCheckpointFailure existing = optional.orElseThrow();
-                            requireSameReference(requested, existing.value());
-                            return existing;
-                        });
+                .handle((optional, readFailure) -> {
+                    if (readFailure != null) {
+                        Throwable exactRead = unwrap(readFailure);
+                        writeFailure.addSuppressed(exactRead);
+                        throw new CompletionException(
+                                metadataFailure("failed to reconcile Kafka checkpoint quarantine", writeFailure));
+                    }
+                    if (optional.isEmpty()) {
+                        throw new CompletionException(
+                                metadataFailure("failed to create Kafka checkpoint quarantine", writeFailure));
+                    }
+                    VersionedKafkaCheckpointFailure existing = optional.orElseThrow();
+                    requireSameReference(requested, existing.value());
+                    return existing;
+                });
     }
 
     @Override
@@ -120,13 +104,10 @@ public final class OxiaJavaKafkaCheckpointFailureMetadataStore
             long expectedIncarnation,
             String expectedObjectId) {
         try {
-            KafkaCheckpointFailureRecord value =
-                    KafkaMetadataCodecs.decodeEnvelope(
-                                    stored.value(), KafkaCheckpointFailureRecord.class)
-                            .withMetadataVersion(stored.version());
-            String expectedKey =
-                    keys.checkpointFailureKey(
-                            expectedIdentity, expectedIncarnation, expectedObjectId);
+            KafkaCheckpointFailureRecord value = KafkaMetadataCodecs.decodeEnvelope(
+                            stored.value(), KafkaCheckpointFailureRecord.class)
+                    .withMetadataVersion(stored.version());
+            String expectedKey = keys.checkpointFailureKey(expectedIdentity, expectedIncarnation, expectedObjectId);
             if (!stored.key().equals(expectedKey)
                     || !value.identity().equals(expectedIdentity)
                     || value.partitionIncarnation() != expectedIncarnation
@@ -151,17 +132,14 @@ public final class OxiaJavaKafkaCheckpointFailureMetadataStore
                 || requested.partitionIncarnation() != existing.partitionIncarnation()
                 || !requested.objectId().equals(existing.objectId())
                 || !Arrays.equals(requested.referenceSha256(), existing.referenceSha256())) {
-            throw invariant(
-                    "existing Kafka checkpoint quarantine conflicts with exact reference", null);
+            throw invariant("existing Kafka checkpoint quarantine conflicts with exact reference", null);
         }
     }
 
     private void ensureOpen() {
         if (closed.get()) {
             throw new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    "Kafka checkpoint failure metadata store is closed");
+                    ErrorCode.STORAGE_CLOSED, false, "Kafka checkpoint failure metadata store is closed");
         }
     }
 
@@ -188,7 +166,8 @@ public final class OxiaJavaKafkaCheckpointFailureMetadataStore
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }

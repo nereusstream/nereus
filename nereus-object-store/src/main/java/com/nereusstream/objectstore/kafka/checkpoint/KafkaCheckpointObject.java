@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.kafka.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -9,7 +10,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Fully verified immutable NKC1 object and decoded state sections. */
+/**
+ * Fully verified immutable NKC1 object and decoded state sections.
+ */
 public record KafkaCheckpointObject(
         KafkaCheckpointHeader header,
         List<KafkaCheckpointSection> sections,
@@ -41,6 +44,8 @@ public record KafkaCheckpointObject(
 
     private static void requireChecksum(Checksum value, ChecksumType type, String name) {
         Objects.requireNonNull(value, name);
-        if (value.type() != type) throw new IllegalArgumentException(name + " has the wrong type");
+        if (value.type() != type) {
+            throw new IllegalArgumentException(name + " has the wrong type");
+        }
     }
 }

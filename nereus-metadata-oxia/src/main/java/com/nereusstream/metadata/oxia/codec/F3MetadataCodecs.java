@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.CursorRetentionRecord;
@@ -6,16 +7,16 @@ import com.nereusstream.metadata.oxia.records.CursorStateRecord;
 import java.util.HexFormat;
 import java.util.List;
 
-/** Fourth explicit metadata record family for F3 cursor roots. */
+/**
+ * Fourth explicit metadata record family for F3 cursor roots.
+ */
 public final class F3MetadataCodecs {
     private static final MapMetadataCodecRegistry REGISTRY = new MapMetadataCodecRegistry(List.of(
-            new MapMetadataCodecRegistry.RegisteredCodec<>(
-                    CursorStateRecord.class, new CursorStateRecordCodecV1()),
+            new MapMetadataCodecRegistry.RegisteredCodec<>(CursorStateRecord.class, new CursorStateRecordCodecV1()),
             new MapMetadataCodecRegistry.RegisteredCodec<>(
                     CursorRetentionRecord.class, new CursorRetentionRecordCodecV1())));
 
-    private F3MetadataCodecs() {
-    }
+    private F3MetadataCodecs() {}
 
     public static MetadataCodecRegistry registry() {
         return REGISTRY;

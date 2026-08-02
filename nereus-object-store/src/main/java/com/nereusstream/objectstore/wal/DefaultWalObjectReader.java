@@ -55,9 +55,7 @@ public final class DefaultWalObjectReader implements WalObjectReader {
     }
 
     public DefaultWalObjectReader(
-            ObjectStore objectStore,
-            ReadResourceGuard resourceGuard,
-            WalReadObserver readObserver) {
+            ObjectStore objectStore, ReadResourceGuard resourceGuard, WalReadObserver readObserver) {
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
         this.resourceGuard = Objects.requireNonNull(resourceGuard, "resourceGuard");
         this.readObserver = Objects.requireNonNull(readObserver, "readObserver");
@@ -65,25 +63,22 @@ public final class DefaultWalObjectReader implements WalObjectReader {
 
     @Override
     public CompletableFuture<WalReadResult> readWithStats(
-            long startOffset,
-            List<ResolvedObjectRange> ranges,
-            ReadOptions options) {
+            long startOffset, List<ResolvedObjectRange> ranges, ReadOptions options) {
         if (options == null) {
-            return NereusException.failedFuture(
-                    ErrorCode.INVALID_ARGUMENT, false, "read options are required");
+            return NereusException.failedFuture(ErrorCode.INVALID_ARGUMENT, false, "read options are required");
         }
-        return readWithStats(new ReadRequest(
-                startOffset,
-                ReadView.COMMITTED,
-                ReadBoundaryMode.EXACT_START,
-                FirstEntryPolicy.LEGACY_STRICT_LIMIT,
-                options), ranges);
+        return readWithStats(
+                new ReadRequest(
+                        startOffset,
+                        ReadView.COMMITTED,
+                        ReadBoundaryMode.EXACT_START,
+                        FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                        options),
+                ranges);
     }
 
     @Override
-    public CompletableFuture<WalReadResult> readWithStats(
-            ReadRequest request,
-            List<ResolvedObjectRange> ranges) {
+    public CompletableFuture<WalReadResult> readWithStats(ReadRequest request, List<ResolvedObjectRange> ranges) {
         Objects.requireNonNull(ranges, "ranges");
         Objects.requireNonNull(request, "request");
         ReadOptions options = request.options();
@@ -98,7 +93,9 @@ public final class DefaultWalObjectReader implements WalObjectReader {
                     break;
                 }
                 SliceRead sliceRead = readSlice(range, deadline);
-                int returnedBefore = batches.stream().mapToInt(batch -> batch.payload().length).sum();
+                int returnedBefore = batches.stream()
+                        .mapToInt(batch -> batch.payload().length)
+                        .sum();
                 ClipResult clipped = clip(
                         request,
                         range,
@@ -110,12 +107,12 @@ public final class DefaultWalObjectReader implements WalObjectReader {
                 batches.addAll(clipped.batches());
                 remainingRecords -= clipped.recordsReturned();
                 remainingBytes -= clipped.bytesReturned();
-                int returnedAfter = batches.stream().mapToInt(batch -> batch.payload().length).sum();
+                int returnedAfter = batches.stream()
+                        .mapToInt(batch -> batch.payload().length)
+                        .sum();
                 try {
                     readObserver.onSliceRead(
-                            range.objectLength(),
-                            range.entryIndexRef().length(),
-                            returnedAfter - returnedBefore);
+                            range.objectLength(), range.entryIndexRef().length(), returnedAfter - returnedBefore);
                 } catch (RuntimeException ignored) {
                     // Metrics callbacks cannot reclassify a verified read.
                 }
@@ -137,13 +134,10 @@ public final class DefaultWalObjectReader implements WalObjectReader {
 
     private SliceRead readSlice(ResolvedObjectRange range, ReadDeadline deadline) {
         validateRange(range);
-        long bytesToReserve = checkedAdd(range.objectLength(), range.entryIndexRef().length());
+        long bytesToReserve =
+                checkedAdd(range.objectLength(), range.entryIndexRef().length());
         try (ReadResourceGuard.Reservation ignored = resourceGuard.reserve(bytesToReserve)) {
-            byte[] payload = readRangeBytes(
-                    range.objectKey(),
-                    range.objectOffset(),
-                    range.objectLength(),
-                    deadline);
+            byte[] payload = readRangeBytes(range.objectKey(), range.objectOffset(), range.objectLength(), deadline);
             ObjectKey indexObjectKey = range.entryIndexRef().objectKey().orElse(range.objectKey());
             byte[] entryIndexBytes = readRangeBytes(
                     indexObjectKey,
@@ -153,14 +147,12 @@ public final class DefaultWalObjectReader implements WalObjectReader {
             if (!Crc32cChecksums.checksum(payload, entryIndexBytes).equals(range.sliceChecksum())) {
                 throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "slice checksum mismatch");
             }
-            if (!Crc32cChecksums.checksum(entryIndexBytes).equals(range.entryIndexRef().checksum())) {
+            if (!Crc32cChecksums.checksum(entryIndexBytes)
+                    .equals(range.entryIndexRef().checksum())) {
                 throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "entry index checksum mismatch");
             }
-            EntryIndex entryIndex = EntryIndexDecoder.decode(
-                    entryIndexBytes,
-                    payload.length,
-                    minEventTime(range),
-                    maxEventTime(range));
+            EntryIndex entryIndex =
+                    EntryIndexDecoder.decode(entryIndexBytes, payload.length, minEventTime(range), maxEventTime(range));
             if (entryIndex.recordCount() != range.offsetRange().recordCount()
                     || payload.length != range.objectLength()) {
                 throw failure(
@@ -189,26 +181,19 @@ public final class DefaultWalObjectReader implements WalObjectReader {
             long absoluteEndOffset = Math.addExact(absoluteOffset, item.recordCount());
             if (absoluteEndOffset > range.offsetRange().endOffset()) {
                 throw failure(
-                        ErrorCode.METADATA_INVARIANT_VIOLATION,
-                        false,
-                        "entry index range exceeds its resolved range");
+                        ErrorCode.METADATA_INVARIANT_VIOLATION, false, "entry index range exceeds its resolved range");
             }
             if (absoluteEndOffset <= request.startOffset()
                     || absoluteOffset >= range.offsetRange().endOffset()) {
                 continue;
             }
-            if (request.boundaryMode() == ReadBoundaryMode.EXACT_START
-                    && absoluteOffset < request.startOffset()) {
-                throw failure(
-                        ErrorCode.OFFSET_NOT_AVAILABLE,
-                        false,
-                        "requested offset is inside a ranged WAL entry");
+            if (request.boundaryMode() == ReadBoundaryMode.EXACT_START && absoluteOffset < request.startOffset()) {
+                throw failure(ErrorCode.OFFSET_NOT_AVAILABLE, false, "requested offset is inside a ranged WAL entry");
             }
             selectedAny = true;
             boolean recordLimitExceeded = (long) recordsReturned + item.recordCount() > maxRecords;
             boolean byteLimitExceeded = item.payloadLength() > (long) maxBytes - bytesReturned;
-            boolean firstEntryOverflow = request.firstEntryPolicy()
-                    == FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW
+            boolean firstEntryOverflow = request.firstEntryPolicy() == FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW
                     && !returnedRecordBeforeRange
                     && batches.isEmpty();
             if ((recordLimitExceeded || byteLimitExceeded) && !firstEntryOverflow) {
@@ -242,19 +227,12 @@ public final class DefaultWalObjectReader implements WalObjectReader {
         return new ClipResult(batches, recordsReturned, bytesReturned, selectedAny && recordsReturned >= maxRecords);
     }
 
-    private byte[] readRangeBytes(
-            ObjectKey objectKey,
-            long offset,
-            long length,
-            ReadDeadline deadline) {
+    private byte[] readRangeBytes(ObjectKey objectKey, long offset, long length, ReadDeadline deadline) {
         RangeReadResult result;
         try {
             Duration remaining = deadline.remaining();
-            result = objectStore.readRange(
-                            objectKey,
-                            offset,
-                            length,
-                            new RangeReadOptions(Optional.empty(), remaining))
+            result = objectStore
+                    .readRange(objectKey, offset, length, new RangeReadOptions(Optional.empty(), remaining))
                     .orTimeout(remaining.toNanos(), TimeUnit.NANOSECONDS)
                     .join();
         } catch (CompletionException e) {
@@ -284,7 +262,8 @@ public final class DefaultWalObjectReader implements WalObjectReader {
         if (range.entryIndexRef().location() != EntryIndexLocation.OBJECT_FOOTER) {
             throw failure(ErrorCode.UNSUPPORTED_FORMAT, false, "unsupported entry index location");
         }
-        if (range.entryIndexRef().objectId().isPresent() != range.entryIndexRef().objectKey().isPresent()) {
+        if (range.entryIndexRef().objectId().isPresent()
+                != range.entryIndexRef().objectKey().isPresent()) {
             throw failure(ErrorCode.UNSUPPORTED_FORMAT, false, "entry index object identity is incomplete");
         }
     }
@@ -313,14 +292,9 @@ public final class DefaultWalObjectReader implements WalObjectReader {
         return new NereusException(code, retriable, message, cause);
     }
 
-    private record SliceRead(byte[] payload, EntryIndex entryIndex) {
-    }
+    private record SliceRead(byte[] payload, EntryIndex entryIndex) {}
 
-    private record ClipResult(
-            List<ReadBatch> batches,
-            int recordsReturned,
-            int bytesReturned,
-            boolean limitReached) {
+    private record ClipResult(List<ReadBatch> batches, int recordsReturned, int bytesReturned, boolean limitReached) {
         private ClipResult {
             batches = List.copyOf(batches);
         }

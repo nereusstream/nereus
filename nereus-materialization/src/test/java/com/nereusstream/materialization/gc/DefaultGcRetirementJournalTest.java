@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectKey;
@@ -68,7 +68,9 @@ class DefaultGcRetirementJournalTest {
         assertThat(prepared.queryIdentitySha256())
                 .isEqualTo(facts.candidate().referenceQuery().queryIdentitySha256());
         assertThat(prepared.domainProofs())
-                .isEqualTo(facts.snapshots().stream().map(GcDomainSnapshotProof::from).toList());
+                .isEqualTo(facts.snapshots().stream()
+                        .map(GcDomainSnapshotProof::from)
+                        .toList());
         assertThat(prepared.plannedProtectionRemovals()).isEqualTo(facts.protections());
         assertThat(prepared.plannedMetadataRemovals()).isEqualTo(facts.removals());
         assertThat(prepared.referenceSetSha256()).isEqualTo(facts.digest());
@@ -78,8 +80,8 @@ class DefaultGcRetirementJournalTest {
         DefaultGcRetirementJournal restarted = new DefaultGcRetirementJournal(CLUSTER, store, config);
         GcRetirementJournalSnapshot loaded;
         try (MaterializationDeadline deadline = deadline()) {
-            loaded = restarted.load(
-                            facts.candidate().object().objectKeyHash(), ATTEMPT_ID, deadline)
+            loaded = restarted
+                    .load(facts.candidate().object().objectKeyHash(), ATTEMPT_ID, deadline)
                     .join()
                     .orElseThrow();
         }
@@ -98,15 +100,14 @@ class DefaultGcRetirementJournalTest {
         ResponseLossStore store = new ResponseLossStore();
         PlanFacts facts = facts(config);
 
-        GcRetirementJournalSnapshot prepared = prepare(
-                new DefaultGcRetirementJournal(CLUSTER, store, config), facts);
+        GcRetirementJournalSnapshot prepared = prepare(new DefaultGcRetirementJournal(CLUSTER, store, config), facts);
 
         assertThat(store.lostProtectionResponse()).isTrue();
         assertThat(store.lostManifestResponse()).isTrue();
         assertThat(prepared.referenceSetSha256()).isEqualTo(facts.digest());
         assertThat(store.getRetirementManifest(
-                        CLUSTER, facts.candidate().object().objectKeyHash(), ATTEMPT_ID)
-                .join())
+                                CLUSTER, facts.candidate().object().objectKeyHash(), ATTEMPT_ID)
+                        .join())
                 .isPresent();
     }
 
@@ -120,13 +121,12 @@ class DefaultGcRetirementJournalTest {
         assertThatThrownBy(() -> prepare(journal, facts))
                 .hasRootCauseMessage("GC retirement journal is missing removal entries");
         assertThat(store.getRetirementManifest(
-                        CLUSTER, facts.candidate().object().objectKeyHash(), ATTEMPT_ID)
-                .join())
+                                CLUSTER, facts.candidate().object().objectKeyHash(), ATTEMPT_ID)
+                        .join())
                 .isEmpty();
     }
 
-    private GcRetirementJournalSnapshot prepare(
-            DefaultGcRetirementJournal journal, PlanFacts facts) {
+    private GcRetirementJournalSnapshot prepare(DefaultGcRetirementJournal journal, PlanFacts facts) {
         try (MaterializationDeadline deadline = deadline()) {
             return journal.prepare(
                             ATTEMPT_ID,
@@ -152,8 +152,7 @@ class DefaultGcRetirementJournalTest {
                 PhysicalObjectIdentity.from(active.value()),
                 List.of(new StreamId("stream-a")),
                 SHA_A);
-        GcCandidate candidate = GcCandidate.fromActiveRoot(
-                config, CANDIDATE_ID, active, query, SHA_A, 250, 250);
+        GcCandidate candidate = GcCandidate.fromActiveRoot(config, CANDIDATE_ID, active, query, SHA_A, 250, 250);
         List<GcReferenceSnapshot> snapshots = List.of(GcReferenceSnapshot.create(
                 "generation-v1",
                 1,
@@ -170,8 +169,7 @@ class DefaultGcRetirementJournalTest {
         List<GcPlannedMetadataRemoval> removals = List.of(
                 new GcPlannedMetadataRemoval("generation-index", "/metadata/a", 11, SHA_B),
                 new GcPlannedMetadataRemoval("generation-index", "/metadata/b", 12, SHA_C));
-        Checksum digest = GcPlan.computeReferenceSetSha256(
-                config, candidate, snapshots, protections, removals);
+        Checksum digest = GcPlan.computeReferenceSetSha256(config, candidate, snapshots, protections, removals);
         return new PlanFacts(candidate, snapshots, protections, removals, digest);
     }
 
@@ -190,10 +188,7 @@ class DefaultGcRetirementJournalTest {
                 0,
                 metadataVersion);
         return new GcPlannedProtectionRemoval(new VersionedObjectProtection(
-                "/protections/" + objectHash + "/" + generationId,
-                value,
-                metadataVersion,
-                durableSha));
+                "/protections/" + objectHash + "/" + generationId, value, metadataVersion, durableSha));
     }
 
     private static VersionedPhysicalObjectRoot activeRoot() {
@@ -265,7 +260,7 @@ class DefaultGcRetirementJournalTest {
             List<GcReferenceSnapshot> snapshots,
             List<GcPlannedProtectionRemoval> protections,
             List<GcPlannedMetadataRemoval> removals,
-            Checksum digest) { }
+            Checksum digest) {}
 
     private static final class ResponseLossStore extends FakePhysicalObjectMetadataStore {
         private final AtomicBoolean loseProtection = new AtomicBoolean(true);
@@ -274,20 +269,18 @@ class DefaultGcRetirementJournalTest {
         @Override
         public CompletableFuture<VersionedGcRetirementProtection> createRetirementProtection(
                 String cluster, GcRetirementProtectionRecord protection) {
-            return super.createRetirementProtection(cluster, protection).thenCompose(created ->
-                    loseProtection.compareAndSet(true, false)
-                            ? CompletableFuture.failedFuture(
-                                    new IllegalStateException("lost protection response"))
+            return super.createRetirementProtection(cluster, protection)
+                    .thenCompose(created -> loseProtection.compareAndSet(true, false)
+                            ? CompletableFuture.failedFuture(new IllegalStateException("lost protection response"))
                             : CompletableFuture.completedFuture(created));
         }
 
         @Override
         public CompletableFuture<VersionedGcRetirementManifest> createRetirementManifest(
                 String cluster, GcRetirementManifestRecord manifest) {
-            return super.createRetirementManifest(cluster, manifest).thenCompose(created ->
-                    loseManifest.compareAndSet(true, false)
-                            ? CompletableFuture.failedFuture(
-                                    new IllegalStateException("lost manifest response"))
+            return super.createRetirementManifest(cluster, manifest)
+                    .thenCompose(created -> loseManifest.compareAndSet(true, false)
+                            ? CompletableFuture.failedFuture(new IllegalStateException("lost manifest response"))
                             : CompletableFuture.completedFuture(created));
         }
 
@@ -304,8 +297,7 @@ class DefaultGcRetirementJournalTest {
         @Override
         public CompletableFuture<VersionedGcRetirementRemoval> createRetirementRemoval(
                 String cluster, GcRetirementRemovalRecord removal) {
-            return CompletableFuture.failedFuture(
-                    new IllegalStateException("injected removal write failure"));
+            return CompletableFuture.failedFuture(new IllegalStateException("injected removal write failure"));
         }
     }
 }

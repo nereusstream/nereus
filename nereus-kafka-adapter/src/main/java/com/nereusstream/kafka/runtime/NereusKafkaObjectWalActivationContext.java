@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.kafka.activation.KafkaBrokerCapabilitySpecification;
@@ -7,7 +8,9 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Kafka-fork activation facts required by the production Object-WAL runtime path. */
+/**
+ * Kafka-fork activation facts required by the production Object-WAL runtime path.
+ */
 public record NereusKafkaObjectWalActivationContext(
         KafkaBrokerCapabilitySpecification capability,
         KafkaStorageClusterSnapshotProvider clusterSnapshots,
@@ -35,13 +38,7 @@ public record NereusKafkaObjectWalActivationContext(
             Duration activationWaitTimeout,
             Duration activationPollInterval,
             Optional<NereusKafkaCompactionContext> compaction) {
-        this(
-                capability,
-                clusterSnapshots,
-                activationWaitTimeout,
-                activationPollInterval,
-                compaction,
-                Optional.empty());
+        this(capability, clusterSnapshots, activationWaitTimeout, activationPollInterval, compaction, Optional.empty());
     }
 
     public NereusKafkaObjectWalActivationContext {

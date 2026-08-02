@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import com.nereusstream.api.ObjectKeyHash;
@@ -25,7 +26,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Bridges F3 cursor inventory to the single F4 physical-root/retirement correctness owner. */
+/**
+ * Bridges F3 cursor inventory to the single F4 physical-root/retirement correctness owner.
+ */
 public final class CursorSnapshotGcExecutor {
     private final PhysicalGcConfig config;
     private final CursorSnapshotGcScanner scanner;
@@ -43,24 +46,19 @@ public final class CursorSnapshotGcExecutor {
             GcIdGenerator candidateIds) {
         this.config = Objects.requireNonNull(config, "config");
         this.scanner = Objects.requireNonNull(scanner, "scanner");
-        this.referenceDomains = Objects.requireNonNull(
-                referenceDomains, "referenceDomains");
-        this.garbageCollector = Objects.requireNonNull(
-                garbageCollector, "garbageCollector");
-        this.sourceRetirement = Objects.requireNonNull(
-                sourceRetirement, "sourceRetirement");
+        this.referenceDomains = Objects.requireNonNull(referenceDomains, "referenceDomains");
+        this.garbageCollector = Objects.requireNonNull(garbageCollector, "garbageCollector");
+        this.sourceRetirement = Objects.requireNonNull(sourceRetirement, "sourceRetirement");
         this.candidateIds = Objects.requireNonNull(candidateIds, "candidateIds");
     }
 
-    /** Discovers and processes every eligible ACTIVE candidate for one exact ledger identity, sequentially. */
-    public CompletableFuture<ScanExecutionReport> scan(
-            CursorLedgerIdentity ledger) {
+    /**
+     * Discovers and processes every eligible ACTIVE candidate for one exact ledger identity, sequentially.
+     */
+    public CompletableFuture<ScanExecutionReport> scan(CursorLedgerIdentity ledger) {
         Objects.requireNonNull(ledger, "ledger");
         ArrayList<CandidateExecutionResult> executions = new ArrayList<>();
-        return scanner.scan(
-                        ledger,
-                        candidate -> executeActive(candidate)
-                                .thenAccept(executions::add))
+        return scanner.scan(ledger, candidate -> executeActive(candidate).thenAccept(executions::add))
                 .thenApply(scan -> new ScanExecutionReport(scan, executions));
     }
 
@@ -71,31 +69,27 @@ public final class CursorSnapshotGcExecutor {
      * rolled back to ACTIVE. An incomplete/failed read propagates and leaves MARKED for a later retry.
      */
     public CompletableFuture<CandidateExecutionResult> recoverMarked(
-            CursorLedgerIdentity ledger,
-            VersionedPhysicalObjectRoot markedRoot) {
+            CursorLedgerIdentity ledger, VersionedPhysicalObjectRoot markedRoot) {
         Objects.requireNonNull(ledger, "ledger");
-        VersionedPhysicalObjectRoot marked = Objects.requireNonNull(
-                markedRoot, "markedRoot");
+        VersionedPhysicalObjectRoot marked = Objects.requireNonNull(markedRoot, "markedRoot");
         return scanner.recoverMarked(ledger, marked)
-                .thenCompose(optional -> optional
-                        .<CompletableFuture<CandidateExecutionResult>>map(candidate ->
-                                reconstructAndAdvance(candidate, marked))
+                .thenCompose(optional -> optional.<CompletableFuture<CandidateExecutionResult>>map(
+                                candidate -> reconstructAndAdvance(candidate, marked))
                         .orElseGet(() -> unmark(marked)));
     }
 
-    /** Resumes an already durable DELETING intent without consulting object-store listing. */
-    public CompletableFuture<PhysicalGcDeletionResult> recoverDeleting(
-            VersionedPhysicalObjectRoot deletingRoot) {
-        return sourceRetirement.resume(Objects.requireNonNull(
-                deletingRoot, "deletingRoot"));
+    /**
+     * Resumes an already durable DELETING intent without consulting object-store listing.
+     */
+    public CompletableFuture<PhysicalGcDeletionResult> recoverDeleting(VersionedPhysicalObjectRoot deletingRoot) {
+        return sourceRetirement.resume(Objects.requireNonNull(deletingRoot, "deletingRoot"));
     }
 
-    private CompletableFuture<CandidateExecutionResult> executeActive(
-            CursorSnapshotGcScanner.Candidate candidate) {
+    private CompletableFuture<CandidateExecutionResult> executeActive(CursorSnapshotGcScanner.Candidate candidate) {
         if (candidate.sourceRoot().value().lifecycle()
                 != com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle.ACTIVE) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "ACTIVE cursor execution received a non-ACTIVE source root"));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("ACTIVE cursor execution received a non-ACTIVE source root"));
         }
         GcCandidate gcCandidate = GcCandidate.fromActiveRoot(
                 config,
@@ -106,23 +100,17 @@ public final class CursorSnapshotGcExecutor {
                 candidate.discoveredAtMillis(),
                 candidate.notBeforeMillis());
         List<GcPlannedProtectionRemoval> protections = protections(candidate);
-        return garbageCollector.mark(gcCandidate, protections, List.of())
-                .thenCompose(mark -> {
-                    if (mark.status() != PhysicalGcMarkStatus.MARKED) {
-                        return CompletableFuture.completedFuture(
-                                CandidateExecutionResult.markOnly(
-                                        gcCandidate.object().objectKeyHash(), mark));
-                    }
-                    return advance(
-                            candidate,
-                            mark.plan().orElseThrow(),
-                            Optional.of(mark));
-                });
+        return garbageCollector.mark(gcCandidate, protections, List.of()).thenCompose(mark -> {
+            if (mark.status() != PhysicalGcMarkStatus.MARKED) {
+                return CompletableFuture.completedFuture(
+                        CandidateExecutionResult.markOnly(gcCandidate.object().objectKeyHash(), mark));
+            }
+            return advance(candidate, mark.plan().orElseThrow(), Optional.of(mark));
+        });
     }
 
     private CompletableFuture<CandidateExecutionResult> reconstructAndAdvance(
-            CursorSnapshotGcScanner.Candidate candidate,
-            VersionedPhysicalObjectRoot marked) {
+            CursorSnapshotGcScanner.Candidate candidate, VersionedPhysicalObjectRoot marked) {
         GcCandidate gcCandidate = GcCandidate.fromMarkedRoot(
                 config,
                 candidateIds.next(),
@@ -130,9 +118,9 @@ public final class CursorSnapshotGcExecutor {
                 candidate.referenceQuery(),
                 candidate.discoveryEvidenceSha256(),
                 candidate.discoveredAtMillis());
-        return referenceDomains.snapshotForDeletion(candidate.referenceQuery())
-                .thenCompose(collection -> reconstructPlan(
-                        candidate, gcCandidate, marked, collection));
+        return referenceDomains
+                .snapshotForDeletion(candidate.referenceQuery())
+                .thenCompose(collection -> reconstructPlan(candidate, gcCandidate, marked, collection));
     }
 
     private CompletableFuture<CandidateExecutionResult> reconstructPlan(
@@ -160,54 +148,41 @@ public final class CursorSnapshotGcExecutor {
     }
 
     private CompletableFuture<CandidateExecutionResult> advance(
-            CursorSnapshotGcScanner.Candidate candidate,
-            GcPlan plan,
-            Optional<PhysicalGcMarkResult> mark) {
-        return garbageCollector.advanceToDeleteIntent(
-                        plan,
-                        ignored -> scanner.revalidate(candidate))
+            CursorSnapshotGcScanner.Candidate candidate, GcPlan plan, Optional<PhysicalGcMarkResult> mark) {
+        return garbageCollector
+                .advanceToDeleteIntent(plan, ignored -> scanner.revalidate(candidate))
                 .thenCompose(advance -> {
                     if (advance.status() != PhysicalGcAdvanceStatus.DELETE_INTENT) {
-                        return CompletableFuture.completedFuture(
-                                CandidateExecutionResult.advanced(
-                                        plan.candidate().object().objectKeyHash(),
-                                        mark,
-                                        advance));
+                        return CompletableFuture.completedFuture(CandidateExecutionResult.advanced(
+                                plan.candidate().object().objectKeyHash(), mark, advance));
                     }
-                    return sourceRetirement.resume(advance.root().orElseThrow())
+                    return sourceRetirement
+                            .resume(advance.root().orElseThrow())
                             .thenApply(deletion -> CandidateExecutionResult.deleted(
-                                    plan.candidate().object().objectKeyHash(),
-                                    mark,
-                                    advance,
-                                    deletion));
+                                    plan.candidate().object().objectKeyHash(), mark, advance, deletion));
                 });
     }
 
-    private CompletableFuture<CandidateExecutionResult> unmark(
-            VersionedPhysicalObjectRoot marked) {
+    private CompletableFuture<CandidateExecutionResult> unmark(VersionedPhysicalObjectRoot marked) {
         ObjectKeyHash object = new ObjectKeyHash(marked.value().objectKeyHash());
-        return garbageCollector.unmarkDrifted(marked)
-                .thenApply(advance -> CandidateExecutionResult.advanced(
-                        object, Optional.empty(), advance));
+        return garbageCollector
+                .unmarkDrifted(marked)
+                .thenApply(advance -> CandidateExecutionResult.advanced(object, Optional.empty(), advance));
     }
 
-    private static List<GcPlannedProtectionRemoval> protections(
-            CursorSnapshotGcScanner.Candidate candidate) {
+    private static List<GcPlannedProtectionRemoval> protections(CursorSnapshotGcScanner.Candidate candidate) {
         return candidate.plannedProtectionRemovals().stream()
                 .map(GcPlannedProtectionRemoval::new)
                 .toList();
     }
 
     public record ScanExecutionReport(
-            CursorSnapshotGcScanner.ScanResult scan,
-            List<CandidateExecutionResult> executions) {
+            CursorSnapshotGcScanner.ScanResult scan, List<CandidateExecutionResult> executions) {
         public ScanExecutionReport {
             Objects.requireNonNull(scan, "scan");
-            executions = List.copyOf(Objects.requireNonNull(
-                    executions, "executions"));
+            executions = List.copyOf(Objects.requireNonNull(executions, "executions"));
             if (executions.size() != scan.visitedCandidates()) {
-                throw new IllegalArgumentException(
-                        "cursor GC execution count differs from visited candidates");
+                throw new IllegalArgumentException("cursor GC execution count differs from visited candidates");
             }
         }
     }
@@ -223,27 +198,18 @@ public final class CursorSnapshotGcExecutor {
             advance = Objects.requireNonNull(advance, "advance");
             deletion = Objects.requireNonNull(deletion, "deletion");
             if (deletion.isPresent()
-                    && (advance.isEmpty()
-                            || advance.orElseThrow().status()
-                                    != PhysicalGcAdvanceStatus.DELETE_INTENT)) {
-                throw new IllegalArgumentException(
-                        "cursor GC deletion requires a durable delete-intent result");
+                    && (advance.isEmpty() || advance.orElseThrow().status() != PhysicalGcAdvanceStatus.DELETE_INTENT)) {
+                throw new IllegalArgumentException("cursor GC deletion requires a durable delete-intent result");
             }
         }
 
-        private static CandidateExecutionResult markOnly(
-                ObjectKeyHash object,
-                PhysicalGcMarkResult mark) {
-            return new CandidateExecutionResult(
-                    object, Optional.of(mark), Optional.empty(), Optional.empty());
+        private static CandidateExecutionResult markOnly(ObjectKeyHash object, PhysicalGcMarkResult mark) {
+            return new CandidateExecutionResult(object, Optional.of(mark), Optional.empty(), Optional.empty());
         }
 
         private static CandidateExecutionResult advanced(
-                ObjectKeyHash object,
-                Optional<PhysicalGcMarkResult> mark,
-                PhysicalGcAdvanceResult advance) {
-            return new CandidateExecutionResult(
-                    object, mark, Optional.of(advance), Optional.empty());
+                ObjectKeyHash object, Optional<PhysicalGcMarkResult> mark, PhysicalGcAdvanceResult advance) {
+            return new CandidateExecutionResult(object, mark, Optional.of(advance), Optional.empty());
         }
 
         private static CandidateExecutionResult deleted(
@@ -251,11 +217,7 @@ public final class CursorSnapshotGcExecutor {
                 Optional<PhysicalGcMarkResult> mark,
                 PhysicalGcAdvanceResult advance,
                 PhysicalGcDeletionResult deletion) {
-            return new CandidateExecutionResult(
-                    object,
-                    mark,
-                    Optional.of(advance),
-                    Optional.of(deletion));
+            return new CandidateExecutionResult(object, mark, Optional.of(advance), Optional.of(deletion));
         }
     }
 }

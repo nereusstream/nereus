@@ -55,13 +55,13 @@ healthy admitted same-view replacement accepted by the final-gated F4 source-ret
 The complete ledger range inventory is the set of exact protection records. Each protection type has an owner-specific
 retirement rule：
 
-| Protection | May retire only after |
-| --- | --- |
-| `REACHABLE_APPEND` | commit is safely represented by generation zero/recovery checkpoint, or exact logical trim/source-retirement plan removes the commit owner |
-| `VISIBLE_GENERATION` | generation-zero index is conditionally retired after trim or healthy higher replacement |
+| Protection               | May retire only after                                                                                                                                   |
+|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `REACHABLE_APPEND`       | commit is safely represented by generation zero/recovery checkpoint, or exact logical trim/source-retirement plan removes the commit owner              |
+| `VISIBLE_GENERATION`     | generation-zero index is conditionally retired after trim or healthy higher replacement                                                                 |
 | `MATERIALIZATION_SOURCE` | task is terminal/reconstructable, required output generation is exact COMMITTED, and source-retirement journal authorizes owner then protection removal |
-| `APPEND_RECOVERY` | recovery checkpoint/anchor has advanced past the source under existing exact commit-chain rules, or trim authorizes retirement |
-| `REPAIR` | bounded lease expired, owner is absent/terminal, and exact root/reference state is revalidated |
+| `APPEND_RECOVERY`        | recovery checkpoint/anchor has advanced past the source under existing exact commit-chain rules, or trim authorizes retirement                          |
+| `REPAIR`                 | bounded lease expired, owner is absent/terminal, and exact root/reference state is revalidated                                                          |
 
 The implemented BK-M2 order is always：
 
@@ -467,7 +467,8 @@ If Object upload/publication/read verification times out or fails after head：
 - producer receives an error with `AppendOutcome.KNOWN_COMMITTED` and the original `AppendAttemptId`；
 - reservation/target/commit/result remain unchanged；
 - task remains durable/retriable or terminal with classified failure；
-- `recoverAppend` reloads the same commit, reconstructs/reuses the same task, and returns the original stable result only
+- `recoverAppend` reloads the same commit, reconstructs/reuses the same task, and returns the original stable result
+  only
   after the required Object proof；
 - a new BK range, offset or MessageId is never allocated by completion recovery。
 
@@ -495,33 +496,36 @@ never justified merely because an upload once succeeded.
 
 ## 10. Retention crash matrix
 
-| Cut | Required recovery |
-| --- | --- |
-| task exists, BK source protection missing | gen0 protection retains source; reconciler creates exact task protection before claim |
-| BK read complete, Object upload absent | task retry reads same target; BK retained |
-| Object bytes uploaded, root/publication absent | F4 guarded output recovery; BK retained |
-| generation COMMITTED, task/checkpoint response lost | exact reload converges; task/source protection remains until retirement |
-| source/index owner retirement response lost | retirement verifier reloads exact authority; protection stays ACTIVE or converges to the same RETIRED tombstone |
-| all protections RETIRED, reader lease exists | ledger remains SEALED/MARKED until lease drain and final revalidation |
-| BookKeeper DELETE response lost | reload exact metadata; never blind-delete foreign identity; dual absence proof |
-| matching ledger reappears during absence grace | validate allocation metadata, repeat delete under same intent, restart grace |
-| allocation create once entered unknown outcome | persist permanent slot + `lateCreateHazard`；matching ledger is recovery-opened/sealed because its writable handle cannot be reconstructed, and automatic delete remains forbidden |
-| namespace readiness/reservation changes before delete | invalidate activation and stop before provider delete；never trust prior metadata check |
-| physical ledger appears for ABORTED/DELETED tombstone | conditional escalation to QUARANTINED；no automatic delete/reuse |
-| reference appears after MARKED | unmark to SEALED; no physical delete |
+| Cut                                                   | Required recovery                                                                                                                                                                 |
+|-------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| task exists, BK source protection missing             | gen0 protection retains source; reconciler creates exact task protection before claim                                                                                             |
+| BK read complete, Object upload absent                | task retry reads same target; BK retained                                                                                                                                         |
+| Object bytes uploaded, root/publication absent        | F4 guarded output recovery; BK retained                                                                                                                                           |
+| generation COMMITTED, task/checkpoint response lost   | exact reload converges; task/source protection remains until retirement                                                                                                           |
+| source/index owner retirement response lost           | retirement verifier reloads exact authority; protection stays ACTIVE or converges to the same RETIRED tombstone                                                                   |
+| all protections RETIRED, reader lease exists          | ledger remains SEALED/MARKED until lease drain and final revalidation                                                                                                             |
+| BookKeeper DELETE response lost                       | reload exact metadata; never blind-delete foreign identity; dual absence proof                                                                                                    |
+| matching ledger reappears during absence grace        | validate allocation metadata, repeat delete under same intent, restart grace                                                                                                      |
+| allocation create once entered unknown outcome        | persist permanent slot + `lateCreateHazard`；matching ledger is recovery-opened/sealed because its writable handle cannot be reconstructed, and automatic delete remains forbidden |
+| namespace readiness/reservation changes before delete | invalidate activation and stop before provider delete；never trust prior metadata check                                                                                            |
+| physical ledger appears for ABORTED/DELETED tombstone | conditional escalation to QUARANTINED；no automatic delete/reuse                                                                                                                   |
+| reference appears after MARKED                        | unmark to SEALED; no physical delete                                                                                                                                              |
 
 ### 10.1 F9 immutable-source retirement correction
 
-F9's Kafka compaction process gate exposed a valid overlap with ordinary async Object materialization：a KCP1 task can freeze
+F9's Kafka compaction process gate exposed a valid overlap with ordinary async Object materialization：a KCP1 task can
+freeze
 BookKeeper generation zero，then a higher Object generation becomes visible and legally retires the fixed
-`VISIBLE_GENERATION` anchor before that KCP1 task begins source IO。The BookKeeper protection adapter now distinguishes three
+`VISIBLE_GENERATION` anchor before that KCP1 task begins source IO。The BookKeeper protection adapter now distinguishes
+three
 states at code level：
 
 1. deterministic dynamic `MATERIALIZATION_SOURCE` exists：revalidate or owner-transfer that exact protection；it remains a
    sufficient ledger-GC veto even if the fixed anchor is already `RETIRED`；
 2. dynamic protection is absent and exactly one matching fixed anchor is ACTIVE：create/reconcile the dynamic slot；
 3. dynamic protection is absent and the sole matching fixed anchor is RETIRED：raise typed
-   `MaterializationSourceRetiredException` / `TaskFailureClass.SOURCE_RETIRED`，cancel the immutable task and admit a fresh
+   `MaterializationSourceRetiredException` / `TaskFailureClass.SOURCE_RETIRED`，cancel the immutable task and admit a
+   fresh
    plan；do not reopen the retired source or spin in retry。
 
 Absent anchors remain retriable metadata conditions；multiple ACTIVE anchors are invariant violations。Kafka compaction

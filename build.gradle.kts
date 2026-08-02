@@ -12,10 +12,14 @@
  * limitations under the License.
  */
 
+import com.diffplug.gradle.spotless.SpotlessExtension
+import org.gradle.api.DefaultTask
+import org.gradle.api.artifacts.VersionCatalogsExtension
+import org.gradle.api.plugins.quality.Checkstyle
+import org.gradle.api.plugins.quality.CheckstyleExtension
+import org.gradle.api.provider.Property
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
-import org.gradle.api.DefaultTask
-import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.TaskAction
 
@@ -36,8 +40,8 @@ abstract class DevelopmentCoordinateVerificationTask : DefaultTask() {
     fun verifyCoordinate() {
         check(actualVersion.get() == expectedVersion.get()) {
             "Refusing to publish Kafka F9 development artifacts as ${actualVersion.get()}; " +
-                "expected ${expectedVersion.get()}. Add the calling gate to " +
-                "kafkaDevelopmentGateRequested."
+                    "expected ${expectedVersion.get()}. Add the calling gate to " +
+                    "kafkaDevelopmentGateRequested."
         }
     }
 }
@@ -45,6 +49,7 @@ abstract class DevelopmentCoordinateVerificationTask : DefaultTask() {
 plugins {
     `base`
     `maven-publish`
+    alias(libs.plugins.spotless) apply false
 }
 
 group = providers.gradleProperty("nereusGroup").get()
@@ -52,60 +57,60 @@ val phase2DevelopmentVersion = "0.1.0-f2-dev"
 val phase9DevelopmentVersion = "0.1.0-f9-dev"
 val pulsarDevelopmentGateRequested = gradle.startParameter.taskNames.any { requested ->
     requested.substringAfterLast(':').startsWith("phase2")
-        || requested.substringAfterLast(':').startsWith("phase3")
-        // M1 consumes the final-gated F3 source composite. The Pulsar fork remains on the
-        // frozen F2 development coordinate until the F4 broker rollout milestone changes both repos.
-        || requested.substringAfterLast(':').startsWith("phase4")
-        || requested.substringAfterLast(':').startsWith("bookKeeperPrimaryWal")
-        || requested.substringAfterLast(':') == "publishPhase2DevelopmentArtifacts"
+            || requested.substringAfterLast(':').startsWith("phase3")
+            // M1 consumes the final-gated F3 source composite. The Pulsar fork remains on the
+            // frozen F2 development coordinate until the F4 broker rollout milestone changes both repos.
+            || requested.substringAfterLast(':').startsWith("phase4")
+            || requested.substringAfterLast(':').startsWith("bookKeeperPrimaryWal")
+            || requested.substringAfterLast(':') == "publishPhase2DevelopmentArtifacts"
 }
 val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { requested ->
     val task = requested.substringAfterLast(':')
     task.startsWith("phase9M3")
-        || task.startsWith("phase9M6Kafka")
-        || task == "phase9M5KafkaCompactionOracleCheck"
-        || task == "phase9M5KafkaRetentionOracleCheck"
-        || task == "phase9ChaosCheck"
-        || task == "phase9CompatibilityCheck"
-        || task == "phase9PerformanceCheck"
-        || task == "phase9M4FinalCheck"
-        || task == "phase9M5FinalCheck"
-        || task == "phase9M6FinalCheck"
-        || task == "phase9M7Check"
-        || task == "phase9M7FinalCheck"
-        || task == "phase9PrepareFinalEvidence"
-        || task == "phase9FinalEvidenceReport"
-        || task == "phase9FinalCheck"
-        || task == "phase9KafkaForkCompatibilityCheck"
-        || task == "f9EvidenceAggregatorTest"
-        || task == "f9M6KafkaProcessIntegrationTest"
-        || task == "f9CheckpointTrimRecoveryProcessIntegrationTest"
-        || task == "f9DeleteRecordsBoundaryProcessIntegrationTest"
-        || task == "f9TrimResponseLossProcessIntegrationTest"
-        || task == "f9TrimProfileMatrixProcessIntegrationTest"
-        || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
-        || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
-        || task == "f9CoordinatorMigrationProcessIntegrationTest"
-        || task == "f9OngoingTransactionMigrationProcessIntegrationTest"
-        || task == "f9TransactionResolutionCutProcessIntegrationTest"
-        || task == "f9TransactionResolutionProfileMatrixProcessIntegrationTest"
-        || task == "f9MandatoryInternalTopicNtc2ProcessIntegrationTest"
-        || task == "f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest"
-        || task == "f9MultiControllerFailoverProcessIntegrationTest"
-        || task == "f9ActivationCutFailoverProcessIntegrationTest"
-        || task == "f9ActivationProofCutFailoverProcessIntegrationTest"
-        || task == "f9ActivationTransportRecoveryProcessIntegrationTest"
-        || task == "f9InFlightTakeoverProcessIntegrationTest"
-        || task == "f9BookKeeperProfileTakeoverProcessIntegrationTest"
-        || task == "f9BookKeeperInFlightTakeoverProcessIntegrationTest"
-        || task == "f9BookKeeperWalOnlyProcessIntegrationTest"
-        || task == "f9BookKeeperWalAsyncObjectProcessIntegrationTest"
-        || task == "f9BookKeeperWalSyncObjectProcessIntegrationTest"
-        || task == "f9ObjectWalAsyncObjectProcessIntegrationTest"
-        || task == "f9LeaderChurnChaosProcessIntegrationTest"
-        || task == "f9ClientCompatibilityProcessIntegrationTest"
-        || task == "f9PerformanceProfileProcessIntegrationTest"
-        || task == "publishPhase9DevelopmentArtifacts"
+            || task.startsWith("phase9M6Kafka")
+            || task == "phase9M5KafkaCompactionOracleCheck"
+            || task == "phase9M5KafkaRetentionOracleCheck"
+            || task == "phase9ChaosCheck"
+            || task == "phase9CompatibilityCheck"
+            || task == "phase9PerformanceCheck"
+            || task == "phase9M4FinalCheck"
+            || task == "phase9M5FinalCheck"
+            || task == "phase9M6FinalCheck"
+            || task == "phase9M7Check"
+            || task == "phase9M7FinalCheck"
+            || task == "phase9PrepareFinalEvidence"
+            || task == "phase9FinalEvidenceReport"
+            || task == "phase9FinalCheck"
+            || task == "phase9KafkaForkCompatibilityCheck"
+            || task == "f9EvidenceAggregatorTest"
+            || task == "f9M6KafkaProcessIntegrationTest"
+            || task == "f9CheckpointTrimRecoveryProcessIntegrationTest"
+            || task == "f9DeleteRecordsBoundaryProcessIntegrationTest"
+            || task == "f9TrimResponseLossProcessIntegrationTest"
+            || task == "f9TrimProfileMatrixProcessIntegrationTest"
+            || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
+            || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
+            || task == "f9CoordinatorMigrationProcessIntegrationTest"
+            || task == "f9OngoingTransactionMigrationProcessIntegrationTest"
+            || task == "f9TransactionResolutionCutProcessIntegrationTest"
+            || task == "f9TransactionResolutionProfileMatrixProcessIntegrationTest"
+            || task == "f9MandatoryInternalTopicNtc2ProcessIntegrationTest"
+            || task == "f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest"
+            || task == "f9MultiControllerFailoverProcessIntegrationTest"
+            || task == "f9ActivationCutFailoverProcessIntegrationTest"
+            || task == "f9ActivationProofCutFailoverProcessIntegrationTest"
+            || task == "f9ActivationTransportRecoveryProcessIntegrationTest"
+            || task == "f9InFlightTakeoverProcessIntegrationTest"
+            || task == "f9BookKeeperProfileTakeoverProcessIntegrationTest"
+            || task == "f9BookKeeperInFlightTakeoverProcessIntegrationTest"
+            || task == "f9BookKeeperWalOnlyProcessIntegrationTest"
+            || task == "f9BookKeeperWalAsyncObjectProcessIntegrationTest"
+            || task == "f9BookKeeperWalSyncObjectProcessIntegrationTest"
+            || task == "f9ObjectWalAsyncObjectProcessIntegrationTest"
+            || task == "f9LeaderChurnChaosProcessIntegrationTest"
+            || task == "f9ClientCompatibilityProcessIntegrationTest"
+            || task == "f9PerformanceProfileProcessIntegrationTest"
+            || task == "publishPhase9DevelopmentArtifacts"
 }
 check(!(pulsarDevelopmentGateRequested && kafkaDevelopmentGateRequested)) {
     "Pulsar F2 and Kafka F9 development artifact gates require separate Gradle invocations"
@@ -130,6 +135,12 @@ if (kafkaDevelopmentGateRequested) {
 }
 
 val javaLanguageVersion = providers.gradleProperty("javaVersion").map(String::toInt).getOrElse(21)
+val checkstyleToolVersion = libs.versions.checkstyle.get()
+val palantirJavaFormatVersion = extensions.getByType<VersionCatalogsExtension>()
+    .named("libs")
+    .findVersion("palantir-java-format")
+    .orElseThrow()
+    .requiredVersion
 val dockerIntegrationGate = gradle.sharedServices.registerIfAbsent(
     "nereusDockerIntegrationGate",
     DockerIntegrationGateService::class,
@@ -267,8 +278,37 @@ subprojects {
 }
 
 configure(subprojects.filter { it.name != "nereus-bom" }) {
+    apply(plugin = "checkstyle")
     apply(plugin = "java-library")
     apply(plugin = "maven-publish")
+    apply(plugin = "com.diffplug.spotless")
+
+    extensions.configure<CheckstyleExtension>("checkstyle") {
+        toolVersion = checkstyleToolVersion
+        configFile = rootProject.file("buildtools/src/main/resources/nereus/checkstyle.xml")
+        configProperties["checkstyle.suppressions.file"] =
+            rootProject.file("buildtools/src/main/resources/nereus/suppressions.xml").absolutePath
+        maxErrors = 0
+        maxWarnings = 0
+    }
+
+    tasks.withType<Checkstyle>().configureEach {
+        maxHeapSize.set("1g")
+        exclude("**/generated/**")
+        exclude("**/generated-sources/**")
+        exclude("**/generated-test-sources/**")
+    }
+
+    extensions.configure<SpotlessExtension>("spotless") {
+        java {
+            target("src/**/*.java")
+            palantirJavaFormat(palantirJavaFormatVersion)
+            importOrder("\\#|")
+            removeUnusedImports()
+            trimTrailingWhitespace()
+            endWithNewline()
+        }
+    }
 
     extensions.configure<JavaPluginExtension>("java") {
         toolchain {
@@ -655,7 +695,8 @@ tasks.register<Exec>("phase3M5PulsarFinalCheck") {
         ":pulsar-broker:checkstyleMain",
         ":pulsar-broker:checkstyleTest",
         ":pulsar-broker:test",
-        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest.preservesDurableCursorTruthAcrossUnloadFailoverRestartExpiryAndBookKeeper",
+        "--tests",
+        "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest.preservesDurableCursorTruthAcrossUnloadFailoverRestartExpiryAndBookKeeper",
         "--rerun-tasks",
         "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
         "-PtestFailFast=true",
@@ -697,7 +738,8 @@ tasks.register<Exec>("phase3M6PulsarFinalCheck") {
         ":pulsar-broker:checkstyleMain",
         ":pulsar-broker:checkstyleTest",
         ":pulsar-broker:test",
-        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest.preservesMessageIdsPropertiesAndIncarnationAcrossCompatibilityCuts",
+        "--tests",
+        "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest.preservesMessageIdsPropertiesAndIncarnationAcrossCompatibilityCuts",
         "--rerun-tasks",
         "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
         "-PtestFailFast=true",
@@ -785,7 +827,8 @@ tasks.register("bookKeeperPrimaryWalM2MetadataCheck") {
 
 tasks.register("bookKeeperPrimaryWalM2RuntimeCheck") {
     group = "verification"
-    description = "Verify the BK-M2 allocator, writer, recovery, physical-reference, lease, and exact reader runtime checkpoint."
+    description =
+        "Verify the BK-M2 allocator, writer, recovery, physical-reference, lease, and exact reader runtime checkpoint."
     dependsOn("bookKeeperPrimaryWalM2RecoveryFencingCheck")
     dependsOn(":nereus-bookkeeper:test")
     dependsOn(":nereus-core:test")
@@ -808,7 +851,8 @@ tasks.register("bookKeeperPrimaryWalM2AppendReadCheck") {
 
 tasks.register("bookKeeperPrimaryWalM2RecoveryFencingCheck") {
     group = "verification"
-    description = "Verify stale-session fencing, recovery-open sealing, restart ownership transfer, and inventory repair."
+    description =
+        "Verify stale-session fencing, recovery-open sealing, restart ownership transfer, and inventory repair."
     dependsOn("bookKeeperPrimaryWalM2AppendReadCheck")
     dependsOn(":nereus-bookkeeper:bkM2RecoveryFencingTest")
 }
@@ -844,7 +888,8 @@ tasks.register<Exec>("bookKeeperPrimaryWalM2PulsarCheck") {
 
 tasks.register("bookKeeperPrimaryWalM2RealServiceCheck") {
     group = "verification"
-    description = "Run BK-M2 real Oxia/BookKeeper append recovery, restart, rollover, and delete-response-loss acceptance."
+    description =
+        "Run BK-M2 real Oxia/BookKeeper append recovery, restart, rollover, and delete-response-loss acceptance."
     dependsOn("bookKeeperPrimaryWalM2RetentionCheck")
     dependsOn(":nereus-pulsar-adapter:bkM2IntegrationTest")
 }
@@ -927,7 +972,8 @@ tasks.register("bookKeeperPrimaryWalM3SourceRetirementCheck") {
 
 tasks.register("bookKeeperPrimaryWalM3LiveReadCheck") {
     group = "verification"
-    description = "Verify exact higher-generation retirement uses the normal resolver, durable Object pin, and full-range reader."
+    description =
+        "Verify exact higher-generation retirement uses the normal resolver, durable Object pin, and full-range reader."
     dependsOn("bookKeeperPrimaryWalM3SourceRetirementCheck")
     dependsOn(":nereus-core:test")
     dependsOn(":nereus-materialization:test")
@@ -957,14 +1003,16 @@ tasks.register("bookKeeperPrimaryWalM3Check") {
 
 tasks.register("bookKeeperPrimaryWalM3RealServiceCheck") {
     group = "verification"
-    description = "Run BK-M3 real Oxia/BookKeeper/Object stable-head, fallback, fresh-runtime publication, read, and retirement proof."
+    description =
+        "Run BK-M3 real Oxia/BookKeeper/Object stable-head, fallback, fresh-runtime publication, read, and retirement proof."
     dependsOn("bookKeeperPrimaryWalM3Check")
     dependsOn(":nereus-pulsar-adapter:bkM3IntegrationTest")
 }
 
 tasks.register("bookKeeperPrimaryWalM3PhysicalRetirementCheck") {
     group = "verification"
-    description = "Verify BK-M3 real source release, mandatory-reference retirement, and whole-ledger physical deletion."
+    description =
+        "Verify BK-M3 real source release, mandatory-reference retirement, and whole-ledger physical deletion."
     dependsOn("bookKeeperPrimaryWalM3RealServiceCheck")
 }
 
@@ -985,14 +1033,16 @@ tasks.register("bookKeeperPrimaryWalM3LagFailureCheck") {
 
 tasks.register("bookKeeperPrimaryWalM3FinalCheck") {
     group = "verification"
-    description = "Run BK-M3 ordinary and real Oxia/BookKeeper/Object acceptance over the final-gated BK_ONLY predecessor."
+    description =
+        "Run BK-M3 ordinary and real Oxia/BookKeeper/Object acceptance over the final-gated BK_ONLY predecessor."
     dependsOn("bookKeeperPrimaryWalM3LagFailureCheck")
     dependsOn("bookKeeperPrimaryWalM2FinalCheck")
 }
 
 tasks.register("bookKeeperPrimaryWalM4CompletionPolicyCheck") {
     group = "verification"
-    description = "Verify BK sync resolves REQUIRED_OBJECT_GENERATION and rejects weaker or uninstalled policies before IO."
+    description =
+        "Verify BK sync resolves REQUIRED_OBJECT_GENERATION and rejects weaker or uninstalled policies before IO."
     dependsOn("bookKeeperPrimaryWalDocumentationCheck")
     dependsOn(":nereus-core:test")
     dependsOn(":nereus-bookkeeper:test")
@@ -1000,7 +1050,8 @@ tasks.register("bookKeeperPrimaryWalM4CompletionPolicyCheck") {
 
 tasks.register("bookKeeperPrimaryWalM4TaskReuseCheck") {
     group = "verification"
-    description = "Verify exact single-source task creation uses the shared F4 worker and cannot race the background planner."
+    description =
+        "Verify exact single-source task creation uses the shared F4 worker and cannot race the background planner."
     dependsOn("bookKeeperPrimaryWalM4CompletionPolicyCheck")
     dependsOn(":nereus-materialization:test")
     dependsOn(":nereus-pulsar-adapter:bkM4IntegrationTest")
@@ -1008,7 +1059,8 @@ tasks.register("bookKeeperPrimaryWalM4TaskReuseCheck") {
 
 tasks.register("bookKeeperPrimaryWalM4KnownCommittedCheck") {
     group = "verification"
-    description = "Verify post-head Object failure returns KNOWN_COMMITTED and recovery reuses one BK reservation and offset."
+    description =
+        "Verify post-head Object failure returns KNOWN_COMMITTED and recovery reuses one BK reservation and offset."
     dependsOn("bookKeeperPrimaryWalM4TaskReuseCheck")
     dependsOn(":nereus-bookkeeper:test")
     dependsOn(":nereus-pulsar-adapter:bkM4IntegrationTest")
@@ -1069,7 +1121,8 @@ tasks.register<Exec>("bookKeeperPrimaryWalM5CapabilityCheck") {
 
 tasks.register("bookKeeperPrimaryWalM5FirstCreateCheck") {
     group = "verification"
-    description = "Verify BK first-create admission precedes every L0 mutation while existing projection open remains available."
+    description =
+        "Verify BK first-create admission precedes every L0 mutation while existing projection open remains available."
     dependsOn("bookKeeperPrimaryWalM5CapabilityCheck")
     dependsOn(":nereus-managed-ledger:test")
     dependsOn(":nereus-pulsar-adapter:test")
@@ -1231,7 +1284,8 @@ tasks.register("bookKeeperPrimaryWalM6ScaleCheck") {
 
 tasks.register("bookKeeperPrimaryWalM6ChaosCheck") {
     group = "verification"
-    description = "Verify allocation/write/seal/head/task/publication/delete response-loss recovery across fresh runtimes."
+    description =
+        "Verify allocation/write/seal/head/task/publication/delete response-loss recovery across fresh runtimes."
     dependsOn("bookKeeperPrimaryWalM6ScaleCheck")
     dependsOn(":nereus-bookkeeper:bkM6ChaosTest")
     dependsOn("bookKeeperPrimaryWalM2AllocationAuthorityCheck")
@@ -1624,7 +1678,8 @@ tasks.register<Exec>("checkPhase4M4GenerationRetirementContractSurface") {
 
 tasks.register("phase4M4GenerationRetirementCheck") {
     group = "verification"
-    description = "Verify exact source deletion, view-specific/below-trim eligibility, higher pre-drain, and retirement recovery."
+    description =
+        "Verify exact source deletion, view-specific/below-trim eligibility, higher pre-drain, and retirement recovery."
     dependsOn("phase4M4DestructiveRecoveryCheck")
     dependsOn("checkPhase4M4GenerationRetirementContractSurface")
     dependsOn("checkPhase4Documentation")
@@ -1766,7 +1821,8 @@ tasks.register<Exec>("checkPhase4M4CursorGcExecutionContractSurface") {
 
 tasks.register("phase4M4CursorGcExecutionCheck") {
     group = "verification"
-    description = "Verify cursor snapshot MARK/drain/restart/delete execution with production deletion still default-off."
+    description =
+        "Verify cursor snapshot MARK/drain/restart/delete execution with production deletion still default-off."
     dependsOn("phase4M4CursorSnapshotGcCheck")
     dependsOn("checkPhase4M4CursorGcExecutionContractSurface")
     dependsOn("checkPhase4Documentation")
@@ -1980,7 +2036,8 @@ tasks.register<Exec>("checkPhase4M4PhysicalDeletionIntegrationContractSurface") 
 
 tasks.register("phase4M4PhysicalDeletionIntegrationCheck") {
     group = "verification"
-    description = "Verify checkpoint AS real Oxia/LocalStack activation, scope fencing, and destructive restart recovery."
+    description =
+        "Verify checkpoint AS real Oxia/LocalStack activation, scope fencing, and destructive restart recovery."
     dependsOn("phase4M4PhysicalDeletionActivationCheck")
     dependsOn("checkPhase4M4PhysicalDeletionIntegrationContractSurface")
     dependsOn("checkPhase4Documentation")
@@ -2043,7 +2100,8 @@ tasks.register<Exec>("checkPhase4M4TwoWorkerConvergenceContractSurface") {
 
 tasks.register("phase4M4TwoWorkerConvergenceCheck") {
     group = "verification"
-    description = "Verify checkpoint AV two independent workers converge one durable delete intent against real services."
+    description =
+        "Verify checkpoint AV two independent workers converge one durable delete intent against real services."
     dependsOn("phase4M4DeletedCasResponseLossCheck")
     dependsOn("checkPhase4M4TwoWorkerConvergenceContractSurface")
     dependsOn("checkPhase4Documentation")
@@ -2131,7 +2189,8 @@ tasks.register<Exec>("checkPhase4M4CursorGcScaleContractSurface") {
 
 tasks.register("phase4M4CursorGcScaleCheck") {
     group = "verification"
-    description = "Verify checkpoint AZ classifies and deletes live/old/CAS-lost/deleted-cursor snapshots at 10,000 roots."
+    description =
+        "Verify checkpoint AZ classifies and deletes live/old/CAS-lost/deleted-cursor snapshots at 10,000 roots."
     dependsOn("phase4M4TombstoneScaleCheck")
     dependsOn("checkPhase4M4CursorGcScaleContractSurface")
     dependsOn("checkPhase4Documentation")
@@ -2930,7 +2989,8 @@ tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
 
 tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
     group = "verification"
-    description = "Verify the local organization-fork F9 branch, exact bridge/recovery/metadata-lifecycle commits, markers, and source blobs."
+    description =
+        "Verify the local organization-fork F9 branch, exact bridge/recovery/metadata-lifecycle commits, markers, and source blobs."
     usesService(kafkaCheckoutGate)
     workingDir = layout.projectDirectory.asFile
     commandLine(
@@ -2982,7 +3042,8 @@ tasks.register<Exec>("phase9M6KafkaProcessRuntime") {
 
 tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
     group = "verification"
-    description = "Compile and test the stock Kafka ListOffsets, metadata lifecycle, and inert configuration seams with no Nereus artifact inputs."
+    description =
+        "Compile and test the stock Kafka ListOffsets, metadata lifecycle, and inert configuration seams with no Nereus artifact inputs."
     dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
     usesService(kafkaCheckoutGate)
     workingDir = file(kafkaForkCheckoutPath.get())
@@ -3165,7 +3226,8 @@ tasks.register<Exec>("phase9M6KafkaFeatureMetadataCheck") {
 
 tasks.register<Exec>("phase9M6KafkaFeatureCoreCheck") {
     group = "verification"
-    description = "Verify dedicated-controller admission, explicit storage formatting, and feature-gated activation scheduling."
+    description =
+        "Verify dedicated-controller admission, explicit storage formatting, and feature-gated activation scheduling."
     dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
     dependsOn("publishPhase9DevelopmentArtifacts")
     usesService(kafkaCheckoutGate)
@@ -3543,7 +3605,7 @@ val phase9FinalEvidenceReport =
             layout.projectDirectory
                 .dir(
                     "nereus-kafka-adapter/build/test-results/"
-                        + "f9EvidenceAggregatorTest",
+                            + "f9EvidenceAggregatorTest",
                 )
                 .asFile
                 .absolutePath,
@@ -3554,7 +3616,7 @@ val phase9FinalEvidenceReport =
         inputs.dir(
             layout.projectDirectory.dir(
                 "nereus-kafka-adapter/build/test-results/"
-                    + "f9EvidenceAggregatorTest",
+                        + "f9EvidenceAggregatorTest",
             ),
         )
         outputs.file(phase9FinalEvidence)

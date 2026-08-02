@@ -17,10 +17,10 @@ package com.nereusstream.api;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Append-session options plus an optional external authority term. */
-public record AppendSessionRequest(
-        AppendSessionOptions options,
-        Optional<AppendAuthority> authority) {
+/**
+ * Append-session options plus an optional external authority term.
+ */
+public record AppendSessionRequest(AppendSessionOptions options, Optional<AppendAuthority> authority) {
     public AppendSessionRequest {
         Objects.requireNonNull(options, "options");
         authority = Objects.requireNonNull(authority, "authority");
@@ -30,9 +30,7 @@ public record AppendSessionRequest(
         return new AppendSessionRequest(options, Optional.empty());
     }
 
-    public static AppendSessionRequest authoritative(
-            AppendSessionOptions options,
-            AppendAuthority authority) {
+    public static AppendSessionRequest authoritative(AppendSessionOptions options, AppendAuthority authority) {
         return new AppendSessionRequest(options, Optional.of(Objects.requireNonNull(authority, "authority")));
     }
 }

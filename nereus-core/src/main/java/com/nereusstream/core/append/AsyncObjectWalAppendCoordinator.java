@@ -70,48 +70,38 @@ public final class AsyncObjectWalAppendCoordinator {
             RequiredObjectGenerationCompletion requiredObjectGeneration) {
         this.materializer = Objects.requireNonNull(materializer, "materializer");
         this.physicalReferences = Objects.requireNonNull(physicalReferences, "physicalReferences");
-        this.backgroundRepairTimeout = requirePositive(
-                backgroundRepairTimeout, "backgroundRepairTimeout");
+        this.backgroundRepairTimeout = requirePositive(backgroundRepairTimeout, "backgroundRepairTimeout");
         this.backgroundExecutor = Objects.requireNonNull(backgroundExecutor, "backgroundExecutor");
         this.requiredObjectGeneration = requiredObjectGeneration;
     }
 
     public boolean supports(AppendAckBoundary boundary) {
         Objects.requireNonNull(boundary, "boundary");
-        return boundary != AppendAckBoundary.REQUIRED_OBJECT_GENERATION
-                || requiredObjectGeneration != null;
+        return boundary != AppendAckBoundary.REQUIRED_OBJECT_GENERATION || requiredObjectGeneration != null;
     }
 
     public CompletableFuture<CommittedAppend> completeAfterStableCommit(
-            StableAppendResult stable,
-            StorageExecutionPlan plan,
-            Duration timeout) {
+            StableAppendResult stable, StorageExecutionPlan plan, Duration timeout) {
         StorageExecutionPlan exactPlan = Objects.requireNonNull(plan, "plan");
         return switch (exactPlan.ackBoundary()) {
-            case STABLE_HEAD -> completeAfterStableCommit(
-                    stable, DurabilityLevel.WAL_DURABLE, timeout);
-            case GENERATION_ZERO_VISIBLE -> completeAfterStableCommit(
-                    stable, DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED, timeout);
-            case REQUIRED_OBJECT_GENERATION -> completeRequiredObjectGeneration(
-                    Objects.requireNonNull(stable, "stable"), timeout);
+            case STABLE_HEAD -> completeAfterStableCommit(stable, DurabilityLevel.WAL_DURABLE, timeout);
+            case GENERATION_ZERO_VISIBLE ->
+                completeAfterStableCommit(stable, DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED, timeout);
+            case REQUIRED_OBJECT_GENERATION ->
+                completeRequiredObjectGeneration(Objects.requireNonNull(stable, "stable"), timeout);
         };
     }
 
     public CompletableFuture<CommittedAppend> completeAfterStableCommit(
-            StableAppendResult stable,
-            DurabilityLevel durability,
-            Duration strictTimeout) {
+            StableAppendResult stable, DurabilityLevel durability, Duration strictTimeout) {
         StableAppendResult exact = Objects.requireNonNull(stable, "stable");
         Objects.requireNonNull(durability, "durability");
         if (durability == DurabilityLevel.WAL_DURABLE) {
             startBackgroundRepair(exact.reachableAppend());
-            return CompletableFuture.completedFuture(
-                    exact.reachableAppend().committedAppend());
+            return CompletableFuture.completedFuture(exact.reachableAppend().committedAppend());
         }
         if (durability == DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED) {
-            return repairAndProtect(
-                    exact.reachableAppend(),
-                    requirePositive(strictTimeout, "strictTimeout"));
+            return repairAndProtect(exact.reachableAppend(), requirePositive(strictTimeout, "strictTimeout"));
         }
         return CompletableFuture.failedFuture(new NereusException(
                 ErrorCode.UNSUPPORTED_DURABILITY_LEVEL,
@@ -121,8 +111,7 @@ public final class AsyncObjectWalAppendCoordinator {
     }
 
     private CompletableFuture<CommittedAppend> completeRequiredObjectGeneration(
-            StableAppendResult stable,
-            Duration timeout) {
+            StableAppendResult stable, Duration timeout) {
         if (requiredObjectGeneration == null) {
             return CompletableFuture.failedFuture(new NereusException(
                     ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
@@ -138,9 +127,7 @@ public final class AsyncObjectWalAppendCoordinator {
                 .thenCompose(ignored -> deadline.bound(
                         () -> requiredObjectGeneration.complete(
                                 new RequiredObjectGenerationRequest(
-                                        committed.streamId(),
-                                        committed.range(),
-                                        committed.commitVersion()),
+                                        committed.streamId(), committed.range(), committed.commitVersion()),
                                 deadline.remaining()),
                         AppendOutcome.KNOWN_COMMITTED,
                         "publish required Object generation"))
@@ -165,15 +152,9 @@ public final class AsyncObjectWalAppendCoordinator {
         String commitId = append.committedAppend().commitId();
         CompletableFuture<CommittedAppend> repair;
         try {
-            repair = backgroundRepairs.computeIfAbsent(
-                    commitId,
-                    ignored -> CompletableFuture.completedFuture(append)
-                            .thenComposeAsync(
-                                    reachable ->
-                                            repairAndProtect(
-                                                    reachable,
-                                                    backgroundRepairTimeout),
-                                    backgroundExecutor));
+            repair = backgroundRepairs.computeIfAbsent(commitId, ignored -> CompletableFuture.completedFuture(append)
+                    .thenComposeAsync(
+                            reachable -> repairAndProtect(reachable, backgroundRepairTimeout), backgroundExecutor));
         } catch (Throwable failure) {
             backgroundRepairFailures.incrementAndGet();
             return;
@@ -186,26 +167,21 @@ public final class AsyncObjectWalAppendCoordinator {
         });
     }
 
-    private CompletableFuture<CommittedAppend> repairAndProtect(
-            ReachableCommittedAppend append,
-            Duration timeout) {
+    private CompletableFuture<CommittedAppend> repairAndProtect(ReachableCommittedAppend append, Duration timeout) {
         AppendDeadline deadline = new AppendDeadline(timeout);
         return deadline.bound(
                         () -> materializer.materialize(append),
                         AppendOutcome.KNOWN_COMMITTED,
                         "materialize generation-zero index")
                 .thenCompose(materialized -> deadline.bound(
-                        () -> physicalReferences.protectVisibleIndex(
-                                materialized, deadline.remaining()),
+                        () -> physicalReferences.protectVisibleIndex(materialized, deadline.remaining()),
                         AppendOutcome.KNOWN_COMMITTED,
                         "protect visible generation-zero index"))
-                .thenApply(protectedIndex -> requireExactProtectedResult(
-                        append, protectedIndex.materialized()));
+                .thenApply(protectedIndex -> requireExactProtectedResult(append, protectedIndex.materialized()));
     }
 
     private static CommittedAppend requireExactProtectedResult(
-            ReachableCommittedAppend expected,
-            MaterializedGenerationZero materialized) {
+            ReachableCommittedAppend expected, MaterializedGenerationZero materialized) {
         if (!materialized.committedAppend().equals(expected.committedAppend())) {
             throw new NereusException(
                     ErrorCode.METADATA_INVARIANT_VIOLATION,
@@ -216,7 +192,9 @@ public final class AsyncObjectWalAppendCoordinator {
         return materialized.committedAppend();
     }
 
-    /** Stops new detached repairs after all append callers admitted by the owner have drained. */
+    /**
+     * Stops new detached repairs after all append callers admitted by the owner have drained.
+     */
     public void stopBackgroundAdmission() {
         backgroundAdmissionClosed.set(true);
     }
@@ -229,8 +207,7 @@ public final class AsyncObjectWalAppendCoordinator {
      */
     public void awaitBackgroundRepairs(Duration timeout) {
         Duration exactTimeout = requirePositive(timeout, "timeout");
-        CompletableFuture<?>[] snapshot =
-                new ArrayList<>(backgroundRepairs.values()).toArray(CompletableFuture[]::new);
+        CompletableFuture<?>[] snapshot = new ArrayList<>(backgroundRepairs.values()).toArray(CompletableFuture[]::new);
         if (snapshot.length == 0) {
             return;
         }

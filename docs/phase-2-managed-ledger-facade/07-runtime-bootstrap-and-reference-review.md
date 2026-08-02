@@ -28,20 +28,20 @@ This review covered `README.md`, `InMemoryStorage`, `InMemoryStorageClass`, `InM
 
 The following prototype choices are explicitly not adopted:
 
-| Prototype behavior | Nereus decision |
-| --- | --- |
-| `entryId` advances by `numberOfMessages` | F2 entry ID advances by one persisted Pulsar Entry; batch count is in-entry metadata. |
-| `getFirstPosition()` points at the first entry | F2 follows stock one-ledger semantics and returns the position before the first retained entry. |
-| in-memory `AtomicLong` ledger IDs | Oxia allocator plus durable projection incarnation. |
-| `getManagedLedgerStorageClass` always returns the custom class | Null/`bookkeeper` selects stock; `nereus` selects Nereus; unknown is empty. |
-| no durable guard against changing an existing topic's storage implementation | Single-key broker binding claims one class per topic lifetime; live switching is rejected. |
-| `getManagedLedgerFactory()` constructs a new factory on every call | One initialized factory instance per storage class. |
-| callbacks run inline | Designated ordered/callback executors; no callback under a lock. |
-| many TODO methods return zero, empty, sentinel or success | Exhaustive `I/L/N/U/D` method contract in `06`. |
-| custom in-memory schema factory | Not adopted; F2 keeps schema-registry/system storage on BookKeeper while ordinary user messages may carry schema references. |
-| cursor mark-delete reports success without durable state | Durable mutations fail until F3; local non-durable mutations are labeled local. |
-| close/delete/offload are mostly no-op | Local close, L0 seal/delete and explicit offload rejection have separate contracts. |
-| retained input buffers live in a process map | Append eagerly copies; Object WAL/Oxia supply durability and restart recovery. |
+| Prototype behavior                                                           | Nereus decision                                                                                                              |
+|------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| `entryId` advances by `numberOfMessages`                                     | F2 entry ID advances by one persisted Pulsar Entry; batch count is in-entry metadata.                                        |
+| `getFirstPosition()` points at the first entry                               | F2 follows stock one-ledger semantics and returns the position before the first retained entry.                              |
+| in-memory `AtomicLong` ledger IDs                                            | Oxia allocator plus durable projection incarnation.                                                                          |
+| `getManagedLedgerStorageClass` always returns the custom class               | Null/`bookkeeper` selects stock; `nereus` selects Nereus; unknown is empty.                                                  |
+| no durable guard against changing an existing topic's storage implementation | Single-key broker binding claims one class per topic lifetime; live switching is rejected.                                   |
+| `getManagedLedgerFactory()` constructs a new factory on every call           | One initialized factory instance per storage class.                                                                          |
+| callbacks run inline                                                         | Designated ordered/callback executors; no callback under a lock.                                                             |
+| many TODO methods return zero, empty, sentinel or success                    | Exhaustive `I/L/N/U/D` method contract in `06`.                                                                              |
+| custom in-memory schema factory                                              | Not adopted; F2 keeps schema-registry/system storage on BookKeeper while ordinary user messages may carry schema references. |
+| cursor mark-delete reports success without durable state                     | Durable mutations fail until F3; local non-durable mutations are labeled local.                                              |
+| close/delete/offload are mostly no-op                                        | Local close, L0 seal/delete and explicit offload rejection have separate contracts.                                          |
+| retained input buffers live in a process map                                 | Append eagerly copies; Object WAL/Oxia supply durability and restart recovery.                                               |
 
 The prototype's `EndToEndTest` remains a useful smoke-test shape, but its consumer does not prove acknowledgement
 recovery, unload/failover, trim, callback races or buffer ownership.
@@ -164,12 +164,12 @@ is a broker startup failure; the provider never starts in a hidden BookKeeper-on
 
 Lookup contract:
 
-| Input | Result |
-| --- | --- |
-| null | stock BookKeeper class |
-| `bookkeeper` | stock BookKeeper class |
-| `nereus` | Nereus class |
-| any other string | empty |
+| Input            | Result                 |
+|------------------|------------------------|
+| null             | stock BookKeeper class |
+| `bookkeeper`     | stock BookKeeper class |
+| `nereus`         | Nereus class           |
+| any other string | empty                  |
 
 `getDefaultStorageClass()` always returns the stock BookKeeper class in F2. `getStorageClasses()` returns an immutable
 ordered collection. `NereusManagedLedgerStorageClass.getManagedLedgerFactory()` always returns the same initialized
@@ -296,7 +296,8 @@ public interface ObjectStoreSecretResolver {
 ```
 
 The provider class is configured explicitly and loaded with the broker/plugin classloader. F2 final integration uses
-an S3-compatible provider against pinned LocalStack Community S3 `4.14.0`. `LocalFileObjectStore` remains test-only and cannot
+an S3-compatible provider against pinned LocalStack Community S3 `4.14.0`. `LocalFileObjectStore` remains test-only and
+cannot
 be selected by production broker configuration. Missing provider, credentials, bucket/prefix or unsupported checksum
 behavior fails broker startup.
 
@@ -393,19 +394,19 @@ an implicit algorithm switch.
 
 `S3ObjectErrorMapper` recursively unwraps SDK completion wrappers and applies this closed table：
 
-| Failure | Nereus result |
-| --- | --- |
-| caller validation | `INVALID_ARGUMENT`, non-retriable |
-| caller cancellation | `CANCELLED`, non-retriable |
-| operation deadline | `TIMEOUT`, retriable |
-| closed provider/store | `STORAGE_CLOSED`, non-retriable |
-| HTTP 404 read/head | `OBJECT_NOT_FOUND`, retriable |
-| HTTP 412 conditional PUT | `OBJECT_UPLOAD_FAILED`, non-retriable |
-| HTTP 409 conditional-request conflict | `OBJECT_UPLOAD_FAILED`, retriable；retry remains conditional |
-| HTTP 401/403 or other deterministic 4xx | operation-specific upload/read error, non-retriable |
-| HTTP 408/429/5xx, connection reset or SDK transport timeout | operation-specific upload/read error, retriable |
-| CRC32C mismatch/malformed checksum metadata | `OBJECT_CHECKSUM_MISMATCH`, non-retriable |
-| unexpected response shape/body length | `OBJECT_READ_FAILED`, non-retriable |
+| Failure                                                     | Nereus result                                               |
+|-------------------------------------------------------------|-------------------------------------------------------------|
+| caller validation                                           | `INVALID_ARGUMENT`, non-retriable                           |
+| caller cancellation                                         | `CANCELLED`, non-retriable                                  |
+| operation deadline                                          | `TIMEOUT`, retriable                                        |
+| closed provider/store                                       | `STORAGE_CLOSED`, non-retriable                             |
+| HTTP 404 read/head                                          | `OBJECT_NOT_FOUND`, retriable                               |
+| HTTP 412 conditional PUT                                    | `OBJECT_UPLOAD_FAILED`, non-retriable                       |
+| HTTP 409 conditional-request conflict                       | `OBJECT_UPLOAD_FAILED`, retriable；retry remains conditional |
+| HTTP 401/403 or other deterministic 4xx                     | operation-specific upload/read error, non-retriable         |
+| HTTP 408/429/5xx, connection reset or SDK transport timeout | operation-specific upload/read error, retriable             |
+| CRC32C mismatch/malformed checksum metadata                 | `OBJECT_CHECKSUM_MISMATCH`, non-retriable                   |
+| unexpected response shape/body length                       | `OBJECT_READ_FAILED`, non-retriable                         |
 
 Exception text includes only operation、bucket and
 `sha256-base32("nereus-s3-key-log-v1\0" + strictUtf8(logicalKey))`；it excludes
@@ -483,46 +484,46 @@ nereusEnableOffsetIndexCache
 Exact `ServiceConfiguration` field types/defaults are frozen below；all duration fields are converted with checked
 `Duration.ofSeconds/ofMillis` only after validation：
 
-| Field(s) | Java type | Default / resolution |
-| --- | --- | --- |
-| `nereusEnabled` | `boolean` | `false` |
-| `nereusRuntimeProviderClassName` | `String` | `com.nereusstream.pulsar.DefaultNereusRuntimeProvider` |
-| `nereusOxiaServiceAddress`, `nereusOxiaNamespace` | `String` | empty；required when enabled |
-| `nereusOxiaSessionTimeoutSeconds` | `long` | `30` |
-| `nereusMaxOxiaPendingOperations` | `int` | `1024` |
-| `nereusObjectStoreProviderClassName` | `String` | `com.nereusstream.objectstore.S3CompatibleObjectStoreProvider` |
-| `nereusObjectStoreEndpoint`, `nereusObjectStoreRegion`, `nereusObjectStoreBucket`, `nereusObjectStorePrefix` | `String` | empty；required when enabled |
-| `nereusObjectStorePathStyleAccess` | `boolean` | `false` |
-| `nereusObjectStoreRequestTimeoutSeconds` | `long` | `30` |
-| `nereusObjectStoreMaxConnections` | `int` | `64` |
-| three ObjectStore secret-ref fields | `String` | empty means absent |
-| `nereusObjectStoreSecretResolverClassName` | `String` | `com.nereusstream.objectstore.NoopObjectStoreSecretResolver`；explicit refs require replacing it with a resolving implementation |
-| `nereusMetadataTimeoutSeconds`, `nereusAppendTimeoutSeconds`, `nereusAppendRecoveryTimeoutSeconds`, `nereusReadTimeoutSeconds` | `long` | `30` each |
-| `nereusAppendRecoveryAttemptTimeoutSeconds` | `long` | `5` |
-| `nereusAppendRecoveryBackoffMinMillis` | `long` | `100` |
-| `nereusAppendRecoveryBackoffMaxSeconds` | `long` | `5` |
-| `nereusAppendRecoveryTerminalTtlSeconds` | `long` | `600` |
-| `nereusCloseTimeoutSeconds` | `long` | `75` |
-| `nereusTailPollIntervalMillis` | `long` | `1000` |
-| session TTL / renew-before / minimum-remaining seconds | `long` | `30 / 10 / 5` |
-| `nereusMaxEntryBytes` | `int` | `0` sentinel resolved once with `Math.addExact(config.getMaxMessageSize(), Commands.MESSAGE_SIZE_FRAME_PADDING)`；resolved value must be positive |
-| `nereusMaxReadEntries` | `int` | `100` |
-| `nereusMaxOpenLedgers` | `int` | `10000` |
-| `nereusMaxPendingCallbacks` | `int` | `1024` |
-| `nereusMaxRetainedAppendAttempts`, `nereusMaxAppendRecoveryTerminals` | `int` | `1024 / 2048` |
-| `nereusMaxScanEntries` | `int` | `10000` |
-| `nereusMaxNamespaceBindingScanEntries` | `int` | `100000`；overflow fails namespace policy update closed |
-| `nereusMaxBindingPendingOperations` | `int` | `1024` |
-| `nereusMaxProjectionMetadataPendingOperations` | `int` | `1024` |
-| `nereusProjectionMetadataMaxValueBytes` | `int` | `65536` |
-| resolve ranges / commit scan / derived-repair page | `int` | `64 / 10000 / 256` |
-| cached streams / in-flight appends | `int` | `10000 / 1024` |
-| `nereusMaxBufferedBytes` | `long` | `67108864` |
-| `nereusMaxConcurrentObjectReads` | `int` | `64` |
-| `nereusMaxReadBufferBytes` | `long` | `134217728` |
-| `nereusMaxObjectBytes` | `int` | `16777216` |
-| `nereusOffsetIndexCacheTtlSeconds` | `long` | `5` |
-| `nereusEnableMetadataWatch`, `nereusEnableOffsetIndexCache` | `boolean` | `false / true` |
+| Field(s)                                                                                                                       | Java type | Default / resolution                                                                                                                             |
+|--------------------------------------------------------------------------------------------------------------------------------|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+| `nereusEnabled`                                                                                                                | `boolean` | `false`                                                                                                                                          |
+| `nereusRuntimeProviderClassName`                                                                                               | `String`  | `com.nereusstream.pulsar.DefaultNereusRuntimeProvider`                                                                                           |
+| `nereusOxiaServiceAddress`, `nereusOxiaNamespace`                                                                              | `String`  | empty；required when enabled                                                                                                                      |
+| `nereusOxiaSessionTimeoutSeconds`                                                                                              | `long`    | `30`                                                                                                                                             |
+| `nereusMaxOxiaPendingOperations`                                                                                               | `int`     | `1024`                                                                                                                                           |
+| `nereusObjectStoreProviderClassName`                                                                                           | `String`  | `com.nereusstream.objectstore.S3CompatibleObjectStoreProvider`                                                                                   |
+| `nereusObjectStoreEndpoint`, `nereusObjectStoreRegion`, `nereusObjectStoreBucket`, `nereusObjectStorePrefix`                   | `String`  | empty；required when enabled                                                                                                                      |
+| `nereusObjectStorePathStyleAccess`                                                                                             | `boolean` | `false`                                                                                                                                          |
+| `nereusObjectStoreRequestTimeoutSeconds`                                                                                       | `long`    | `30`                                                                                                                                             |
+| `nereusObjectStoreMaxConnections`                                                                                              | `int`     | `64`                                                                                                                                             |
+| three ObjectStore secret-ref fields                                                                                            | `String`  | empty means absent                                                                                                                               |
+| `nereusObjectStoreSecretResolverClassName`                                                                                     | `String`  | `com.nereusstream.objectstore.NoopObjectStoreSecretResolver`；explicit refs require replacing it with a resolving implementation                  |
+| `nereusMetadataTimeoutSeconds`, `nereusAppendTimeoutSeconds`, `nereusAppendRecoveryTimeoutSeconds`, `nereusReadTimeoutSeconds` | `long`    | `30` each                                                                                                                                        |
+| `nereusAppendRecoveryAttemptTimeoutSeconds`                                                                                    | `long`    | `5`                                                                                                                                              |
+| `nereusAppendRecoveryBackoffMinMillis`                                                                                         | `long`    | `100`                                                                                                                                            |
+| `nereusAppendRecoveryBackoffMaxSeconds`                                                                                        | `long`    | `5`                                                                                                                                              |
+| `nereusAppendRecoveryTerminalTtlSeconds`                                                                                       | `long`    | `600`                                                                                                                                            |
+| `nereusCloseTimeoutSeconds`                                                                                                    | `long`    | `75`                                                                                                                                             |
+| `nereusTailPollIntervalMillis`                                                                                                 | `long`    | `1000`                                                                                                                                           |
+| session TTL / renew-before / minimum-remaining seconds                                                                         | `long`    | `30 / 10 / 5`                                                                                                                                    |
+| `nereusMaxEntryBytes`                                                                                                          | `int`     | `0` sentinel resolved once with `Math.addExact(config.getMaxMessageSize(), Commands.MESSAGE_SIZE_FRAME_PADDING)`；resolved value must be positive |
+| `nereusMaxReadEntries`                                                                                                         | `int`     | `100`                                                                                                                                            |
+| `nereusMaxOpenLedgers`                                                                                                         | `int`     | `10000`                                                                                                                                          |
+| `nereusMaxPendingCallbacks`                                                                                                    | `int`     | `1024`                                                                                                                                           |
+| `nereusMaxRetainedAppendAttempts`, `nereusMaxAppendRecoveryTerminals`                                                          | `int`     | `1024 / 2048`                                                                                                                                    |
+| `nereusMaxScanEntries`                                                                                                         | `int`     | `10000`                                                                                                                                          |
+| `nereusMaxNamespaceBindingScanEntries`                                                                                         | `int`     | `100000`；overflow fails namespace policy update closed                                                                                           |
+| `nereusMaxBindingPendingOperations`                                                                                            | `int`     | `1024`                                                                                                                                           |
+| `nereusMaxProjectionMetadataPendingOperations`                                                                                 | `int`     | `1024`                                                                                                                                           |
+| `nereusProjectionMetadataMaxValueBytes`                                                                                        | `int`     | `65536`                                                                                                                                          |
+| resolve ranges / commit scan / derived-repair page                                                                             | `int`     | `64 / 10000 / 256`                                                                                                                               |
+| cached streams / in-flight appends                                                                                             | `int`     | `10000 / 1024`                                                                                                                                   |
+| `nereusMaxBufferedBytes`                                                                                                       | `long`    | `67108864`                                                                                                                                       |
+| `nereusMaxConcurrentObjectReads`                                                                                               | `int`     | `64`                                                                                                                                             |
+| `nereusMaxReadBufferBytes`                                                                                                     | `long`    | `134217728`                                                                                                                                      |
+| `nereusMaxObjectBytes`                                                                                                         | `int`     | `16777216`                                                                                                                                       |
+| `nereusOffsetIndexCacheTtlSeconds`                                                                                             | `long`    | `5`                                                                                                                                              |
+| `nereusEnableMetadataWatch`, `nereusEnableOffsetIndexCache`                                                                    | `boolean` | `false / true`                                                                                                                                   |
 
 The `0` sentinel is legal only on the raw broker field and never reaches a Nereus constructor. Every other numeric
 field must be positive as configured. Blank optional secret refs become `Optional.empty()`；blank required strings
@@ -560,23 +561,25 @@ changing connectivity, identity or durability configuration requires broker rest
 
 The conversion is constructor-by-constructor, with no untyped property bag:
 
-| Target config | Exact broker mapping / fixed F2 value |
-| --- | --- |
-| `OxiaClientConfiguration` | service address, namespace, metadata request timeout, Oxia session timeout, `maxCommitChainScan`, max Oxia pending operations |
-| `ObjectStoreConfiguration` | provider, parsed absolute endpoint URI, region/bucket/prefix, path-style flag, object request timeout, connection limit and secret references |
-| `StreamStorageConfig` identity/session | cluster name, writer ID=`pulsar-f2/{processRunId}`, explicit cryptographically generated `processRunId`, TTL, renew-before, minimum commit remaining；no broker ID dependency |
-| `StreamStorageConfig` deadlines | append/read/recovery attempt/backoff/terminal TTL from matching Nereus fields; shutdown grace equals close timeout |
-| `StreamStorageConfig` resource limits | resolve ranges, commit scan, derived repair page, cached streams, in-flight appends, retained attempts/terminals, buffered/primary-append bytes, concurrent primary reads, primary-read buffer and object bytes |
-| `StreamStorageConfig` fixed F2 fields | `maxAppendBatchRecords=1`, `autoAcquireAppendSession=true`; metadata watch and offset cache use their explicit booleans/TTL |
-| `NereusManagedLedgerFactoryConfig` | metadata/append/recovery/read/close/poll deadlines and entry/read/open/callback/retained-attempt/scan limits |
-| `ProjectionMetadataStoreConfig` | metadata timeout, projection-specific pending-operation limit and max encoded value bytes |
+| Target config                          | Exact broker mapping / fixed F2 value                                                                                                                                                                           |
+|----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `OxiaClientConfiguration`              | service address, namespace, metadata request timeout, Oxia session timeout, `maxCommitChainScan`, max Oxia pending operations                                                                                   |
+| `ObjectStoreConfiguration`             | provider, parsed absolute endpoint URI, region/bucket/prefix, path-style flag, object request timeout, connection limit and secret references                                                                   |
+| `StreamStorageConfig` identity/session | cluster name, writer ID=`pulsar-f2/{processRunId}`, explicit cryptographically generated `processRunId`, TTL, renew-before, minimum commit remaining；no broker ID dependency                                    |
+| `StreamStorageConfig` deadlines        | append/read/recovery attempt/backoff/terminal TTL from matching Nereus fields; shutdown grace equals close timeout                                                                                              |
+| `StreamStorageConfig` resource limits  | resolve ranges, commit scan, derived repair page, cached streams, in-flight appends, retained attempts/terminals, buffered/primary-append bytes, concurrent primary reads, primary-read buffer and object bytes |
+| `StreamStorageConfig` fixed F2 fields  | `maxAppendBatchRecords=1`, `autoAcquireAppendSession=true`; metadata watch and offset cache use their explicit booleans/TTL                                                                                     |
+| `NereusManagedLedgerFactoryConfig`     | metadata/append/recovery/read/close/poll deadlines and entry/read/open/callback/retained-attempt/scan limits                                                                                                    |
+| `ProjectionMetadataStoreConfig`        | metadata timeout, projection-specific pending-operation limit and max encoded value bytes                                                                                                                       |
 
 `DefaultNereusRuntimeProvider` passes the already-frozen `StreamStorageConfig.cluster()` into
 `NereusManagedLedgerRuntime` as its exact `cluster` constructor argument。This is not inferred from the Oxia
 namespace：projection metadata needs the logical cluster key component，and the protocol-neutral `StreamStorage`
 surface deliberately has no configuration getter。
-| `NereusStorageClassBindingStore` | metadata timeout and binding pending-operation limit；admission occurs before metadata-store calls |
-| `NamespaceStorageClassPolicyGuard` | metadata timeout and namespace binding-scan cap；binding reads use a bounded async fan-out |
+| `NereusStorageClassBindingStore` | metadata timeout and binding pending-operation limit；admission occurs before
+metadata-store calls |
+| `NamespaceStorageClassPolicyGuard` | metadata timeout and namespace binding-scan cap；binding reads use a bounded async
+fan-out |
 
 The two `maxCommitChainScan` constructor arguments must be identical. `maxCachedStreams >= maxOpenLedgers`；
 the core/facade `maxRetainedAppendAttempts` values must be identical；core terminal capacity is at least that value；
@@ -832,12 +835,12 @@ get-only probes in parallel：`nereusFactory.inspectStorageState(persistenceName
 `bookkeeperFactory.asyncExists(persistenceName)`；lookup timeout/failure never means absent and the Nereus probe never
 repairs or creates. The decision table is closed：
 
-| BookKeeper exists | Nereus durable state | Missing-binding action |
-| --- | --- | --- |
-| true | `MISSING` | put-if-absent an `ACTIVE/bookkeeper/generation=1` adoption；then open only if policy also selected BookKeeper |
-| false | `MISSING` | if `createIfMissing`, put-if-absent `CLAIMED/{selected}/generation=1`；otherwise not-found with no write |
-| true | any non-missing state | invariant failure: two durable class views or a lost binding |
-| false | any non-missing state | invariant failure: Nereus projection embeds a binding generation and the binding key is never removed；it cannot be adopted |
+| BookKeeper exists | Nereus durable state  | Missing-binding action                                                                                                     |
+|-------------------|-----------------------|----------------------------------------------------------------------------------------------------------------------------|
+| true              | `MISSING`             | put-if-absent an `ACTIVE/bookkeeper/generation=1` adoption；then open only if policy also selected BookKeeper               |
+| false             | `MISSING`             | if `createIfMissing`, put-if-absent `CLAIMED/{selected}/generation=1`；otherwise not-found with no write                    |
+| true              | any non-missing state | invariant failure: two durable class views or a lost binding                                                               |
+| false             | any non-missing state | invariant failure: Nereus projection embeds a binding generation and the binding key is never removed；it cannot be adopted |
 
 Thus a policy selecting Nereus over an existing BookKeeper ledger first restores the actual `ACTIVE/bookkeeper`
 binding and then returns `NEREUS_STORAGE_CLASS_MIGRATION_REQUIRED`；selection never changes observed durable truth。
@@ -846,12 +849,12 @@ this call；only exact `bookkeeper`/`nereus` values can be bound. Non-persistent
 
 For an existing binding:
 
-| Binding state | Open behavior |
-| --- | --- |
-| `CLAIMED` | only the same class/generation may resume creation; the other class is rejected |
-| `ACTIVE` | only the same class may open；BookKeeper must exist, while Nereus must be `ACTIVE/SEALED` with exact binding generation；missing selected state is corruption, never empty recreation |
-| `DELETING` | no live open is returned; resume the bound class's delete protocol |
-| `DELETED` | with create-if-missing, verify old selected state is terminal and the candidate class has no live state, then CAS to the next generation's `CLAIMED`; otherwise not-found |
+| Binding state | Open behavior                                                                                                                                                                       |
+|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `CLAIMED`     | only the same class/generation may resume creation; the other class is rejected                                                                                                     |
+| `ACTIVE`      | only the same class may open；BookKeeper must exist, while Nereus must be `ACTIVE/SEALED` with exact binding generation；missing selected state is corruption, never empty recreation |
+| `DELETING`    | no live open is returned; resume the bound class's delete protocol                                                                                                                  |
+| `DELETED`     | with create-if-missing, verify old selected state is terminal and the candidate class has no live state, then CAS to the next generation's `CLAIMED`; otherwise not-found           |
 
 For a `CLAIMED/nereus` permit，`MISSING` means resume first creation；`ACTIVE/SEALED` is activatable only when the
 projection carries the same generation；and a `DELETED` projection is recreatable only when it carries exactly the
@@ -867,16 +870,16 @@ generation. BookKeeper absence is terminal for a prior deleted BookKeeper genera
 
 `prepareStorageClassDelete` has its own closed state table and never recomputes class from mutable policy：
 
-| Binding observation | Delete action |
-| --- | --- |
-| missing + BookKeeper exists + Nereus `MISSING` | adopt `ACTIVE/bookkeeper/generation=1`，then retry preparation |
-| missing + both absent | `ManagedLedgerNotFoundException`，no write |
-| missing + any Nereus non-missing, or both live | invariant failure；a generation-bearing Nereus projection cannot lose its binding |
-| `CLAIMED` + selected storage absent/not yet published | CAS `CLAIMED -> DELETING -> DELETED`，no factory delete |
-| `CLAIMED` + selected storage published | CAS to `DELETING`，then call only the bound factory |
-| `ACTIVE` | verify bound durable state, CAS to `DELETING`，then call only the bound factory；active-missing is corruption |
-| `DELETING` | return the same-generation permit and resume only the bound factory delete |
-| `DELETED` | idempotent terminal success；do not call either factory |
+| Binding observation                                   | Delete action                                                                                               |
+|-------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| missing + BookKeeper exists + Nereus `MISSING`        | adopt `ACTIVE/bookkeeper/generation=1`，then retry preparation                                               |
+| missing + both absent                                 | `ManagedLedgerNotFoundException`，no write                                                                   |
+| missing + any Nereus non-missing, or both live        | invariant failure；a generation-bearing Nereus projection cannot lose its binding                            |
+| `CLAIMED` + selected storage absent/not yet published | CAS `CLAIMED -> DELETING -> DELETED`，no factory delete                                                      |
+| `CLAIMED` + selected storage published                | CAS to `DELETING`，then call only the bound factory                                                          |
+| `ACTIVE`                                              | verify bound durable state, CAS to `DELETING`，then call only the bound factory；active-missing is corruption |
+| `DELETING`                                            | return the same-generation permit and resume only the bound factory delete                                  |
+| `DELETED`                                             | idempotent terminal success；do not call either factory                                                      |
 
 The returned `Optional` is empty only when preparation itself reaches or observes the terminal `DELETED` binding and
 no factory call is allowed。A missing binding with both storage probes absent still fails with
@@ -911,7 +914,8 @@ delete/create race cannot observe key absence and independently claim both class
 The implementation uses only the locked `MetadataStore` primitives: `sync(key)` then `get(key)`, create with
 `put(key,bytes,Optional.of(-1L))`, and transition with
 `put(key,bytes,Optional.of(getResult.getStat().getVersion()))`. Bytes are copied
-from `GetResult.getValue()`; the expected/metadata version is `GetResult.getStat().getVersion()`. Even an already-`ACTIVE` open permit is revalidated by
+from `GetResult.getValue()`; the expected/metadata version is `GetResult.getStat().getVersion()`. Even an already-
+`ACTIVE` open permit is revalidated by
 `sync/get` in `completeStorageClassOpen`; “activationRequired=false” means no state transition, not an unchecked no-op.
 Every get/put/CAS is bounded by `nereusMetadataTimeoutSeconds`; version conflicts reread with capped exponential
 backoff, while timeout/unavailability fails the broker operation and never falls back to an unbound factory call.
@@ -1012,7 +1016,8 @@ after that claim and before either factory can create storage. On mismatch it ta
 factory IO；close is idempotent and a leaked process lock is session-released.
 
 `updateNamespacePersistence` first runs `requireClusterReady` when the effective class changes to Nereus, acquires
-the same lock, reloads the expected policy version, and lists existing persistent topics plus non-`DELETED` binding records for the
+the same lock, reloads the expected policy version, and lists existing persistent topics plus non-`DELETED` binding
+records for the
 namespace. Any result rejects before policy mutation. Otherwise it CAS-writes the policy, reloads it, and repeats the
 topic/binding check before success. A split/stale lock owner can at most publish a no-storage `CLAIMED` record：its
 mandatory post-claim policy validation aborts that record before factory open, and the updater waits/retries the
@@ -1211,7 +1216,8 @@ topic. It may reset dedup、call `readyToCreateNewLedger` and `unfence` only whe
 `pendingWriteOps==0` and a fresh fence read is empty。
 If a higher generation is present, it attaches that generation and the stale completion does nothing. Both
 `COMMITTED` and `PROVEN_NOT_COMMITTED` authorize this check；neither emits a second producer callback. Exceptional
-permanent recovery calls the topic's close/unload path and never unfences it；broker/runtime shutdown may close the bridge but
+permanent recovery calls the topic's close/unload path and never unfences it；broker/runtime shutdown may close the
+bridge but
 bridge close only detaches its continuation and never cancels the core recovery future。Shutdown cannot report a
 safely retryable append outcome. Rejected publishes while fenced may drive pending count back to zero,
 but they join the same generation instead of creating duplicate waiters。If a completion arrives while producer
@@ -1219,29 +1225,29 @@ disconnect still keeps `pendingWriteOps` nonzero，the topic retains the newest 
 the zero transition；it does not drop the only terminal after the facade has cleared `currentWriteFence()`。Executor
 rejection is converted to a failure completion and closes the topic rather than authorizing an inline success。
 
-| Broker feature | F2 admission |
-| --- | --- |
-| ordinary persistent user topic | allowed |
-| existing topic switched between BookKeeper and Nereus | rejected; no F2 migration contract |
-| ordinary non-transactional producer, batching/chunking, client encryption | allowed; entry bytes remain opaque |
-| Reader, read-only cursor, non-durable Exclusive/Failover consumer | allowed |
-| non-durable consumer acknowledgement | only the cumulative one-position whole-entry shape in 5.4；batched-entry ack is rejected even though producing/Reader-reading opaque batches is allowed |
-| every durable subscription/consumer | rejected before `openCursor`; F3 owns durable progress |
-| Shared / Key_Shared | rejected before cursor open |
-| read-compacted cursor / Pulsar topic-compaction admission | rejected; final-gated F4 keeps `TOPIC_COMPACTED` as an isolated storage view and does not enable this Pulsar surface |
-| BookKeeper offload policy/admin operation | rejected; Nereus Object WAL is not Pulsar offload |
-| transaction buffer / pending ack transaction | rejected; F8 not implemented |
-| delayed delivery / replicated subscription | rejected; F8 not implemented |
-| geo-replication | rejected until its projection contract exists |
-| broker-entry metadata interceptor / managed-ledger payload processor | rejected; this Pulsar version wraps both in `ManagedLedgerInterceptorImpl`, whose before-add, failure rollback, property recovery and cache-processor lifecycle F2 does not implement |
-| broker message deduplication | rejected; F2 has no durable producer-sequence state |
-| broker/topic entry filters | rejected until accept/reject/reschedule and cursor-progress effects are audited |
-| TTL/backlog operation that requires durable cursor mutation | rejected or kept on BookKeeper |
-| non-default message TTL, retention, backlog-eviction or subscription-expiration policy | rejected at topic open; F2 has no cursor-driven trim/GC contract |
-| auto-skip non-recoverable data | rejected; corruption is never converted into a skipped virtual position |
-| schema-registry/system/internal storage topic | kept on BookKeeper; selecting Nereus is an explicit load error until F8 bootstrap |
-| ordinary user topic whose messages reference a schema | allowed; the separate schema storage topic remains BookKeeper |
-| shadow topic / migration / truncate | rejected |
+| Broker feature                                                                         | F2 admission                                                                                                                                                                          |
+|----------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ordinary persistent user topic                                                         | allowed                                                                                                                                                                               |
+| existing topic switched between BookKeeper and Nereus                                  | rejected; no F2 migration contract                                                                                                                                                    |
+| ordinary non-transactional producer, batching/chunking, client encryption              | allowed; entry bytes remain opaque                                                                                                                                                    |
+| Reader, read-only cursor, non-durable Exclusive/Failover consumer                      | allowed                                                                                                                                                                               |
+| non-durable consumer acknowledgement                                                   | only the cumulative one-position whole-entry shape in 5.4；batched-entry ack is rejected even though producing/Reader-reading opaque batches is allowed                                |
+| every durable subscription/consumer                                                    | rejected before `openCursor`; F3 owns durable progress                                                                                                                                |
+| Shared / Key_Shared                                                                    | rejected before cursor open                                                                                                                                                           |
+| read-compacted cursor / Pulsar topic-compaction admission                              | rejected; final-gated F4 keeps `TOPIC_COMPACTED` as an isolated storage view and does not enable this Pulsar surface                                                                  |
+| BookKeeper offload policy/admin operation                                              | rejected; Nereus Object WAL is not Pulsar offload                                                                                                                                     |
+| transaction buffer / pending ack transaction                                           | rejected; F8 not implemented                                                                                                                                                          |
+| delayed delivery / replicated subscription                                             | rejected; F8 not implemented                                                                                                                                                          |
+| geo-replication                                                                        | rejected until its projection contract exists                                                                                                                                         |
+| broker-entry metadata interceptor / managed-ledger payload processor                   | rejected; this Pulsar version wraps both in `ManagedLedgerInterceptorImpl`, whose before-add, failure rollback, property recovery and cache-processor lifecycle F2 does not implement |
+| broker message deduplication                                                           | rejected; F2 has no durable producer-sequence state                                                                                                                                   |
+| broker/topic entry filters                                                             | rejected until accept/reject/reschedule and cursor-progress effects are audited                                                                                                       |
+| TTL/backlog operation that requires durable cursor mutation                            | rejected or kept on BookKeeper                                                                                                                                                        |
+| non-default message TTL, retention, backlog-eviction or subscription-expiration policy | rejected at topic open; F2 has no cursor-driven trim/GC contract                                                                                                                      |
+| auto-skip non-recoverable data                                                         | rejected; corruption is never converted into a skipped virtual position                                                                                                               |
+| schema-registry/system/internal storage topic                                          | kept on BookKeeper; selecting Nereus is an explicit load error until F8 bootstrap                                                                                                     |
+| ordinary user topic whose messages reference a schema                                  | allowed; the separate schema storage topic remains BookKeeper                                                                                                                         |
+| shadow topic / migration / truncate                                                    | rejected                                                                                                                                                                              |
 
 This validation occurs where the fork still has a `TopicName`, operation arguments and relevant policies. The Nereus
 factory continues treating the persistence name as opaque and never reparses it to guess whether it is a system
@@ -1439,17 +1445,20 @@ In addition to `05`, the F2-M5/F2-M6 gates include and now pass:
 8. effective-feature resolver parity covers broker/namespace/local/global policy precedence and normalization；an
    unsupported Nereus view fails before a storage-class binding is claimed；
 9. namespace policy that unintentionally selects a system topic fails clearly instead of falling back；
-10. each unsupported feature in section 5 is rejected at its exact topic/producer/publish/subscribe/admin gate before facade
-   mutation or append/read IO；
+10. each unsupported feature in section 5 is rejected at its exact topic/producer/publish/subscribe/admin gate before
+    facade
+    mutation or append/read IO；
 11. broker-entry metadata and payload-processor configurations both produce a non-null
-   `ManagedLedgerInterceptor` and are rejected before the first append；
-12. independent reader/writer facade runtimes over one shared metadata authority wake a local read waiter through polling
+    `ManagedLedgerInterceptor` and are rejected before the first append；
+12. independent reader/writer facade runtimes over one shared metadata authority wake a local read waiter through
+    polling
     while metadata watch delivery is explicitly disabled；
 13. with the broker transaction coordinator enabled, a Nereus topic constructs only `TransactionBufferDisable`; txn,
     end-txn, marker and `deliverAtTime` paths fail before pending-write, dedup, transaction-buffer and ledger
     counters/mocks observe a call; publish validation preserves `ByteBuf` indexes/refcount, while a BookKeeper topic
     still uses the configured transaction provider；
-14. pinned LocalStack Community S3 `4.14.0` restart test proves shared Object WAL, not a process-local map, supplies bytes；
+14. pinned LocalStack Community S3 `4.14.0` restart test proves shared Object WAL, not a process-local map, supplies
+    bytes；
 15. the useful `pulsar-storage` smoke shape is adapted to producer plus Reader/non-durable consumer; durable
     subscription creation is rejected before `ManagedLedger.openCursor`；
 16. every typed broker field maps to the expected immutable constructor argument; invalid cross-field bounds fail

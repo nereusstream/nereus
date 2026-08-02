@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.security.SecureRandom;
 import java.util.HashSet;
 import java.util.Set;
@@ -13,22 +13,20 @@ import org.junit.jupiter.api.Test;
 class MaterializationDomainTest {
     @Test
     void canonicalPolicySourceAndTaskIdentityIsStableAcrossIndependentRecovery() {
-        try (GenerationPublicationTestSupport.Context first =
-                        GenerationPublicationTestSupport.context();
-                GenerationPublicationTestSupport.Context second =
-                        GenerationPublicationTestSupport.context()) {
+        try (GenerationPublicationTestSupport.Context first = GenerationPublicationTestSupport.context();
+                GenerationPublicationTestSupport.Context second = GenerationPublicationTestSupport.context()) {
             assertThat(second.task()).isEqualTo(first.task());
             assertThat(second.task().taskId()).isEqualTo(first.task().taskId());
             assertThat(second.task().sourceSetSha256()).isEqualTo(first.task().sourceSetSha256());
-            assertThat(second.task().policyDigestSha256()).isEqualTo(first.task().policyDigestSha256());
+            assertThat(second.task().policyDigestSha256())
+                    .isEqualTo(first.task().policyDigestSha256());
             assertThat(second.output()).isEqualTo(first.output());
         }
     }
 
     @Test
     void durableTaskRejectsAnIdentityThatDoesNotMatchItsCanonicalFacts() {
-        try (GenerationPublicationTestSupport.Context context =
-                GenerationPublicationTestSupport.context()) {
+        try (GenerationPublicationTestSupport.Context context = GenerationPublicationTestSupport.context()) {
             MaterializationTask task = context.task();
             assertThatThrownBy(() -> new MaterializationTask(
                             "not-the-canonical-task-id",

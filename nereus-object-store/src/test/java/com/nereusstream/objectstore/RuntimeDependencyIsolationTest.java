@@ -15,7 +15,6 @@
 package com.nereusstream.objectstore;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import org.junit.jupiter.api.Test;
 
 class RuntimeDependencyIsolationTest {

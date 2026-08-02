@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import com.nereusstream.api.Checksum;
@@ -97,41 +98,33 @@ public final class ReferencedObjectGcExecutor {
             ScheduledExecutorService scheduler) {
         this.cluster = requireText(cluster, "cluster");
         this.config = Objects.requireNonNull(config, "config");
-        MaterializationConfig exactMaterializationConfig = Objects.requireNonNull(
-                materializationConfig, "materializationConfig");
-        this.physicalMetadata = Objects.requireNonNull(
-                physicalMetadata, "physicalMetadata");
-        this.objectProtections = Objects.requireNonNull(
-                objectProtections, "objectProtections");
+        MaterializationConfig exactMaterializationConfig =
+                Objects.requireNonNull(materializationConfig, "materializationConfig");
+        this.physicalMetadata = Objects.requireNonNull(physicalMetadata, "physicalMetadata");
+        this.objectProtections = Objects.requireNonNull(objectProtections, "objectProtections");
         this.preDrain = Objects.requireNonNull(preDrain, "preDrain");
         this.sourcePlans = Objects.requireNonNull(sourcePlans, "sourcePlans");
-        this.referenceDomains = Objects.requireNonNull(
-                referenceDomains, "referenceDomains");
-        this.garbageCollector = Objects.requireNonNull(
-                garbageCollector, "garbageCollector");
-        this.sourceRetirement = Objects.requireNonNull(
-                sourceRetirement, "sourceRetirement");
-        this.retirementJournal = Objects.requireNonNull(
-                retirementJournal, "retirementJournal");
+        this.referenceDomains = Objects.requireNonNull(referenceDomains, "referenceDomains");
+        this.garbageCollector = Objects.requireNonNull(garbageCollector, "garbageCollector");
+        this.sourceRetirement = Objects.requireNonNull(sourceRetirement, "sourceRetirement");
+        this.retirementJournal = Objects.requireNonNull(retirementJournal, "retirementJournal");
         this.candidateIds = Objects.requireNonNull(candidateIds, "candidateIds");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.keys = new F4Keyspace(this.cluster);
-        this.sourceGraceMillis = requireMillis(
-                exactMaterializationConfig.sourceRetirementGrace(),
-                "sourceRetirementGrace");
-        this.maximumClockSkewMillis = requireMillis(
-                this.config.maximumClockSkew(), "maximumClockSkew");
+        this.sourceGraceMillis =
+                requireMillis(exactMaterializationConfig.sourceRetirementGrace(), "sourceRetirementGrace");
+        this.maximumClockSkewMillis = requireMillis(this.config.maximumClockSkew(), "maximumClockSkew");
     }
 
-    /** Returns empty only when no exact visible-generation owner identifies this ACTIVE root as a source. */
-    public CompletableFuture<Optional<ExecutionResult>> executeActive(
-            VersionedPhysicalObjectRoot activeRoot) {
-        VersionedPhysicalObjectRoot active = Objects.requireNonNull(
-                activeRoot, "activeRoot");
+    /**
+     * Returns empty only when no exact visible-generation owner identifies this ACTIVE root as a source.
+     */
+    public CompletableFuture<Optional<ExecutionResult>> executeActive(VersionedPhysicalObjectRoot activeRoot) {
+        VersionedPhysicalObjectRoot active = Objects.requireNonNull(activeRoot, "activeRoot");
         if (active.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "referenced discovery requires an exact ACTIVE root"));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("referenced discovery requires an exact ACTIVE root"));
         }
         return discover(active).thenCompose(optional -> {
             if (optional.isEmpty()) {
@@ -142,80 +135,71 @@ public final class ReferencedObjectGcExecutor {
             long notBefore = sourceNotBefore(active);
             if (now < active.value().createdAtMillis() || now < notBefore) {
                 return handled(ExecutionResult.notEligible(
-                        discovery.object().objectKeyHash(),
-                        "source-retirement grace is pending"));
+                        discovery.object().objectKeyHash(), "source-retirement grace is pending"));
             }
             GcCandidate candidate = GcCandidate.fromActiveRoot(
-                    config,
-                    candidateIds.next(),
-                    active,
-                    discovery.query(),
-                    discovery.evidence(),
-                    now,
-                    notBefore);
+                    config, candidateIds.next(), active, discovery.query(), discovery.evidence(), now, notBefore);
             return recoverConditionAsNotEligible(
-                    preDrain.preDrain(candidate).thenCompose(result -> {
-                        if (result.status() == HigherGenerationPreDrainStatus.NOT_ELIGIBLE_YET
-                                || result.status() == HigherGenerationPreDrainStatus.MUTATION_DISABLED) {
-                            return CompletableFuture.completedFuture(
-                                    ExecutionResult.notEligible(
+                            preDrain.preDrain(candidate).thenCompose(result -> {
+                                if (result.status() == HigherGenerationPreDrainStatus.NOT_ELIGIBLE_YET
+                                        || result.status() == HigherGenerationPreDrainStatus.MUTATION_DISABLED) {
+                                    return CompletableFuture.completedFuture(ExecutionResult.notEligible(
                                             candidate.object().objectKeyHash(),
-                                            "higher-generation pre-drain status is "
-                                                    + result.status()));
-                        }
-                        return sourcePlans.build(candidate).thenCompose(removals -> {
-                            if (removals.isEmpty()) {
-                                return CompletableFuture.completedFuture(
-                                        ExecutionResult.notEligible(
-                                                candidate.object().objectKeyHash(),
-                                                "source-retirement plan is empty"));
-                            }
-                            Optional<String> ownerMismatch = protectionOwnerMismatch(
-                                    discovery.protections(), removals);
-                            if (ownerMismatch.isPresent()) {
-                                return CompletableFuture.completedFuture(
-                                        ExecutionResult.notEligible(
-                                                candidate.object().objectKeyHash(),
-                                                ownerMismatch.orElseThrow()));
-                            }
-                            return rebindStaleProtectionEpochs(
-                                            discovery, removals, candidate)
-                                    .thenCompose(rebound -> {
-                                        if (rebound > 0) {
-                                            return CompletableFuture.completedFuture(
-                                                    ExecutionResult.notEligible(
-                                                            candidate.object().objectKeyHash(),
-                                                            rebound
-                                                                    + " physical protection(s) rebound to the current ACTIVE root epoch; retry"));
-                                        }
-                                        Optional<String> protectionMismatch =
-                                                protectionMismatch(
-                                                        discovery.protections(),
-                                                        removals,
-                                                        candidate);
-                                        if (protectionMismatch.isPresent()) {
-                                            return CompletableFuture.completedFuture(
-                                                    ExecutionResult.notEligible(
-                                                            candidate.object().objectKeyHash(),
-                                                            protectionMismatch.orElseThrow()));
-                                        }
-                                        return garbageCollector.mark(
-                                                        candidate,
-                                                        discovery.protections(),
-                                                        removals)
-                                                .thenCompose(mark -> mark.status()
-                                                                == PhysicalGcMarkStatus.MARKED
-                                                        ? advance(
-                                                                mark.plan().orElseThrow(),
-                                                                Optional.of(mark))
-                                                        : CompletableFuture.completedFuture(
-                                                                ExecutionResult.markOnly(
-                                                                        candidate.object()
-                                                                                .objectKeyHash(),
-                                                                        mark)));
-                                    });
-                        });
-                    }), discovery.object().objectKeyHash()).thenApply(Optional::of);
+                                            "higher-generation pre-drain status is " + result.status()));
+                                }
+                                return sourcePlans.build(candidate).thenCompose(removals -> {
+                                    if (removals.isEmpty()) {
+                                        return CompletableFuture.completedFuture(ExecutionResult.notEligible(
+                                                candidate.object().objectKeyHash(), "source-retirement plan is empty"));
+                                    }
+                                    Optional<String> ownerMismatch =
+                                            protectionOwnerMismatch(discovery.protections(), removals);
+                                    if (ownerMismatch.isPresent()) {
+                                        return CompletableFuture.completedFuture(ExecutionResult.notEligible(
+                                                candidate.object().objectKeyHash(), ownerMismatch.orElseThrow()));
+                                    }
+                                    return rebindStaleProtectionEpochs(discovery, removals, candidate)
+                                            .thenCompose(rebound -> {
+                                                if (rebound > 0) {
+                                                    return CompletableFuture.completedFuture(
+                                                            ExecutionResult.notEligible(
+                                                                    candidate
+                                                                            .object()
+                                                                            .objectKeyHash(),
+                                                                    rebound
+                                                                            + " physical protection(s)"
+                                                                            + " rebound to the current"
+                                                                            + " ACTIVE root epoch; retry"));
+                                                }
+                                                Optional<String> protectionMismatch = protectionMismatch(
+                                                        discovery.protections(), removals, candidate);
+                                                if (protectionMismatch.isPresent()) {
+                                                    return CompletableFuture.completedFuture(
+                                                            ExecutionResult.notEligible(
+                                                                    candidate
+                                                                            .object()
+                                                                            .objectKeyHash(),
+                                                                    protectionMismatch.orElseThrow()));
+                                                }
+                                                return garbageCollector
+                                                        .mark(candidate, discovery.protections(), removals)
+                                                        .thenCompose(
+                                                                mark -> mark.status() == PhysicalGcMarkStatus.MARKED
+                                                                        ? advance(
+                                                                                mark.plan()
+                                                                                        .orElseThrow(),
+                                                                                Optional.of(mark))
+                                                                        : CompletableFuture.completedFuture(
+                                                                                ExecutionResult.markOnly(
+                                                                                        candidate
+                                                                                                .object()
+                                                                                                .objectKeyHash(),
+                                                                                        mark)));
+                                            });
+                                });
+                            }),
+                            discovery.object().objectKeyHash())
+                    .thenApply(Optional::of);
         });
     }
 
@@ -224,62 +208,47 @@ public final class ReferencedObjectGcExecutor {
      * caller must then use the ownerless-global recovery path, which either reconstructs its own exact plan or safely
      * rolls the pre-delete root back to ACTIVE.
      */
-    public CompletableFuture<Optional<ExecutionResult>> recoverMarked(
-            VersionedPhysicalObjectRoot markedRoot) {
-        VersionedPhysicalObjectRoot marked = Objects.requireNonNull(
-                markedRoot, "markedRoot");
+    public CompletableFuture<Optional<ExecutionResult>> recoverMarked(VersionedPhysicalObjectRoot markedRoot) {
+        VersionedPhysicalObjectRoot marked = Objects.requireNonNull(markedRoot, "markedRoot");
         if (marked.value().lifecycle() != PhysicalObjectLifecycle.MARKED) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "referenced recovery requires an exact MARKED root"));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("referenced recovery requires an exact MARKED root"));
         }
         return discover(marked).thenCompose(optional -> {
             if (optional.isEmpty()) {
                 return CompletableFuture.completedFuture(Optional.empty());
             }
             Discovery discovery = optional.orElseThrow();
-            MaterializationDeadline deadline = new MaterializationDeadline(
-                    config.operationTimeout(), scheduler);
+            MaterializationDeadline deadline = new MaterializationDeadline(config.operationTimeout(), scheduler);
             CompletableFuture<Optional<ExecutionResult>> result = deadline.bound(
                             () -> retirementJournal.load(
                                     discovery.object().objectKeyHash(),
                                     marked.value().gcAttemptId(),
                                     deadline),
                             "load referenced-object GC retirement journal")
-                    .thenCompose(journal -> recoverMarked(
-                            marked, discovery, requireJournal(journal, marked)));
+                    .thenCompose(journal -> recoverMarked(marked, discovery, requireJournal(journal, marked)));
             result.whenComplete((ignored, failure) -> deadline.close());
             return result;
         });
     }
 
     private CompletableFuture<Optional<ExecutionResult>> recoverMarked(
-            VersionedPhysicalObjectRoot marked,
-            Discovery discovery,
-            GcRetirementJournalSnapshot journal) {
-        if (!journal.queryIdentitySha256().equals(
-                discovery.query().queryIdentitySha256())) {
+            VersionedPhysicalObjectRoot marked, Discovery discovery, GcRetirementJournalSnapshot journal) {
+        if (!journal.queryIdentitySha256().equals(discovery.query().queryIdentitySha256())) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
         GcCandidate candidate = GcCandidate.fromMarkedRoot(
-                config,
-                candidateIds.next(),
-                marked,
-                discovery.query(),
-                discovery.evidence(),
-                nonNegativeNow());
-        return sourcePlans.reload(candidate, journal.plannedMetadataRemovals())
+                config, candidateIds.next(), marked, discovery.query(), discovery.evidence(), nonNegativeNow());
+        return sourcePlans
+                .reload(candidate, journal.plannedMetadataRemovals())
                 .thenCompose(removals -> {
                     if (!removals.equals(journal.plannedMetadataRemovals())
-                            || !discovery.protections().equals(
-                                    journal.plannedProtectionRemovals())) {
+                            || !discovery.protections().equals(journal.plannedProtectionRemovals())) {
                         return unmark(marked);
                     }
-                    return referenceDomains.snapshotForDeletion(discovery.query())
-                            .thenCompose(collection -> reconstructAndAdvance(
-                                    marked,
-                                    candidate,
-                                    journal,
-                                    collection));
+                    return referenceDomains
+                            .snapshotForDeletion(discovery.query())
+                            .thenCompose(collection -> reconstructAndAdvance(marked, candidate, journal, collection));
                 })
                 .handle((execution, failure) -> {
                     if (failure == null) {
@@ -318,50 +287,35 @@ public final class ReferencedObjectGcExecutor {
         return advance(plan, Optional.empty());
     }
 
-    private CompletableFuture<ExecutionResult> advance(
-            GcPlan plan, Optional<PhysicalGcMarkResult> mark) {
-        return garbageCollector.advanceToDeleteIntent(
-                        plan,
-                        ignored -> sourcePlans.reload(
-                                        plan.candidate(),
-                                        plan.plannedMetadataRemovals())
-                                .thenApply(plan.plannedMetadataRemovals()::equals))
+    private CompletableFuture<ExecutionResult> advance(GcPlan plan, Optional<PhysicalGcMarkResult> mark) {
+        return garbageCollector
+                .advanceToDeleteIntent(plan, ignored -> sourcePlans
+                        .reload(plan.candidate(), plan.plannedMetadataRemovals())
+                        .thenApply(plan.plannedMetadataRemovals()::equals))
                 .thenCompose(advance -> {
                     if (advance.status() != PhysicalGcAdvanceStatus.DELETE_INTENT) {
-                        return CompletableFuture.completedFuture(
-                                ExecutionResult.advanced(
-                                        plan.candidate().object().objectKeyHash(),
-                                        mark,
-                                        advance));
+                        return CompletableFuture.completedFuture(ExecutionResult.advanced(
+                                plan.candidate().object().objectKeyHash(), mark, advance));
                     }
-                    return sourceRetirement.resume(advance.root().orElseThrow())
+                    return sourceRetirement
+                            .resume(advance.root().orElseThrow())
                             .thenApply(deletion -> ExecutionResult.deleted(
-                                    plan.candidate().object().objectKeyHash(),
-                                    mark,
-                                    advance,
-                                    deletion));
+                                    plan.candidate().object().objectKeyHash(), mark, advance, deletion));
                 });
     }
 
-    private CompletableFuture<ExecutionResult> unmark(
-            VersionedPhysicalObjectRoot marked) {
+    private CompletableFuture<ExecutionResult> unmark(VersionedPhysicalObjectRoot marked) {
         ObjectKeyHash object = new ObjectKeyHash(marked.value().objectKeyHash());
-        return garbageCollector.unmarkDrifted(marked)
-                .thenApply(advance -> ExecutionResult.advanced(
-                        object, Optional.empty(), advance));
+        return garbageCollector
+                .unmarkDrifted(marked)
+                .thenApply(advance -> ExecutionResult.advanced(object, Optional.empty(), advance));
     }
 
-    private CompletableFuture<Optional<Discovery>> discover(
-            VersionedPhysicalObjectRoot root) {
+    private CompletableFuture<Optional<Discovery>> discover(VersionedPhysicalObjectRoot root) {
         PhysicalObjectIdentity object = PhysicalObjectIdentity.from(root.value());
-        MaterializationDeadline deadline = new MaterializationDeadline(
-                config.operationTimeout(), scheduler);
+        MaterializationDeadline deadline = new MaterializationDeadline(config.operationTimeout(), scheduler);
         CompletableFuture<Optional<Discovery>> result = scanProtections(
-                        object.objectKeyHash(),
-                        Optional.empty(),
-                        new ArrayList<>(),
-                        null,
-                        deadline)
+                        object.objectKeyHash(), Optional.empty(), new ArrayList<>(), null, deadline)
                 .thenApply(protections -> discovery(object, protections));
         result.whenComplete((ignored, failure) -> deadline.close());
         return result;
@@ -375,10 +329,7 @@ public final class ReferencedObjectGcExecutor {
             MaterializationDeadline deadline) {
         return deadline.bound(
                         () -> physicalMetadata.scanProtections(
-                                cluster,
-                                object,
-                                continuation,
-                                config.metadataScanPageSize()),
+                                cluster, object, continuation, config.metadataScanPageSize()),
                         "scan referenced-object physical protections")
                 .thenCompose(page -> {
                     requireProgress(page, previousKey);
@@ -395,27 +346,21 @@ public final class ReferencedObjectGcExecutor {
                         return CompletableFuture.completedFuture(List.copyOf(values));
                     }
                     String lastKey = page.values().get(page.values().size() - 1).key();
-                    return scanProtections(
-                            object,
-                            page.continuation(),
-                            values,
-                            lastKey,
-                            deadline);
+                    return scanProtections(object, page.continuation(), values, lastKey, deadline);
                 });
     }
 
-    private Optional<Discovery> discovery(
-            PhysicalObjectIdentity object,
-            List<GcPlannedProtectionRemoval> protections) {
+    private Optional<Discovery> discovery(PhysicalObjectIdentity object, List<GcPlannedProtectionRemoval> protections) {
         ArrayList<StreamId> streams = new ArrayList<>();
         for (GcPlannedProtectionRemoval removal : protections) {
             VersionedObjectProtection protection = removal.protection();
-            if (!protection.value().objectKeyHash().equals(
-                    object.objectKeyHash().value())) {
+            if (!protection
+                    .value()
+                    .objectKeyHash()
+                    .equals(object.objectKeyHash().value())) {
                 throw invariant("protection scan escaped its physical object identity");
             }
-            if (ObjectProtectionType.fromWireId(
-                            protection.value().protectionTypeId())
+            if (ObjectProtectionType.fromWireId(protection.value().protectionTypeId())
                     == ObjectProtectionType.VISIBLE_GENERATION) {
                 StreamId stream = keys.parseGenerationIndexKey(
                                 protection.value().ownerKey())
@@ -434,11 +379,8 @@ public final class ReferencedObjectGcExecutor {
             throw invariant("referenced-object affected-stream set exceeded its configured bound");
         }
         Checksum evidence = object.identitySha256();
-        GcReferenceQuery query = GcReferenceQuery.create(
-                GcReferenceQueryKind.REFERENCED_OBJECT,
-                object,
-                exactStreams,
-                evidence);
+        GcReferenceQuery query =
+                GcReferenceQuery.create(GcReferenceQueryKind.REFERENCED_OBJECT, object, exactStreams, evidence);
         return Optional.of(new Discovery(object, query, evidence, protections));
     }
 
@@ -448,48 +390,42 @@ public final class ReferencedObjectGcExecutor {
             GcCandidate candidate) {
         for (GcPlannedProtectionRemoval protection : protections) {
             VersionedObjectProtection exact = protection.protection();
-            ObjectProtectionType type = ObjectProtectionType.fromWireId(
-                    exact.value().protectionTypeId());
+            ObjectProtectionType type =
+                    ObjectProtectionType.fromWireId(exact.value().protectionTypeId());
             if (exact.value().rootLifecycleEpoch() != candidate.activeRootLifecycleEpoch()) {
-                return Optional.of(
-                        "physical protection " + type
-                                + " has root lifecycle epoch "
-                                + exact.value().rootLifecycleEpoch()
-                                + ", expected "
-                                + candidate.activeRootLifecycleEpoch());
+                return Optional.of("physical protection " + type
+                        + " has root lifecycle epoch "
+                        + exact.value().rootLifecycleEpoch()
+                        + ", expected "
+                        + candidate.activeRootLifecycleEpoch());
             }
         }
         return protectionOwnerMismatch(protections, removals);
     }
 
     private Optional<String> protectionOwnerMismatch(
-            List<GcPlannedProtectionRemoval> protections,
-            List<GcPlannedMetadataRemoval> removals) {
+            List<GcPlannedProtectionRemoval> protections, List<GcPlannedMetadataRemoval> removals) {
         Map<String, GcPlannedMetadataRemoval> byKey = metadataRemovalsByKey(removals);
         for (GcPlannedProtectionRemoval protection : protections) {
             VersionedObjectProtection exact = protection.protection();
-            ObjectProtectionType type = ObjectProtectionType.fromWireId(
-                    exact.value().protectionTypeId());
+            ObjectProtectionType type =
+                    ObjectProtectionType.fromWireId(exact.value().protectionTypeId());
             GcPlannedMetadataRemoval owner = byKey.get(exact.value().ownerKey());
             if (owner == null) {
-                return Optional.of(
-                        "physical protection " + type
-                                + " has no source-retirement owner removal: "
-                                + exact.value().ownerKey());
+                return Optional.of("physical protection " + type
+                        + " has no source-retirement owner removal: "
+                        + exact.value().ownerKey());
             }
             if (owner.metadataVersion() != exact.value().ownerMetadataVersion()) {
-                return Optional.of(
-                        "physical protection " + type
-                                + " owner metadata version is "
-                                + exact.value().ownerMetadataVersion()
-                                + ", expected "
-                                + owner.metadataVersion());
+                return Optional.of("physical protection " + type
+                        + " owner metadata version is "
+                        + exact.value().ownerMetadataVersion()
+                        + ", expected "
+                        + owner.metadataVersion());
             }
-            if (!owner.durableValueSha256().value().equals(
-                    exact.value().ownerIdentitySha256())) {
+            if (!owner.durableValueSha256().value().equals(exact.value().ownerIdentitySha256())) {
                 return Optional.of(
-                        "physical protection " + type
-                                + " owner identity differs from source-retirement removal");
+                        "physical protection " + type + " owner identity differs from source-retirement removal");
             }
         }
         return protections.isEmpty()
@@ -498,37 +434,29 @@ public final class ReferencedObjectGcExecutor {
     }
 
     private CompletableFuture<Integer> rebindStaleProtectionEpochs(
-            Discovery discovery,
-            List<GcPlannedMetadataRemoval> removals,
-            GcCandidate candidate) {
+            Discovery discovery, List<GcPlannedMetadataRemoval> removals, GcCandidate candidate) {
         Map<String, GcPlannedMetadataRemoval> byKey = metadataRemovalsByKey(removals);
         CompletableFuture<Integer> rebound = CompletableFuture.completedFuture(0);
         for (GcPlannedProtectionRemoval plannedProtection : discovery.protections()) {
             VersionedObjectProtection protection = plannedProtection.protection();
-            if (protection.value().rootLifecycleEpoch()
-                    >= candidate.activeRootLifecycleEpoch()) {
+            if (protection.value().rootLifecycleEpoch() >= candidate.activeRootLifecycleEpoch()) {
                 continue;
             }
-            GcPlannedMetadataRemoval removal = byKey.get(
-                    protection.value().ownerKey());
+            GcPlannedMetadataRemoval removal = byKey.get(protection.value().ownerKey());
             if (removal == null) {
                 throw invariant("protection epoch rebind lost its exact owner removal");
             }
-            ObjectProtectionOwner owner = new ObjectProtectionOwner(
-                    removal.key(),
-                    removal.metadataVersion(),
-                    removal.durableValueSha256());
+            ObjectProtectionOwner owner =
+                    new ObjectProtectionOwner(removal.key(), removal.metadataVersion(), removal.durableValueSha256());
             ObjectProtectionRequest request = new ObjectProtectionRequest(
                     discovery.object(),
-                    ObjectProtectionType.fromWireId(
-                            protection.value().protectionTypeId()),
+                    ObjectProtectionType.fromWireId(protection.value().protectionTypeId()),
                     protection.value().referenceId(),
                     owner,
                     protection.value().expiresAtMillis());
-            rebound = rebound.thenCompose(count -> objectProtections.acquireOrTransfer(
-                            request,
-                            expected -> revalidateProtectionOwner(
-                                    candidate, removals, owner, expected))
+            rebound = rebound.thenCompose(count -> objectProtections
+                    .acquireOrTransfer(
+                            request, expected -> revalidateProtectionOwner(candidate, removals, owner, expected))
                     .thenApply(ignored -> count + 1));
         }
         return rebound;
@@ -540,18 +468,18 @@ public final class ReferencedObjectGcExecutor {
             ObjectProtectionOwner plannedOwner,
             ObjectProtectionOwner requestedOwner) {
         if (!plannedOwner.equals(requestedOwner)) {
-            return CompletableFuture.failedFuture(invariant(
-                    "protection manager revalidated an unexpected source owner"));
+            return CompletableFuture.failedFuture(
+                    invariant("protection manager revalidated an unexpected source owner"));
         }
-        return sourcePlans.reload(candidate, expectedRemovals)
+        return sourcePlans
+                .reload(candidate, expectedRemovals)
                 .thenCompose(current -> current.equals(expectedRemovals)
                         ? CompletableFuture.completedFuture(null)
-                        : CompletableFuture.failedFuture(condition(
-                                "source-retirement owner changed during protection epoch rebind")));
+                        : CompletableFuture.failedFuture(
+                                condition("source-retirement owner changed during protection epoch rebind")));
     }
 
-    private Map<String, GcPlannedMetadataRemoval> metadataRemovalsByKey(
-            List<GcPlannedMetadataRemoval> removals) {
+    private Map<String, GcPlannedMetadataRemoval> metadataRemovalsByKey(List<GcPlannedMetadataRemoval> removals) {
         Map<String, GcPlannedMetadataRemoval> byKey = new HashMap<>();
         for (GcPlannedMetadataRemoval removal : removals) {
             if (byKey.put(removal.key(), removal) != null) {
@@ -578,42 +506,37 @@ public final class ReferencedObjectGcExecutor {
     }
 
     private CompletableFuture<ExecutionResult> recoverConditionAsNotEligible(
-            CompletableFuture<ExecutionResult> operation,
-            ObjectKeyHash object) {
-        return operation.handle((value, failure) -> {
+            CompletableFuture<ExecutionResult> operation, ObjectKeyHash object) {
+        return operation
+                .handle((value, failure) -> {
                     if (failure == null) {
                         return CompletableFuture.completedFuture(value);
                     }
                     Throwable exact = unwrap(failure);
                     return isConditionFailure(exact)
-                            ? CompletableFuture.completedFuture(
-                                    ExecutionResult.notEligible(
-                                            object,
-                                            exact.getMessage() == null
-                                                    ? "source-retirement condition failed"
-                                                    : exact.getMessage()))
+                            ? CompletableFuture.completedFuture(ExecutionResult.notEligible(
+                                    object,
+                                    exact.getMessage() == null
+                                            ? "source-retirement condition failed"
+                                            : exact.getMessage()))
                             : CompletableFuture.<ExecutionResult>failedFuture(exact);
                 })
                 .thenCompose(value -> value);
     }
 
     private static GcRetirementJournalSnapshot requireJournal(
-            Optional<GcRetirementJournalSnapshot> optional,
-            VersionedPhysicalObjectRoot root) {
-        GcRetirementJournalSnapshot journal = optional.orElseThrow(() -> invariant(
-                "MARKED referenced-object root is missing its retirement journal"));
+            Optional<GcRetirementJournalSnapshot> optional, VersionedPhysicalObjectRoot root) {
+        GcRetirementJournalSnapshot journal = optional.orElseThrow(
+                () -> invariant("MARKED referenced-object root is missing its retirement journal"));
         if (!journal.object().value().equals(root.value().objectKeyHash())
                 || !journal.gcAttemptId().equals(root.value().gcAttemptId())
-                || !journal.referenceSetSha256().value().equals(
-                        root.value().referenceSetSha256())) {
+                || !journal.referenceSetSha256().value().equals(root.value().referenceSetSha256())) {
             throw invariant("MARKED referenced-object root differs from its retirement journal");
         }
         return journal;
     }
 
-    private static void requireProgress(
-            ObjectProtectionScanPage page,
-            String previousKey) {
+    private static void requireProgress(ObjectProtectionScanPage page, String previousKey) {
         if (previousKey != null
                 && !page.values().isEmpty()
                 && page.values().get(0).key().compareTo(previousKey) <= 0) {
@@ -624,8 +547,7 @@ public final class ReferencedObjectGcExecutor {
         }
     }
 
-    private static CompletableFuture<Optional<ExecutionResult>> handled(
-            ExecutionResult result) {
+    private static CompletableFuture<Optional<ExecutionResult>> handled(ExecutionResult result) {
         return CompletableFuture.completedFuture(Optional.of(result));
     }
 
@@ -638,14 +560,12 @@ public final class ReferencedObjectGcExecutor {
     }
 
     private static boolean isConditionFailure(Throwable failure) {
-        return failure instanceof NereusException nereus
-                && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
+        return failure instanceof NereusException nereus && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
     }
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while ((current instanceof CompletionException
-                        || current instanceof ExecutionException)
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -674,13 +594,11 @@ public final class ReferencedObjectGcExecutor {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static NereusException condition(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_CONDITION_FAILED, true, message);
+        return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
 
     private record Discovery(
@@ -692,12 +610,13 @@ public final class ReferencedObjectGcExecutor {
             Objects.requireNonNull(object, "object");
             Objects.requireNonNull(query, "query");
             Objects.requireNonNull(evidence, "evidence");
-            protections = List.copyOf(Objects.requireNonNull(
-                    protections, "protections"));
+            protections = List.copyOf(Objects.requireNonNull(protections, "protections"));
         }
     }
 
-    /** Exact progress for one referenced root visit; NOT_ELIGIBLE is a handled, fail-closed no-op. */
+    /**
+     * Exact progress for one referenced root visit; NOT_ELIGIBLE is a handled, fail-closed no-op.
+     */
     public record ExecutionResult(
             ObjectKeyHash object,
             boolean eligible,
@@ -707,26 +626,20 @@ public final class ReferencedObjectGcExecutor {
             Optional<PhysicalGcDeletionResult> deletion) {
         public ExecutionResult {
             Objects.requireNonNull(object, "object");
-            eligibilityBlocker = Objects.requireNonNull(
-                    eligibilityBlocker, "eligibilityBlocker");
+            eligibilityBlocker = Objects.requireNonNull(eligibilityBlocker, "eligibilityBlocker");
             mark = Objects.requireNonNull(mark, "mark");
             advance = Objects.requireNonNull(advance, "advance");
             deletion = Objects.requireNonNull(deletion, "deletion");
             if (deletion.isPresent()
-                    && (advance.isEmpty()
-                            || advance.orElseThrow().status()
-                                    != PhysicalGcAdvanceStatus.DELETE_INTENT)) {
-                throw new IllegalArgumentException(
-                        "referenced-object deletion requires durable delete intent");
+                    && (advance.isEmpty() || advance.orElseThrow().status() != PhysicalGcAdvanceStatus.DELETE_INTENT)) {
+                throw new IllegalArgumentException("referenced-object deletion requires durable delete intent");
             }
             if (eligible == eligibilityBlocker.isPresent()) {
-                throw new IllegalArgumentException(
-                        "only an ineligible referenced-object result carries a blocker");
+                throw new IllegalArgumentException("only an ineligible referenced-object result carries a blocker");
             }
         }
 
-        private static ExecutionResult notEligible(
-                ObjectKeyHash object, String blocker) {
+        private static ExecutionResult notEligible(ObjectKeyHash object, String blocker) {
             return new ExecutionResult(
                     object,
                     false,
@@ -736,28 +649,14 @@ public final class ReferencedObjectGcExecutor {
                     Optional.empty());
         }
 
-        private static ExecutionResult markOnly(
-                ObjectKeyHash object, PhysicalGcMarkResult mark) {
+        private static ExecutionResult markOnly(ObjectKeyHash object, PhysicalGcMarkResult mark) {
             return new ExecutionResult(
-                    object,
-                    true,
-                    Optional.empty(),
-                    Optional.of(mark),
-                    Optional.empty(),
-                    Optional.empty());
+                    object, true, Optional.empty(), Optional.of(mark), Optional.empty(), Optional.empty());
         }
 
         private static ExecutionResult advanced(
-                ObjectKeyHash object,
-                Optional<PhysicalGcMarkResult> mark,
-                PhysicalGcAdvanceResult advance) {
-            return new ExecutionResult(
-                    object,
-                    true,
-                    Optional.empty(),
-                    mark,
-                    Optional.of(advance),
-                    Optional.empty());
+                ObjectKeyHash object, Optional<PhysicalGcMarkResult> mark, PhysicalGcAdvanceResult advance) {
+            return new ExecutionResult(object, true, Optional.empty(), mark, Optional.of(advance), Optional.empty());
         }
 
         private static ExecutionResult deleted(
@@ -766,12 +665,7 @@ public final class ReferencedObjectGcExecutor {
                 PhysicalGcAdvanceResult advance,
                 PhysicalGcDeletionResult deletion) {
             return new ExecutionResult(
-                    object,
-                    true,
-                    Optional.empty(),
-                    mark,
-                    Optional.of(advance),
-                    Optional.of(deletion));
+                    object, true, Optional.empty(), mark, Optional.of(advance), Optional.of(deletion));
         }
     }
 }

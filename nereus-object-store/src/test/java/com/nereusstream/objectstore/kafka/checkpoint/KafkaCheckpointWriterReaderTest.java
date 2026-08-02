@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.kafka.checkpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
@@ -15,8 +15,8 @@ import com.nereusstream.objectstore.PutObjectResult;
 import com.nereusstream.objectstore.RangeReadOptions;
 import com.nereusstream.objectstore.RangeReadResult;
 import com.nereusstream.objectstore.ReplayableObjectUpload;
-import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import com.nereusstream.objectstore.staging.StagingFileManager;
+import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -26,7 +26,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class KafkaCheckpointWriterReaderTest {
-    @TempDir Path temporaryDirectory;
+    @TempDir
+    Path temporaryDirectory;
 
     @Test
     void immutablePutAndAlreadyExistsResponseConvergeToExactObject() throws Exception {
@@ -34,17 +35,22 @@ class KafkaCheckpointWriterReaderTest {
         Path stagingDirectory = Files.createDirectory(temporaryDirectory.resolve("staging"));
         Files.setPosixFilePermissions(stagingDirectory, PosixFilePermissions.fromString("rwx------"));
         try (LocalFileObjectStore store = new LocalFileObjectStore(objects);
-             StagingFileManager staging = new StagingFileManager(
-                     stagingDirectory, 32L << 20, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
-                     Duration.ofHours(1), Runnable::run)) {
+                StagingFileManager staging = new StagingFileManager(
+                        stagingDirectory,
+                        32L << 20,
+                        StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
+                        Duration.ofHours(1),
+                        Runnable::run)) {
             KafkaCheckpointCodecV1 codec = new KafkaCheckpointCodecV1();
             KafkaCheckpointReader reader = new KafkaCheckpointReader(store, codec);
             KafkaCheckpointVerifier verifier = new KafkaCheckpointVerifier();
-            KafkaCheckpointWriter writer = new KafkaCheckpointWriter(
-                    store, staging, Runnable::run, codec, reader, verifier);
+            KafkaCheckpointWriter writer =
+                    new KafkaCheckpointWriter(store, staging, Runnable::run, codec, reader, verifier);
             KafkaCheckpointWriteRequest request = new KafkaCheckpointWriteRequest(
-                    "nereus", KafkaCheckpointCodecV1Test.header(0),
-                    KafkaCheckpointCodecV1Test.sections(), KafkaCheckpointCodecV1Test.sha256('b'),
+                    "nereus",
+                    KafkaCheckpointCodecV1Test.header(0),
+                    KafkaCheckpointCodecV1Test.sections(),
+                    KafkaCheckpointCodecV1Test.sha256('b'),
                     Duration.ofSeconds(5));
 
             KafkaCheckpointObject first = writer.write(request).join();
@@ -63,8 +69,8 @@ class KafkaCheckpointWriterReaderTest {
     void reconcilesResponseLossAfterImmutablePut() throws Exception {
         Path objects = Files.createDirectory(temporaryDirectory.resolve("response-loss-objects"));
         try (LocalFileObjectStore durable = new LocalFileObjectStore(objects);
-             ResponseLossObjectStore store = new ResponseLossObjectStore(durable);
-             StagingFileManager staging = staging("response-loss-staging")) {
+                ResponseLossObjectStore store = new ResponseLossObjectStore(durable);
+                StagingFileManager staging = staging("response-loss-staging")) {
             KafkaCheckpointCodecV1 codec = new KafkaCheckpointCodecV1();
             KafkaCheckpointReader reader = new KafkaCheckpointReader(store, codec);
             KafkaCheckpointWriter writer = new KafkaCheckpointWriter(
@@ -81,26 +87,30 @@ class KafkaCheckpointWriterReaderTest {
     void neverReconcilesPastAFailedPreUploadGuard() throws Exception {
         Path objects = Files.createDirectory(temporaryDirectory.resolve("guard-objects"));
         try (LocalFileObjectStore store = new LocalFileObjectStore(objects);
-             StagingFileManager staging = staging("guard-staging")) {
+                StagingFileManager staging = staging("guard-staging")) {
             KafkaCheckpointCodecV1 codec = new KafkaCheckpointCodecV1();
             KafkaCheckpointReader reader = new KafkaCheckpointReader(store, codec);
             KafkaCheckpointWriter writer = new KafkaCheckpointWriter(
                     store, staging, Runnable::run, codec, reader, new KafkaCheckpointVerifier());
             writer.write(request()).join();
 
-            assertThatThrownBy(() -> writer.write(request(), ignored -> CompletableFuture.failedFuture(
-                            new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, "guard failed")))
-                    .join())
+            assertThatThrownBy(() -> writer.write(
+                                    request(),
+                                    ignored -> CompletableFuture.failedFuture(new NereusException(
+                                            ErrorCode.METADATA_CONDITION_FAILED, true, "guard failed")))
+                            .join())
                     .satisfies(failure -> assertThat(unwrap(failure))
-                            .isInstanceOfSatisfying(NereusException.class, nereus ->
-                                    assertThat(nereus.code()).isEqualTo(ErrorCode.METADATA_CONDITION_FAILED)));
+                            .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                                    .isEqualTo(ErrorCode.METADATA_CONDITION_FAILED)));
         }
     }
 
     private KafkaCheckpointWriteRequest request() {
         return new KafkaCheckpointWriteRequest(
-                "nereus", KafkaCheckpointCodecV1Test.header(0),
-                KafkaCheckpointCodecV1Test.sections(), KafkaCheckpointCodecV1Test.sha256('b'),
+                "nereus",
+                KafkaCheckpointCodecV1Test.header(0),
+                KafkaCheckpointCodecV1Test.sections(),
+                KafkaCheckpointCodecV1Test.sha256('b'),
                 Duration.ofSeconds(5));
     }
 
@@ -108,8 +118,11 @@ class KafkaCheckpointWriterReaderTest {
         Path stagingDirectory = Files.createDirectory(temporaryDirectory.resolve(name));
         Files.setPosixFilePermissions(stagingDirectory, PosixFilePermissions.fromString("rwx------"));
         return new StagingFileManager(
-                stagingDirectory, 32L << 20, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
-                Duration.ofHours(1), Runnable::run);
+                stagingDirectory,
+                32L << 20,
+                StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
+                Duration.ofHours(1),
+                Runnable::run);
     }
 
     private static Throwable unwrap(Throwable failure) {
@@ -133,8 +146,8 @@ class KafkaCheckpointWriterReaderTest {
                 ObjectKey key, ReplayableObjectUpload source, PutObjectOptions options) {
             return delegate.putObject(key, source, options).thenCompose(ignored -> {
                 lostResponse = true;
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.OBJECT_UPLOAD_FAILED, true, "simulated response loss"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.OBJECT_UPLOAD_FAILED, true, "simulated response loss"));
             });
         }
 
@@ -154,6 +167,6 @@ class KafkaCheckpointWriterReaderTest {
         }
 
         @Override
-        public void close() { }
+        public void close() {}
     }
 }

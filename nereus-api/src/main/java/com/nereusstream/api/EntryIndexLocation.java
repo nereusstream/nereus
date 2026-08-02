@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Where entry index bytes can be found. */
+/**
+ * Where entry index bytes can be found.
+ */
 public enum EntryIndexLocation {
     INLINE,
     OBJECT_FOOTER,

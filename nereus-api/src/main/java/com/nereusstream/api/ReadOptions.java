@@ -17,12 +17,10 @@ package com.nereusstream.api;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Limits and timeout for a read call. */
-public record ReadOptions(
-        int maxRecords,
-        int maxBytes,
-        ReadIsolation isolation,
-        Duration timeout) {
+/**
+ * Limits and timeout for a read call.
+ */
+public record ReadOptions(int maxRecords, int maxBytes, ReadIsolation isolation, Duration timeout) {
     public ReadOptions {
         Objects.requireNonNull(isolation, "isolation");
         Objects.requireNonNull(timeout, "timeout");

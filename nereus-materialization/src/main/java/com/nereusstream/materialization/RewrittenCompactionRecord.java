@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -8,7 +9,9 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.zip.CRC32C;
 
-/** One sparse survivor row before mapping to a protocol-specific compacted-object schema. */
+/**
+ * One sparse survivor row before mapping to a protocol-specific compacted-object schema.
+ */
 public record RewrittenCompactionRecord(
         long absoluteOffset,
         Disposition disposition,
@@ -44,8 +47,7 @@ public record RewrittenCompactionRecord(
         ByteBuffer payload = exactPayload.asReadOnlyBuffer();
         crc32c.update(payload);
         if ((int) crc32c.getValue() != payloadCrc32c) {
-            throw new IllegalArgumentException(
-                    "rewritten compaction payload CRC32C does not match exact bytes");
+            throw new IllegalArgumentException("rewritten compaction payload CRC32C does not match exact bytes");
         }
     }
 

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import java.nio.ByteBuffer;
@@ -6,7 +7,9 @@ import java.util.Objects;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Replayable compatibility upload backed by one immutable copied buffer. */
+/**
+ * Replayable compatibility upload backed by one immutable copied buffer.
+ */
 public final class ByteBufferObjectUpload implements ReplayableObjectUpload {
     private final byte[] bytes;
     private final AtomicBoolean closed = new AtomicBoolean();

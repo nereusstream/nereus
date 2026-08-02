@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.profile;
 
 import com.nereusstream.api.AppendCompletionPolicy;
@@ -13,7 +14,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
 
-/** Immutable exact-profile registry used when one process installs more than one primary WAL. */
+/**
+ * Immutable exact-profile registry used when one process installs more than one primary WAL.
+ */
 public final class StorageProfileResolverRegistry implements StorageProfileResolver {
     private final Map<StorageProfile, StorageProfileResolver> resolvers;
 
@@ -21,7 +24,8 @@ public final class StorageProfileResolverRegistry implements StorageProfileResol
         Objects.requireNonNull(resolvers, "resolvers");
         EnumMap<StorageProfile, StorageProfileResolver> installed = new EnumMap<>(StorageProfile.class);
         resolvers.forEach((rawProfile, rawResolver) -> {
-            StorageProfile profile = Objects.requireNonNull(rawProfile, "profile").canonical();
+            StorageProfile profile =
+                    Objects.requireNonNull(rawProfile, "profile").canonical();
             StorageProfileResolver resolver = Objects.requireNonNull(rawResolver, "resolver");
             if (installed.putIfAbsent(profile, resolver) != null) {
                 throw new IllegalArgumentException("duplicate storage-profile resolver for " + profile);
@@ -41,11 +45,8 @@ public final class StorageProfileResolverRegistry implements StorageProfileResol
             DurabilityLevel durability,
             boolean primaryAppenderInstalled,
             boolean primaryReaderInstalled) {
-        return require(profile).requireExecutable(
-                profile,
-                durability,
-                primaryAppenderInstalled,
-                primaryReaderInstalled);
+        return require(profile)
+                .requireExecutable(profile, durability, primaryAppenderInstalled, primaryReaderInstalled);
     }
 
     @Override
@@ -56,19 +57,18 @@ public final class StorageProfileResolverRegistry implements StorageProfileResol
             boolean primaryAppenderInstalled,
             boolean primaryReaderInstalled,
             boolean requiredObjectGenerationInstalled) {
-        return require(profile).requireExecutable(
-                profile,
-                durability,
-                completionPolicy,
-                primaryAppenderInstalled,
-                primaryReaderInstalled,
-                requiredObjectGenerationInstalled);
+        return require(profile)
+                .requireExecutable(
+                        profile,
+                        durability,
+                        completionPolicy,
+                        primaryAppenderInstalled,
+                        primaryReaderInstalled,
+                        requiredObjectGenerationInstalled);
     }
 
     @Override
-    public ReadTargetType requireReadable(
-            StorageProfile profile,
-            Predicate<ReadTargetType> readerInstalled) {
+    public ReadTargetType requireReadable(StorageProfile profile, Predicate<ReadTargetType> readerInstalled) {
         return require(profile).requireReadable(profile, readerInstalled);
     }
 

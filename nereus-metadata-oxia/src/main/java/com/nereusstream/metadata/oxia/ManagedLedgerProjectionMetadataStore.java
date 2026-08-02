@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.StreamId;
@@ -9,7 +10,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Protocol-neutral metadata contract for authoritative and derived F2 projections. */
+/**
+ * Protocol-neutral metadata contract for authoritative and derived F2 projections.
+ */
 public interface ManagedLedgerProjectionMetadataStore extends AutoCloseable {
     static ManagedLedgerProjectionMetadataStore usingSharedRuntime(
             OxiaClientConfiguration clientConfig,
@@ -20,18 +23,12 @@ public interface ManagedLedgerProjectionMetadataStore extends AutoCloseable {
                 clientConfig, runtime, storeConfig, clock);
     }
 
-    CompletableFuture<Optional<TopicProjectionRecord>> getProjection(
-            String cluster,
-            String managedLedgerName);
+    CompletableFuture<Optional<TopicProjectionRecord>> getProjection(String cluster, String managedLedgerName);
 
-    CompletableFuture<ManagedLedgerStreamProjection> getProjectionByStream(
-            String cluster,
-            StreamId streamId);
+    CompletableFuture<ManagedLedgerStreamProjection> getProjectionByStream(String cluster, StreamId streamId);
 
     CompletableFuture<TopicProjectionRecord> createFirstProjection(
-            String cluster,
-            ProjectionCreateRequest request,
-            ProjectionPublishGuard publishGuard);
+            String cluster, ProjectionCreateRequest request, ProjectionPublishGuard publishGuard);
 
     CompletableFuture<TopicProjectionRecord> recreateDeletedProjection(
             String cluster,
@@ -67,8 +64,7 @@ public interface ManagedLedgerProjectionMetadataStore extends AutoCloseable {
             ManagedLedgerFacadeState state);
 
     CompletableFuture<ProjectionRepairResult> repairProjectionIndexes(
-            String cluster,
-            TopicProjectionRecord authoritative);
+            String cluster, TopicProjectionRecord authoritative);
 
     @Override
     void close();

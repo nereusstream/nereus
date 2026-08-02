@@ -16,7 +16,6 @@ package com.nereusstream.core.append;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
@@ -71,56 +70,59 @@ class AppendCoordinatorLaneLifecycleTest {
     @Test
     void retainsSuspendedLaneAfterKnownCommittedFailure() {
         TestContext context = context("uncertain");
-        context.metadata().failNext(
-                FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
+        context.metadata().failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
 
         AtomicReference<NereusException> captured = new AtomicReference<>();
-        assertThatThrownBy(() -> context.coordinator().append(context.streamId(), batch(), options()).join())
+        assertThatThrownBy(() -> context.coordinator()
+                        .append(context.streamId(), batch(), options())
+                        .join())
                 .isInstanceOfSatisfying(CompletionException.class, error -> {
                     NereusException failure = (NereusException) error.getCause();
                     captured.set(failure);
                     assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
                     assertThat(failure.appendAttemptId()).isPresent();
                 });
-        context.coordinator().recoverAppend(context.streamId(),
-                captured.get().appendAttemptId().orElseThrow(),
-                new AppendRecoveryOptions(Duration.ofSeconds(1))).join();
+        context.coordinator()
+                .recoverAppend(
+                        context.streamId(),
+                        captured.get().appendAttemptId().orElseThrow(),
+                        new AppendRecoveryOptions(Duration.ofSeconds(1)))
+                .join();
         assertThat(context.coordinator().retainedLaneCount()).isZero();
     }
 
     @Test
     void checkpointReplayProofDoesNotRecreateHistoricalGenerationZeroIndex() {
         AtomicInteger searches = new AtomicInteger();
-        TestContext context = context("checkpoint-replay", metadata ->
-                (request, maximumLiveCommits, pageSize, timeout) -> {
+        TestContext context =
+                context("checkpoint-replay", metadata -> (request, maximumLiveCommits, pageSize, timeout) -> {
                     searches.incrementAndGet();
-                    return metadata.searchAppendReplay(
-                                    "cluster/a",
-                                    request,
-                                    Optional.empty(),
-                                    maximumLiveCommits)
+                    return metadata.searchAppendReplay("cluster/a", request, Optional.empty(), maximumLiveCommits)
                             .thenApply(result -> AppendReplayResolution.found(
                                     result.committedAppend().orElseThrow(),
                                     AppendReplayEvidenceSource.RECOVERY_CHECKPOINT,
                                     result.scannedRecords()));
                 });
-        context.metadata().failNext(
-                FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
+        context.metadata().failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
 
         AtomicReference<NereusException> captured = new AtomicReference<>();
         assertThatThrownBy(() -> context.coordinator()
-                        .append(context.streamId(), batch(), options()).join())
-                .isInstanceOfSatisfying(CompletionException.class, error ->
-                        captured.set((NereusException) error.getCause()));
+                        .append(context.streamId(), batch(), options())
+                        .join())
+                .isInstanceOfSatisfying(
+                        CompletionException.class, error -> captured.set((NereusException) error.getCause()));
 
-        context.coordinator().recoverAppend(
-                context.streamId(),
-                captured.get().appendAttemptId().orElseThrow(),
-                new AppendRecoveryOptions(Duration.ofSeconds(1))).join();
+        context.coordinator()
+                .recoverAppend(
+                        context.streamId(),
+                        captured.get().appendAttemptId().orElseThrow(),
+                        new AppendRecoveryOptions(Duration.ofSeconds(1)))
+                .join();
 
         assertThat(searches).hasValue(1);
-        assertThat(context.metadata().scanOffsetIndex(
-                        "cluster/a", context.streamId(), 0, 10).join())
+        assertThat(context.metadata()
+                        .scanOffsetIndex("cluster/a", context.streamId(), 0, 10)
+                        .join())
                 .isEmpty();
         assertThat(context.coordinator().retainedLaneCount()).isZero();
     }
@@ -130,39 +132,24 @@ class AppendCoordinatorLaneLifecycleTest {
     }
 
     private TestContext context(
-            String name,
-            Function<FakeOxiaMetadataStore, AppendRecoverySearcher>
-                    recoverySearcherFactory) {
+            String name, Function<FakeOxiaMetadataStore, AppendRecoverySearcher> recoverySearcherFactory) {
         StreamStorageConfig config = StreamStorageConfig.defaults("cluster/a", "writer-a");
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         StreamId streamId = new StreamId(metadata.createOrGetStream(
                         config.cluster(),
                         new StreamName("lane-" + name),
                         new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
-                .join().streamId());
+                .join()
+                .streamId());
         AppendSessionManager sessions = new AppendSessionManager(config, metadata, CLOCK);
         LocalFileObjectStore objectStore = new LocalFileObjectStore(temporaryDirectory.resolve(name));
         DefaultObjectProtectionManager protections = new DefaultObjectProtectionManager(
-                config.cluster(),
-                metadata,
-                Duration.ofMinutes(10),
-                Duration.ZERO,
-                Duration.ofHours(24),
-                CLOCK);
-        DefaultWalObjectWriter writer = new DefaultWalObjectWriter(
-                objectStore, "test-writer", CLOCK);
+                config.cluster(), metadata, Duration.ofMinutes(10), Duration.ZERO, Duration.ofHours(24), CLOCK);
+        DefaultWalObjectWriter writer = new DefaultWalObjectWriter(objectStore, "test-writer", CLOCK);
         DefaultGenerationZeroPhysicalReferencePublisher physicalReferences =
-                new DefaultGenerationZeroPhysicalReferencePublisher(
-                        config.cluster(), metadata, metadata, protections);
+                new DefaultGenerationZeroPhysicalReferencePublisher(config.cluster(), metadata, metadata, protections);
         AppendCoordinator coordinator = recoverySearcherFactory == null
-                ? new AppendCoordinator(
-                        config,
-                        metadata,
-                        writer,
-                        sessions,
-                        physicalReferences,
-                        CLOCK,
-                        Runnable::run)
+                ? new AppendCoordinator(config, metadata, writer, sessions, physicalReferences, CLOCK, Runnable::run)
                 : new AppendCoordinator(
                         config,
                         metadata,
@@ -199,9 +186,5 @@ class AppendCoordinatorLaneLifecycleTest {
                 Map.of());
     }
 
-    private record TestContext(
-            FakeOxiaMetadataStore metadata,
-            AppendCoordinator coordinator,
-            StreamId streamId) {
-    }
+    private record TestContext(FakeOxiaMetadataStore metadata, AppendCoordinator coordinator, StreamId streamId) {}
 }

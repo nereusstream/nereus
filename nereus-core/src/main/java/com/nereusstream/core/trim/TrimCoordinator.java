@@ -31,7 +31,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-/** Coordinates the metadata-only Phase 1 trim operation. */
+/**
+ * Coordinates the metadata-only Phase 1 trim operation.
+ */
 public final class TrimCoordinator implements AutoCloseable {
     private final StreamStorageConfig config;
     private final OxiaMetadataStore metadataStore;
@@ -55,10 +57,7 @@ public final class TrimCoordinator implements AutoCloseable {
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
     }
 
-    public CompletableFuture<Void> trim(
-            StreamId streamId,
-            long beforeOffset,
-            TrimOptions options) {
+    public CompletableFuture<Void> trim(StreamId streamId, long beforeOffset, TrimOptions options) {
         CancelAwareFuture<Void> result = new CancelAwareFuture<>();
         if (closed.get()) {
             result.completeExceptionally(
@@ -66,13 +65,13 @@ public final class TrimCoordinator implements AutoCloseable {
             return result;
         }
         if (streamId == null || options == null) {
-            result.completeExceptionally(new NereusException(
-                    ErrorCode.INVALID_ARGUMENT, false, "streamId and trim options are required"));
+            result.completeExceptionally(
+                    new NereusException(ErrorCode.INVALID_ARGUMENT, false, "streamId and trim options are required"));
             return result;
         }
         if (beforeOffset < 0) {
-            result.completeExceptionally(new NereusException(
-                    ErrorCode.INVALID_ARGUMENT, false, "beforeOffset must be non-negative"));
+            result.completeExceptionally(
+                    new NereusException(ErrorCode.INVALID_ARGUMENT, false, "beforeOffset must be non-negative"));
             return result;
         }
         try {
@@ -91,25 +90,28 @@ public final class TrimCoordinator implements AutoCloseable {
                 trimCompleted();
             }
         };
-        CompletableFuture<Void> pipeline = deadline
-                .bound(
+        CompletableFuture<Void> pipeline = deadline.bound(
                         () -> {
                             CompletableFuture<TrimRecord> source = metadataStore
                                     .updateTrim(config.cluster(), streamId, beforeOffset, options.reason())
-                                    .thenApplyAsync(record -> {
-                                        validateResult(streamId, beforeOffset, record);
-                                        cacheInvalidator.accept(streamId);
-                                        return record;
-                                    }, callbackExecutor);
+                                    .thenApplyAsync(
+                                            record -> {
+                                                validateResult(streamId, beforeOffset, record);
+                                                cacheInvalidator.accept(streamId);
+                                                return record;
+                                            },
+                                            callbackExecutor);
                             sourceOperation.set(source);
                             source.whenComplete((ignored, error) -> releaseLifecycle.run());
                             return source;
                         },
                         "update stream trim offset")
-                .thenApplyAsync(record -> {
-                    observe(() -> observer.onTrimSucceeded(streamId, beforeOffset));
-                    return null;
-                }, callbackExecutor)
+                .thenApplyAsync(
+                        record -> {
+                            observe(() -> observer.onTrimSucceeded(streamId, beforeOffset));
+                            return null;
+                        },
+                        callbackExecutor)
                 .handle((ignored, error) -> {
                     if (error == null) {
                         return null;
@@ -127,13 +129,8 @@ public final class TrimCoordinator implements AutoCloseable {
         return result;
     }
 
-    private static void validateResult(
-            StreamId streamId,
-            long beforeOffset,
-            TrimRecord record) {
-        if (record == null
-                || !record.streamId().equals(streamId.value())
-                || record.trimOffset() != beforeOffset) {
+    private static void validateResult(StreamId streamId, long beforeOffset, TrimRecord record) {
+        if (record == null || !record.streamId().equals(streamId.value()) || record.trimOffset() != beforeOffset) {
             throw new NereusException(
                     ErrorCode.METADATA_INVARIANT_VIOLATION,
                     false,
@@ -169,10 +166,7 @@ public final class TrimCoordinator implements AutoCloseable {
             return new NereusException(ErrorCode.INVALID_ARGUMENT, false, cause.getMessage(), cause);
         }
         return new NereusException(
-                ErrorCode.METADATA_UNAVAILABLE,
-                true,
-                "trim failed with an unexpected asynchronous error",
-                cause);
+                ErrorCode.METADATA_UNAVAILABLE, true, "trim failed with an unexpected asynchronous error", cause);
     }
 
     private static Throwable unwrap(Throwable error) {
@@ -183,9 +177,7 @@ public final class TrimCoordinator implements AutoCloseable {
         return current;
     }
 
-    private static <T> void completeFrom(
-            CompletableFuture<T> target,
-            CompletableFuture<T> source) {
+    private static <T> void completeFrom(CompletableFuture<T> target, CompletableFuture<T> source) {
         source.whenComplete((value, error) -> {
             if (error == null) {
                 target.complete(value);
@@ -209,12 +201,16 @@ public final class TrimCoordinator implements AutoCloseable {
         awaitClose(config.shutdownGrace());
     }
 
-    /** Stops admission without waiting for already accepted trims. */
+    /**
+     * Stops admission without waiting for already accepted trims.
+     */
     public void beginClose() {
         closed.set(true);
     }
 
-    /** Waits for accepted trims using the caller's remaining global shutdown budget. */
+    /**
+     * Waits for accepted trims using the caller's remaining global shutdown budget.
+     */
     public void awaitClose(Duration grace) {
         Objects.requireNonNull(grace, "grace");
         long graceNanos;
@@ -241,8 +237,7 @@ public final class TrimCoordinator implements AutoCloseable {
     }
 
     private static final class CancelAwareFuture<T> extends CompletableFuture<T> {
-        private Runnable cancellation = () -> {
-        };
+        private Runnable cancellation = () -> {};
 
         synchronized void onCancel(Runnable action) {
             cancellation = Objects.requireNonNull(action, "action");

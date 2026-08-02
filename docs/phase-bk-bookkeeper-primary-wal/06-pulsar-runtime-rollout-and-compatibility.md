@@ -87,43 +87,43 @@ deletion activation described in §6；physical deletion remains fail closed unt
 
 Add checked one-time fields to `ServiceConfiguration` and map them in `NereusBrokerStorageConfiguration`：
 
-| Field | V1 rule/default |
-| --- | --- |
-| `nereusBookKeeperPrimaryWalEnabled` | `false`; gates registration/profile first-create |
-| `nereusBookKeeperClusterAlias` | nonblank durable alias |
-| `nereusBookKeeperProviderScopeId` | required canonical non-secret stock BK metadata-service/ledger-root identity；adapter derives/verifies SHA-256 |
-| `nereusBookKeeperLedgerIdPrefixBits` | required `[8,24]`；leaves at least 39 random bits inside positive 63-bit ids |
-| `nereusBookKeeperLedgerIdPrefixValue` | required canonical value with highest prefix bit one；all generated/existing ids must round-trip it |
-| `nereusBookKeeperLedgerIdNamespaceReservationId` | required deployment-owned reservation identity；immutable/digest-bound, not a Boolean override |
-| `nereusBookKeeperEnsembleSize` | positive; defaults to explicit stock BK configured value |
-| `nereusBookKeeperWriteQuorumSize` | `ensemble >= write >= ack` |
-| `nereusBookKeeperAckQuorumSize` | positive |
-| `nereusBookKeeperDigestType` | admitted BookKeeper digest enum; immutable binding |
-| `nereusBookKeeperPasswordSecretRef` | secret reference only; empty password must be explicit/defaulted consistently |
-| `nereusBookKeeperMaxEntriesPerLedger` | positive and bounded |
-| `nereusBookKeeperMaxBytesPerLedger` | positive and bounded |
-| `nereusBookKeeperMaxAppendRangesPerLedger` | positive hard bound for protection/inventory pagination |
-| `nereusBookKeeperProtectionSlotsPerRange` | `[4,64]` fixed slots；checked product with max ranges is at most 65,536 |
-| `nereusBookKeeperMaxReaderLeasesPerLedger` | positive hard cap on process/ledger lease rows；overflow rejects read before provider IO |
-| `nereusBookKeeperMaxUncertainAllocations` | `[1,65536]` fixed durable slot count；exhaustion rejects before another provider create |
-| `nereusBookKeeperMaxLedgerAgeSeconds` | positive |
-| `nereusBookKeeperMaxWritesInFlight` | V1 default `1`; bounded |
-| `nereusBookKeeperMaxReadsInFlight` | positive |
-| `nereusBookKeeperMaxReadBytesInFlight` | at least one admitted target bound |
-| `nereusBookKeeperOperationTimeoutSeconds` | positive, within broker close budget |
-| `nereusBookKeeperAllocationTimeoutSeconds` | positive |
-| `nereusBookKeeperSealTimeoutSeconds` | positive |
-| `nereusBookKeeperDeleteTimeoutSeconds` | positive |
-| `nereusBookKeeperReaderLeaseSeconds` | greater than renewal interval |
-| `nereusBookKeeperReaderLeaseRenewSeconds` | positive |
-| `nereusBookKeeperRetentionScanIntervalSeconds` | positive |
-| `nereusBookKeeperRetentionScanPageSize` | `[1,1024]` |
-| `nereusBookKeeperMaxConcurrentDeletes` | positive bounded |
-| `nereusBookKeeperMaxClockSkewSeconds` | nonnegative deployment bound；part of lease/drain safety validation |
-| `nereusBookKeeperGcDrainGraceSeconds` | at least reader lease + clock skew |
-| `nereusBookKeeperLateCreateAuditGraceSeconds` | positive alert/recheck pacing only；never proves a transmitted create impossible |
-| `nereusBookKeeperGcEnabled` | `false` safe default |
-| `nereusBookKeeperGcDryRun` | `true` safe default |
+| Field                                            | V1 rule/default                                                                                               |
+|--------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| `nereusBookKeeperPrimaryWalEnabled`              | `false`; gates registration/profile first-create                                                              |
+| `nereusBookKeeperClusterAlias`                   | nonblank durable alias                                                                                        |
+| `nereusBookKeeperProviderScopeId`                | required canonical non-secret stock BK metadata-service/ledger-root identity；adapter derives/verifies SHA-256 |
+| `nereusBookKeeperLedgerIdPrefixBits`             | required `[8,24]`；leaves at least 39 random bits inside positive 63-bit ids                                   |
+| `nereusBookKeeperLedgerIdPrefixValue`            | required canonical value with highest prefix bit one；all generated/existing ids must round-trip it            |
+| `nereusBookKeeperLedgerIdNamespaceReservationId` | required deployment-owned reservation identity；immutable/digest-bound, not a Boolean override                 |
+| `nereusBookKeeperEnsembleSize`                   | positive; defaults to explicit stock BK configured value                                                      |
+| `nereusBookKeeperWriteQuorumSize`                | `ensemble >= write >= ack`                                                                                    |
+| `nereusBookKeeperAckQuorumSize`                  | positive                                                                                                      |
+| `nereusBookKeeperDigestType`                     | admitted BookKeeper digest enum; immutable binding                                                            |
+| `nereusBookKeeperPasswordSecretRef`              | secret reference only; empty password must be explicit/defaulted consistently                                 |
+| `nereusBookKeeperMaxEntriesPerLedger`            | positive and bounded                                                                                          |
+| `nereusBookKeeperMaxBytesPerLedger`              | positive and bounded                                                                                          |
+| `nereusBookKeeperMaxAppendRangesPerLedger`       | positive hard bound for protection/inventory pagination                                                       |
+| `nereusBookKeeperProtectionSlotsPerRange`        | `[4,64]` fixed slots；checked product with max ranges is at most 65,536                                        |
+| `nereusBookKeeperMaxReaderLeasesPerLedger`       | positive hard cap on process/ledger lease rows；overflow rejects read before provider IO                       |
+| `nereusBookKeeperMaxUncertainAllocations`        | `[1,65536]` fixed durable slot count；exhaustion rejects before another provider create                        |
+| `nereusBookKeeperMaxLedgerAgeSeconds`            | positive                                                                                                      |
+| `nereusBookKeeperMaxWritesInFlight`              | V1 default `1`; bounded                                                                                       |
+| `nereusBookKeeperMaxReadsInFlight`               | positive                                                                                                      |
+| `nereusBookKeeperMaxReadBytesInFlight`           | at least one admitted target bound                                                                            |
+| `nereusBookKeeperOperationTimeoutSeconds`        | positive, within broker close budget                                                                          |
+| `nereusBookKeeperAllocationTimeoutSeconds`       | positive                                                                                                      |
+| `nereusBookKeeperSealTimeoutSeconds`             | positive                                                                                                      |
+| `nereusBookKeeperDeleteTimeoutSeconds`           | positive                                                                                                      |
+| `nereusBookKeeperReaderLeaseSeconds`             | greater than renewal interval                                                                                 |
+| `nereusBookKeeperReaderLeaseRenewSeconds`        | positive                                                                                                      |
+| `nereusBookKeeperRetentionScanIntervalSeconds`   | positive                                                                                                      |
+| `nereusBookKeeperRetentionScanPageSize`          | `[1,1024]`                                                                                                    |
+| `nereusBookKeeperMaxConcurrentDeletes`           | positive bounded                                                                                              |
+| `nereusBookKeeperMaxClockSkewSeconds`            | nonnegative deployment bound；part of lease/drain safety validation                                            |
+| `nereusBookKeeperGcDrainGraceSeconds`            | at least reader lease + clock skew                                                                            |
+| `nereusBookKeeperLateCreateAuditGraceSeconds`    | positive alert/recheck pacing only；never proves a transmitted create impossible                               |
+| `nereusBookKeeperGcEnabled`                      | `false` safe default                                                                                          |
+| `nereusBookKeeperGcDryRun`                       | `true` safe default                                                                                           |
 
 The provider/ledger/read/scan fields map to `BookKeeperWalConfiguration`; delete concurrency、clock/drain/audit and
 the two local switches map to `BookKeeperLedgerGcConfiguration`。No field is silently dropped or defaulted differently
@@ -132,7 +132,8 @@ between brokers.
 `nereusDefaultStorageProfile` remains first-create-only. Merely selecting a BK enum while the feature/capability is
 disabled must fail broker config validation or topic first-create before any ledger allocation.
 
-Configuration binding SHA-256 includes cluster alias、provider-scope digest、exact ledger-id namespace/reservation、quorums、digest、range/
+Configuration binding SHA-256 includes cluster alias、provider-scope digest、exact ledger-id
+namespace/reservation、quorums、digest、range/
 size bounds、non-secret password identity/version and V1 protocol semantics. Every broker advertises the same digest;
 secret bytes never enter lookup properties/Oxia/logs.
 
@@ -214,11 +215,11 @@ client、module、codecs、writer/reader/recovery and exact deployment namespace
 
 Profile barriers use two stable all-persistent-broker snapshots：
 
-| Profile | Required capabilities |
-| --- | --- |
-| BK_ONLY | storage binding + cursor + BK protocol/config + exact ledger-id namespace |
-| BK_ASYNC_OBJECT | BK_ONLY set + generation protocol |
-| BK_SYNC_OBJECT | BK_ONLY set + generation protocol + independent required-object completion property |
+| Profile         | Required capabilities                                                               |
+|-----------------|-------------------------------------------------------------------------------------|
+| BK_ONLY         | storage binding + cursor + BK protocol/config + exact ledger-id namespace           |
+| BK_ASYNC_OBJECT | BK_ONLY set + generation protocol                                                   |
+| BK_SYNC_OBJECT  | BK_ONLY set + generation protocol + independent required-object completion property |
 
 BK-M4 has final-gated the module-local completion path；the production rollout nevertheless keeps sync completion as a
 separate reserved property so a broker cannot infer Object publication support from generation-zero durability。The
@@ -369,14 +370,14 @@ Checkpoint E.1 implements the three proof producers and the only deletion-activa
 
 Checkpoint E.2 installs the authenticated broker REST and durable-profile routing boundary：
 
-| Method/path below `/admin/v2/brokers` | Request authority |
-| --- | --- |
-| `PUT /bookkeeper-primary-wal/namespace` | `{operatorEvidenceSha256, timeoutSeconds}` |
-| `POST /bookkeeper-primary-wal/namespace/revoke` | `{revocationEvidenceSha256, expectedMetadataVersion, timeoutSeconds}` |
-| `POST /bookkeeper-primary-wal/activation/prepare` | `{brokerReadinessEpoch, brokerReadinessSha256, timeoutSeconds}` |
-| `POST /bookkeeper-primary-wal/activation/publications` | readiness identity、async/sync bits、expected version、timeout；no deletion/proof fields |
-| `POST /bookkeeper-primary-wal/activation/deletion` | `{runId, expectedActivationMetadataVersion, timeoutSeconds}` only |
-| `GET /bookkeeper-primary-wal/activation?timeoutSeconds=...` | authoritative read；missing record is 404 |
+| Method/path below `/admin/v2/brokers`                       | Request authority                                                                    |
+|-------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| `PUT /bookkeeper-primary-wal/namespace`                     | `{operatorEvidenceSha256, timeoutSeconds}`                                           |
+| `POST /bookkeeper-primary-wal/namespace/revoke`             | `{revocationEvidenceSha256, expectedMetadataVersion, timeoutSeconds}`                |
+| `POST /bookkeeper-primary-wal/activation/prepare`           | `{brokerReadinessEpoch, brokerReadinessSha256, timeoutSeconds}`                      |
+| `POST /bookkeeper-primary-wal/activation/publications`      | readiness identity、async/sync bits、expected version、timeout；no deletion/proof fields |
+| `POST /bookkeeper-primary-wal/activation/deletion`          | `{runId, expectedActivationMetadataVersion, timeoutSeconds}` only                    |
+| `GET /bookkeeper-primary-wal/activation?timeoutSeconds=...` | authoritative read；missing record is 404                                             |
 
 Every route completes `validateSuperUserAccessAsync()` before storage lookup or mutation，rejects a non-Nereus broker
 before IO and caps request timeouts at 86,400 seconds。REST models return non-secret identity/version/digest facts but
@@ -582,18 +583,18 @@ design must separately decide whether BK_ONLY -> async backfills pre-barrier his
 
 ## 12. Compatibility matrix
 
-| Dimension | Required behavior |
-| --- | --- |
-| Object-WAL + BK-WAL topics | same brokers/runtime; correct registry dispatch; no target casts |
-| stock BookKeeper topic | unchanged write/read/trim while Nereus BK profiles operate/delete own ledgers |
-| old Object target chain | remains decodable/readable after BK module rollout |
-| BK generation zero + Object higher generation | highest healthy selection/fallback/source retirement exact |
-| ordinary/batched Pulsar entries | raw Entry bytes/properties and virtual MessageIds unchanged |
-| cursor seek/history/restart | F3 logical positions independent of physical ledger rollover/deletion |
-| topic unload/failover/rejoin | new ledger per session, no offset gap/duplicate head |
-| partitioned topics | each partition has its own immutable profile/stream/ledger lifecycle |
-| loaded/unloaded admin | durable profile/readiness route; no default-profile reinterpretation |
-| config mismatch/old broker | pre-IO rejection and ownership exclusion |
+| Dimension                                     | Required behavior                                                             |
+|-----------------------------------------------|-------------------------------------------------------------------------------|
+| Object-WAL + BK-WAL topics                    | same brokers/runtime; correct registry dispatch; no target casts              |
+| stock BookKeeper topic                        | unchanged write/read/trim while Nereus BK profiles operate/delete own ledgers |
+| old Object target chain                       | remains decodable/readable after BK module rollout                            |
+| BK generation zero + Object higher generation | highest healthy selection/fallback/source retirement exact                    |
+| ordinary/batched Pulsar entries               | raw Entry bytes/properties and virtual MessageIds unchanged                   |
+| cursor seek/history/restart                   | F3 logical positions independent of physical ledger rollover/deletion         |
+| topic unload/failover/rejoin                  | new ledger per session, no offset gap/duplicate head                          |
+| partitioned topics                            | each partition has its own immutable profile/stream/ledger lifecycle          |
+| loaded/unloaded admin                         | durable profile/readiness route; no default-profile reinterpretation          |
+| config mismatch/old broker                    | pre-IO rejection and ownership exclusion                                      |
 
 ## 13. Operations and observability
 

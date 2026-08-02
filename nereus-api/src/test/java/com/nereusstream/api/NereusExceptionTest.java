@@ -16,7 +16,6 @@ package com.nereusstream.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
@@ -31,10 +30,7 @@ class NereusExceptionTest {
     @Test
     void appendFailureCarriesMachineReadableCommitCertainty() {
         NereusException exception = new NereusException(
-                ErrorCode.TIMEOUT,
-                true,
-                "head CAS response timed out",
-                AppendOutcome.MAY_HAVE_COMMITTED);
+                ErrorCode.TIMEOUT, true, "head CAS response timed out", AppendOutcome.MAY_HAVE_COMMITTED);
 
         assertThat(exception.appendOutcome()).contains(AppendOutcome.MAY_HAVE_COMMITTED);
     }
@@ -50,7 +46,7 @@ class NereusExceptionTest {
         assertThatThrownBy(future::join)
                 .hasRootCauseInstanceOf(NereusException.class)
                 .rootCause()
-                .isInstanceOfSatisfying(NereusException.class, exception ->
-                        assertThat(exception.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED));
+                .isInstanceOfSatisfying(NereusException.class, exception -> assertThat(exception.appendOutcome())
+                        .contains(AppendOutcome.KNOWN_COMMITTED));
     }
 }

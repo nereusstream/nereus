@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.checkpoint;
 
 import com.nereusstream.metadata.oxia.KafkaPartitionId;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointFailureSource;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
-
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
@@ -17,9 +17,7 @@ import java.util.function.BiConsumer;
  */
 public interface KafkaCheckpointFailureQuarantine {
     CompletableFuture<Boolean> isQuarantined(
-            KafkaPartitionId identity,
-            long partitionIncarnation,
-            KafkaCheckpointReferenceRecord reference);
+            KafkaPartitionId identity, long partitionIncarnation, KafkaCheckpointReferenceRecord reference);
 
     CompletableFuture<Void> quarantine(
             KafkaPartitionId identity,
@@ -28,17 +26,16 @@ public interface KafkaCheckpointFailureQuarantine {
             KafkaCheckpointFailureSource source,
             Throwable failure);
 
-    /** In-memory observer adapter for deterministic tests only. */
+    /**
+     * In-memory observer adapter for deterministic tests only.
+     */
     static KafkaCheckpointFailureQuarantine transientObserver(
             BiConsumer<KafkaCheckpointReferenceRecord, Throwable> observer) {
-        BiConsumer<KafkaCheckpointReferenceRecord, Throwable> exact =
-                Objects.requireNonNull(observer, "observer");
+        BiConsumer<KafkaCheckpointReferenceRecord, Throwable> exact = Objects.requireNonNull(observer, "observer");
         return new KafkaCheckpointFailureQuarantine() {
             @Override
             public CompletableFuture<Boolean> isQuarantined(
-                    KafkaPartitionId identity,
-                    long partitionIncarnation,
-                    KafkaCheckpointReferenceRecord reference) {
+                    KafkaPartitionId identity, long partitionIncarnation, KafkaCheckpointReferenceRecord reference) {
                 return CompletableFuture.completedFuture(false);
             }
 

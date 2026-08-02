@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -33,17 +34,14 @@ import com.nereusstream.metadata.oxia.AppendRecoveryAnchor;
 import com.nereusstream.metadata.oxia.AppendRecoveryCommit;
 import com.nereusstream.metadata.oxia.AppendRecoveryHead;
 import com.nereusstream.metadata.oxia.AppendRecoveryTailCursor;
-import com.nereusstream.metadata.oxia.AppendRecoveryTailPage;
 import com.nereusstream.metadata.oxia.CursorKeyspace;
 import com.nereusstream.metadata.oxia.CursorMetadataDigests;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
-import com.nereusstream.metadata.oxia.CursorScanPage;
 import com.nereusstream.metadata.oxia.CursorScanToken;
 import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
-import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.OxiaKeyspace;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
@@ -95,13 +93,10 @@ import java.util.function.Supplier;
  * Full 64-shard live-reference backfill with exact owner/root handshakes and
  * activation-proof publication only after a stable zero-failure pass.
  */
-public final class DefaultPhysicalRootBackfillCoordinator
-        implements PhysicalRootBackfillCoordinator {
-    private static final ReadTargetCodecRegistry TARGET_CODECS =
-            ReadTargetCodecRegistry.phase15();
+public final class DefaultPhysicalRootBackfillCoordinator implements PhysicalRootBackfillCoordinator {
+    private static final ReadTargetCodecRegistry TARGET_CODECS = ReadTargetCodecRegistry.phase15();
     private static final String CURSOR_FORMAT = "NCS1";
-    private static final String CURSOR_OBJECT_TYPE =
-            "CURSOR_SNAPSHOT_OBJECT";
+    private static final String CURSOR_OBJECT_TYPE = "CURSOR_SNAPSHOT_OBJECT";
 
     private final String cluster;
     private final OxiaMetadataStore l0Metadata;
@@ -204,50 +199,36 @@ public final class DefaultPhysicalRootBackfillCoordinator
             Clock clock,
             LongSupplier nanoTime) {
         this.cluster = requireText(cluster, "cluster");
-        this.l0Metadata = Objects.requireNonNull(
-                l0Metadata, "l0Metadata");
-        this.generations = Objects.requireNonNull(
-                generations, "generations");
-        this.sourceRetirement = Objects.requireNonNull(
-                sourceRetirement, "sourceRetirement");
+        this.l0Metadata = Objects.requireNonNull(l0Metadata, "l0Metadata");
+        this.generations = Objects.requireNonNull(generations, "generations");
+        this.sourceRetirement = Objects.requireNonNull(sourceRetirement, "sourceRetirement");
         this.cursors = Objects.requireNonNull(cursors, "cursors");
-        this.activations = Objects.requireNonNull(
-                activations, "activations");
-        this.physicalMetadata = Objects.requireNonNull(
-                physicalMetadata, "physicalMetadata");
-        this.protections = Objects.requireNonNull(
-                protections, "protections");
-        this.objectStore = Objects.requireNonNull(
-                objectStore, "objectStore");
-        this.projectionAuthorities = Objects.requireNonNull(
-                projectionAuthorities, "projectionAuthorities");
+        this.activations = Objects.requireNonNull(activations, "activations");
+        this.physicalMetadata = Objects.requireNonNull(physicalMetadata, "physicalMetadata");
+        this.protections = Objects.requireNonNull(protections, "protections");
+        this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
+        this.projectionAuthorities = Objects.requireNonNull(projectionAuthorities, "projectionAuthorities");
         if (metadataPageSize <= 0 || metadataPageSize > 4_096) {
-            throw new IllegalArgumentException(
-                    "metadataPageSize must be in [1, 4096]");
+            throw new IllegalArgumentException("metadataPageSize must be in [1, 4096]");
         }
         this.metadataPageSize = metadataPageSize;
         if (cursorPageSize <= 0 || cursorPageSize > 4_096) {
-            throw new IllegalArgumentException(
-                    "cursorPageSize must be in [1, 4096]");
+            throw new IllegalArgumentException("cursorPageSize must be in [1, 4096]");
         }
         this.cursorPageSize = cursorPageSize;
-        this.objectStoreRequestTimeout = requirePositive(
-                objectStoreRequestTimeout, "objectStoreRequestTimeout");
+        this.objectStoreRequestTimeout = requirePositive(objectStoreRequestTimeout, "objectStoreRequestTimeout");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
         this.dataIdentityResolver =
-                new MetadataPhysicalObjectIdentityResolver(
-                        this.cluster, this.l0Metadata, this.physicalMetadata);
+                new MetadataPhysicalObjectIdentityResolver(this.cluster, this.l0Metadata, this.physicalMetadata);
         this.f4Keys = new F4Keyspace(this.cluster);
         this.l0Keys = new OxiaKeyspace(this.cluster);
         this.cursorKeys = new CursorKeyspace(this.cluster);
     }
 
     @Override
-    public CompletableFuture<PhysicalRootBackfillReport> run(
-            PhysicalRootBackfillRequest request) {
-        PhysicalRootBackfillRequest exact =
-                Objects.requireNonNull(request, "request");
+    public CompletableFuture<PhysicalRootBackfillReport> run(PhysicalRootBackfillRequest request) {
+        PhysicalRootBackfillRequest exact = Objects.requireNonNull(request, "request");
         Deadline deadline = Deadline.start(exact.timeout(), nanoTime);
         RunAccumulator accumulator = new RunAccumulator(exact);
         return deadline.call(() -> activations.get(cluster))
@@ -257,41 +238,31 @@ public final class DefaultPhysicalRootBackfillCoordinator
                                 CoverageSide.BOTH,
                                 PhysicalRootBackfillStage.FINAL_REVALIDATION,
                                 f4Keys.generationProtocolActivationKey(),
-                                errorCode(
-                                        PhysicalRootBackfillStage
-                                                .FINAL_REVALIDATION,
-                                        failure));
-                        return Optional
-                                .<VersionedGenerationProtocolActivation>empty();
+                                errorCode(PhysicalRootBackfillStage.FINAL_REVALIDATION, failure));
+                        return Optional.<VersionedGenerationProtocolActivation>empty();
                     }
                     return optional;
                 })
-                .thenCompose(optional -> start(
-                        optional, exact, accumulator, deadline))
+                .thenCompose(optional -> start(optional, exact, accumulator, deadline))
                 .exceptionally(failure -> {
                     accumulator.globalFailure(
                             CoverageSide.BOTH,
                             PhysicalRootBackfillStage.FINAL_REVALIDATION,
                             f4Keys.generationProtocolActivationKey(),
-                            errorCode(
-                                    PhysicalRootBackfillStage
-                                            .FINAL_REVALIDATION,
-                                    failure));
+                            errorCode(PhysicalRootBackfillStage.FINAL_REVALIDATION, failure));
                     return accumulator.report();
                 });
     }
 
     @Override
     public CompletableFuture<PhysicalRootBackfillReport> runRollover(
-            PhysicalRootBackfillRequest request,
-            VersionedGenerationProtocolActivation expectedCurrent) {
+            PhysicalRootBackfillRequest request, VersionedGenerationProtocolActivation expectedCurrent) {
         final PhysicalRootBackfillRequest exact;
         final VersionedGenerationProtocolActivation expected;
         final Deadline deadline;
         try {
             exact = Objects.requireNonNull(request, "request");
-            expected = Objects.requireNonNull(
-                    expectedCurrent, "expectedCurrent");
+            expected = Objects.requireNonNull(expectedCurrent, "expectedCurrent");
             deadline = Deadline.start(exact.timeout(), nanoTime);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
@@ -304,30 +275,18 @@ public final class DefaultPhysicalRootBackfillCoordinator
                                 CoverageSide.BOTH,
                                 PhysicalRootBackfillStage.FINAL_REVALIDATION,
                                 f4Keys.generationProtocolActivationKey(),
-                                errorCode(
-                                        PhysicalRootBackfillStage
-                                                .FINAL_REVALIDATION,
-                                        failure));
-                        return Optional
-                                .<VersionedGenerationProtocolActivation>empty();
+                                errorCode(PhysicalRootBackfillStage.FINAL_REVALIDATION, failure));
+                        return Optional.<VersionedGenerationProtocolActivation>empty();
                     }
                     return optional;
                 })
-                .thenCompose(optional -> startRollover(
-                        optional,
-                        expected,
-                        exact,
-                        accumulator,
-                        deadline))
+                .thenCompose(optional -> startRollover(optional, expected, exact, accumulator, deadline))
                 .exceptionally(failure -> {
                     accumulator.globalFailure(
                             CoverageSide.BOTH,
                             PhysicalRootBackfillStage.FINAL_REVALIDATION,
                             f4Keys.generationProtocolActivationKey(),
-                            errorCode(
-                                    PhysicalRootBackfillStage
-                                            .FINAL_REVALIDATION,
-                                    failure));
+                            errorCode(PhysicalRootBackfillStage.FINAL_REVALIDATION, failure));
                     return accumulator.report();
                 });
     }
@@ -343,30 +302,20 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     PhysicalRootBackfillStage.FINAL_REVALIDATION,
                     f4Keys.generationProtocolActivationKey(),
                     "ACTIVATION_ABSENT");
-            return CompletableFuture.completedFuture(
-                    accumulator.report());
+            return CompletableFuture.completedFuture(accumulator.report());
         }
-        VersionedGenerationProtocolActivation activation =
-                optional.orElseThrow();
-        String precondition = activationPrecondition(
-                activation.value(),
-                request.expectedBrokerReadinessEpoch());
+        VersionedGenerationProtocolActivation activation = optional.orElseThrow();
+        String precondition = activationPrecondition(activation.value(), request.expectedBrokerReadinessEpoch());
         if (precondition != null) {
             accumulator.globalFailure(
-                    CoverageSide.BOTH,
-                    PhysicalRootBackfillStage.FINAL_REVALIDATION,
-                    activation.key(),
-                    precondition);
-            return CompletableFuture.completedFuture(
-                    accumulator.report());
+                    CoverageSide.BOTH, PhysicalRootBackfillStage.FINAL_REVALIDATION, activation.key(), precondition);
+            return CompletableFuture.completedFuture(accumulator.report());
         }
         ActivationBasis basis = new ActivationBasis(
                 activation.value().requiredReferenceDomains(),
                 activation.value().streamRegistrationBackfill());
-        return scanShard(
-                        0, request, accumulator, deadline)
-                .thenCompose(ignored -> publishProofs(
-                        basis, request, accumulator, deadline))
+        return scanShard(0, request, accumulator, deadline)
+                .thenCompose(ignored -> publishProofs(basis, request, accumulator, deadline))
                 .thenApply(ignored -> accumulator.report());
     }
 
@@ -382,72 +331,46 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     PhysicalRootBackfillStage.FINAL_REVALIDATION,
                     f4Keys.generationProtocolActivationKey(),
                     "ACTIVATION_ABSENT");
-            return CompletableFuture.completedFuture(
-                    accumulator.report());
+            return CompletableFuture.completedFuture(accumulator.report());
         }
-        VersionedGenerationProtocolActivation current =
-                optional.orElseThrow();
-        String precondition = rolloverPrecondition(
-                current, expected, request.expectedBrokerReadinessEpoch());
+        VersionedGenerationProtocolActivation current = optional.orElseThrow();
+        String precondition = rolloverPrecondition(current, expected, request.expectedBrokerReadinessEpoch());
         if (precondition != null) {
             accumulator.globalFailure(
-                    CoverageSide.BOTH,
-                    PhysicalRootBackfillStage.FINAL_REVALIDATION,
-                    current.key(),
-                    precondition);
-            return CompletableFuture.completedFuture(
-                    accumulator.report());
+                    CoverageSide.BOTH, PhysicalRootBackfillStage.FINAL_REVALIDATION, current.key(), precondition);
+            return CompletableFuture.completedFuture(accumulator.report());
         }
         return scanShard(0, request, accumulator, deadline)
-                .thenCompose(ignored -> revalidateRolloverBasis(
-                        expected, accumulator, deadline))
+                .thenCompose(ignored -> revalidateRolloverBasis(expected, accumulator, deadline))
                 .thenApply(ignored -> accumulator.report());
     }
 
     private CompletableFuture<Void> revalidateRolloverBasis(
-            VersionedGenerationProtocolActivation expected,
-            RunAccumulator accumulator,
-            Deadline deadline) {
+            VersionedGenerationProtocolActivation expected, RunAccumulator accumulator, Deadline deadline) {
         if (accumulator.failureCount != 0) {
             return CompletableFuture.completedFuture(null);
         }
-        return deadline.call(() -> activations.get(cluster))
-                .thenAccept(optional -> {
-                    if (optional.isEmpty()
-                            || !optional.orElseThrow().equals(expected)) {
-                        accumulator.globalFailure(
-                                CoverageSide.BOTH,
-                                PhysicalRootBackfillStage
-                                        .FINAL_REVALIDATION,
-                                expected.key(),
-                                "ACTIVATION_AUTHORITY_CHANGED");
-                    }
-                });
+        return deadline.call(() -> activations.get(cluster)).thenAccept(optional -> {
+            if (optional.isEmpty() || !optional.orElseThrow().equals(expected)) {
+                accumulator.globalFailure(
+                        CoverageSide.BOTH,
+                        PhysicalRootBackfillStage.FINAL_REVALIDATION,
+                        expected.key(),
+                        "ACTIVATION_AUTHORITY_CHANGED");
+            }
+        });
     }
 
     private CompletableFuture<Void> scanShard(
-            int shard,
-            PhysicalRootBackfillRequest request,
-            RunAccumulator accumulator,
-            Deadline deadline) {
+            int shard, PhysicalRootBackfillRequest request, RunAccumulator accumulator, Deadline deadline) {
         if (shard == F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS) {
             return CompletableFuture.completedFuture(null);
         }
         accumulator.shardStarted(shard);
-        return scanRegistryPage(
-                        shard,
-                        Optional.empty(),
-                        null,
-                        request,
-                        accumulator,
-                        deadline)
+        return scanRegistryPage(shard, Optional.empty(), null, request, accumulator, deadline)
                 .thenCompose(ignored -> {
                     accumulator.shardCompleted(shard);
-                    return scanShard(
-                            shard + 1,
-                            request,
-                            accumulator,
-                            deadline);
+                    return scanShard(shard + 1, request, accumulator, deadline);
                 });
     }
 
@@ -458,22 +381,14 @@ public final class DefaultPhysicalRootBackfillCoordinator
             PhysicalRootBackfillRequest request,
             RunAccumulator accumulator,
             Deadline deadline) {
-        return deadline.call(() -> generations.scanStreamRegistrations(
-                        cluster,
-                        shard,
-                        continuation,
-                        metadataPageSize))
+        return deadline.call(() -> generations.scanStreamRegistrations(cluster, shard, continuation, metadataPageSize))
                 .handle((page, failure) -> {
                     if (failure != null) {
                         accumulator.globalFailure(
                                 CoverageSide.BOTH,
                                 PhysicalRootBackfillStage.REGISTRY_SCAN,
-                                f4Keys.materializationRegistryPrefix(
-                                        shard),
-                                errorCode(
-                                        PhysicalRootBackfillStage
-                                                .REGISTRY_SCAN,
-                                        failure));
+                                f4Keys.materializationRegistryPrefix(shard),
+                                errorCode(PhysicalRootBackfillStage.REGISTRY_SCAN, failure));
                         return null;
                     }
                     return page;
@@ -488,32 +403,20 @@ public final class DefaultPhysicalRootBackfillCoordinator
                         accumulator.globalFailure(
                                 CoverageSide.BOTH,
                                 PhysicalRootBackfillStage.REGISTRY_SCAN,
-                                f4Keys.materializationRegistryPrefix(
-                                        shard),
+                                f4Keys.materializationRegistryPrefix(shard),
                                 "REGISTRY_SCAN_DID_NOT_ADVANCE");
                         return CompletableFuture.completedFuture(null);
                     }
-                    return processRegistrationPage(
-                                    page.values(),
-                                    0,
-                                    request,
-                                    accumulator,
-                                    deadline)
+                    return processRegistrationPage(page.values(), 0, request, accumulator, deadline)
                             .thenCompose(ignored -> {
                                 if (page.continuation().isEmpty()) {
-                                    return CompletableFuture
-                                            .completedFuture(null);
+                                    return CompletableFuture.completedFuture(null);
                                 }
                                 String lastKey = page.values()
                                         .get(page.values().size() - 1)
                                         .key();
                                 return scanRegistryPage(
-                                        shard,
-                                        page.continuation(),
-                                        lastKey,
-                                        request,
-                                        accumulator,
-                                        deadline);
+                                        shard, page.continuation(), lastKey, request, accumulator, deadline);
                             });
                 });
     }
@@ -527,17 +430,11 @@ public final class DefaultPhysicalRootBackfillCoordinator
         if (start == registrations.size()) {
             return CompletableFuture.completedFuture(null);
         }
-        int end = Math.min(
-                registrations.size(),
-                Math.addExact(
-                        start, request.maxConcurrentStreams()));
-        ArrayList<CompletableFuture<StreamBackfillResult>> futures =
-                new ArrayList<>(end - start);
+        int end = Math.min(registrations.size(), Math.addExact(start, request.maxConcurrentStreams()));
+        ArrayList<CompletableFuture<StreamBackfillResult>> futures = new ArrayList<>(end - start);
         for (int index = start; index < end; index++) {
-            VersionedMaterializationStreamRegistration registration =
-                    registrations.get(index);
-            StreamId stream =
-                    new StreamId(registration.value().streamId());
+            VersionedMaterializationStreamRegistration registration = registrations.get(index);
+            StreamId stream = new StreamId(registration.value().streamId());
             if (!accumulator.admitStream(stream)) {
                 accumulator.globalFailure(
                         CoverageSide.BOTH,
@@ -546,42 +443,29 @@ public final class DefaultPhysicalRootBackfillCoordinator
                         "DUPLICATE_REGISTERED_STREAM");
                 continue;
             }
-            futures.add(processRegistration(
-                    registration, deadline));
+            futures.add(processRegistration(registration, deadline));
         }
-        return CompletableFuture.allOf(
-                        futures.toArray(CompletableFuture[]::new))
+        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
                 .thenCompose(ignored -> {
-                    for (CompletableFuture<StreamBackfillResult> future :
-                            futures) {
+                    for (CompletableFuture<StreamBackfillResult> future : futures) {
                         accumulator.fold(future.join());
                     }
-                    return processRegistrationPage(
-                            registrations,
-                            end,
-                            request,
-                            accumulator,
-                            deadline);
+                    return processRegistrationPage(registrations, end, request, accumulator, deadline);
                 });
     }
 
     private CompletableFuture<StreamBackfillResult> processRegistration(
-            VersionedMaterializationStreamRegistration registration,
-            Deadline deadline) {
-        StreamAccumulator accumulator =
-                new StreamAccumulator(registration);
-        StreamId streamId =
-                new StreamId(registration.value().streamId());
+            VersionedMaterializationStreamRegistration registration, Deadline deadline) {
+        StreamAccumulator accumulator = new StreamAccumulator(registration);
+        StreamId streamId = new StreamId(registration.value().streamId());
         try {
-            if (!registration.key().equals(
-                    f4Keys.materializationRegistryKey(streamId))) {
+            if (!registration.key().equals(f4Keys.materializationRegistryKey(streamId))) {
                 accumulator.failure(
                         CoverageSide.BOTH,
                         PhysicalRootBackfillStage.REGISTRY_SCAN,
                         registration.key(),
                         "REGISTRATION_KEY_IDENTITY_MISMATCH");
-                return CompletableFuture.completedFuture(
-                        accumulator.result(false));
+                return CompletableFuture.completedFuture(accumulator.result(false));
             }
             accumulator.registration();
         } catch (RuntimeException failure) {
@@ -590,46 +474,25 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     PhysicalRootBackfillStage.REGISTRY_SCAN,
                     registration.key(),
                     "REGISTRATION_IDENTITY_INVALID");
-            return CompletableFuture.completedFuture(
-                    accumulator.result(false));
+            return CompletableFuture.completedFuture(accumulator.result(false));
         }
-        return deadline.call(() -> l0Metadata.getStreamSnapshot(
-                        cluster, streamId))
-                .thenCompose(snapshot -> captureProjection(
-                        registration,
-                        snapshot,
-                        accumulator,
-                        deadline))
+        return deadline.call(() -> l0Metadata.getStreamSnapshot(cluster, streamId))
+                .thenCompose(snapshot -> captureProjection(registration, snapshot, accumulator, deadline))
                 .thenCompose(capture -> {
                     accumulator.capture = capture;
                     if (!capture.live()) {
-                        return finalRevalidate(
-                                accumulator, deadline);
+                        return finalRevalidate(accumulator, deadline);
                     }
                     accumulator.live = true;
-                    return scanRecovery(
-                                    accumulator, deadline)
-                            .thenCompose(ignored ->
-                                    scanGenerationZero(
-                                            accumulator, deadline))
-                            .thenCompose(ignored ->
-                                    scanCursorInventory(
-                                            accumulator, deadline))
-                            .thenCompose(ignored ->
-                                    finalRevalidate(
-                                            accumulator, deadline));
+                    return scanRecovery(accumulator, deadline)
+                            .thenCompose(ignored -> scanGenerationZero(accumulator, deadline))
+                            .thenCompose(ignored -> scanCursorInventory(accumulator, deadline))
+                            .thenCompose(ignored -> finalRevalidate(accumulator, deadline));
                 })
                 .exceptionally(failure -> {
                     Throwable exact = unwrap(failure);
-                    PhysicalRootBackfillStage stage =
-                            stage(exact,
-                                    PhysicalRootBackfillStage
-                                            .PROJECTION_READ);
-                    accumulator.failure(
-                            CoverageSide.BOTH,
-                            stage,
-                            registration.key(),
-                            errorCode(stage, exact));
+                    PhysicalRootBackfillStage stage = stage(exact, PhysicalRootBackfillStage.PROJECTION_READ);
+                    accumulator.failure(CoverageSide.BOTH, stage, registration.key(), errorCode(stage, exact));
                     return accumulator.result(false);
                 });
     }
@@ -639,14 +502,12 @@ public final class DefaultPhysicalRootBackfillCoordinator
             StreamMetadataSnapshot snapshot,
             StreamAccumulator accumulator,
             Deadline deadline) {
-        MaterializationStreamRegistrationRecord value =
-                registration.value();
+        MaterializationStreamRegistrationRecord value = registration.value();
         StreamId streamId = new StreamId(value.streamId());
         if (!snapshot.metadata().streamId().equals(streamId.value())) {
             return failedStep(
                     PhysicalRootBackfillStage.PROJECTION_READ,
-                    invariant(
-                            "registered stream snapshot belongs to another stream"));
+                    invariant("registered stream snapshot belongs to another stream"));
         }
         final StreamState state;
         final StorageProfile registeredProfile;
@@ -654,77 +515,46 @@ public final class DefaultPhysicalRootBackfillCoordinator
         final ProjectionRef projectionRef;
         try {
             state = StreamState.valueOf(snapshot.metadata().state());
-            registeredProfile =
-                    StorageProfile.valueOf(value.storageProfile())
-                            .canonical();
+            registeredProfile = StorageProfile.valueOf(value.storageProfile()).canonical();
             actualProfile =
-                    StorageProfile.valueOf(snapshot.metadata().profile())
-                            .canonical();
-            projectionRef = ProjectionIdentity.decode(
-                            value.projectionRef())
-                    .orElseThrow(() -> invariant(
-                            "registered stream has no projection reference"));
+                    StorageProfile.valueOf(snapshot.metadata().profile()).canonical();
+            projectionRef = ProjectionIdentity.decode(value.projectionRef())
+                    .orElseThrow(() -> invariant("registered stream has no projection reference"));
         } catch (RuntimeException failure) {
             return failedStep(
                     PhysicalRootBackfillStage.PROJECTION_READ,
-                    invariant(
-                            "registered stream carries an unsupported state/profile/projection",
-                            failure));
+                    invariant("registered stream carries an unsupported state/profile/projection", failure));
         }
         LiveProjectionSubject subject = new LiveProjectionSubject(
-                streamId,
-                projectionRef,
-                new Checksum(
-                        ChecksumType.SHA256,
-                        value.projectionIdentitySha256()));
+                streamId, projectionRef, new Checksum(ChecksumType.SHA256, value.projectionIdentitySha256()));
         accumulator.streamSnapshot(snapshot);
-        return deadline.call(() ->
-                        projectionAuthorities.capture(subject))
+        return deadline.call(() -> projectionAuthorities.capture(subject))
                 .thenApply(projection -> {
                     accumulator.projection(projection);
-                    boolean streamLive =
-                            (state == StreamState.ACTIVE
-                                            || state
-                                                    == StreamState.SEALED)
-                                    && registeredProfile
-                                            == actualProfile
-                                    && actualProfile
-                                            .objectMaterializationEnabled()
-                                    && value.lastHintCommitVersion()
-                                            <= snapshot.committedEnd()
-                                                    .commitVersion();
+                    boolean streamLive = (state == StreamState.ACTIVE || state == StreamState.SEALED)
+                            && registeredProfile == actualProfile
+                            && actualProfile.objectMaterializationEnabled()
+                            && value.lastHintCommitVersion()
+                                    <= snapshot.committedEnd().commitVersion();
                     if (projection.live() && !streamLive) {
-                        throw invariant(
-                                "live projection conflicts with its registered L0 stream authority");
+                        throw invariant("live projection conflicts with its registered L0 stream authority");
                     }
-                    return new RegistrationCapture(
-                            registration,
-                            snapshot,
-                            projection,
-                            streamLive && projection.live());
+                    return new RegistrationCapture(registration, snapshot, projection, streamLive && projection.live());
                 })
-                .exceptionallyCompose(failure -> failedStep(
-                        PhysicalRootBackfillStage.PROJECTION_READ,
-                        unwrap(failure)));
+                .exceptionallyCompose(
+                        failure -> failedStep(PhysicalRootBackfillStage.PROJECTION_READ, unwrap(failure)));
     }
 
-    private CompletableFuture<Void> scanRecovery(
-            StreamAccumulator accumulator,
-            Deadline deadline) {
+    private CompletableFuture<Void> scanRecovery(StreamAccumulator accumulator, Deadline deadline) {
         StreamId stream = accumulator.streamId();
-        return deadline.call(() -> generations.getRecoveryRoot(
-                        cluster, stream))
+        return deadline.call(() -> generations.getRecoveryRoot(cluster, stream))
                 .handle((root, failure) -> {
                     if (failure != null) {
                         accumulator.failure(
                                 CoverageSide.DATA,
-                                PhysicalRootBackfillStage
-                                        .HEAD_COMMIT_SCAN,
+                                PhysicalRootBackfillStage.HEAD_COMMIT_SCAN,
                                 f4Keys.recoveryRootKey(stream),
-                                errorCode(
-                                        PhysicalRootBackfillStage
-                                                .HEAD_COMMIT_SCAN,
-                                        failure));
+                                errorCode(PhysicalRootBackfillStage.HEAD_COMMIT_SCAN, failure));
                         return null;
                     }
                     return root;
@@ -734,21 +564,11 @@ public final class DefaultPhysicalRootBackfillCoordinator
                         return CompletableFuture.completedFuture(null);
                     }
                     accumulator.recoveryRoot = root;
-                    accumulator.recoveryRoot(
-                            f4Keys.recoveryRootKey(stream),
-                            root);
-                    AppendRecoveryAnchor anchor = root
-                            .map(value -> anchor(stream, value))
-                            .orElseGet(() ->
-                                    AppendRecoveryAnchor.genesis(
-                                            stream));
+                    accumulator.recoveryRoot(f4Keys.recoveryRootKey(stream), root);
+                    AppendRecoveryAnchor anchor = root.map(value -> anchor(stream, value))
+                            .orElseGet(() -> AppendRecoveryAnchor.genesis(stream));
                     accumulator.recoveryAnchor = anchor;
-                    return scanRecoveryPage(
-                            accumulator,
-                            anchor,
-                            Optional.empty(),
-                            null,
-                            deadline);
+                    return scanRecoveryPage(accumulator, anchor, Optional.empty(), null, deadline);
                 });
     }
 
@@ -759,23 +579,15 @@ public final class DefaultPhysicalRootBackfillCoordinator
             AppendRecoveryHead expectedHead,
             Deadline deadline) {
         StreamId stream = accumulator.streamId();
-        return deadline.call(() -> l0Metadata.readAppendRecoveryTail(
-                        cluster,
-                        stream,
-                        anchor,
-                        continuation,
-                        metadataPageSize))
+        return deadline.call(() ->
+                        l0Metadata.readAppendRecoveryTail(cluster, stream, anchor, continuation, metadataPageSize))
                 .handle((page, failure) -> {
                     if (failure != null) {
                         accumulator.failure(
                                 CoverageSide.DATA,
-                                PhysicalRootBackfillStage
-                                        .HEAD_COMMIT_SCAN,
+                                PhysicalRootBackfillStage.HEAD_COMMIT_SCAN,
                                 l0Keys.streamHeadKey(stream),
-                                errorCode(
-                                        PhysicalRootBackfillStage
-                                                .HEAD_COMMIT_SCAN,
-                                        failure));
+                                errorCode(PhysicalRootBackfillStage.HEAD_COMMIT_SCAN, failure));
                         return null;
                     }
                     return page;
@@ -785,12 +597,10 @@ public final class DefaultPhysicalRootBackfillCoordinator
                         return CompletableFuture.completedFuture(null);
                     }
                     AppendRecoveryHead observed = page.observedHead();
-                    if (expectedHead != null
-                            && !expectedHead.equals(observed)) {
+                    if (expectedHead != null && !expectedHead.equals(observed)) {
                         accumulator.failure(
                                 CoverageSide.DATA,
-                                PhysicalRootBackfillStage
-                                        .HEAD_COMMIT_SCAN,
+                                PhysicalRootBackfillStage.HEAD_COMMIT_SCAN,
                                 l0Keys.streamHeadKey(stream),
                                 "HEAD_CHANGED_DURING_SCAN");
                         return CompletableFuture.completedFuture(null);
@@ -799,31 +609,18 @@ public final class DefaultPhysicalRootBackfillCoordinator
                         accumulator.recoveryHead = observed;
                         accumulator.recoveryHead(observed);
                     }
-                    return processRecoveryCommits(
-                                    accumulator,
-                                    page.commitsNewestFirst(),
-                                    0,
-                                    deadline)
+                    return processRecoveryCommits(accumulator, page.commitsNewestFirst(), 0, deadline)
                             .thenCompose(ignored -> {
                                 if (page.continuation().isEmpty()) {
-                                    return CompletableFuture
-                                            .completedFuture(null);
+                                    return CompletableFuture.completedFuture(null);
                                 }
-                                return scanRecoveryPage(
-                                        accumulator,
-                                        anchor,
-                                        page.continuation(),
-                                        observed,
-                                        deadline);
+                                return scanRecoveryPage(accumulator, anchor, page.continuation(), observed, deadline);
                             });
                 });
     }
 
     private CompletableFuture<Void> processRecoveryCommits(
-            StreamAccumulator accumulator,
-            List<AppendRecoveryCommit> commits,
-            int index,
-            Deadline deadline) {
+            StreamAccumulator accumulator, List<AppendRecoveryCommit> commits, int index, Deadline deadline) {
         if (index == commits.size()) {
             return CompletableFuture.completedFuture(null);
         }
@@ -831,14 +628,10 @@ public final class DefaultPhysicalRootBackfillCoordinator
         accumulator.commitAuthority(commit);
         final ObjectSliceReadTarget target;
         try {
-            ReadTarget decoded =
-                    TARGET_CODECS.decode(
-                            commit.canonicalCommit().readTarget());
+            ReadTarget decoded = TARGET_CODECS.decode(commit.canonicalCommit().readTarget());
             if (!(decoded instanceof ObjectSliceReadTarget object)
-                    || object.objectType()
-                            != ObjectType.MULTI_STREAM_WAL_OBJECT) {
-                throw invariant(
-                        "reachable commit has an unsupported live target");
+                    || object.objectType() != ObjectType.MULTI_STREAM_WAL_OBJECT) {
+                throw invariant("reachable commit has an unsupported live target");
             }
             target = object;
         } catch (RuntimeException failure) {
@@ -847,41 +640,26 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     PhysicalRootBackfillStage.HEAD_COMMIT_SCAN,
                     commit.key(),
                     "UNSUPPORTED_LIVE_COMMIT_TARGET");
-            return processRecoveryCommits(
-                    accumulator, commits, index + 1, deadline);
+            return processRecoveryCommits(accumulator, commits, index + 1, deadline);
         }
         try {
             requireCompatibleProjection(
-                    ProjectionIdentity.decode(
-                            commit.canonicalCommit()
-                                    .projectionRef()),
-                    accumulator.capture.projection()
-                            .subject()
-                            .projectionRef());
+                    ProjectionIdentity.decode(commit.canonicalCommit().projectionRef()),
+                    accumulator.capture.projection().subject().projectionRef());
         } catch (RuntimeException failure) {
             accumulator.failure(
                     CoverageSide.DATA,
                     PhysicalRootBackfillStage.HEAD_COMMIT_SCAN,
                     commit.key(),
                     "REACHABLE_COMMIT_PROJECTION_MISMATCH");
-            return processRecoveryCommits(
-                    accumulator, commits, index + 1, deadline);
+            return processRecoveryCommits(accumulator, commits, index + 1, deadline);
         }
         ObjectProtectionOwner owner =
-                new ObjectProtectionOwner(
-                        commit.key(),
-                        commit.sourceMetadataVersion(),
-                        commit.sourceRecordSha256());
-        ObjectKeyHash objectHash =
-                ObjectKeyHash.from(target.objectKey());
-        String referenceId =
-                GenerationZeroProtectionIdentities
-                        .reachableAppendReferenceId(
-                                accumulator.streamId(),
-                                commit.canonicalCommit().commitId(),
-                                objectHash);
-        ObjectProtectionManager.OwnerRevalidator revalidator =
-                expected -> revalidateCommit(commit, expected, deadline);
+                new ObjectProtectionOwner(commit.key(), commit.sourceMetadataVersion(), commit.sourceRecordSha256());
+        ObjectKeyHash objectHash = ObjectKeyHash.from(target.objectKey());
+        String referenceId = GenerationZeroProtectionIdentities.reachableAppendReferenceId(
+                accumulator.streamId(), commit.canonicalCommit().commitId(), objectHash);
+        ObjectProtectionManager.OwnerRevalidator revalidator = expected -> revalidateCommit(commit, expected, deadline);
         return protectDataReference(
                         accumulator,
                         commit.key(),
@@ -891,43 +669,25 @@ public final class DefaultPhysicalRootBackfillCoordinator
                         owner,
                         revalidator,
                         deadline)
-                .thenCompose(ignored -> processRecoveryCommits(
-                        accumulator, commits, index + 1, deadline));
+                .thenCompose(ignored -> processRecoveryCommits(accumulator, commits, index + 1, deadline));
     }
 
-    private CompletableFuture<Void> scanGenerationZero(
-            StreamAccumulator accumulator,
-            Deadline deadline) {
-        return scanGenerationZeroPage(
-                accumulator, Optional.empty(), null, deadline);
+    private CompletableFuture<Void> scanGenerationZero(StreamAccumulator accumulator, Deadline deadline) {
+        return scanGenerationZeroPage(accumulator, Optional.empty(), null, deadline);
     }
 
     private CompletableFuture<Void> scanGenerationZeroPage(
-            StreamAccumulator accumulator,
-            Optional<F4ScanToken> continuation,
-            String previousKey,
-            Deadline deadline) {
+            StreamAccumulator accumulator, Optional<F4ScanToken> continuation, String previousKey, Deadline deadline) {
         StreamId stream = accumulator.streamId();
         return deadline.call(() -> generations.scanIndex(
-                        cluster,
-                        stream,
-                        ReadView.COMMITTED,
-                        0,
-                        Long.MAX_VALUE,
-                        continuation,
-                        metadataPageSize))
+                        cluster, stream, ReadView.COMMITTED, 0, Long.MAX_VALUE, continuation, metadataPageSize))
                 .handle((page, failure) -> {
                     if (failure != null) {
                         accumulator.failure(
                                 CoverageSide.DATA,
-                                PhysicalRootBackfillStage
-                                        .GENERATION_ZERO_SCAN,
-                                f4Keys.generationIndexPrefix(
-                                        stream, ReadView.COMMITTED),
-                                errorCode(
-                                        PhysicalRootBackfillStage
-                                                .GENERATION_ZERO_SCAN,
-                                        failure));
+                                PhysicalRootBackfillStage.GENERATION_ZERO_SCAN,
+                                f4Keys.generationIndexPrefix(stream, ReadView.COMMITTED),
+                                errorCode(PhysicalRootBackfillStage.GENERATION_ZERO_SCAN, failure));
                         return null;
                     }
                     return page;
@@ -938,28 +698,18 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     }
                     if (previousKey != null
                             && !page.values().isEmpty()
-                            && page.values()
-                                            .get(0)
-                                            .key()
-                                            .compareTo(previousKey)
-                                    <= 0) {
+                            && page.values().get(0).key().compareTo(previousKey) <= 0) {
                         accumulator.failure(
                                 CoverageSide.DATA,
-                                PhysicalRootBackfillStage
-                                        .GENERATION_ZERO_SCAN,
+                                PhysicalRootBackfillStage.GENERATION_ZERO_SCAN,
                                 previousKey,
                                 "GENERATION_SCAN_DID_NOT_ADVANCE");
                         return CompletableFuture.completedFuture(null);
                     }
-                    return processGenerationCandidates(
-                                    accumulator,
-                                    page.values(),
-                                    0,
-                                    deadline)
+                    return processGenerationCandidates(accumulator, page.values(), 0, deadline)
                             .thenCompose(ignored -> {
                                 if (page.continuation().isEmpty()) {
-                                    return CompletableFuture
-                                            .completedFuture(null);
+                                    return CompletableFuture.completedFuture(null);
                                 }
                                 return scanGenerationZeroPage(
                                         accumulator,
@@ -980,14 +730,9 @@ public final class DefaultPhysicalRootBackfillCoordinator
         if (index == candidates.size()) {
             return CompletableFuture.completedFuture(null);
         }
-        VersionedGenerationCandidate candidate =
-                candidates.get(index);
+        VersionedGenerationCandidate candidate = candidates.get(index);
         if (candidate instanceof VersionedGenerationIndex) {
-            return processGenerationCandidates(
-                    accumulator,
-                    candidates,
-                    index + 1,
-                    deadline);
+            return processGenerationCandidates(accumulator, candidates, index + 1, deadline);
         }
         if (!(candidate instanceof VersionedGenerationZeroIndex zero)) {
             accumulator.failure(
@@ -995,88 +740,50 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     PhysicalRootBackfillStage.GENERATION_ZERO_SCAN,
                     candidate.key(),
                     "UNKNOWN_GENERATION_CANDIDATE");
-            return processGenerationCandidates(
-                    accumulator,
-                    candidates,
-                    index + 1,
-                    deadline);
+            return processGenerationCandidates(accumulator, candidates, index + 1, deadline);
         }
         accumulator.generationZeroAuthority(zero);
         if (zero.value().tombstoned()) {
             accumulator.generationZeroTombstone(zero);
-            return processGenerationCandidates(
-                    accumulator,
-                    candidates,
-                    index + 1,
-                    deadline);
+            return processGenerationCandidates(accumulator, candidates, index + 1, deadline);
         }
         if (zero.value().offsetEnd()
-                        > accumulator.capture
-                                .streamSnapshot()
-                                .committedEnd()
-                                .committedEndOffset()
+                        > accumulator.capture.streamSnapshot().committedEnd().committedEndOffset()
                 || zero.value().commitVersion()
-                        > accumulator.capture
-                                .streamSnapshot()
-                                .committedEnd()
-                                .commitVersion()) {
+                        > accumulator.capture.streamSnapshot().committedEnd().commitVersion()) {
             accumulator.failure(
                     CoverageSide.DATA,
                     PhysicalRootBackfillStage.GENERATION_ZERO_SCAN,
                     zero.key(),
                     "GENERATION_ZERO_AHEAD_OF_HEAD");
-            return processGenerationCandidates(
-                    accumulator,
-                    candidates,
-                    index + 1,
-                    deadline);
+            return processGenerationCandidates(accumulator, candidates, index + 1, deadline);
         }
-        if (!(zero.value().readTarget()
-                        instanceof ObjectSliceReadTarget target)
-                || target.objectType()
-                        != ObjectType.MULTI_STREAM_WAL_OBJECT) {
+        if (!(zero.value().readTarget() instanceof ObjectSliceReadTarget target)
+                || target.objectType() != ObjectType.MULTI_STREAM_WAL_OBJECT) {
             accumulator.failure(
                     CoverageSide.DATA,
                     PhysicalRootBackfillStage.GENERATION_ZERO_SCAN,
                     zero.key(),
                     "UNSUPPORTED_LIVE_INDEX_TARGET");
-            return processGenerationCandidates(
-                    accumulator,
-                    candidates,
-                    index + 1,
-                    deadline);
+            return processGenerationCandidates(accumulator, candidates, index + 1, deadline);
         }
         try {
             requireCompatibleProjection(
                     zero.value().projectionRef(),
-                    accumulator.capture.projection()
-                            .subject()
-                            .projectionRef());
+                    accumulator.capture.projection().subject().projectionRef());
         } catch (RuntimeException failure) {
             accumulator.failure(
                     CoverageSide.DATA,
                     PhysicalRootBackfillStage.GENERATION_ZERO_SCAN,
                     zero.key(),
                     "GENERATION_ZERO_PROJECTION_MISMATCH");
-            return processGenerationCandidates(
-                    accumulator,
-                    candidates,
-                    index + 1,
-                    deadline);
+            return processGenerationCandidates(accumulator, candidates, index + 1, deadline);
         }
         ObjectProtectionOwner owner =
-                new ObjectProtectionOwner(
-                        zero.key(),
-                        zero.metadataVersion(),
-                        zero.durableValueSha256());
-        String referenceId =
-                GenerationZeroProtectionIdentities
-                        .visibleGenerationReferenceId(
-                                accumulator.streamId(),
-                                zero.key(),
-                                zero.durableValueSha256());
-        ObjectProtectionManager.OwnerRevalidator revalidator =
-                expected -> revalidateIndex(zero, expected, deadline);
+                new ObjectProtectionOwner(zero.key(), zero.metadataVersion(), zero.durableValueSha256());
+        String referenceId = GenerationZeroProtectionIdentities.visibleGenerationReferenceId(
+                accumulator.streamId(), zero.key(), zero.durableValueSha256());
+        ObjectProtectionManager.OwnerRevalidator revalidator = expected -> revalidateIndex(zero, expected, deadline);
         return protectDataReference(
                         accumulator,
                         zero.key(),
@@ -1086,37 +793,22 @@ public final class DefaultPhysicalRootBackfillCoordinator
                         owner,
                         revalidator,
                         deadline)
-                .thenCompose(ignored -> processGenerationCandidates(
-                        accumulator,
-                        candidates,
-                        index + 1,
-                        deadline));
+                .thenCompose(ignored -> processGenerationCandidates(accumulator, candidates, index + 1, deadline));
     }
 
-    private CompletableFuture<Void> scanCursorInventory(
-            StreamAccumulator accumulator,
-            Deadline deadline) {
+    private CompletableFuture<Void> scanCursorInventory(StreamAccumulator accumulator, Deadline deadline) {
         return captureCursorInventory(
                         accumulator,
-                        accumulator.capture.projection()
-                                .managedLedgerIdentity()
-                                .orElseThrow(),
+                        accumulator.capture.projection().managedLedgerIdentity().orElseThrow(),
                         true,
                         deadline)
                 .handle((capture, failure) -> {
                     if (failure != null) {
                         accumulator.failure(
                                 CoverageSide.CURSOR,
-                                stage(
-                                        unwrap(failure),
-                                        PhysicalRootBackfillStage
-                                                .CURSOR_INVENTORY_SCAN),
-                                cursorKeys.retentionKey(
-                                        accumulator.streamId()),
-                                errorCode(
-                                        PhysicalRootBackfillStage
-                                                .CURSOR_INVENTORY_SCAN,
-                                        failure));
+                                stage(unwrap(failure), PhysicalRootBackfillStage.CURSOR_INVENTORY_SCAN),
+                                cursorKeys.retentionKey(accumulator.streamId()),
+                                errorCode(PhysicalRootBackfillStage.CURSOR_INVENTORY_SCAN, failure));
                     } else {
                         accumulator.cursorInventory = capture;
                         accumulator.cursorInventory(capture);
@@ -1127,29 +819,20 @@ public final class DefaultPhysicalRootBackfillCoordinator
 
     private CompletableFuture<CursorInventoryCapture> captureCursorInventory(
             StreamAccumulator accumulator,
-            com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity
-                    expectedProjection,
+            com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity expectedProjection,
             boolean protectObjects,
             Deadline deadline) {
         StreamId stream = accumulator.streamId();
-        return deadline.call(() -> cursors.getRetention(
-                        cluster, stream))
+        return deadline.call(() -> cursors.getRetention(cluster, stream))
                 .thenCompose(retention -> {
-                    CursorInventoryBuilder builder =
-                            new CursorInventoryBuilder(
-                                    stream, retention);
+                    CursorInventoryBuilder builder = new CursorInventoryBuilder(stream, retention);
                     if (retention.isPresent()) {
-                        VersionedCursorRetention exact =
-                                retention.orElseThrow();
-                        if (!exact.value().projection()
-                                        .equals(expectedProjection)
-                                || exact.value().lifecycle()
-                                        != CursorRetentionLifecycle.ACTIVE) {
+                        VersionedCursorRetention exact = retention.orElseThrow();
+                        if (!exact.value().projection().equals(expectedProjection)
+                                || exact.value().lifecycle() != CursorRetentionLifecycle.ACTIVE) {
                             return failedStep(
-                                    PhysicalRootBackfillStage
-                                            .CURSOR_INVENTORY_SCAN,
-                                    invariant(
-                                            "cursor retention is not ACTIVE for the live projection"));
+                                    PhysicalRootBackfillStage.CURSOR_INVENTORY_SCAN,
+                                    invariant("cursor retention is not ACTIVE for the live projection"));
                         }
                     }
                     return scanCursorPage(
@@ -1161,50 +844,33 @@ public final class DefaultPhysicalRootBackfillCoordinator
                                     null,
                                     deadline)
                             .thenApply(ignored -> {
-                                if (builder.retention.isEmpty()
-                                        && builder.cursorCount > 0) {
-                                    throw invariant(
-                                            "cursor roots exist without a retention authority");
+                                if (builder.retention.isEmpty() && builder.cursorCount > 0) {
+                                    throw invariant("cursor roots exist without a retention authority");
                                 }
                                 return builder.finish();
                             });
                 })
-                .exceptionallyCompose(failure -> failedStep(
-                        PhysicalRootBackfillStage
-                                .CURSOR_INVENTORY_SCAN,
-                        unwrap(failure)));
+                .exceptionallyCompose(
+                        failure -> failedStep(PhysicalRootBackfillStage.CURSOR_INVENTORY_SCAN, unwrap(failure)));
     }
 
     private CompletableFuture<Void> scanCursorPage(
             StreamAccumulator accumulator,
-            com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity
-                    expectedProjection,
+            com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity expectedProjection,
             boolean protectObjects,
             CursorInventoryBuilder builder,
             Optional<CursorScanToken> continuation,
             String previousKey,
             Deadline deadline) {
         StreamId stream = accumulator.streamId();
-        return deadline.call(() -> cursors.scanCursors(
-                        cluster,
-                        stream,
-                        continuation,
-                        cursorPageSize))
+        return deadline.call(() -> cursors.scanCursors(cluster, stream, continuation, cursorPageSize))
                 .thenCompose(page -> {
                     if (previousKey != null
                             && !page.records().isEmpty()
-                            && cursorKey(
-                                                    stream,
-                                                    page.records()
-                                                            .get(0)
-                                                            .value())
-                                            .compareTo(previousKey)
-                                    <= 0) {
+                            && cursorKey(stream, page.records().get(0).value()).compareTo(previousKey) <= 0) {
                         return failedStep(
-                                PhysicalRootBackfillStage
-                                        .CURSOR_INVENTORY_SCAN,
-                                invariant(
-                                        "cursor inventory scan did not advance"));
+                                PhysicalRootBackfillStage.CURSOR_INVENTORY_SCAN,
+                                invariant("cursor inventory scan did not advance"));
                     }
                     return processCursorRoots(
                                     accumulator,
@@ -1216,16 +882,12 @@ public final class DefaultPhysicalRootBackfillCoordinator
                                     deadline)
                             .thenCompose(ignored -> {
                                 if (page.continuation().isEmpty()) {
-                                    return CompletableFuture
-                                            .completedFuture(null);
+                                    return CompletableFuture.completedFuture(null);
                                 }
                                 String lastKey = cursorKey(
                                         stream,
                                         page.records()
-                                                .get(
-                                                        page.records()
-                                                                        .size()
-                                                                - 1)
+                                                .get(page.records().size() - 1)
                                                 .value());
                                 return scanCursorPage(
                                         accumulator,
@@ -1241,8 +903,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
 
     private CompletableFuture<Void> processCursorRoots(
             StreamAccumulator accumulator,
-            com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity
-                    expectedProjection,
+            com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity expectedProjection,
             boolean protectObjects,
             CursorInventoryBuilder builder,
             List<VersionedCursorState> roots,
@@ -1256,65 +917,34 @@ public final class DefaultPhysicalRootBackfillCoordinator
         if (!cursor.projection().equals(expectedProjection)) {
             return failedStep(
                     PhysicalRootBackfillStage.CURSOR_INVENTORY_SCAN,
-                    invariant(
-                            "cursor root belongs to another projection"));
+                    invariant("cursor root belongs to another projection"));
         }
         builder.add(versioned);
         if (!protectObjects
-                || cursor.lifecycle()
-                        != CursorRecordLifecycle.ACTIVE
+                || cursor.lifecycle() != CursorRecordLifecycle.ACTIVE
                 || cursor.snapshotReference().isEmpty()) {
             return processCursorRoots(
-                    accumulator,
-                    expectedProjection,
-                    protectObjects,
-                    builder,
-                    roots,
-                    index + 1,
-                    deadline);
+                    accumulator, expectedProjection, protectObjects, builder, roots, index + 1, deadline);
         }
-        CursorSnapshotReferenceRecord reference =
-                cursor.snapshotReference().orElseThrow();
+        CursorSnapshotReferenceRecord reference = cursor.snapshotReference().orElseThrow();
         final ObjectKey key;
         try {
-            key = canonicalCursorObjectKey(
-                    accumulator.streamId(),
-                    cursor,
-                    reference);
+            key = canonicalCursorObjectKey(accumulator.streamId(), cursor, reference);
             if (!key.value().equals(reference.objectKey())) {
-                throw invariant(
-                        "cursor snapshot reference uses a non-canonical object key");
+                throw invariant("cursor snapshot reference uses a non-canonical object key");
             }
         } catch (RuntimeException failure) {
             accumulator.failure(
                     CoverageSide.CURSOR,
-                    PhysicalRootBackfillStage
-                            .CURSOR_INVENTORY_SCAN,
+                    PhysicalRootBackfillStage.CURSOR_INVENTORY_SCAN,
                     cursorKey(accumulator.streamId(), cursor),
                     "CURSOR_SNAPSHOT_KEY_INVALID");
             return processCursorRoots(
-                    accumulator,
-                    expectedProjection,
-                    protectObjects,
-                    builder,
-                    roots,
-                    index + 1,
-                    deadline);
+                    accumulator, expectedProjection, protectObjects, builder, roots, index + 1, deadline);
         }
-        return protectCursorReference(
-                        accumulator,
-                        versioned,
-                        reference,
-                        key,
-                        deadline)
+        return protectCursorReference(accumulator, versioned, reference, key, deadline)
                 .thenCompose(ignored -> processCursorRoots(
-                        accumulator,
-                        expectedProjection,
-                        protectObjects,
-                        builder,
-                        roots,
-                        index + 1,
-                        deadline));
+                        accumulator, expectedProjection, protectObjects, builder, roots, index + 1, deadline));
     }
 
     private CompletableFuture<Void> protectDataReference(
@@ -1329,44 +959,25 @@ public final class DefaultPhysicalRootBackfillCoordinator
         return step(
                         PhysicalRootBackfillStage.OBJECT_HEAD,
                         deadline,
-                        () -> dataIdentityResolver.resolve(
-                                target, ReadView.COMMITTED))
+                        () -> dataIdentityResolver.resolve(target, ReadView.COMMITTED))
                 .thenCompose(object -> step(
-                        PhysicalRootBackfillStage.OBJECT_HEAD,
-                        deadline,
-                        () -> objectStore.headObject(
-                                object.objectKey(),
-                                new HeadObjectOptions(
-                                        deadline.callTimeout(
-                                                objectStoreRequestTimeout))))
+                                PhysicalRootBackfillStage.OBJECT_HEAD,
+                                deadline,
+                                () -> objectStore.headObject(
+                                        object.objectKey(),
+                                        new HeadObjectOptions(deadline.callTimeout(objectStoreRequestTimeout))))
                         .thenApply(head -> {
-                            requireHeadMatches(
-                                    head, object, Optional.empty());
+                            requireHeadMatches(head, object, Optional.empty());
                             return object;
                         }))
-                .thenCompose(object -> protect(
-                        object,
-                        type,
-                        referenceId,
-                        owner,
-                        revalidator,
-                        deadline))
+                .thenCompose(object -> protect(object, type, referenceId, owner, revalidator, deadline))
                 .handle((outcome, failure) -> {
                     if (failure != null) {
                         Throwable exact = unwrap(failure);
-                        PhysicalRootBackfillStage stage =
-                                stage(
-                                        exact,
-                                        PhysicalRootBackfillStage
-                                                .PROTECTION_WRITE);
-                        accumulator.failure(
-                                CoverageSide.DATA,
-                                stage,
-                                resource,
-                                errorCode(stage, exact));
+                        PhysicalRootBackfillStage stage = stage(exact, PhysicalRootBackfillStage.PROTECTION_WRITE);
+                        accumulator.failure(CoverageSide.DATA, stage, resource, errorCode(stage, exact));
                     } else {
-                        accumulator.dataOutcome(
-                                resource, outcome);
+                        accumulator.dataOutcome(resource, outcome);
                     }
                     return null;
                 });
@@ -1378,12 +989,9 @@ public final class DefaultPhysicalRootBackfillCoordinator
             CursorSnapshotReferenceRecord reference,
             ObjectKey key,
             Deadline deadline) {
-        String resource = cursorKey(
-                accumulator.streamId(), cursor.value());
-        Checksum checksum = new Checksum(
-                ChecksumType.valueOf(
-                        reference.storageChecksumType()),
-                reference.storageChecksumValue());
+        String resource = cursorKey(accumulator.streamId(), cursor.value());
+        Checksum checksum =
+                new Checksum(ChecksumType.valueOf(reference.storageChecksumType()), reference.storageChecksumValue());
         Map<String, String> metadata = Map.of(
                 "nereus-format",
                 CURSOR_FORMAT,
@@ -1395,41 +1003,29 @@ public final class DefaultPhysicalRootBackfillCoordinator
                         PhysicalRootBackfillStage.OBJECT_HEAD,
                         deadline,
                         () -> objectStore.headObject(
-                                key,
-                                new HeadObjectOptions(
-                                        deadline.callTimeout(
-                                                objectStoreRequestTimeout))))
+                                key, new HeadObjectOptions(deadline.callTimeout(objectStoreRequestTimeout))))
                 .thenApply(head -> {
-                    PhysicalObjectIdentity object =
-                            PhysicalObjectIdentity.create(
-                                    key,
-                                    Optional.empty(),
-                                    PhysicalObjectKind.CURSOR_SNAPSHOT,
-                                    reference.objectLength(),
-                                    checksum,
-                                    Optional.empty(),
-                                    head.etag());
-                    requireHeadMatches(
-                            head, object, Optional.of(metadata));
+                    PhysicalObjectIdentity object = PhysicalObjectIdentity.create(
+                            key,
+                            Optional.empty(),
+                            PhysicalObjectKind.CURSOR_SNAPSHOT,
+                            reference.objectLength(),
+                            checksum,
+                            Optional.empty(),
+                            head.etag());
+                    requireHeadMatches(head, object, Optional.of(metadata));
                     return object;
                 })
                 .thenCompose(object -> {
-                    ObjectProtectionOwner owner =
-                            new ObjectProtectionOwner(
-                                    resource,
-                                    cursor.metadataVersion(),
-                                    CursorMetadataDigests
-                                            .durableValueSha256(
-                                                    cursor.value()));
+                    ObjectProtectionOwner owner = new ObjectProtectionOwner(
+                            resource,
+                            cursor.metadataVersion(),
+                            CursorMetadataDigests.durableValueSha256(cursor.value()));
                     ObjectProtectionManager.OwnerRevalidator revalidator =
-                            expected -> revalidateCursor(
-                                    cursor,
-                                    expected,
-                                    deadline);
+                            expected -> revalidateCursor(cursor, expected, deadline);
                     return protect(
                             object,
-                            ObjectProtectionType
-                                    .CURSOR_SNAPSHOT_ROOT,
+                            ObjectProtectionType.CURSOR_SNAPSHOT_ROOT,
                             reference.snapshotId(),
                             owner,
                             revalidator,
@@ -1438,19 +1034,10 @@ public final class DefaultPhysicalRootBackfillCoordinator
                 .handle((outcome, failure) -> {
                     if (failure != null) {
                         Throwable exact = unwrap(failure);
-                        PhysicalRootBackfillStage stage =
-                                stage(
-                                        exact,
-                                        PhysicalRootBackfillStage
-                                                .PROTECTION_WRITE);
-                        accumulator.failure(
-                                CoverageSide.CURSOR,
-                                stage,
-                                resource,
-                                errorCode(stage, exact));
+                        PhysicalRootBackfillStage stage = stage(exact, PhysicalRootBackfillStage.PROTECTION_WRITE);
+                        accumulator.failure(CoverageSide.CURSOR, stage, resource, errorCode(stage, exact));
                     } else {
-                        accumulator.cursorOutcome(
-                                resource, outcome);
+                        accumulator.cursorOutcome(resource, outcome);
                     }
                     return null;
                 });
@@ -1466,221 +1053,135 @@ public final class DefaultPhysicalRootBackfillCoordinator
         return step(
                         PhysicalRootBackfillStage.ROOT_WRITE,
                         deadline,
-                        () -> physicalMetadata.getRoot(
-                                cluster, object.objectKeyHash()))
+                        () -> physicalMetadata.getRoot(cluster, object.objectKeyHash()))
                 .thenCompose(initial -> {
                     if (initial.isPresent()) {
-                        requireExactActiveRoot(
-                                object, initial.orElseThrow());
+                        requireExactActiveRoot(object, initial.orElseThrow());
                     }
-                    PhysicalRootBackfillStage acquisitionStage =
-                            initial.isEmpty()
-                                    ? PhysicalRootBackfillStage.ROOT_WRITE
-                                    : PhysicalRootBackfillStage
-                                            .PROTECTION_WRITE;
-                    ObjectProtectionRequest request =
-                            new ObjectProtectionRequest(
-                                    object,
-                                    type,
-                                    referenceId,
-                                    owner,
-                                    0);
-                    return step(
-                                    acquisitionStage,
-                                    deadline,
-                                    () -> protections.acquireOrTransfer(
-                                            request,
-                                            revalidator))
+                    PhysicalRootBackfillStage acquisitionStage = initial.isEmpty()
+                            ? PhysicalRootBackfillStage.ROOT_WRITE
+                            : PhysicalRootBackfillStage.PROTECTION_WRITE;
+                    ObjectProtectionRequest request = new ObjectProtectionRequest(object, type, referenceId, owner, 0);
+                    return step(acquisitionStage, deadline, () -> protections.acquireOrTransfer(request, revalidator))
                             .thenCompose(protection -> step(
-                                    PhysicalRootBackfillStage
-                                            .PROTECTION_WRITE,
+                                    PhysicalRootBackfillStage.PROTECTION_WRITE,
                                     deadline,
-                                    () -> protections.revalidate(
-                                            protection,
-                                            revalidator)));
+                                    () -> protections.revalidate(protection, revalidator)));
                 })
                 .thenCompose(protection -> step(
-                        PhysicalRootBackfillStage.ROOT_WRITE,
-                        deadline,
-                        () -> physicalMetadata.getRoot(
-                                cluster, object.objectKeyHash()))
+                                PhysicalRootBackfillStage.ROOT_WRITE,
+                                deadline,
+                                () -> physicalMetadata.getRoot(cluster, object.objectKeyHash()))
                         .thenApply(optional -> {
                             VersionedPhysicalObjectRoot root =
-                                    optional.orElseThrow(() ->
-                                            invariant(
-                                                    "physical root is absent after protection"));
+                                    optional.orElseThrow(() -> invariant("physical root is absent after protection"));
                             requireExactActiveRoot(object, root);
-                            if (root.value().lifecycleEpoch()
-                                    != protection
-                                            .rootLifecycleEpoch()) {
-                                throw invariant(
-                                        "protection/root lifecycle epoch changed");
+                            if (root.value().lifecycleEpoch() != protection.rootLifecycleEpoch()) {
+                                throw invariant("protection/root lifecycle epoch changed");
                             }
-                            return new ProtectionOutcome(
-                                    object, root, protection);
+                            return new ProtectionOutcome(object, root, protection);
                         }));
     }
 
     private CompletableFuture<Void> revalidateCommit(
-            AppendRecoveryCommit expected,
-            ObjectProtectionOwner actualOwner,
-            Deadline deadline) {
-        ObjectProtectionOwner canonical =
-                new ObjectProtectionOwner(
-                        expected.key(),
-                        expected.sourceMetadataVersion(),
-                        expected.sourceRecordSha256());
+            AppendRecoveryCommit expected, ObjectProtectionOwner actualOwner, Deadline deadline) {
+        ObjectProtectionOwner canonical = new ObjectProtectionOwner(
+                expected.key(), expected.sourceMetadataVersion(), expected.sourceRecordSha256());
         if (!canonical.equals(actualOwner)) {
-            return CompletableFuture.failedFuture(
-                    invariant(
-                            "reachable append protection owner changed"));
+            return CompletableFuture.failedFuture(invariant("reachable append protection owner changed"));
         }
-        return deadline.call(() ->
-                        sourceRetirement.getCommitNodeByKey(
-                                cluster, expected.key()))
+        return deadline.call(() -> sourceRetirement.getCommitNodeByKey(cluster, expected.key()))
                 .thenAccept(current -> {
                     VersionedGenerationZeroCommit exact =
-                            current.orElseThrow(() ->
-                                    invariant(
-                                            "reachable append owner disappeared"));
+                            current.orElseThrow(() -> invariant("reachable append owner disappeared"));
                     if (!exact.key().equals(expected.key())
-                            || exact.metadataVersion()
-                                    != expected
-                                            .sourceMetadataVersion()
-                            || !exact.durableValueSha256()
-                                    .equals(
-                                            expected
-                                                    .sourceRecordSha256())
+                            || exact.metadataVersion() != expected.sourceMetadataVersion()
+                            || !exact.durableValueSha256().equals(expected.sourceRecordSha256())
                             || !exact.commitId()
-                                    .equals(
-                                            expected
-                                                    .canonicalCommit()
-                                                    .commitId())) {
-                        throw invariant(
-                                "reachable append owner changed");
+                                    .equals(expected.canonicalCommit().commitId())) {
+                        throw invariant("reachable append owner changed");
                     }
                 });
     }
 
     private CompletableFuture<Void> revalidateIndex(
-            VersionedGenerationZeroIndex expected,
-            ObjectProtectionOwner actualOwner,
-            Deadline deadline) {
+            VersionedGenerationZeroIndex expected, ObjectProtectionOwner actualOwner, Deadline deadline) {
         ObjectProtectionOwner canonical =
-                new ObjectProtectionOwner(
-                        expected.key(),
-                        expected.metadataVersion(),
-                        expected.durableValueSha256());
+                new ObjectProtectionOwner(expected.key(), expected.metadataVersion(), expected.durableValueSha256());
         if (!canonical.equals(actualOwner)) {
-            return CompletableFuture.failedFuture(
-                    invariant(
-                            "visible generation protection owner changed"));
+            return CompletableFuture.failedFuture(invariant("visible generation protection owner changed"));
         }
         return deadline.call(() -> generations.getCandidateByKey(
-                        cluster,
-                        expected.value().streamId(),
-                        ReadView.COMMITTED,
-                        expected.key()))
+                        cluster, expected.value().streamId(), ReadView.COMMITTED, expected.key()))
                 .thenAccept(current -> {
-                    if (current.isEmpty()
-                            || !current.orElseThrow()
-                                    .equals(expected)) {
-                        throw invariant(
-                                "visible generation owner changed");
+                    if (current.isEmpty() || !current.orElseThrow().equals(expected)) {
+                        throw invariant("visible generation owner changed");
                     }
                 });
     }
 
     private CompletableFuture<Void> revalidateCursor(
-            VersionedCursorState expected,
-            ObjectProtectionOwner actualOwner,
-            Deadline deadline) {
-        StreamId stream =
-                new StreamId(expected.value().projection().streamId());
-        ObjectProtectionOwner canonical =
-                new ObjectProtectionOwner(
-                        cursorKey(stream, expected.value()),
-                        expected.metadataVersion(),
-                        CursorMetadataDigests.durableValueSha256(
-                                expected.value()));
+            VersionedCursorState expected, ObjectProtectionOwner actualOwner, Deadline deadline) {
+        StreamId stream = new StreamId(expected.value().projection().streamId());
+        ObjectProtectionOwner canonical = new ObjectProtectionOwner(
+                cursorKey(stream, expected.value()),
+                expected.metadataVersion(),
+                CursorMetadataDigests.durableValueSha256(expected.value()));
         if (!canonical.equals(actualOwner)) {
-            return CompletableFuture.failedFuture(
-                    invariant(
-                            "cursor snapshot protection owner changed"));
+            return CompletableFuture.failedFuture(invariant("cursor snapshot protection owner changed"));
         }
-        return deadline.call(() -> cursors.getCursor(
-                        cluster,
-                        stream,
-                        expected.value().cursorName()))
+        return deadline.call(() ->
+                        cursors.getCursor(cluster, stream, expected.value().cursorName()))
                 .thenAccept(current -> {
-                    if (current.isEmpty()
-                            || !current.orElseThrow()
-                                    .equals(expected)) {
-                        throw invariant(
-                                "cursor snapshot owner changed");
+                    if (current.isEmpty() || !current.orElseThrow().equals(expected)) {
+                        throw invariant("cursor snapshot owner changed");
                     }
                 });
     }
 
-    private CompletableFuture<StreamBackfillResult> finalRevalidate(
-            StreamAccumulator accumulator,
-            Deadline deadline) {
+    private CompletableFuture<StreamBackfillResult> finalRevalidate(StreamAccumulator accumulator, Deadline deadline) {
         RegistrationCapture capture = accumulator.capture;
         StreamId stream = accumulator.streamId();
-        return deadline.call(() -> generations.getStreamRegistration(
-                        cluster, stream))
+        return deadline.call(() -> generations.getStreamRegistration(cluster, stream))
                 .thenAccept(current -> {
-                    if (current.isEmpty()
-                            || !current.orElseThrow()
-                                    .equals(capture.registration())) {
-                        throw invariant(
-                                "registration changed during backfill");
+                    if (current.isEmpty() || !current.orElseThrow().equals(capture.registration())) {
+                        throw invariant("registration changed during backfill");
                     }
                 })
-                .thenCompose(ignored -> deadline.call(() ->
-                        l0Metadata.getStreamSnapshot(cluster, stream)))
+                .thenCompose(ignored -> deadline.call(() -> l0Metadata.getStreamSnapshot(cluster, stream)))
                 .thenAccept(current -> {
-                    if (!sameStreamAuthority(
-                            current, capture.streamSnapshot())) {
-                        throw invariant(
-                                "stream head/profile changed during backfill");
+                    if (!sameStreamAuthority(current, capture.streamSnapshot())) {
+                        throw invariant("stream head/profile changed during backfill");
                     }
                 })
-                .thenCompose(ignored -> deadline.call(() ->
-                        projectionAuthorities.capture(
-                                capture.projection().subject())))
+                .thenCompose(ignored -> deadline.call(
+                        () -> projectionAuthorities.capture(capture.projection().subject())))
                 .thenAccept(current -> {
                     if (!current.equals(capture.projection())) {
-                        throw invariant(
-                                "projection authority changed during backfill");
+                        throw invariant("projection authority changed during backfill");
                     }
                 })
                 .thenCompose(ignored -> {
                     if (!capture.live()) {
                         return CompletableFuture.completedFuture(null);
                     }
-                    return revalidateLiveAuthorities(
-                            accumulator, deadline);
+                    return revalidateLiveAuthorities(accumulator, deadline);
                 })
                 .handle((ignored, failure) -> {
                     if (failure != null) {
                         accumulator.failure(
                                 CoverageSide.BOTH,
-                                PhysicalRootBackfillStage
-                                        .FINAL_REVALIDATION,
+                                PhysicalRootBackfillStage.FINAL_REVALIDATION,
                                 accumulator.registration.key(),
                                 finalRevalidationErrorCode(failure));
                         return accumulator.result(false);
                     }
                     accumulator.finalRevalidation();
-                    return accumulator.result(
-                            !accumulator.failed);
+                    return accumulator.result(!accumulator.failed);
                 });
     }
 
-    private CompletableFuture<Void> revalidateLiveAuthorities(
-            StreamAccumulator accumulator,
-            Deadline deadline) {
+    private CompletableFuture<Void> revalidateLiveAuthorities(StreamAccumulator accumulator, Deadline deadline) {
         StreamId stream = accumulator.streamId();
         CompletableFuture<Void> recovery;
         if (accumulator.recoveryRoot == null
@@ -1688,28 +1189,17 @@ public final class DefaultPhysicalRootBackfillCoordinator
                 || accumulator.recoveryHead == null) {
             recovery = CompletableFuture.completedFuture(null);
         } else {
-            recovery = deadline.call(() -> generations.getRecoveryRoot(
-                            cluster, stream))
+            recovery = deadline.call(() -> generations.getRecoveryRoot(cluster, stream))
                     .thenAccept(current -> {
-                        if (!current.equals(
-                                accumulator.recoveryRoot)) {
-                            throw invariant(
-                                    "recovery root changed during backfill");
+                        if (!current.equals(accumulator.recoveryRoot)) {
+                            throw invariant("recovery root changed during backfill");
                         }
                     })
-                    .thenCompose(ignored -> deadline.call(() ->
-                            l0Metadata.readAppendRecoveryTail(
-                                    cluster,
-                                    stream,
-                                    accumulator.recoveryAnchor,
-                                    Optional.empty(),
-                                    1)))
+                    .thenCompose(ignored -> deadline.call(() -> l0Metadata.readAppendRecoveryTail(
+                            cluster, stream, accumulator.recoveryAnchor, Optional.empty(), 1)))
                     .thenAccept(page -> {
-                        if (!sameAppendRecoveryAuthority(
-                                page.observedHead(),
-                                accumulator.recoveryHead)) {
-                            throw invariant(
-                                    "append head changed during backfill");
+                        if (!sameAppendRecoveryAuthority(page.observedHead(), accumulator.recoveryHead)) {
+                            throw invariant("append head changed during backfill");
                         }
                     });
         }
@@ -1719,26 +1209,23 @@ public final class DefaultPhysicalRootBackfillCoordinator
             }
             return captureCursorInventory(
                             accumulator,
-                            accumulator.capture.projection()
+                            accumulator
+                                    .capture
+                                    .projection()
                                     .managedLedgerIdentity()
                                     .orElseThrow(),
                             false,
                             deadline)
                     .thenAccept(current -> {
-                        if (!current.equals(
-                                accumulator.cursorInventory)) {
-                            throw invariant(
-                                    "cursor inventory changed during backfill");
+                        if (!current.equals(accumulator.cursorInventory)) {
+                            throw invariant("cursor inventory changed during backfill");
                         }
                     });
         });
     }
 
     private CompletableFuture<Void> publishProofs(
-            ActivationBasis basis,
-            PhysicalRootBackfillRequest request,
-            RunAccumulator accumulator,
-            Deadline deadline) {
+            ActivationBasis basis, PhysicalRootBackfillRequest request, RunAccumulator accumulator, Deadline deadline) {
         if (accumulator.failureCount != 0) {
             return CompletableFuture.completedFuture(null);
         }
@@ -1749,106 +1236,67 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     if (optional.isEmpty()) {
                         accumulator.globalFailure(
                                 CoverageSide.BOTH,
-                                PhysicalRootBackfillStage
-                                        .FINAL_REVALIDATION,
+                                PhysicalRootBackfillStage.FINAL_REVALIDATION,
                                 f4Keys.generationProtocolActivationKey(),
                                 "ACTIVATION_ABSENT");
                         return CompletableFuture.completedFuture(null);
                     }
-                    VersionedGenerationProtocolActivation current =
-                            optional.orElseThrow();
-                    String precondition = activationPrecondition(
-                            current.value(),
-                            request.expectedBrokerReadinessEpoch());
+                    VersionedGenerationProtocolActivation current = optional.orElseThrow();
+                    String precondition =
+                            activationPrecondition(current.value(), request.expectedBrokerReadinessEpoch());
                     if (precondition != null
-                            || !current.value()
-                                            .requiredReferenceDomains()
-                                    .equals(basis.requiredDomains())
-                            || !current.value()
-                                            .streamRegistrationBackfill()
-                                    .equals(
-                                            basis
-                                                    .registrationBackfill())) {
+                            || !current.value().requiredReferenceDomains().equals(basis.requiredDomains())
+                            || !current.value().streamRegistrationBackfill().equals(basis.registrationBackfill())) {
                         accumulator.globalFailure(
                                 CoverageSide.BOTH,
-                                PhysicalRootBackfillStage
-                                        .FINAL_REVALIDATION,
+                                PhysicalRootBackfillStage.FINAL_REVALIDATION,
                                 current.key(),
-                                precondition == null
-                                        ? "ACTIVATION_AUTHORITY_CHANGED"
-                                        : precondition);
+                                precondition == null ? "ACTIVATION_AUTHORITY_CHANGED" : precondition);
                         return CompletableFuture.completedFuture(null);
                     }
                     final GenerationBackfillProofRecord dataProof;
                     final GenerationBackfillProofRecord cursorProof;
                     try {
                         long completedAt = positiveNow();
-                        dataProof = proof(
-                                current.value()
-                                        .physicalRootBackfill(),
-                                request,
-                                dataCoverage,
-                                completedAt);
-                        cursorProof = proof(
-                                current.value()
-                                        .cursorSnapshotBackfill(),
-                                request,
-                                cursorCoverage,
-                                completedAt);
+                        dataProof = proof(current.value().physicalRootBackfill(), request, dataCoverage, completedAt);
+                        cursorProof =
+                                proof(current.value().cursorSnapshotBackfill(), request, cursorCoverage, completedAt);
                     } catch (ProofConflictException conflict) {
                         accumulator.globalFailure(
                                 CoverageSide.BOTH,
-                                PhysicalRootBackfillStage
-                                        .FINAL_REVALIDATION,
+                                PhysicalRootBackfillStage.FINAL_REVALIDATION,
                                 current.key(),
                                 "ACTIVATION_PROOF_CONFLICT");
                         return CompletableFuture.completedFuture(null);
                     }
-                    GenerationProtocolActivationRecord replacement =
-                            withBackfillProofs(
-                                    current.value(),
-                                    dataProof,
-                                    cursorProof,
-                                    Math.max(
-                                            current.value()
-                                                    .updatedAtMillis(),
-                                            Math.max(
-                                                    dataProof
-                                                            .completedAtMillis(),
-                                                    cursorProof
-                                                            .completedAtMillis())));
-                    if (current.value()
-                                    .physicalRootBackfill()
-                                    .equals(dataProof)
-                            && current.value()
-                                    .cursorSnapshotBackfill()
-                                    .equals(cursorProof)) {
-                        return CompletableFuture
-                                .<Void>completedFuture(null);
+                    GenerationProtocolActivationRecord replacement = withBackfillProofs(
+                            current.value(),
+                            dataProof,
+                            cursorProof,
+                            Math.max(
+                                    current.value().updatedAtMillis(),
+                                    Math.max(dataProof.completedAtMillis(), cursorProof.completedAtMillis())));
+                    if (current.value().physicalRootBackfill().equals(dataProof)
+                            && current.value().cursorSnapshotBackfill().equals(cursorProof)) {
+                        return CompletableFuture.<Void>completedFuture(null);
                     }
-                    return deadline.call(() -> activations.compareAndSet(
-                                    cluster,
-                                    replacement,
-                                    current.metadataVersion()))
+                    return deadline.call(
+                                    () -> activations.compareAndSet(cluster, replacement, current.metadataVersion()))
                             .handle((updated, failure) -> {
                                 if (failure == null) {
-                                    return CompletableFuture
-                                            .<Void>completedFuture(null);
+                                    return CompletableFuture.<Void>completedFuture(null);
                                 }
-                                return deadline.call(() ->
-                                                activations.get(cluster))
+                                return deadline.call(() -> activations.get(cluster))
                                         .thenAccept(reloaded -> {
                                             if (reloaded.isEmpty()
                                                     || !activationHasProofs(
-                                                            reloaded
-                                                                    .orElseThrow()
+                                                            reloaded.orElseThrow()
                                                                     .value(),
                                                             request,
                                                             basis,
                                                             dataProof,
                                                             cursorProof)) {
-                                                throw new CompletionException(
-                                                        unwrap(failure));
+                                                throw new CompletionException(unwrap(failure));
                                             }
                                         });
                             })
@@ -1856,8 +1304,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
                             .exceptionally(failure -> {
                                 accumulator.globalFailure(
                                         CoverageSide.BOTH,
-                                        PhysicalRootBackfillStage
-                                                .FINAL_REVALIDATION,
+                                        PhysicalRootBackfillStage.FINAL_REVALIDATION,
                                         current.key(),
                                         "ACTIVATION_CAS_FAILED");
                                 return null;
@@ -1867,13 +1314,9 @@ public final class DefaultPhysicalRootBackfillCoordinator
                 .exceptionally(failure -> {
                     accumulator.globalFailure(
                             CoverageSide.BOTH,
-                            PhysicalRootBackfillStage
-                                    .FINAL_REVALIDATION,
+                            PhysicalRootBackfillStage.FINAL_REVALIDATION,
                             f4Keys.generationProtocolActivationKey(),
-                            errorCode(
-                                    PhysicalRootBackfillStage
-                                            .FINAL_REVALIDATION,
-                                    failure));
+                            errorCode(PhysicalRootBackfillStage.FINAL_REVALIDATION, failure));
                     return null;
                 });
     }
@@ -1884,21 +1327,14 @@ public final class DefaultPhysicalRootBackfillCoordinator
             Checksum coverage,
             long completedAt) {
         if (current.complete()) {
-            if (current.brokerReadinessEpoch()
-                            != request
-                                    .expectedBrokerReadinessEpoch()
-                    || !current.coverageSha256()
-                            .equals(coverage.value())) {
+            if (current.brokerReadinessEpoch() != request.expectedBrokerReadinessEpoch()
+                    || !current.coverageSha256().equals(coverage.value())) {
                 throw new ProofConflictException();
             }
             return current;
         }
         return new GenerationBackfillProofRecord(
-                request.runId(),
-                request.expectedBrokerReadinessEpoch(),
-                coverage.value(),
-                true,
-                completedAt);
+                request.runId(), request.expectedBrokerReadinessEpoch(), coverage.value(), true, completedAt);
     }
 
     private static GenerationProtocolActivationRecord withBackfillProofs(
@@ -1932,38 +1368,27 @@ public final class DefaultPhysicalRootBackfillCoordinator
             ActivationBasis basis,
             GenerationBackfillProofRecord dataProof,
             GenerationBackfillProofRecord cursorProof) {
-        return activation.brokerCapabilityReadinessEpoch()
-                        == request.expectedBrokerReadinessEpoch()
-                && activation.requiredReferenceDomains()
-                        .equals(basis.requiredDomains())
-                && activation.streamRegistrationBackfill()
-                        .equals(basis.registrationBackfill())
-                && activation.physicalRootBackfill()
-                        .equals(dataProof)
-                && activation.cursorSnapshotBackfill()
-                        .equals(cursorProof);
+        return activation.brokerCapabilityReadinessEpoch() == request.expectedBrokerReadinessEpoch()
+                && activation.requiredReferenceDomains().equals(basis.requiredDomains())
+                && activation.streamRegistrationBackfill().equals(basis.registrationBackfill())
+                && activation.physicalRootBackfill().equals(dataProof)
+                && activation.cursorSnapshotBackfill().equals(cursorProof);
     }
 
     private long positiveNow() {
         long value = clock.millis();
         if (value <= 0) {
-            throw new IllegalStateException(
-                    "backfill completion clock must be positive");
+            throw new IllegalStateException("backfill completion clock must be positive");
         }
         return value;
     }
 
-    private static String activationPrecondition(
-            GenerationProtocolActivationRecord activation,
-            long expectedEpoch) {
-        if (activation.brokerCapabilityReadinessEpoch()
-                != expectedEpoch) {
+    private static String activationPrecondition(GenerationProtocolActivationRecord activation, long expectedEpoch) {
+        if (activation.brokerCapabilityReadinessEpoch() != expectedEpoch) {
             return "READINESS_EPOCH_MISMATCH";
         }
         if (!activation.streamRegistrationBackfill().complete()
-                || activation.streamRegistrationBackfill()
-                                .brokerReadinessEpoch()
-                        != expectedEpoch) {
+                || activation.streamRegistrationBackfill().brokerReadinessEpoch() != expectedEpoch) {
             return "REGISTRATION_BACKFILL_INCOMPLETE";
         }
         return null;
@@ -1977,8 +1402,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
             return "ACTIVATION_AUTHORITY_CHANGED";
         }
         GenerationProtocolActivationRecord value = current.value();
-        if (!value.physicalDeleteEnabled()
-                || !value.cursorSnapshotDeleteEnabled()) {
+        if (!value.physicalDeleteEnabled() || !value.cursorSnapshotDeleteEnabled()) {
             return "DELETION_AUTHORITY_INACTIVE";
         }
         if (nextEpoch == value.brokerCapabilityReadinessEpoch()) {
@@ -1988,66 +1412,44 @@ public final class DefaultPhysicalRootBackfillCoordinator
     }
 
     private static void requireHeadMatches(
-            HeadObjectResult head,
-            PhysicalObjectIdentity object,
-            Optional<Map<String, String>> expectedMetadata) {
+            HeadObjectResult head, PhysicalObjectIdentity object, Optional<Map<String, String>> expectedMetadata) {
         if (!head.key().equals(object.objectKey())
                 || head.objectLength() != object.objectLength()
-                || !head.checksum()
-                        .equals(object.storageChecksum())
-                || (object.etag().isPresent()
-                        && !head.etag().equals(object.etag()))
-                || (expectedMetadata.isPresent()
-                        && !head.metadata()
-                                .equals(
-                                        expectedMetadata
-                                                .orElseThrow()))) {
+                || !head.checksum().equals(object.storageChecksum())
+                || (object.etag().isPresent() && !head.etag().equals(object.etag()))
+                || (expectedMetadata.isPresent() && !head.metadata().equals(expectedMetadata.orElseThrow()))) {
             throw new NereusException(
-                    ErrorCode.OBJECT_CHECKSUM_MISMATCH,
-                    false,
-                    "physical-root backfill HEAD identity mismatch");
+                    ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "physical-root backfill HEAD identity mismatch");
         }
     }
 
-    private static void requireExactActiveRoot(
-            PhysicalObjectIdentity object,
-            VersionedPhysicalObjectRoot root) {
-        if (root.value().lifecycle()
-                        != PhysicalObjectLifecycle.ACTIVE
-                || !PhysicalObjectIdentity.from(root.value())
-                        .equals(object)) {
-            throw invariant(
-                    "physical root is not the exact ACTIVE identity");
+    private static void requireExactActiveRoot(PhysicalObjectIdentity object, VersionedPhysicalObjectRoot root) {
+        if (root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
+                || !PhysicalObjectIdentity.from(root.value()).equals(object)) {
+            throw invariant("physical root is not the exact ACTIVE identity");
         }
     }
 
     private ObjectKey canonicalCursorObjectKey(
-            StreamId stream,
-            CursorStateRecord cursor,
-            CursorSnapshotReferenceRecord reference) {
+            StreamId stream, CursorStateRecord cursor, CursorSnapshotReferenceRecord reference) {
         String value = KeyComponentCodec.encodeComponent(cluster)
                 + "/cursor-snapshots/v1/"
                 + KeyComponentCodec.encodeComponent(stream.value())
                 + "/"
                 + cursor.cursorNameHash()
                 + "/"
-                + KeyComponentCodec.encodeNonNegativeLong(
-                        cursor.cursorGeneration())
+                + KeyComponentCodec.encodeNonNegativeLong(cursor.cursorGeneration())
                 + "/"
                 + reference.snapshotId()
                 + ".ncs";
         return new ObjectKey(value);
     }
 
-    private String cursorKey(
-            StreamId stream, CursorStateRecord cursor) {
-        return cursorKeys.cursorStateKey(
-                stream, cursor.cursorName());
+    private String cursorKey(StreamId stream, CursorStateRecord cursor) {
+        return cursorKeys.cursorStateKey(stream, cursor.cursorName());
     }
 
-    private static AppendRecoveryAnchor anchor(
-            StreamId stream,
-            VersionedRecoveryCheckpointRoot root) {
+    private static AppendRecoveryAnchor anchor(StreamId stream, VersionedRecoveryCheckpointRoot root) {
         if (root.value().checkpoints().isEmpty()) {
             return AppendRecoveryAnchor.genesis(stream);
         }
@@ -2059,60 +1461,37 @@ public final class DefaultPhysicalRootBackfillCoordinator
                 root.value().lastCommitVersion());
     }
 
-    private static void requireRegistryProgress(
-            StreamRegistrationScanPage page, String previousKey) {
+    private static void requireRegistryProgress(StreamRegistrationScanPage page, String previousKey) {
         if (previousKey != null
                 && !page.values().isEmpty()
-                && page.values()
-                                .get(0)
-                                .key()
-                                .compareTo(previousKey)
-                        <= 0) {
-            throw invariant(
-                    "registered-stream scan did not advance");
+                && page.values().get(0).key().compareTo(previousKey) <= 0) {
+            throw invariant("registered-stream scan did not advance");
         }
     }
 
-    private static void requireCompatibleProjection(
-            Optional<ProjectionRef> stored,
-            ProjectionRef expected) {
+    private static void requireCompatibleProjection(Optional<ProjectionRef> stored, ProjectionRef expected) {
         Objects.requireNonNull(stored, "stored");
         Objects.requireNonNull(expected, "expected");
-        if (stored.isPresent()
-                && !stored.orElseThrow().equals(expected)) {
-            throw invariant(
-                    "generation-zero projection reference conflicts with the live registration");
+        if (stored.isPresent() && !stored.orElseThrow().equals(expected)) {
+            throw invariant("generation-zero projection reference conflicts with the live registration");
         }
     }
 
     private static <T> CompletableFuture<T> step(
-            PhysicalRootBackfillStage stage,
-            Deadline deadline,
-            Supplier<CompletableFuture<T>> operation) {
-        return deadline.call(operation)
-                .exceptionallyCompose(failure -> failedStep(
-                        stage, unwrap(failure)));
+            PhysicalRootBackfillStage stage, Deadline deadline, Supplier<CompletableFuture<T>> operation) {
+        return deadline.call(operation).exceptionallyCompose(failure -> failedStep(stage, unwrap(failure)));
     }
 
-    private static <T> CompletableFuture<T> failedStep(
-            PhysicalRootBackfillStage stage,
-            Throwable failure) {
-        return CompletableFuture.failedFuture(
-                new BackfillStepException(stage, failure));
+    private static <T> CompletableFuture<T> failedStep(PhysicalRootBackfillStage stage, Throwable failure) {
+        return CompletableFuture.failedFuture(new BackfillStepException(stage, failure));
     }
 
-    private static PhysicalRootBackfillStage stage(
-            Throwable failure,
-            PhysicalRootBackfillStage fallback) {
+    private static PhysicalRootBackfillStage stage(Throwable failure, PhysicalRootBackfillStage fallback) {
         Throwable exact = unwrap(failure);
-        return exact instanceof BackfillStepException step
-                ? step.stage
-                : fallback;
+        return exact instanceof BackfillStepException step ? step.stage : fallback;
     }
 
-    private static String errorCode(
-            PhysicalRootBackfillStage stage,
-            Throwable failure) {
+    private static String errorCode(PhysicalRootBackfillStage stage, Throwable failure) {
         Throwable exact = unwrap(failure);
         while (exact instanceof BackfillStepException step) {
             exact = unwrap(step.getCause());
@@ -2124,15 +1503,12 @@ public final class DefaultPhysicalRootBackfillCoordinator
             case REGISTRY_SCAN -> "REGISTRY_SCAN_FAILED";
             case PROJECTION_READ -> "PROJECTION_READ_FAILED";
             case HEAD_COMMIT_SCAN -> "HEAD_COMMIT_SCAN_FAILED";
-            case GENERATION_ZERO_SCAN ->
-                    "GENERATION_ZERO_SCAN_FAILED";
-            case CURSOR_INVENTORY_SCAN ->
-                    cursorInventoryErrorCode(exact);
+            case GENERATION_ZERO_SCAN -> "GENERATION_ZERO_SCAN_FAILED";
+            case CURSOR_INVENTORY_SCAN -> cursorInventoryErrorCode(exact);
             case OBJECT_HEAD -> "OBJECT_HEAD_FAILED";
             case ROOT_WRITE -> "ROOT_WRITE_FAILED";
             case PROTECTION_WRITE -> "PROTECTION_WRITE_FAILED";
-            case FINAL_REVALIDATION ->
-                    "FINAL_REVALIDATION_FAILED";
+            case FINAL_REVALIDATION -> "FINAL_REVALIDATION_FAILED";
         };
     }
 
@@ -2186,33 +1562,25 @@ public final class DefaultPhysicalRootBackfillCoordinator
         return "FINAL_REVALIDATION_FAILED";
     }
 
-    static boolean sameStreamAuthority(
-            StreamMetadataSnapshot first,
-            StreamMetadataSnapshot second) {
+    static boolean sameStreamAuthority(StreamMetadataSnapshot first, StreamMetadataSnapshot second) {
         Objects.requireNonNull(first, "first");
         Objects.requireNonNull(second, "second");
         return first.sameSemanticAuthority(second);
     }
 
-    static boolean sameAppendRecoveryAuthority(
-            AppendRecoveryHead first,
-            AppendRecoveryHead second) {
+    static boolean sameAppendRecoveryAuthority(AppendRecoveryHead first, AppendRecoveryHead second) {
         Objects.requireNonNull(first, "first");
         Objects.requireNonNull(second, "second");
         return first.streamId().equals(second.streamId())
-                && first.lastCommitId().equals(
-                        second.lastCommitId())
+                && first.lastCommitId().equals(second.lastCommitId())
                 && first.offsetEnd() == second.offsetEnd()
-                && first.cumulativeSize()
-                        == second.cumulativeSize()
-                && first.commitVersion()
-                        == second.commitVersion();
+                && first.cumulativeSize() == second.cumulativeSize()
+                && first.commitVersion() == second.commitVersion();
     }
 
     private static Throwable unwrap(Throwable supplied) {
         Throwable current = supplied;
-        while ((current instanceof CompletionException
-                        || current instanceof ExecutionException)
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -2223,31 +1591,22 @@ public final class DefaultPhysicalRootBackfillCoordinator
         return invariant(message, null);
     }
 
-    private static NereusException invariant(
-            String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message,
-                cause);
+    private static NereusException invariant(String message, Throwable cause) {
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
-    private static String requireText(
-            String value, String field) {
+    private static String requireText(String value, String field) {
         Objects.requireNonNull(value, field);
         if (value.isBlank()) {
-            throw new IllegalArgumentException(
-                    field + " cannot be blank");
+            throw new IllegalArgumentException(field + " cannot be blank");
         }
         return value;
     }
 
-    private static Duration requirePositive(
-            Duration value, String field) {
+    private static Duration requirePositive(Duration value, String field) {
         Objects.requireNonNull(value, field);
         if (value.isZero() || value.isNegative()) {
-            throw new IllegalArgumentException(
-                    field + " must be positive");
+            throw new IllegalArgumentException(field + " must be positive");
         }
         return value;
     }
@@ -2262,24 +1621,16 @@ public final class DefaultPhysicalRootBackfillCoordinator
             VersionedMaterializationStreamRegistration registration,
             StreamMetadataSnapshot streamSnapshot,
             GenerationProjectionAuthoritySnapshot projection,
-            boolean live) {
-    }
+            boolean live) {}
 
     private record ProtectionOutcome(
-            PhysicalObjectIdentity object,
-            VersionedPhysicalObjectRoot root,
-            ObjectProtection protection) {
-    }
+            PhysicalObjectIdentity object, VersionedPhysicalObjectRoot root, ObjectProtection protection) {}
 
     private record CursorInventoryCapture(
-            Optional<VersionedCursorRetention> retention,
-            long cursorCount,
-            Checksum authoritySha256) {
-    }
+            Optional<VersionedCursorRetention> retention, long cursorCount, Checksum authoritySha256) {}
 
     private record ActivationBasis(
-            List<ReferenceDomainVersionRecord> requiredDomains,
-            GenerationBackfillProofRecord registrationBackfill) {
+            List<ReferenceDomainVersionRecord> requiredDomains, GenerationBackfillProofRecord registrationBackfill) {
         private ActivationBasis {
             requiredDomains = List.copyOf(requiredDomains);
         }
@@ -2294,23 +1645,17 @@ public final class DefaultPhysicalRootBackfillCoordinator
             long failureCount,
             List<PhysicalRootBackfillFailure> boundedFailures,
             Checksum dataCoverage,
-            Checksum cursorCoverage) {
-    }
+            Checksum cursorCoverage) {}
 
     private static final class StreamAccumulator {
-        private final VersionedMaterializationStreamRegistration
-                registration;
+        private final VersionedMaterializationStreamRegistration registration;
         private final PhysicalRootBackfillDigest data =
-                new PhysicalRootBackfillDigest(
-                        "physical-root-backfill-stream-data-v1");
+                new PhysicalRootBackfillDigest("physical-root-backfill-stream-data-v1");
         private final PhysicalRootBackfillDigest cursor =
-                new PhysicalRootBackfillDigest(
-                        "physical-root-backfill-stream-cursor-v1");
-        private final ArrayList<PhysicalRootBackfillFailure>
-                failures = new ArrayList<>();
+                new PhysicalRootBackfillDigest("physical-root-backfill-stream-cursor-v1");
+        private final ArrayList<PhysicalRootBackfillFailure> failures = new ArrayList<>();
         private RegistrationCapture capture;
-        private Optional<VersionedRecoveryCheckpointRoot>
-                recoveryRoot;
+        private Optional<VersionedRecoveryCheckpointRoot> recoveryRoot;
         private AppendRecoveryAnchor recoveryAnchor;
         private AppendRecoveryHead recoveryHead;
         private CursorInventoryCapture cursorInventory;
@@ -2322,72 +1667,49 @@ public final class DefaultPhysicalRootBackfillCoordinator
         private boolean live;
         private boolean failed;
 
-        private StreamAccumulator(
-                VersionedMaterializationStreamRegistration
-                        registration) {
-            this.registration =
-                    Objects.requireNonNull(
-                            registration, "registration");
+        private StreamAccumulator(VersionedMaterializationStreamRegistration registration) {
+            this.registration = Objects.requireNonNull(registration, "registration");
             data.text(registration.value().streamId());
             cursor.text(registration.value().streamId());
         }
 
         private StreamId streamId() {
-            return new StreamId(
-                    registration.value().streamId());
+            return new StreamId(registration.value().streamId());
         }
 
         private void registration() {
-            GcAuthorityToken authority =
-                    new GcAuthorityToken(
-                            registration.key(),
-                            registration.metadataVersion(),
-                            registration.durableValueSha256());
+            GcAuthorityToken authority = new GcAuthorityToken(
+                    registration.key(), registration.metadataVersion(), registration.durableValueSha256());
             data.authority(authority);
             cursor.authority(authority);
         }
 
-        private void streamSnapshot(
-                StreamMetadataSnapshot snapshot) {
+        private void streamSnapshot(StreamMetadataSnapshot snapshot) {
             writeStreamAuthority(data, snapshot);
             writeStreamAuthority(cursor, snapshot);
         }
 
-        private void projection(
-                GenerationProjectionAuthoritySnapshot projection) {
+        private void projection(GenerationProjectionAuthoritySnapshot projection) {
             data.text("projection");
             data.bool(projection.live());
             cursor.text("projection");
             cursor.bool(projection.live());
-            for (GcAuthorityToken authority :
-                    projection.authorities()) {
+            for (GcAuthorityToken authority : projection.authorities()) {
                 data.authority(authority);
                 cursor.authority(authority);
             }
         }
 
-        private void recoveryRoot(
-                String rootKey,
-                Optional<VersionedRecoveryCheckpointRoot> root) {
+        private void recoveryRoot(String rootKey, Optional<VersionedRecoveryCheckpointRoot> root) {
             if (root.isEmpty()) {
-                data.authority(new GcAuthorityToken(
-                        rootKey,
-                        0,
-                        absence(
-                                "recovery-root",
-                                rootKey)));
+                data.authority(new GcAuthorityToken(rootKey, 0, absence("recovery-root", rootKey)));
                 return;
             }
-            VersionedRecoveryCheckpointRoot exact =
-                    root.orElseThrow();
-            data.authority(new GcAuthorityToken(
-                    exact.key(),
-                    exact.metadataVersion(),
-                    exact.durableValueSha256()));
+            VersionedRecoveryCheckpointRoot exact = root.orElseThrow();
+            data.authority(new GcAuthorityToken(exact.key(), exact.metadataVersion(), exact.durableValueSha256()));
         }
 
-        private void recoveryHead(
-                AppendRecoveryHead head) {
+        private void recoveryHead(AppendRecoveryHead head) {
             data.text("append-head");
             data.text(head.streamId().value());
             data.text(head.lastCommitId());
@@ -2396,38 +1718,25 @@ public final class DefaultPhysicalRootBackfillCoordinator
             data.int64(head.commitVersion());
         }
 
-        private void commitAuthority(
-                AppendRecoveryCommit commit) {
-            data.authority(new GcAuthorityToken(
-                    commit.key(),
-                    commit.sourceMetadataVersion(),
-                    commit.sourceRecordSha256()));
+        private void commitAuthority(AppendRecoveryCommit commit) {
+            data.authority(
+                    new GcAuthorityToken(commit.key(), commit.sourceMetadataVersion(), commit.sourceRecordSha256()));
         }
 
-        private void generationZeroAuthority(
-                VersionedGenerationZeroIndex zero) {
-            data.authority(new GcAuthorityToken(
-                    zero.key(),
-                    zero.metadataVersion(),
-                    zero.durableValueSha256()));
+        private void generationZeroAuthority(VersionedGenerationZeroIndex zero) {
+            data.authority(new GcAuthorityToken(zero.key(), zero.metadataVersion(), zero.durableValueSha256()));
             data.text(zero.encoding().name());
         }
 
-        private void generationZeroTombstone(
-                VersionedGenerationZeroIndex zero) {
+        private void generationZeroTombstone(VersionedGenerationZeroIndex zero) {
             data.text("generation-zero-tombstone");
             data.text(zero.key());
         }
 
-        private void dataOutcome(
-                String resource,
-                ProtectionOutcome outcome) {
-            dataObjectsScanned = Math.addExact(
-                    dataObjectsScanned, 1);
-            rootsCreatedOrVerified = Math.addExact(
-                    rootsCreatedOrVerified, 1);
-            protectionsCreatedOrVerified = Math.addExact(
-                    protectionsCreatedOrVerified, 1);
+        private void dataOutcome(String resource, ProtectionOutcome outcome) {
+            dataObjectsScanned = Math.addExact(dataObjectsScanned, 1);
+            rootsCreatedOrVerified = Math.addExact(rootsCreatedOrVerified, 1);
+            protectionsCreatedOrVerified = Math.addExact(protectionsCreatedOrVerified, 1);
             data.text("data-protected");
             data.text(resource);
             data.object(outcome.object());
@@ -2435,15 +1744,10 @@ public final class DefaultPhysicalRootBackfillCoordinator
             data.protection(outcome.protection());
         }
 
-        private void cursorOutcome(
-                String resource,
-                ProtectionOutcome outcome) {
-            cursorObjectsScanned = Math.addExact(
-                    cursorObjectsScanned, 1);
-            rootsCreatedOrVerified = Math.addExact(
-                    rootsCreatedOrVerified, 1);
-            protectionsCreatedOrVerified = Math.addExact(
-                    protectionsCreatedOrVerified, 1);
+        private void cursorOutcome(String resource, ProtectionOutcome outcome) {
+            cursorObjectsScanned = Math.addExact(cursorObjectsScanned, 1);
+            rootsCreatedOrVerified = Math.addExact(rootsCreatedOrVerified, 1);
+            protectionsCreatedOrVerified = Math.addExact(protectionsCreatedOrVerified, 1);
             cursor.text("cursor-protected");
             cursor.text(resource);
             cursor.object(outcome.object());
@@ -2458,46 +1762,29 @@ public final class DefaultPhysicalRootBackfillCoordinator
             cursor.bool(true);
         }
 
-        private void cursorInventory(
-                CursorInventoryCapture inventory) {
+        private void cursorInventory(CursorInventoryCapture inventory) {
             cursor.text("cursor-inventory");
             cursor.int64(inventory.cursorCount());
             cursor.checksum(inventory.authoritySha256());
         }
 
-        private void failure(
-                CoverageSide side,
-                PhysicalRootBackfillStage stage,
-                String resource,
-                String errorCode) {
+        private void failure(CoverageSide side, PhysicalRootBackfillStage stage, String resource, String errorCode) {
             failed = true;
-            failureCount = Math.addExact(
-                    failureCount, 1);
-            PhysicalRootBackfillFailure failure =
-                    new PhysicalRootBackfillFailure(
-                            PhysicalRootBackfillDigest
-                                    .resourceIdentity(
-                                            stage.name(),
-                                            resource),
-                            stage,
-                            errorCode);
-            if (failures.size()
-                    < PhysicalRootBackfillReport
-                            .MAX_FAILURE_DETAILS) {
+            failureCount = Math.addExact(failureCount, 1);
+            PhysicalRootBackfillFailure failure = new PhysicalRootBackfillFailure(
+                    PhysicalRootBackfillDigest.resourceIdentity(stage.name(), resource), stage, errorCode);
+            if (failures.size() < PhysicalRootBackfillReport.MAX_FAILURE_DETAILS) {
                 failures.add(failure);
             }
-            if (side == CoverageSide.DATA
-                    || side == CoverageSide.BOTH) {
+            if (side == CoverageSide.DATA || side == CoverageSide.BOTH) {
                 writeFailure(data, failure);
             }
-            if (side == CoverageSide.CURSOR
-                    || side == CoverageSide.BOTH) {
+            if (side == CoverageSide.CURSOR || side == CoverageSide.BOTH) {
                 writeFailure(cursor, failure);
             }
         }
 
-        private StreamBackfillResult result(
-                boolean covered) {
+        private StreamBackfillResult result(boolean covered) {
             data.text("classification");
             data.bool(live);
             data.bool(covered);
@@ -2516,9 +1803,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     cursor.finish());
         }
 
-        private static void writeStreamAuthority(
-                PhysicalRootBackfillDigest writer,
-                StreamMetadataSnapshot snapshot) {
+        private static void writeStreamAuthority(PhysicalRootBackfillDigest writer, StreamMetadataSnapshot snapshot) {
             writer.text("stream-authority-v1");
             writer.text(snapshot.metadata().streamId());
             writer.text(snapshot.metadata().streamName());
@@ -2527,94 +1812,58 @@ public final class DefaultPhysicalRootBackfillCoordinator
             writer.text(snapshot.metadata().profile());
             writer.int64(snapshot.metadata().createdAtMillis());
             writer.int64(snapshot.metadata().policyVersion());
-            writer.int64(
-                    snapshot.committedEnd()
-                            .committedEndOffset());
-            writer.int64(
-                    snapshot.committedEnd()
-                            .cumulativeSize());
-            writer.int64(
-                    snapshot.committedEnd()
-                            .commitVersion());
+            writer.int64(snapshot.committedEnd().committedEndOffset());
+            writer.int64(snapshot.committedEnd().cumulativeSize());
+            writer.int64(snapshot.committedEnd().commitVersion());
             writer.int64(snapshot.trim().trimOffset());
-            writer.int32(
-                    snapshot.metadata()
-                            .attributes()
-                            .size());
-            snapshot.metadata()
-                    .attributes()
-                    .forEach((key, value) -> {
-                        writer.text(key);
-                        writer.text(value);
-                    });
+            writer.int32(snapshot.metadata().attributes().size());
+            snapshot.metadata().attributes().forEach((key, value) -> {
+                writer.text(key);
+                writer.text(value);
+            });
         }
     }
 
     private final class CursorInventoryBuilder {
         private final StreamId stream;
-        private final Optional<VersionedCursorRetention>
-                retention;
+        private final Optional<VersionedCursorRetention> retention;
         private final PhysicalRootBackfillDigest digest =
-                new PhysicalRootBackfillDigest(
-                        "physical-root-backfill-cursor-inventory-v1");
+                new PhysicalRootBackfillDigest("physical-root-backfill-cursor-inventory-v1");
         private long cursorCount;
 
-        private CursorInventoryBuilder(
-                StreamId stream,
-                Optional<VersionedCursorRetention>
-                        retention) {
+        private CursorInventoryBuilder(StreamId stream, Optional<VersionedCursorRetention> retention) {
             this.stream = stream;
             this.retention = retention;
             String key = cursorKeys.retentionKey(stream);
             if (retention.isEmpty()) {
-                digest.authority(new GcAuthorityToken(
-                        key,
-                        0,
-                        absence(
-                                "cursor-retention",
-                                key)));
+                digest.authority(new GcAuthorityToken(key, 0, absence("cursor-retention", key)));
             } else {
-                VersionedCursorRetention exact =
-                        retention.orElseThrow();
+                VersionedCursorRetention exact = retention.orElseThrow();
                 digest.authority(new GcAuthorityToken(
-                        key,
-                        exact.metadataVersion(),
-                        CursorMetadataDigests
-                                .durableValueSha256(
-                                        exact.value())));
+                        key, exact.metadataVersion(), CursorMetadataDigests.durableValueSha256(exact.value())));
             }
         }
 
         private void add(VersionedCursorState cursor) {
-            cursorCount = Math.addExact(
-                    cursorCount, 1);
+            cursorCount = Math.addExact(cursorCount, 1);
             digest.authority(new GcAuthorityToken(
                     cursorKey(stream, cursor.value()),
                     cursor.metadataVersion(),
-                    CursorMetadataDigests
-                            .durableValueSha256(
-                                    cursor.value())));
+                    CursorMetadataDigests.durableValueSha256(cursor.value())));
         }
 
         private CursorInventoryCapture finish() {
             digest.int64(cursorCount);
-            return new CursorInventoryCapture(
-                    retention,
-                    cursorCount,
-                    digest.finish());
+            return new CursorInventoryCapture(retention, cursorCount, digest.finish());
         }
     }
 
     private static final class RunAccumulator {
         private final PhysicalRootBackfillRequest request;
-        private final ArrayList<Checksum> dataPieces =
-                new ArrayList<>();
-        private final ArrayList<Checksum> cursorPieces =
-                new ArrayList<>();
-        private final ArrayList<PhysicalRootBackfillFailure>
-                failures = new ArrayList<>();
-        private final HashSet<String> streamIds =
-                new HashSet<>();
+        private final ArrayList<Checksum> dataPieces = new ArrayList<>();
+        private final ArrayList<Checksum> cursorPieces = new ArrayList<>();
+        private final ArrayList<PhysicalRootBackfillFailure> failures = new ArrayList<>();
+        private final HashSet<String> streamIds = new HashSet<>();
         private long streamsScanned;
         private long dataObjectsScanned;
         private long cursorObjectsScanned;
@@ -2622,8 +1871,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
         private long protectionsCreatedOrVerified;
         private long failureCount;
 
-        private RunAccumulator(
-                PhysicalRootBackfillRequest request) {
+        private RunAccumulator(PhysicalRootBackfillRequest request) {
             this.request = request;
         }
 
@@ -2639,11 +1887,9 @@ public final class DefaultPhysicalRootBackfillCoordinator
             addShardPiece("complete", shard);
         }
 
-        private void addShardPiece(
-                String state, int shard) {
+        private void addShardPiece(String state, int shard) {
             PhysicalRootBackfillDigest piece =
-                    new PhysicalRootBackfillDigest(
-                            "physical-root-backfill-registry-shard-v1");
+                    new PhysicalRootBackfillDigest("physical-root-backfill-registry-shard-v1");
             piece.text(state);
             piece.int32(shard);
             Checksum checksum = piece.finish();
@@ -2651,95 +1897,53 @@ public final class DefaultPhysicalRootBackfillCoordinator
             cursorPieces.add(checksum);
         }
 
-        private void fold(
-                StreamBackfillResult result) {
-            streamsScanned = Math.addExact(
-                    streamsScanned,
-                    result.streamsScanned());
-            dataObjectsScanned = Math.addExact(
-                    dataObjectsScanned,
-                    result.dataObjectsScanned());
-            cursorObjectsScanned = Math.addExact(
-                    cursorObjectsScanned,
-                    result.cursorObjectsScanned());
-            rootsCreatedOrVerified = Math.addExact(
-                    rootsCreatedOrVerified,
-                    result.rootsCreatedOrVerified());
-            protectionsCreatedOrVerified = Math.addExact(
-                    protectionsCreatedOrVerified,
-                    result.protectionsCreatedOrVerified());
+        private void fold(StreamBackfillResult result) {
+            streamsScanned = Math.addExact(streamsScanned, result.streamsScanned());
+            dataObjectsScanned = Math.addExact(dataObjectsScanned, result.dataObjectsScanned());
+            cursorObjectsScanned = Math.addExact(cursorObjectsScanned, result.cursorObjectsScanned());
+            rootsCreatedOrVerified = Math.addExact(rootsCreatedOrVerified, result.rootsCreatedOrVerified());
+            protectionsCreatedOrVerified =
+                    Math.addExact(protectionsCreatedOrVerified, result.protectionsCreatedOrVerified());
             long oldFailureCount = failureCount;
-            failureCount = Math.addExact(
-                    failureCount, result.failureCount());
-            int remaining = (int) Math.max(
-                    0,
-                    PhysicalRootBackfillReport
-                                    .MAX_FAILURE_DETAILS
-                            - failures.size());
+            failureCount = Math.addExact(failureCount, result.failureCount());
+            int remaining = (int) Math.max(0, PhysicalRootBackfillReport.MAX_FAILURE_DETAILS - failures.size());
             if (remaining > 0) {
-                failures.addAll(
-                        result.boundedFailures()
-                                .subList(
-                                        0,
-                                        Math.min(
-                                                remaining,
-                                                result
-                                                        .boundedFailures()
-                                                        .size())));
+                failures.addAll(result.boundedFailures()
+                        .subList(0, Math.min(remaining, result.boundedFailures().size())));
             }
             if (failureCount < oldFailureCount) {
-                throw new ArithmeticException(
-                        "backfill failure counter overflow");
+                throw new ArithmeticException("backfill failure counter overflow");
             }
             dataPieces.add(result.dataCoverage());
             cursorPieces.add(result.cursorCoverage());
         }
 
         private void globalFailure(
-                CoverageSide side,
-                PhysicalRootBackfillStage stage,
-                String resource,
-                String errorCode) {
-            failureCount = Math.addExact(
-                    failureCount, 1);
-            PhysicalRootBackfillFailure failure =
-                    new PhysicalRootBackfillFailure(
-                            PhysicalRootBackfillDigest
-                                    .resourceIdentity(
-                                            stage.name(),
-                                            resource),
-                            stage,
-                            errorCode);
-            if (failures.size()
-                    < PhysicalRootBackfillReport
-                            .MAX_FAILURE_DETAILS) {
+                CoverageSide side, PhysicalRootBackfillStage stage, String resource, String errorCode) {
+            failureCount = Math.addExact(failureCount, 1);
+            PhysicalRootBackfillFailure failure = new PhysicalRootBackfillFailure(
+                    PhysicalRootBackfillDigest.resourceIdentity(stage.name(), resource), stage, errorCode);
+            if (failures.size() < PhysicalRootBackfillReport.MAX_FAILURE_DETAILS) {
                 failures.add(failure);
             }
             PhysicalRootBackfillDigest piece =
-                    new PhysicalRootBackfillDigest(
-                            "physical-root-backfill-global-failure-v1");
+                    new PhysicalRootBackfillDigest("physical-root-backfill-global-failure-v1");
             writeFailure(piece, failure);
             Checksum checksum = piece.finish();
-            if (side == CoverageSide.DATA
-                    || side == CoverageSide.BOTH) {
+            if (side == CoverageSide.DATA || side == CoverageSide.BOTH) {
                 dataPieces.add(checksum);
             }
-            if (side == CoverageSide.CURSOR
-                    || side == CoverageSide.BOTH) {
+            if (side == CoverageSide.CURSOR || side == CoverageSide.BOTH) {
                 cursorPieces.add(checksum);
             }
         }
 
         private Checksum dataCoverage() {
-            return coverage(
-                    "physical-root-backfill-data-coverage-v1",
-                    dataPieces);
+            return coverage("physical-root-backfill-data-coverage-v1", dataPieces);
         }
 
         private Checksum cursorCoverage() {
-            return coverage(
-                    "physical-root-backfill-cursor-coverage-v1",
-                    cursorPieces);
+            return coverage("physical-root-backfill-cursor-coverage-v1", cursorPieces);
         }
 
         private PhysicalRootBackfillReport report() {
@@ -2757,10 +1961,8 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     List.copyOf(failures));
         }
 
-        private static Checksum coverage(
-                String domain, List<Checksum> pieces) {
-            PhysicalRootBackfillDigest writer =
-                    new PhysicalRootBackfillDigest(domain);
+        private static Checksum coverage(String domain, List<Checksum> pieces) {
+            PhysicalRootBackfillDigest writer = new PhysicalRootBackfillDigest(domain);
             writer.int64(pieces.size());
             for (Checksum piece : pieces) {
                 writer.checksum(piece);
@@ -2769,56 +1971,41 @@ public final class DefaultPhysicalRootBackfillCoordinator
         }
     }
 
-    private static void writeFailure(
-            PhysicalRootBackfillDigest writer,
-            PhysicalRootBackfillFailure failure) {
+    private static void writeFailure(PhysicalRootBackfillDigest writer, PhysicalRootBackfillFailure failure) {
         writer.text("failure");
-        writer.text(
-                failure.resourceIdentitySha256());
+        writer.text(failure.resourceIdentitySha256());
         writer.text(failure.stage().name());
         writer.text(failure.errorCode());
     }
 
-    private static Checksum absence(
-            String domain, String key) {
-        PhysicalRootBackfillDigest writer =
-                new PhysicalRootBackfillDigest(
-                        "physical-root-backfill-absence-v1");
+    private static Checksum absence(String domain, String key) {
+        PhysicalRootBackfillDigest writer = new PhysicalRootBackfillDigest("physical-root-backfill-absence-v1");
         writer.text(domain);
         writer.text(key);
         return writer.finish();
     }
 
-    private static final class BackfillStepException
-            extends RuntimeException {
+    private static final class BackfillStepException extends RuntimeException {
         private final PhysicalRootBackfillStage stage;
 
-        private BackfillStepException(
-                PhysicalRootBackfillStage stage,
-                Throwable cause) {
+        private BackfillStepException(PhysicalRootBackfillStage stage, Throwable cause) {
             super(cause);
             this.stage = stage;
         }
     }
 
-    private static final class ProofConflictException
-            extends RuntimeException {
-    }
+    private static final class ProofConflictException extends RuntimeException {}
 
     private static final class Deadline {
         private final long deadlineNanos;
         private final LongSupplier nanoTime;
 
-        private Deadline(
-                long deadlineNanos,
-                LongSupplier nanoTime) {
+        private Deadline(long deadlineNanos, LongSupplier nanoTime) {
             this.deadlineNanos = deadlineNanos;
             this.nanoTime = nanoTime;
         }
 
-        private static Deadline start(
-                Duration timeout,
-                LongSupplier nanoTime) {
+        private static Deadline start(Duration timeout, LongSupplier nanoTime) {
             long now = nanoTime.getAsLong();
             long duration;
             try {
@@ -2835,34 +2022,24 @@ public final class DefaultPhysicalRootBackfillCoordinator
             return new Deadline(deadline, nanoTime);
         }
 
-        private <T> CompletableFuture<T> call(
-                Supplier<CompletableFuture<T>> operation) {
-            long remaining = deadlineNanos
-                    - nanoTime.getAsLong();
+        private <T> CompletableFuture<T> call(Supplier<CompletableFuture<T>> operation) {
+            long remaining = deadlineNanos - nanoTime.getAsLong();
             if (remaining <= 0) {
-                return CompletableFuture.failedFuture(
-                        new TimeoutException(
-                                "physical-root backfill deadline expired"));
+                return CompletableFuture.failedFuture(new TimeoutException("physical-root backfill deadline expired"));
             }
             final CompletableFuture<T> future;
             try {
-                future = Objects.requireNonNull(
-                        operation.get(),
-                        "backfill operation returned null");
+                future = Objects.requireNonNull(operation.get(), "backfill operation returned null");
             } catch (Throwable failure) {
                 return CompletableFuture.failedFuture(failure);
             }
-            return future.orTimeout(
-                    remaining, TimeUnit.NANOSECONDS);
+            return future.orTimeout(remaining, TimeUnit.NANOSECONDS);
         }
 
         private Duration callTimeout(Duration maximum) {
-            long remaining = deadlineNanos
-                    - nanoTime.getAsLong();
+            long remaining = deadlineNanos - nanoTime.getAsLong();
             if (remaining <= 0) {
-                throw new CompletionException(
-                        new TimeoutException(
-                                "physical-root backfill deadline expired"));
+                throw new CompletionException(new TimeoutException("physical-root backfill deadline expired"));
             }
             long maximumNanos;
             try {
@@ -2870,8 +2047,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
             } catch (ArithmeticException ignored) {
                 maximumNanos = Long.MAX_VALUE;
             }
-            return Duration.ofNanos(
-                    Math.min(remaining, maximumNanos));
+            return Duration.ofNanos(Math.min(remaining, maximumNanos));
         }
     }
 }

@@ -18,7 +18,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Public exception type used to complete asynchronous API calls exceptionally. */
+/**
+ * Public exception type used to complete asynchronous API calls exceptionally.
+ */
 public class NereusException extends RuntimeException {
     private final ErrorCode code;
     private final boolean retriable;
@@ -33,13 +35,25 @@ public class NereusException extends RuntimeException {
         this(code, retriable, message, cause, Optional.empty(), Optional.empty());
     }
 
+    public NereusException(ErrorCode code, boolean retriable, String message, AppendOutcome appendOutcome) {
+        this(
+                code,
+                retriable,
+                message,
+                null,
+                Optional.of(Objects.requireNonNull(appendOutcome, "appendOutcome")),
+                Optional.empty());
+    }
+
     public NereusException(
-            ErrorCode code,
-            boolean retriable,
-            String message,
-            AppendOutcome appendOutcome) {
-        this(code, retriable, message, null,
-                Optional.of(Objects.requireNonNull(appendOutcome, "appendOutcome")), Optional.empty());
+            ErrorCode code, boolean retriable, String message, Throwable cause, AppendOutcome appendOutcome) {
+        this(
+                code,
+                retriable,
+                message,
+                cause,
+                Optional.of(Objects.requireNonNull(appendOutcome, "appendOutcome")),
+                Optional.empty());
     }
 
     public NereusException(
@@ -47,15 +61,13 @@ public class NereusException extends RuntimeException {
             boolean retriable,
             String message,
             Throwable cause,
-            AppendOutcome appendOutcome) {
-        this(code, retriable, message, cause,
-                Optional.of(Objects.requireNonNull(appendOutcome, "appendOutcome")), Optional.empty());
-    }
-
-    public NereusException(
-            ErrorCode code, boolean retriable, String message, Throwable cause,
-            AppendOutcome appendOutcome, AppendAttemptId appendAttemptId) {
-        this(code, retriable, message, cause,
+            AppendOutcome appendOutcome,
+            AppendAttemptId appendAttemptId) {
+        this(
+                code,
+                retriable,
+                message,
+                cause,
                 Optional.of(Objects.requireNonNull(appendOutcome, "appendOutcome")),
                 Optional.of(Objects.requireNonNull(appendAttemptId, "appendAttemptId")));
     }
@@ -88,7 +100,9 @@ public class NereusException extends RuntimeException {
         return retriable;
     }
 
-    /** Empty for failures that are not associated with an append commit attempt. */
+    /**
+     * Empty for failures that are not associated with an append commit attempt.
+     */
     public Optional<AppendOutcome> appendOutcome() {
         return appendOutcome;
     }
@@ -98,42 +112,27 @@ public class NereusException extends RuntimeException {
     }
 
     public NereusException withAppendAttemptId(AppendAttemptId attemptId) {
-        AppendOutcome outcome = appendOutcome.orElseThrow(() ->
-                new IllegalStateException("cannot attach attempt ID to a non-append failure"));
+        AppendOutcome outcome = appendOutcome.orElseThrow(
+                () -> new IllegalStateException("cannot attach attempt ID to a non-append failure"));
         return new NereusException(code, retriable, getMessage(), this, outcome, attemptId);
     }
 
     public static <T> CompletableFuture<T> failedFuture(
-            ErrorCode code,
-            boolean retriable,
-            String message,
-            Throwable cause) {
+            ErrorCode code, boolean retriable, String message, Throwable cause) {
         return CompletableFuture.failedFuture(new NereusException(code, retriable, message, cause));
     }
 
-    public static <T> CompletableFuture<T> failedFuture(
-            ErrorCode code,
-            boolean retriable,
-            String message) {
+    public static <T> CompletableFuture<T> failedFuture(ErrorCode code, boolean retriable, String message) {
         return CompletableFuture.failedFuture(new NereusException(code, retriable, message));
     }
 
     public static <T> CompletableFuture<T> failedAppendFuture(
-            ErrorCode code,
-            boolean retriable,
-            AppendOutcome appendOutcome,
-            String message,
-            Throwable cause) {
-        return CompletableFuture.failedFuture(
-                new NereusException(code, retriable, message, cause, appendOutcome));
+            ErrorCode code, boolean retriable, AppendOutcome appendOutcome, String message, Throwable cause) {
+        return CompletableFuture.failedFuture(new NereusException(code, retriable, message, cause, appendOutcome));
     }
 
     public static <T> CompletableFuture<T> failedAppendFuture(
-            ErrorCode code,
-            boolean retriable,
-            AppendOutcome appendOutcome,
-            String message) {
-        return CompletableFuture.failedFuture(
-                new NereusException(code, retriable, message, appendOutcome));
+            ErrorCode code, boolean retriable, AppendOutcome appendOutcome, String message) {
+        return CompletableFuture.failedFuture(new NereusException(code, retriable, message, appendOutcome));
     }
 }

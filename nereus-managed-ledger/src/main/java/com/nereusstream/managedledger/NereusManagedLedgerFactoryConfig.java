@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import com.nereusstream.api.StorageProfile;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Product-owned F2 limits and deadlines, independent of BookKeeper compatibility tuning. */
+/**
+ * Product-owned F2 limits and deadlines, independent of BookKeeper compatibility tuning.
+ */
 public record NereusManagedLedgerFactoryConfig(
         String storageClassName,
         Duration metadataTimeout,
@@ -81,22 +84,14 @@ public record NereusManagedLedgerFactoryConfig(
                 || maxScanEntries <= 0) {
             throw new IllegalArgumentException("all F2 managed-ledger limits must be positive");
         }
-        defaultStorageProfile = Objects.requireNonNull(
-                        defaultStorageProfile,
-                        "defaultStorageProfile")
+        defaultStorageProfile = Objects.requireNonNull(defaultStorageProfile, "defaultStorageProfile")
                 .canonical();
-        if (defaultStorageProfile
-                        != StorageProfile.OBJECT_WAL_SYNC_OBJECT
-                && defaultStorageProfile
-                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
-                && defaultStorageProfile
-                        != StorageProfile.BOOKKEEPER_WAL_ONLY
-                && defaultStorageProfile
-                        != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
-                && defaultStorageProfile
-                        != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT) {
-            throw new IllegalArgumentException(
-                    "defaultStorageProfile has no executable managed-ledger mapping");
+        if (defaultStorageProfile != StorageProfile.OBJECT_WAL_SYNC_OBJECT
+                && defaultStorageProfile != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
+                && defaultStorageProfile != StorageProfile.BOOKKEEPER_WAL_ONLY
+                && defaultStorageProfile != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
+                && defaultStorageProfile != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT) {
+            throw new IllegalArgumentException("defaultStorageProfile has no executable managed-ledger mapping");
         }
     }
 

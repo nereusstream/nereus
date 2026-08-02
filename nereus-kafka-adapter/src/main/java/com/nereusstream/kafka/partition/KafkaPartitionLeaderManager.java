@@ -45,22 +45,26 @@ public final class KafkaPartitionLeaderManager implements AutoCloseable {
         KafkaPartitionStorage superseded = null;
         OpenAttempt attempt;
         synchronized (guard) {
-            if (closed) return failedClosed();
+            if (closed) {
+                return failedClosed();
+            }
             Slot slot = slots.computeIfAbsent(authority.identity(), ignored -> new Slot());
             if (slot.desired != null) {
                 KafkaLeaderAuthority.AuthorityRelation relation = authority.relationTo(slot.desired.authority());
                 if (relation == KafkaLeaderAuthority.AuthorityRelation.EXACT) {
                     if (!plan.compatibleWith(slot.desired)) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "Kafka leader open conflicts with the process-current binding or profile"));
+                        return CompletableFuture.failedFuture(
+                                invariant("Kafka leader open conflicts with the process-current binding or profile"));
                     }
-                    if (slot.opening != null) return slot.opening.result;
+                    if (slot.opening != null) {
+                        return slot.opening.result;
+                    }
                     if (slot.installed != null) {
                         return CompletableFuture.completedFuture(slot.installed.storage);
                     }
                 } else if (relation != KafkaLeaderAuthority.AuthorityRelation.DOMINATES) {
-                    return CompletableFuture.failedFuture(fenced(
-                            "Kafka leader authority is stale or conflicts with the process-current term"));
+                    return CompletableFuture.failedFuture(
+                            fenced("Kafka leader authority is stale or conflicts with the process-current term"));
                 }
             }
             slot.desired = plan;
@@ -71,12 +75,16 @@ public final class KafkaPartitionLeaderManager implements AutoCloseable {
             attempt = new OpenAttempt(plan);
             slot.opening = attempt;
         }
-        if (superseded != null) safeResign(superseded);
+        if (superseded != null) {
+            safeResign(superseded);
+        }
         beginOpen(attempt);
         return attempt.result;
     }
 
-    /** A stale follower/resign notification is a no-op and can never close a newer installed leader. */
+    /**
+     * A stale follower/resign notification is a no-op and can never close a newer installed leader.
+     */
     public CompletableFuture<Void> resign(KafkaLeaderAuthority authority) {
         Objects.requireNonNull(authority, "authority");
         KafkaPartitionStorage storage = null;
@@ -86,14 +94,17 @@ public final class KafkaPartitionLeaderManager implements AutoCloseable {
                 return CompletableFuture.completedFuture(null);
             }
             slots.remove(authority.identity());
-            if (slot.installed != null) storage = slot.installed.storage;
+            if (slot.installed != null) {
+                storage = slot.installed.storage;
+            }
         }
         return storage == null ? CompletableFuture.completedFuture(null) : strictResign(storage);
     }
 
-    /** Resigns the current local term when the observed KRaft epoch is current or newer. */
-    public CompletableFuture<Void> resign(
-            KafkaPartitionIdentity identity, int observedLeaderEpoch) {
+    /**
+     * Resigns the current local term when the observed KRaft epoch is current or newer.
+     */
+    public CompletableFuture<Void> resign(KafkaPartitionIdentity identity, int observedLeaderEpoch) {
         Objects.requireNonNull(identity, "identity");
         if (observedLeaderEpoch < 0) {
             throw new IllegalArgumentException("observedLeaderEpoch must be non-negative");
@@ -105,7 +116,9 @@ public final class KafkaPartitionLeaderManager implements AutoCloseable {
                 return CompletableFuture.completedFuture(null);
             }
             slots.remove(identity);
-            if (slot.installed != null) storage = slot.installed.storage;
+            if (slot.installed != null) {
+                storage = slot.installed.storage;
+            }
         }
         return storage == null ? CompletableFuture.completedFuture(null) : strictResign(storage);
     }
@@ -114,9 +127,7 @@ public final class KafkaPartitionLeaderManager implements AutoCloseable {
         Objects.requireNonNull(identity, "identity");
         synchronized (guard) {
             Slot slot = slots.get(identity);
-            return slot == null || slot.installed == null
-                    ? Optional.empty()
-                    : Optional.of(slot.installed.storage);
+            return slot == null || slot.installed == null ? Optional.empty() : Optional.of(slot.installed.storage);
         }
     }
 
@@ -128,14 +139,20 @@ public final class KafkaPartitionLeaderManager implements AutoCloseable {
         }
     }
 
-    /** Stops new opens and asynchronously resigns every installed instance. */
+    /**
+     * Stops new opens and asynchronously resigns every installed instance.
+     */
     public CompletableFuture<Void> shutdown() {
         List<KafkaPartitionStorage> installed = new ArrayList<>();
         synchronized (guard) {
-            if (closed) return CompletableFuture.completedFuture(null);
+            if (closed) {
+                return CompletableFuture.completedFuture(null);
+            }
             closed = true;
             for (Slot slot : slots.values()) {
-                if (slot.installed != null) installed.add(slot.installed.storage);
+                if (slot.installed != null) {
+                    installed.add(slot.installed.storage);
+                }
             }
             slots.clear();
         }
@@ -160,10 +177,7 @@ public final class KafkaPartitionLeaderManager implements AutoCloseable {
         opening.whenComplete((storage, failure) -> completeOpen(attempt, storage, failure));
     }
 
-    private void completeOpen(
-            OpenAttempt attempt,
-            KafkaPartitionStorage storage,
-            Throwable suppliedFailure) {
+    private void completeOpen(OpenAttempt attempt, KafkaPartitionStorage storage, Throwable suppliedFailure) {
         Throwable failure = suppliedFailure == null ? null : unwrap(suppliedFailure);
         if (failure == null) {
             try {
@@ -175,11 +189,7 @@ public final class KafkaPartitionLeaderManager implements AutoCloseable {
         boolean install = false;
         synchronized (guard) {
             Slot slot = slots.get(attempt.plan.authority().identity());
-            if (failure == null
-                    && !closed
-                    && slot != null
-                    && slot.opening == attempt
-                    && attempt.plan == slot.desired) {
+            if (failure == null && !closed && slot != null && slot.opening == attempt && attempt.plan == slot.desired) {
                 slot.opening = null;
                 slot.installed = new Installed(attempt.plan, storage);
                 install = true;
@@ -194,14 +204,14 @@ public final class KafkaPartitionLeaderManager implements AutoCloseable {
             attempt.result.succeed(storage);
             return;
         }
-        if (storage != null) safeResign(storage);
-        attempt.result.fail(failure == null
-                ? fenced("Kafka partition open was superseded before installation")
-                : failure);
+        if (storage != null) {
+            safeResign(storage);
+        }
+        attempt.result.fail(
+                failure == null ? fenced("Kafka partition open was superseded before installation") : failure);
     }
 
-    private static void validateOpened(
-            KafkaPartitionOpenPlan plan, KafkaPartitionStorage storage) {
+    private static void validateOpened(KafkaPartitionOpenPlan plan, KafkaPartitionStorage storage) {
         Objects.requireNonNull(storage, "Kafka partition storage");
         if (!storage.identity().equals(plan.authority().identity())
                 || storage.leaderEpoch() != plan.authority().leaderEpoch()
@@ -248,8 +258,8 @@ public final class KafkaPartitionLeaderManager implements AutoCloseable {
     }
 
     private static CompletableFuture<KafkaPartitionStorage> failedClosed() {
-        return CompletableFuture.failedFuture(new NereusException(
-                ErrorCode.STORAGE_CLOSED, false, "Kafka partition leader manager is closed"));
+        return CompletableFuture.failedFuture(
+                new NereusException(ErrorCode.STORAGE_CLOSED, false, "Kafka partition leader manager is closed"));
     }
 
     private static final class Slot {
@@ -302,7 +312,5 @@ public final class KafkaPartitionLeaderManager implements AutoCloseable {
         }
     }
 
-    private record Installed(
-            KafkaPartitionOpenPlan plan,
-            KafkaPartitionStorage storage) {}
+    private record Installed(KafkaPartitionOpenPlan plan, KafkaPartitionStorage storage) {}
 }

@@ -25,19 +25,20 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.zip.CRC32C;
 
-/** Closed NBKE1 framing for one ranged logical entry stored in one BookKeeper entry. */
+/**
+ * Closed NBKE1 framing for one ranged logical entry stored in one BookKeeper entry.
+ */
 public final class BookKeeperRangedEntryCodecV1 {
     private static final byte[] MAGIC = "NBKE1".getBytes(StandardCharsets.US_ASCII);
     private static final int HEADER_BYTES = MAGIC.length + Integer.BYTES * 3;
 
-    private BookKeeperRangedEntryCodecV1() {
-    }
+    private BookKeeperRangedEntryCodecV1() {}
 
     public static byte[] encode(AppendEntry entry) {
         Objects.requireNonNull(entry, "entry");
         byte[] payload = entry.payload();
-        ByteBuffer encoded = ByteBuffer.allocate(Math.addExact(HEADER_BYTES, payload.length))
-                .order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer encoded =
+                ByteBuffer.allocate(Math.addExact(HEADER_BYTES, payload.length)).order(ByteOrder.BIG_ENDIAN);
         encoded.put(MAGIC);
         encoded.putInt(entry.recordCount());
         encoded.putInt(payload.length);
@@ -76,10 +77,7 @@ public final class BookKeeperRangedEntryCodecV1 {
         byte[] payload = new byte[payloadLength];
         input.get(payload);
         if (crc32c(payload) != expectedCrc32c) {
-            throw new NereusException(
-                    ErrorCode.PRIMARY_WAL_CHECKSUM_MISMATCH,
-                    false,
-                    "NBKE1 payload CRC32C mismatch");
+            throw new NereusException(ErrorCode.PRIMARY_WAL_CHECKSUM_MISMATCH, false, "NBKE1 payload CRC32C mismatch");
         }
         return new DecodedEntry(recordCount, payload);
     }

@@ -16,7 +16,6 @@ package com.nereusstream.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import java.time.Duration;
 import java.util.HashMap;
@@ -31,10 +30,8 @@ import org.junit.jupiter.api.Test;
 class ApiValueValidationTest {
     @Test
     void offsetRangeRejectsInvalidRangesAndKeepsHalfOpenHelpers() {
-        assertThatThrownBy(() -> new OffsetRange(-1, 0))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new OffsetRange(2, 1))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new OffsetRange(-1, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new OffsetRange(2, 1)).isInstanceOf(IllegalArgumentException.class);
 
         OffsetRange range = new OffsetRange(10, 13);
 
@@ -48,13 +45,10 @@ class ApiValueValidationTest {
 
     @Test
     void checksumUsesCanonicalLowercaseHexWithFixedWidth() {
-        assertThat(new Checksum(ChecksumType.CRC32C, "ABCDEF12").value())
-                .isEqualTo("abcdef12");
-        assertThat(new Checksum(ChecksumType.SHA256, "A".repeat(64)).value())
-                .isEqualTo("a".repeat(64));
+        assertThat(new Checksum(ChecksumType.CRC32C, "ABCDEF12").value()).isEqualTo("abcdef12");
+        assertThat(new Checksum(ChecksumType.SHA256, "A".repeat(64)).value()).isEqualTo("a".repeat(64));
 
-        assertThatThrownBy(() -> new Checksum(ChecksumType.CRC32C, "abc"))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Checksum(ChecksumType.CRC32C, "abc")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new Checksum(ChecksumType.SHA256, "g".repeat(64)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -84,10 +78,7 @@ class ApiValueValidationTest {
         assertThatThrownBy(() -> new StreamCreateOptions(StorageProfile.OBJECT_WAL, nullKey))
                 .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new AppendEntry(
-                new byte[] {1},
-                1,
-                1,
-                Map.of("k", "x".repeat(ApiLimits.MAX_ENTRY_ATTRIBUTES_ENCODED_BYTES))))
+                        new byte[] {1}, 1, 1, Map.of("k", "x".repeat(ApiLimits.MAX_ENTRY_ATTRIBUTES_ENCODED_BYTES))))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -98,20 +89,16 @@ class ApiValueValidationTest {
         SchemaRef unicodeNamespace = new SchemaRef("zhang", "a", 0);
 
         AppendBatch batch = batch(
-                List.of(entry(new byte[] {1}, 10)),
-                List.of(unicodeNamespace, laterId, earlierId),
-                Optional.empty());
+                List.of(entry(new byte[] {1}, 10)), List.of(unicodeNamespace, laterId, earlierId), Optional.empty());
 
         assertThat(batch.schemaRefs()).containsExactly(earlierId, laterId, unicodeNamespace);
-        assertThatThrownBy(() -> batch(
-                List.of(entry(new byte[] {1}, 10)),
-                List.of(earlierId, earlierId),
-                Optional.empty()))
+        assertThatThrownBy(() ->
+                        batch(List.of(entry(new byte[] {1}, 10)), List.of(earlierId, earlierId), Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> batch(
-                List.of(entry(new byte[] {1}, 10)),
-                List.of(new SchemaRef("n".repeat(ApiLimits.MAX_SCHEMA_REFS_ENCODED_BYTES), "id", 1)),
-                Optional.empty()))
+                        List.of(entry(new byte[] {1}, 10)),
+                        List.of(new SchemaRef("n".repeat(ApiLimits.MAX_SCHEMA_REFS_ENCODED_BYTES), "id", 1)),
+                        Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -120,48 +107,48 @@ class ApiValueValidationTest {
         AppendEntry entry = entry(new byte[] {1, 2, 3}, 10);
 
         assertThatThrownBy(() -> new AppendBatch(
-                PayloadFormat.PULSAR_ENTRY_BATCH,
-                List.of(entry),
-                1,
-                1,
-                10,
-                10,
-                List.of(),
-                Map.of(),
-                Optional.empty()))
+                        PayloadFormat.PULSAR_ENTRY_BATCH,
+                        List.of(entry),
+                        1,
+                        1,
+                        10,
+                        10,
+                        List.of(),
+                        Map.of(),
+                        Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AppendBatch(
-                PayloadFormat.KAFKA_RECORD_BATCH,
-                List.of(entry),
-                1,
-                1,
-                10,
-                10,
-                List.of(),
-                Map.of("future", "projection"),
-                Optional.empty()))
+                        PayloadFormat.KAFKA_RECORD_BATCH,
+                        List.of(entry),
+                        1,
+                        1,
+                        10,
+                        10,
+                        List.of(),
+                        Map.of("future", "projection"),
+                        Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AppendBatch(
-                PayloadFormat.OPAQUE_RECORD_BATCH,
-                List.of(entry),
-                1,
-                1,
-                10,
-                10,
-                List.of(),
-                Map.of("future", "projection"),
-                Optional.empty()))
+                        PayloadFormat.OPAQUE_RECORD_BATCH,
+                        List.of(entry),
+                        1,
+                        1,
+                        10,
+                        10,
+                        List.of(),
+                        Map.of("future", "projection"),
+                        Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AppendBatch(
-                PayloadFormat.OPAQUE_RECORD_BATCH,
-                List.of(entry),
-                1,
-                1,
-                10,
-                10,
-                List.of(),
-                Map.of(),
-                Optional.of(new Checksum(ChecksumType.CRC32C, "00000000"))))
+                        PayloadFormat.OPAQUE_RECORD_BATCH,
+                        List.of(entry),
+                        1,
+                        1,
+                        10,
+                        10,
+                        List.of(),
+                        Map.of(),
+                        Optional.of(new Checksum(ChecksumType.CRC32C, "00000000"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("checksum mismatch");
     }
@@ -184,74 +171,70 @@ class ApiValueValidationTest {
         assertThatThrownBy(() -> batch(List.of(), List.of(), Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AppendBatch(
-                PayloadFormat.OPAQUE_RECORD_BATCH,
-                List.of(entry),
-                2,
-                1,
-                10,
-                10,
-                List.of(),
-                Map.of(),
-                Optional.empty()))
+                        PayloadFormat.OPAQUE_RECORD_BATCH,
+                        List.of(entry),
+                        2,
+                        1,
+                        10,
+                        10,
+                        List.of(),
+                        Map.of(),
+                        Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AppendBatch(
-                PayloadFormat.OPAQUE_RECORD_BATCH,
-                List.of(subRecords),
-                2,
-                1,
-                10,
-                10,
-                List.of(),
-                Map.of(),
-                Optional.empty()))
+                        PayloadFormat.OPAQUE_RECORD_BATCH,
+                        List.of(subRecords),
+                        2,
+                        1,
+                        10,
+                        10,
+                        List.of(),
+                        Map.of(),
+                        Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void entryIndexRefValidatesLocationSpecificShapeAndDefensiveCopiesInlineData() {
         assertThatThrownBy(() -> new EntryIndexRef(
-                EntryIndexLocation.INLINE,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                0,
-                0,
-                checksum()))
+                        EntryIndexLocation.INLINE,
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty(),
+                        0,
+                        0,
+                        checksum()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new EntryIndexRef(
-                EntryIndexLocation.INDEX_OBJECT,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                0,
-                1,
-                checksum()))
+                        EntryIndexLocation.INDEX_OBJECT,
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty(),
+                        0,
+                        1,
+                        checksum()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new EntryIndexRef(
-                EntryIndexLocation.OBJECT_FOOTER,
-                Optional.of(new ObjectId("index")),
-                Optional.empty(),
-                Optional.empty(),
-                0,
-                1,
-                checksum()))
+                        EntryIndexLocation.OBJECT_FOOTER,
+                        Optional.of(new ObjectId("index")),
+                        Optional.empty(),
+                        Optional.empty(),
+                        0,
+                        1,
+                        checksum()))
                 .isInstanceOf(IllegalArgumentException.class);
 
         byte[] inline = new byte[] {1, 2};
         EntryIndexRef ref = new EntryIndexRef(
-                EntryIndexLocation.INLINE,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.of(inline),
-                0,
-                0,
-                checksum());
+                EntryIndexLocation.INLINE, Optional.empty(), Optional.empty(), Optional.of(inline), 0, 0, checksum());
 
         inline[0] = 9;
-        assertThat(ref.inlineData()).hasValueSatisfying(bytes -> assertThat(bytes).containsExactly(1, 2));
+        assertThat(ref.inlineData())
+                .hasValueSatisfying(bytes -> assertThat(bytes).containsExactly(1, 2));
         byte[] returned = ref.inlineData().orElseThrow();
         returned[1] = 9;
-        assertThat(ref.inlineData()).hasValueSatisfying(bytes -> assertThat(bytes).containsExactly(1, 2));
+        assertThat(ref.inlineData())
+                .hasValueSatisfying(bytes -> assertThat(bytes).containsExactly(1, 2));
 
         EntryIndexRef independentlyDecoded = new EntryIndexRef(
                 EntryIndexLocation.INLINE,
@@ -281,49 +264,65 @@ class ApiValueValidationTest {
         assertThatThrownBy(() -> new ObjectRange(objectKey, Long.MAX_VALUE, 1))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new EntryIndexRef(
-                EntryIndexLocation.OBJECT_FOOTER,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Long.MAX_VALUE,
-                1,
-                checksum()))
+                        EntryIndexLocation.OBJECT_FOOTER,
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty(),
+                        Long.MAX_VALUE,
+                        1,
+                        checksum()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ReadBatch(
-                new OffsetRange(0, 1),
-                PayloadFormat.OPAQUE_RECORD_BATCH,
-                new byte[] {1},
-                List.of(),
-                Optional.empty(),
-                new ReadSourceRef(
                         new OffsetRange(0, 1),
-                        0,
-                        1,
-                        new com.nereusstream.api.target.ObjectSliceReadTarget(
-                                1, objectId, objectKey, ObjectType.MULTI_STREAM_WAL_OBJECT,
-                                "WAL_OBJECT_V1", "OPAQUE_SLICE", "slice", 0, 1,
-                                checksum(), objectFooterRef()),
-                        ReadTargetIdentities.sha256(new com.nereusstream.api.target.ObjectSliceReadTarget(
-                                1, objectId, objectKey, ObjectType.MULTI_STREAM_WAL_OBJECT,
-                                "WAL_OBJECT_V1", "OPAQUE_SLICE", "slice", 0, 1,
-                                checksum(), objectFooterRef()))),
-                Long.MAX_VALUE,
-                1))
+                        PayloadFormat.OPAQUE_RECORD_BATCH,
+                        new byte[] {1},
+                        List.of(),
+                        Optional.empty(),
+                        new ReadSourceRef(
+                                new OffsetRange(0, 1),
+                                0,
+                                1,
+                                new com.nereusstream.api.target.ObjectSliceReadTarget(
+                                        1,
+                                        objectId,
+                                        objectKey,
+                                        ObjectType.MULTI_STREAM_WAL_OBJECT,
+                                        "WAL_OBJECT_V1",
+                                        "OPAQUE_SLICE",
+                                        "slice",
+                                        0,
+                                        1,
+                                        checksum(),
+                                        objectFooterRef()),
+                                ReadTargetIdentities.sha256(new com.nereusstream.api.target.ObjectSliceReadTarget(
+                                        1,
+                                        objectId,
+                                        objectKey,
+                                        ObjectType.MULTI_STREAM_WAL_OBJECT,
+                                        "WAL_OBJECT_V1",
+                                        "OPAQUE_SLICE",
+                                        "slice",
+                                        0,
+                                        1,
+                                        checksum(),
+                                        objectFooterRef()))),
+                        Long.MAX_VALUE,
+                        1))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ResolvedObjectRange(
-                new OffsetRange(0, 1),
-                0,
-                objectId,
-                objectKey,
-                ObjectType.MULTI_STREAM_WAL_OBJECT,
-                Long.MAX_VALUE,
-                1,
-                checksum(),
-                PayloadFormat.OPAQUE_RECORD_BATCH,
-                List.of(),
-                objectFooterRef(),
-                Optional.empty(),
-                1))
+                        new OffsetRange(0, 1),
+                        0,
+                        objectId,
+                        objectKey,
+                        ObjectType.MULTI_STREAM_WAL_OBJECT,
+                        Long.MAX_VALUE,
+                        1,
+                        checksum(),
+                        PayloadFormat.OPAQUE_RECORD_BATCH,
+                        List.of(),
+                        objectFooterRef(),
+                        Optional.empty(),
+                        1))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> appendResult(new OffsetRange(0, 1), Long.MAX_VALUE, 1, 1, 1))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -347,10 +346,8 @@ class ApiValueValidationTest {
 
     @Test
     void basicOptionsAndIdsRejectInvalidValues() {
-        assertThatThrownBy(() -> new StreamId(" "))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new StreamName(""))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new StreamId(" ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new StreamName("")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AppendSessionOptions(" ", Duration.ofSeconds(1), false))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AppendSessionOptions("writer", Duration.ofNanos(1), false))
@@ -359,10 +356,8 @@ class ApiValueValidationTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ReadOptions(0, 1, ReadIsolation.COMMITTED, Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ResolveOptions(0, true, true))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new TrimOptions(Duration.ZERO, "test"))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ResolveOptions(0, true, true)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new TrimOptions(Duration.ZERO, "test")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @SuppressWarnings("deprecation")
@@ -370,23 +365,21 @@ class ApiValueValidationTest {
     void storageProfileHelpersDescribeWalAndObjectMaterializationMode() {
         assertThat(StorageProfile.OBJECT_WAL.canonical()).isEqualTo(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
         assertThat(StorageProfile.BOOKKEEPER_WAL_ONLY.usesBookKeeperWal()).isTrue();
-        assertThat(StorageProfile.BOOKKEEPER_WAL_ONLY.objectMaterializationEnabled()).isFalse();
-        assertThat(StorageProfile.BOOKKEEPER_WAL_ONLY.defaultDurabilityLevel())
-                .isEqualTo(DurabilityLevel.WAL_DURABLE);
-        assertThat(StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT.syncObjectMaterialization()).isTrue();
+        assertThat(StorageProfile.BOOKKEEPER_WAL_ONLY.objectMaterializationEnabled())
+                .isFalse();
+        assertThat(StorageProfile.BOOKKEEPER_WAL_ONLY.defaultDurabilityLevel()).isEqualTo(DurabilityLevel.WAL_DURABLE);
+        assertThat(StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT.syncObjectMaterialization())
+                .isTrue();
         assertThat(StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT.defaultDurabilityLevel())
                 .isEqualTo(DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED);
-        assertThat(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT.asyncObjectMaterialization()).isTrue();
+        assertThat(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT.asyncObjectMaterialization())
+                .isTrue();
         assertThat(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT.defaultDurabilityLevel())
                 .isEqualTo(DurabilityLevel.WAL_DURABLE);
         assertThat(StorageProfile.OBJECT_WAL_ASYNC_OBJECT.usesObjectWal()).isTrue();
 
-        AppendOptions fastAck = new AppendOptions(
-                Optional.empty(),
-                DurabilityLevel.WAL_DURABLE,
-                Duration.ofSeconds(1),
-                true,
-                Map.of());
+        AppendOptions fastAck =
+                new AppendOptions(Optional.empty(), DurabilityLevel.WAL_DURABLE, Duration.ofSeconds(1), true, Map.of());
 
         assertThat(fastAck.durabilityLevel()).isEqualTo(DurabilityLevel.WAL_DURABLE);
     }
@@ -404,9 +397,7 @@ class ApiValueValidationTest {
     }
 
     private static AppendBatch batch(
-            List<AppendEntry> entries,
-            List<SchemaRef> schemaRefs,
-            Optional<Checksum> checksum) {
+            List<AppendEntry> entries, List<SchemaRef> schemaRefs, Optional<Checksum> checksum) {
         return new AppendBatch(
                 PayloadFormat.OPAQUE_RECORD_BATCH,
                 entries,
@@ -448,11 +439,7 @@ class ApiValueValidationTest {
     }
 
     private static AppendResult appendResult(
-            OffsetRange range,
-            long objectOffset,
-            long objectLength,
-            int recordCount,
-            int entryCount) {
+            OffsetRange range, long objectOffset, long objectLength, int recordCount, int entryCount) {
         return appendResult(range, objectOffset, objectLength, recordCount, entryCount, recordCount);
     }
 

@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Minimal retention role kept distinct from TestCursorStorage for runtime lifecycle tests. */
+/**
+ * Minimal retention role kept distinct from TestCursorStorage for runtime lifecycle tests.
+ */
 public final class TestCursorRetentionCoordinator implements CursorRetentionCoordinator {
     @Override
     public CompletableFuture<CursorRetentionView> claimAndRecover(CursorOwnerSession owner) {
@@ -12,9 +15,7 @@ public final class TestCursorRetentionCoordinator implements CursorRetentionCoor
     }
 
     @Override
-    public CompletableFuture<ProtectionLease> beginProtection(
-            CursorOwnerSession owner,
-            ProtectionRequest request) {
+    public CompletableFuture<ProtectionLease> beginProtection(CursorOwnerSession owner, ProtectionRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException("beginProtection"));
     }
 
@@ -30,15 +31,12 @@ public final class TestCursorRetentionCoordinator implements CursorRetentionCoor
 
     @Override
     public CompletableFuture<CursorRetentionView> requestTrim(
-            CursorOwnerSession owner,
-            long candidateOffset,
-            String reason) {
+            CursorOwnerSession owner, long candidateOffset, String reason) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException("requestTrim"));
     }
 
     @Override
-    public void close() {
-    }
+    public void close() {}
 
     private static CursorRetentionView active(CursorOwnerSession owner) {
         return new CursorRetentionView(

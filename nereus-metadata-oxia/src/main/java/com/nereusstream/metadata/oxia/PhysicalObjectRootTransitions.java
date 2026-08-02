@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.ErrorCode;
@@ -6,14 +7,13 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 
-/** Store-level closed transition validator for the physical deletion authority root. */
+/**
+ * Store-level closed transition validator for the physical deletion authority root.
+ */
 final class PhysicalObjectRootTransitions {
-    private PhysicalObjectRootTransitions() {
-    }
+    private PhysicalObjectRootTransitions() {}
 
-    static void requireValidReplacement(
-            PhysicalObjectRootRecord current,
-            PhysicalObjectRootRecord replacement) {
+    static void requireValidReplacement(PhysicalObjectRootRecord current, PhysicalObjectRootRecord replacement) {
         if (!sameImmutableRoot(current, replacement)) {
             throw invariant("physical root CAS attempted to change immutable identity");
         }
@@ -30,25 +30,23 @@ final class PhysicalObjectRootTransitions {
         if (replacement.lifecycleEpoch() != Math.addExact(current.lifecycleEpoch(), 1)) {
             throw invariant("physical root lifecycle transition must increment epoch exactly once");
         }
-        boolean allowed = switch (from) {
-            case ACTIVE -> to == PhysicalObjectLifecycle.MARKED
-                    || to == PhysicalObjectLifecycle.QUARANTINED;
-            case MARKED -> to == PhysicalObjectLifecycle.ACTIVE
-                    || to == PhysicalObjectLifecycle.DELETING
-                    || to == PhysicalObjectLifecycle.QUARANTINED;
-            case DELETING -> to == PhysicalObjectLifecycle.DELETED;
-            case QUARANTINED -> to == PhysicalObjectLifecycle.ACTIVE
-                    || to == PhysicalObjectLifecycle.MARKED;
-            case DELETED -> false;
-        };
+        boolean allowed =
+                switch (from) {
+                    case ACTIVE -> to == PhysicalObjectLifecycle.MARKED || to == PhysicalObjectLifecycle.QUARANTINED;
+                    case MARKED ->
+                        to == PhysicalObjectLifecycle.ACTIVE
+                                || to == PhysicalObjectLifecycle.DELETING
+                                || to == PhysicalObjectLifecycle.QUARANTINED;
+                    case DELETING -> to == PhysicalObjectLifecycle.DELETED;
+                    case QUARANTINED -> to == PhysicalObjectLifecycle.ACTIVE || to == PhysicalObjectLifecycle.MARKED;
+                    case DELETED -> false;
+                };
         if (!allowed) {
             throw invariant("illegal physical root lifecycle transition: " + from + " -> " + to);
         }
     }
 
-    static boolean sameImmutableIdentity(
-            PhysicalObjectRootRecord left,
-            PhysicalObjectRootRecord right) {
+    static boolean sameImmutableIdentity(PhysicalObjectRootRecord left, PhysicalObjectRootRecord right) {
         return left.objectKeyHash().equals(right.objectKeyHash())
                 && left.objectKey().equals(right.objectKey())
                 && left.objectId().equals(right.objectId())
@@ -60,17 +58,13 @@ final class PhysicalObjectRootTransitions {
                 && left.etag().equals(right.etag());
     }
 
-    private static boolean sameImmutableRoot(
-            PhysicalObjectRootRecord left,
-            PhysicalObjectRootRecord right) {
+    private static boolean sameImmutableRoot(PhysicalObjectRootRecord left, PhysicalObjectRootRecord right) {
         return sameImmutableIdentity(left, right)
                 && left.createdAtMillis() == right.createdAtMillis()
                 && left.orphanNotBeforeMillis() == right.orphanNotBeforeMillis();
     }
 
-    private static boolean sameDeletedAuditBase(
-            PhysicalObjectRootRecord left,
-            PhysicalObjectRootRecord right) {
+    private static boolean sameDeletedAuditBase(PhysicalObjectRootRecord left, PhysicalObjectRootRecord right) {
         return left.gcAttemptId().equals(right.gcAttemptId())
                 && left.referenceSetSha256().equals(right.referenceSetSha256())
                 && left.markedAtMillis() == right.markedAtMillis()

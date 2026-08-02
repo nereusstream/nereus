@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -21,7 +22,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
-/** Task-specific facade that freezes domain identities and revalidates every exact source before create. */
+/**
+ * Task-specific facade that freezes domain identities and revalidates every exact source before create.
+ */
 public final class MaterializationTaskStore {
     public static final int MAX_ENCODED_TASK_BYTES = 64 * 1024;
 
@@ -29,10 +32,7 @@ public final class MaterializationTaskStore {
     private final GenerationMetadataStore generations;
     private final Clock clock;
 
-    public MaterializationTaskStore(
-            String cluster,
-            GenerationMetadataStore generations,
-            Clock clock) {
+    public MaterializationTaskStore(String cluster, GenerationMetadataStore generations, Clock clock) {
         this.cluster = requireText(cluster, "cluster");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -43,14 +43,11 @@ public final class MaterializationTaskStore {
     }
 
     public CompletableFuture<VersionedMaterializationTask> create(
-            MaterializationTask task,
-            MaterializationTaskMutationGuard mutationGuard) {
+            MaterializationTask task, MaterializationTaskMutationGuard mutationGuard) {
         return async(() -> {
             MaterializationTask exactTask = Objects.requireNonNull(task, "task");
-            MaterializationTaskMutationGuard exactGuard = Objects.requireNonNull(
-                    mutationGuard, "mutationGuard");
-            MaterializationTaskRecord planned = MaterializationRecordMapper.plannedTask(
-                    exactTask, clock.millis());
+            MaterializationTaskMutationGuard exactGuard = Objects.requireNonNull(mutationGuard, "mutationGuard");
+            MaterializationTaskRecord planned = MaterializationRecordMapper.plannedTask(exactTask, clock.millis());
             if (F4MetadataCodecs.encodeEnvelope(planned, MaterializationTaskRecord.class).length
                     > MAX_ENCODED_TASK_BYTES) {
                 return CompletableFuture.failedFuture(new NereusException(
@@ -58,9 +55,11 @@ public final class MaterializationTaskStore {
                         false,
                         "encoded materialization task exceeds the 64 KiB protocol limit"));
             }
-            List<CompletableFuture<Void>> sourceChecks = new ArrayList<>(exactTask.sources().size());
+            List<CompletableFuture<Void>> sourceChecks =
+                    new ArrayList<>(exactTask.sources().size());
             for (SourceGeneration source : exactTask.sources()) {
-                sourceChecks.add(generations.getCandidate(
+                sourceChecks.add(generations
+                        .getCandidate(
                                 cluster,
                                 exactTask.streamId(),
                                 source.view(),
@@ -81,19 +80,12 @@ public final class MaterializationTaskStore {
         });
     }
 
-    public CompletableFuture<Optional<VersionedMaterializationTask>> get(
-            StreamId streamId,
-            String taskId) {
+    public CompletableFuture<Optional<VersionedMaterializationTask>> get(StreamId streamId, String taskId) {
         return async(() -> generations.getTask(
-                cluster,
-                Objects.requireNonNull(streamId, "streamId"),
-                requireText(taskId, "taskId")));
+                cluster, Objects.requireNonNull(streamId, "streamId"), requireText(taskId, "taskId")));
     }
 
-    public CompletableFuture<TaskScanPage> scan(
-            StreamId streamId,
-            Optional<F4ScanToken> continuation,
-            int limit) {
+    public CompletableFuture<TaskScanPage> scan(StreamId streamId, Optional<F4ScanToken> continuation, int limit) {
         return async(() -> generations.scanTasks(
                 cluster,
                 Objects.requireNonNull(streamId, "streamId"),
@@ -102,22 +94,15 @@ public final class MaterializationTaskStore {
     }
 
     public CompletableFuture<VersionedMaterializationTask> compareAndSet(
-            MaterializationTaskRecord replacement,
-            long expectedVersion) {
+            MaterializationTaskRecord replacement, long expectedVersion) {
         return async(() -> generations.compareAndSetTask(
-                cluster,
-                Objects.requireNonNull(replacement, "replacement"),
-                expectedVersion));
+                cluster, Objects.requireNonNull(replacement, "replacement"), expectedVersion));
     }
 
     public CompletableFuture<VersionedMaterializationTask> claim(
-            VersionedMaterializationTask expected,
-            String claimId,
-            String processRunId,
-            long expiresAtMillis) {
+            VersionedMaterializationTask expected, String claimId, String processRunId, long expiresAtMillis) {
         return async(() -> {
-            VersionedMaterializationTask exact =
-                    Objects.requireNonNull(expected, "expected");
+            VersionedMaterializationTask exact = Objects.requireNonNull(expected, "expected");
             requireTask(exact);
             MaterializationTaskRecord claimed = MaterializationRecordMapper.claimed(
                     exact.value(),
@@ -125,45 +110,36 @@ public final class MaterializationTaskStore {
                     requireText(processRunId, "processRunId"),
                     clock.millis(),
                     expiresAtMillis);
-            return generations.compareAndSetTask(
-                    cluster, claimed, exact.metadataVersion());
+            return generations.compareAndSetTask(cluster, claimed, exact.metadataVersion());
         });
     }
 
     public CompletableFuture<VersionedMaterializationTask> outputReady(
-            VersionedMaterializationTask expected,
-            MaterializationOutput output) {
+            VersionedMaterializationTask expected, MaterializationOutput output) {
         return async(() -> {
-            VersionedMaterializationTask exact =
-                    Objects.requireNonNull(expected, "expected");
+            VersionedMaterializationTask exact = Objects.requireNonNull(expected, "expected");
             MaterializationTask task = requireTask(exact);
-            MaterializationOutput exactOutput =
-                    Objects.requireNonNull(output, "output");
+            MaterializationOutput exactOutput = Objects.requireNonNull(output, "output");
             if (!task.taskId().equals(exactOutput.taskId())
                     || !task.streamId().equals(exactOutput.streamId())
                     || task.view() != exactOutput.view()
                     || !task.coverage().equals(exactOutput.coverage())) {
-                throw new IllegalArgumentException(
-                        "materialization task/output identity does not agree");
+                throw new IllegalArgumentException("materialization task/output identity does not agree");
             }
-            MaterializationTaskRecord ready = MaterializationRecordMapper.outputReady(
-                    exact.value(), exactOutput, clock.millis());
-            return generations.compareAndSetTask(
-                    cluster, ready, exact.metadataVersion());
+            MaterializationTaskRecord ready =
+                    MaterializationRecordMapper.outputReady(exact.value(), exactOutput, clock.millis());
+            return generations.compareAndSetTask(cluster, ready, exact.metadataVersion());
         });
     }
 
     public CompletableFuture<VersionedMaterializationTask> heartbeat(
-            VersionedMaterializationTask expected,
-            long expiresAtMillis) {
+            VersionedMaterializationTask expected, long expiresAtMillis) {
         return async(() -> {
-            VersionedMaterializationTask exact =
-                    Objects.requireNonNull(expected, "expected");
+            VersionedMaterializationTask exact = Objects.requireNonNull(expected, "expected");
             requireTask(exact);
-            MaterializationTaskRecord heartbeat = MaterializationRecordMapper.heartbeat(
-                    exact.value(), expiresAtMillis, clock.millis());
-            return generations.compareAndSetTask(
-                    cluster, heartbeat, exact.metadataVersion());
+            MaterializationTaskRecord heartbeat =
+                    MaterializationRecordMapper.heartbeat(exact.value(), expiresAtMillis, clock.millis());
+            return generations.compareAndSetTask(cluster, heartbeat, exact.metadataVersion());
         });
     }
 
@@ -182,8 +158,7 @@ public final class MaterializationTaskStore {
             String failureMessage,
             long retryNotBeforeMillis) {
         return async(() -> {
-            VersionedMaterializationTask exact =
-                    Objects.requireNonNull(expected, "expected");
+            VersionedMaterializationTask exact = Objects.requireNonNull(expected, "expected");
             requireTask(exact);
             MaterializationTaskRecord failed = MaterializationRecordMapper.failedClaim(
                     exact.value(),
@@ -192,8 +167,7 @@ public final class MaterializationTaskStore {
                     requireText(failureMessage, "failureMessage"),
                     retryNotBeforeMillis,
                     clock.millis());
-            return generations.compareAndSetTask(
-                    cluster, failed, exact.metadataVersion());
+            return generations.compareAndSetTask(cluster, failed, exact.metadataVersion());
         });
     }
 
@@ -205,44 +179,30 @@ public final class MaterializationTaskStore {
      */
     public CompletableFuture<Void> delete(VersionedMaterializationTask expected) {
         return async(() -> {
-            VersionedMaterializationTask exact =
-                    Objects.requireNonNull(expected, "expected");
+            VersionedMaterializationTask exact = Objects.requireNonNull(expected, "expected");
             MaterializationTask task = requireTask(exact);
-            return generations.deleteTask(
-                    cluster,
-                    task.streamId(),
-                    task.taskId(),
-                    exact.metadataVersion());
+            return generations.deleteTask(cluster, task.streamId(), task.taskId(), exact.metadataVersion());
         });
     }
 
-    public MaterializationTask requireTask(
-            VersionedMaterializationTask durable) {
+    public MaterializationTask requireTask(VersionedMaterializationTask durable) {
         return MaterializationRecordMapper.domainTask(durable);
     }
 
-    public MaterializationTask requireTask(
-            VersionedMaterializationTask durable,
-            MaterializationPolicy policy) {
+    public MaterializationTask requireTask(VersionedMaterializationTask durable, MaterializationPolicy policy) {
         return MaterializationRecordMapper.domainTask(durable, policy);
     }
 
-    public Optional<MaterializationOutput> requireOutput(
-            VersionedMaterializationTask durable) {
-        VersionedMaterializationTask exact =
-                Objects.requireNonNull(durable, "durable");
+    public Optional<MaterializationOutput> requireOutput(VersionedMaterializationTask durable) {
+        VersionedMaterializationTask exact = Objects.requireNonNull(durable, "durable");
         MaterializationTask task = requireTask(exact);
-        return exact.value().output().map(value ->
-                MaterializationRecordMapper.domainOutput(task, value));
+        return exact.value().output().map(value -> MaterializationRecordMapper.domainOutput(task, value));
     }
 
     private static void requireExactSource(
-            Optional<VersionedGenerationCandidate> candidate,
-            StreamId streamId,
-            SourceGeneration expected) {
+            Optional<VersionedGenerationCandidate> candidate, StreamId streamId, SourceGeneration expected) {
         if (candidate.isEmpty()
-                || !MaterializationSourceMapper.matchesExactSource(
-                        candidate.orElseThrow(), streamId, expected)) {
+                || !MaterializationSourceMapper.matchesExactSource(candidate.orElseThrow(), streamId, expected)) {
             throw new NereusException(
                     ErrorCode.METADATA_CONDITION_FAILED,
                     true,

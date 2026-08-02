@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
@@ -8,7 +9,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/** Observable result from one nonblocking GC convergence pass. */
+/**
+ * Observable result from one nonblocking GC convergence pass.
+ */
 public record BookKeeperLedgerGcResult(
         BookKeeperLedgerGcAction action,
         Optional<BookKeeperVersionedValue<BookKeeperLedgerRootRecord>> root,
@@ -25,15 +28,12 @@ public record BookKeeperLedgerGcResult(
     }
 
     public static BookKeeperLedgerGcResult of(
-            BookKeeperLedgerGcAction action,
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root) {
+            BookKeeperLedgerGcAction action, BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root) {
         return new BookKeeperLedgerGcResult(action, Optional.ofNullable(root), Set.of());
     }
 
     public static BookKeeperLedgerGcResult blocked(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            Set<BookKeeperRetentionBlocker> blockers) {
-        return new BookKeeperLedgerGcResult(
-                BookKeeperLedgerGcAction.BLOCKED, Optional.ofNullable(root), blockers);
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, Set<BookKeeperRetentionBlocker> blockers) {
+        return new BookKeeperLedgerGcResult(BookKeeperLedgerGcAction.BLOCKED, Optional.ofNullable(root), blockers);
     }
 }

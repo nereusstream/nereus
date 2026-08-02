@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Public Phase 1 API value limits shared by metadata and object modules. */
+/**
+ * Public Phase 1 API value limits shared by metadata and object modules.
+ */
 public final class ApiLimits {
     public static final int MAX_APPEND_ENTRIES = 65_536;
     public static final int MAX_ENTRY_PAYLOAD_BYTES = 64 * 1024 * 1024;
@@ -24,6 +26,5 @@ public final class ApiLimits {
     public static final int MAX_READ_TARGET_ENCODED_BYTES = 64 * 1024;
     public static final int MAX_APPEND_ATTEMPT_ID_ENCODED_BYTES = 256;
 
-    private ApiLimits() {
-    }
+    private ApiLimits() {}
 }

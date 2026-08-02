@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import com.nereusstream.api.ErrorCode;
@@ -20,7 +21,9 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-/** Binding-first partition manager; authority acquisition and fresh recovery remain owned by its opener. */
+/**
+ * Binding-first partition manager; authority acquisition and fresh recovery remain owned by its opener.
+ */
 public final class DefaultKafkaPartitionStorageManager implements KafkaPartitionStorageManager {
     private final Object guard = new Object();
     private final KafkaPartitionBindingLifecycle bindings;
@@ -76,8 +79,7 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
     }
 
     @Override
-    public CompletableFuture<KafkaPartitionStorage> openLeader(
-            KafkaPartitionLeaderOpenRequest request) {
+    public CompletableFuture<KafkaPartitionStorage> openLeader(KafkaPartitionLeaderOpenRequest request) {
         Objects.requireNonNull(request, "request");
         KafkaStorageProfilePolicy policy = KafkaStorageProfilePolicy.forProfile(request.storageProfile());
         if (!executableProfiles.contains(policy.storageProfile())) {
@@ -90,7 +92,9 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
         OpenIntent intent = new OpenIntent(request, policy, deadline);
         OpenIntent superseded = null;
         synchronized (guard) {
-            if (closed) return failedClosed();
+            if (closed) {
+                return failedClosed();
+            }
             OpenIntent current = intents.get(request.identity());
             if (current != null) {
                 KafkaLeaderAuthority.AuthorityRelation relation =
@@ -132,8 +136,7 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
                 operationTtl);
         CompletableFuture<KafkaPartitionStorage> operation;
         try {
-            operation = Objects.requireNonNull(
-                    bindings.ensureBinding(bindingRequest), "Kafka binding future")
+            operation = Objects.requireNonNull(bindings.ensureBinding(bindingRequest), "Kafka binding future")
                     .thenCompose(binding -> openBound(intent, binding));
         } catch (Throwable failure) {
             operation = CompletableFuture.failedFuture(failure);
@@ -141,13 +144,11 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
         operation.whenComplete((storage, failure) -> completeOpen(intent, storage, failure));
     }
 
-    private CompletableFuture<KafkaPartitionStorage> openBound(
-            OpenIntent intent, KafkaPartitionBinding binding) {
+    private CompletableFuture<KafkaPartitionStorage> openBound(OpenIntent intent, KafkaPartitionBinding binding) {
         Duration remaining = remaining(intent.deadline);
         KafkaPartitionOpenPlan plan;
         try {
-            plan = new KafkaPartitionOpenPlan(
-                    intent.request.authority(), binding, intent.policy, remaining);
+            plan = new KafkaPartitionOpenPlan(intent.request.authority(), binding, intent.policy, remaining);
         } catch (IllegalArgumentException failure) {
             return CompletableFuture.failedFuture(new NereusException(
                     ErrorCode.METADATA_INVARIANT_VIOLATION,
@@ -168,21 +169,22 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
         }
     }
 
-    private void completeOpen(
-            OpenIntent intent, KafkaPartitionStorage storage, Throwable failure) {
+    private void completeOpen(OpenIntent intent, KafkaPartitionStorage storage, Throwable failure) {
         Throwable cause = failure == null ? null : unwrap(failure);
         synchronized (guard) {
             if (intents.get(intent.request.identity()) == intent && cause != null) {
                 intents.remove(intent.request.identity());
             }
         }
-        if (cause == null) intent.result.succeed(storage);
-        else intent.result.fail(cause);
+        if (cause == null) {
+            intent.result.succeed(storage);
+        } else {
+            intent.result.fail(cause);
+        }
     }
 
     @Override
-    public CompletableFuture<Void> resign(
-            KafkaPartitionIdentity identity, int observedLeaderEpoch, Duration timeout) {
+    public CompletableFuture<Void> resign(KafkaPartitionIdentity identity, int observedLeaderEpoch, Duration timeout) {
         Objects.requireNonNull(identity, "identity");
         positive(Objects.requireNonNull(timeout, "timeout"), "timeout");
         OpenIntent removed = removeIntent(identity, observedLeaderEpoch);
@@ -194,14 +196,17 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
     }
 
     @Override
-    public CompletableFuture<Void> delete(
-            KafkaPartitionIdentity identity, long metadataOffset, Duration timeout) {
+    public CompletableFuture<Void> delete(KafkaPartitionIdentity identity, long metadataOffset, Duration timeout) {
         Objects.requireNonNull(identity, "identity");
         Duration exactTimeout = positive(Objects.requireNonNull(timeout, "timeout"), "timeout");
-        if (metadataOffset < 0) throw new IllegalArgumentException("metadataOffset must be non-negative");
+        if (metadataOffset < 0) {
+            throw new IllegalArgumentException("metadataOffset must be non-negative");
+        }
         OpenIntent removed;
         synchronized (guard) {
-            if (closed) return failedClosedVoid();
+            if (closed) {
+                return failedClosedVoid();
+            }
             removed = intents.remove(identity);
         }
         if (removed != null) {
@@ -211,7 +216,9 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
         CompletableFuture<Void> operation = leaders.resign(identity, Integer.MAX_VALUE)
                 .thenCompose(ignored -> {
                     synchronized (guard) {
-                        if (closed) return failedClosedVoid();
+                        if (closed) {
+                            return failedClosedVoid();
+                        }
                     }
                     return bindings.delete(new KafkaPartitionDeleteRequest(
                             identity,
@@ -233,14 +240,16 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
     public CompletableFuture<Void> shutdown() {
         List<OpenIntent> removed;
         synchronized (guard) {
-            if (closed) return CompletableFuture.completedFuture(null);
+            if (closed) {
+                return CompletableFuture.completedFuture(null);
+            }
             closed = true;
             removed = new ArrayList<>(intents.values());
             intents.clear();
         }
         for (OpenIntent intent : removed) {
-            intent.result.fail(new NereusException(
-                    ErrorCode.STORAGE_CLOSED, false, "Kafka partition storage manager is closed"));
+            intent.result.fail(
+                    new NereusException(ErrorCode.STORAGE_CLOSED, false, "Kafka partition storage manager is closed"));
         }
         return protectedResult(leaders.shutdown());
     }
@@ -271,14 +280,15 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
         return Duration.ofMillis(millis);
     }
 
-    private OpenIntent removeIntent(
-            KafkaPartitionIdentity identity, int observedLeaderEpoch) {
+    private OpenIntent removeIntent(KafkaPartitionIdentity identity, int observedLeaderEpoch) {
         if (observedLeaderEpoch < 0) {
             throw new IllegalArgumentException("observedLeaderEpoch must be non-negative");
         }
         synchronized (guard) {
             OpenIntent current = intents.get(identity);
-            if (current == null || current.request.leaderEpoch() > observedLeaderEpoch) return null;
+            if (current == null || current.request.leaderEpoch() > observedLeaderEpoch) {
+                return null;
+            }
             intents.remove(identity);
             return current;
         }
@@ -294,8 +304,11 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
     private static <T> CompletableFuture<T> protectedResult(CompletableFuture<T> operation) {
         ManagerFuture<T> result = new ManagerFuture<>();
         operation.whenComplete((value, failure) -> {
-            if (failure == null) result.succeed(value);
-            else result.fail(unwrap(failure));
+            if (failure == null) {
+                result.succeed(value);
+            } else {
+                result.fail(unwrap(failure));
+            }
         });
         return result;
     }
@@ -309,8 +322,8 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
     }
 
     private static <T> CompletableFuture<T> failedClosed() {
-        return CompletableFuture.failedFuture(new NereusException(
-                ErrorCode.STORAGE_CLOSED, false, "Kafka partition storage manager is closed"));
+        return CompletableFuture.failedFuture(
+                new NereusException(ErrorCode.STORAGE_CLOSED, false, "Kafka partition storage manager is closed"));
     }
 
     private static CompletableFuture<Void> failedClosedVoid() {
@@ -358,10 +371,7 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
         private final long deadline;
         private final ManagerFuture<KafkaPartitionStorage> result = new ManagerFuture<>();
 
-        private OpenIntent(
-                KafkaPartitionLeaderOpenRequest request,
-                KafkaStorageProfilePolicy policy,
-                long deadline) {
+        private OpenIntent(KafkaPartitionLeaderOpenRequest request, KafkaStorageProfilePolicy policy, long deadline) {
             this.request = request;
             this.policy = policy;
             this.deadline = deadline;

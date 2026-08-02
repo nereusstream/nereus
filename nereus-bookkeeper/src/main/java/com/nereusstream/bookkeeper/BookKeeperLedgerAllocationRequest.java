@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.AppendSession;
@@ -6,9 +7,10 @@ import com.nereusstream.api.StreamId;
 import java.time.Duration;
 import java.util.Objects;
 
-/** One pre-entry-write request to acquire an exact advanced BookKeeper ledger. */
-public record BookKeeperLedgerAllocationRequest(
-        StreamId streamId, AppendSession session, Duration timeout) {
+/**
+ * One pre-entry-write request to acquire an exact advanced BookKeeper ledger.
+ */
+public record BookKeeperLedgerAllocationRequest(StreamId streamId, AppendSession session, Duration timeout) {
     public BookKeeperLedgerAllocationRequest {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(session, "session");

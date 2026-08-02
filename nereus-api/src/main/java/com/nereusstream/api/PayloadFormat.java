@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Protocol-neutral label for bytes stored in an append batch. */
+/**
+ * Protocol-neutral label for bytes stored in an append batch.
+ */
 public enum PayloadFormat {
     OPAQUE_RECORD_BATCH,
     PULSAR_ENTRY_BATCH,

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.snapshot;
 
 import com.nereusstream.api.AppendResult;
@@ -8,7 +9,9 @@ import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamState;
 import java.util.Objects;
 
-/** Monotonic merger of complete remote metadata and the exact local append result overlay. */
+/**
+ * Monotonic merger of complete remote metadata and the exact local append result overlay.
+ */
 public final class StreamSnapshotTracker {
     private StreamMetadata remoteBase;
     private StreamSnapshotView effective;

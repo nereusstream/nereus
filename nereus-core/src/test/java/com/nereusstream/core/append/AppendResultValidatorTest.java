@@ -16,7 +16,6 @@ package com.nereusstream.core.append;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOutcome;
@@ -45,60 +44,48 @@ class AppendResultValidatorTest {
     @Test
     void acceptsOnlyTheExactCommittedRequest() {
         AppendBatch request = request();
-        AppendResult result = result(
-                STREAM_ID,
-                new OffsetRange(4, 7),
-                PayloadFormat.KAFKA_RECORD_BATCH,
-                3,
-                1,
-                3,
-                List.of(SCHEMA));
+        AppendResult result =
+                result(STREAM_ID, new OffsetRange(4, 7), PayloadFormat.KAFKA_RECORD_BATCH, 3, 1, 3, List.of(SCHEMA));
 
         assertThat(AppendResultValidator.requireExactRequest(
-                STREAM_ID,
-                request,
-                AppendPrecondition.expectedStartOffset(4),
-                result)).isSameAs(result);
+                        STREAM_ID, request, AppendPrecondition.expectedStartOffset(4), result))
+                .isSameAs(result);
     }
 
     @Test
     void rejectsEveryCallerVisibleLogicalMismatchAsKnownCommitted() {
         AppendBatch request = request();
         List<AppendResult> mismatches = List.of(
-                result(new StreamId("stream-b"), new OffsetRange(4, 7),
-                        PayloadFormat.KAFKA_RECORD_BATCH, 3, 1, 3, List.of(SCHEMA)),
-                result(STREAM_ID, new OffsetRange(4, 7),
-                        PayloadFormat.PULSAR_ENTRY_BATCH, 3, 1, 3, List.of(SCHEMA)),
-                result(STREAM_ID, new OffsetRange(4, 6),
-                        PayloadFormat.KAFKA_RECORD_BATCH, 2, 1, 3, List.of(SCHEMA)),
-                result(STREAM_ID, new OffsetRange(4, 7),
-                        PayloadFormat.KAFKA_RECORD_BATCH, 3, 2, 3, List.of(SCHEMA)),
-                result(STREAM_ID, new OffsetRange(4, 7),
-                        PayloadFormat.KAFKA_RECORD_BATCH, 3, 1, 4, List.of(SCHEMA)),
-                result(STREAM_ID, new OffsetRange(4, 7),
-                        PayloadFormat.KAFKA_RECORD_BATCH, 3, 1, 3, List.of()));
+                result(
+                        new StreamId("stream-b"),
+                        new OffsetRange(4, 7),
+                        PayloadFormat.KAFKA_RECORD_BATCH,
+                        3,
+                        1,
+                        3,
+                        List.of(SCHEMA)),
+                result(STREAM_ID, new OffsetRange(4, 7), PayloadFormat.PULSAR_ENTRY_BATCH, 3, 1, 3, List.of(SCHEMA)),
+                result(STREAM_ID, new OffsetRange(4, 6), PayloadFormat.KAFKA_RECORD_BATCH, 2, 1, 3, List.of(SCHEMA)),
+                result(STREAM_ID, new OffsetRange(4, 7), PayloadFormat.KAFKA_RECORD_BATCH, 3, 2, 3, List.of(SCHEMA)),
+                result(STREAM_ID, new OffsetRange(4, 7), PayloadFormat.KAFKA_RECORD_BATCH, 3, 1, 4, List.of(SCHEMA)),
+                result(STREAM_ID, new OffsetRange(4, 7), PayloadFormat.KAFKA_RECORD_BATCH, 3, 1, 3, List.of()));
 
         for (AppendResult mismatch : mismatches) {
             assertInvariantViolation(() -> AppendResultValidator.requireExactRequest(
-                    STREAM_ID,
-                    request,
-                    AppendPrecondition.expectedStartOffset(4),
-                    mismatch));
+                    STREAM_ID, request, AppendPrecondition.expectedStartOffset(4), mismatch));
         }
         assertInvariantViolation(() -> AppendResultValidator.requireExactRequest(
                 STREAM_ID,
                 request,
                 AppendPrecondition.expectedStartOffset(5),
-                result(STREAM_ID, new OffsetRange(4, 7),
-                        PayloadFormat.KAFKA_RECORD_BATCH, 3, 1, 3, List.of(SCHEMA))));
+                result(STREAM_ID, new OffsetRange(4, 7), PayloadFormat.KAFKA_RECORD_BATCH, 3, 1, 3, List.of(SCHEMA))));
     }
 
     private static void assertInvariantViolation(Runnable operation) {
-        assertThatThrownBy(operation::run)
-                .isInstanceOfSatisfying(NereusException.class, failure -> {
-                    assertThat(failure.code()).isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION);
-                    assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
-                });
+        assertThatThrownBy(operation::run).isInstanceOfSatisfying(NereusException.class, failure -> {
+            assertThat(failure.code()).isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION);
+            assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
+        });
     }
 
     private static AppendBatch request() {

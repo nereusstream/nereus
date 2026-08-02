@@ -16,7 +16,9 @@ package com.nereusstream.api;
 
 import java.util.Objects;
 
-/** Half-open stream offset range: [startOffset, endOffset). */
+/**
+ * Half-open stream offset range: [startOffset, endOffset).
+ */
 public record OffsetRange(long startOffset, long endOffset) {
     public OffsetRange {
         if (startOffset < 0) {

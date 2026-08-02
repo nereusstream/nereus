@@ -25,38 +25,38 @@ branch、迁移现有 local logs、支持 RF>1 或声称 Kafka compatibility 已
 
 ## 2. Artifact inventory
 
-| Artifact | Lines at review | Review result |
-| --- | ---: | --- |
-| `01-current-contract-and-automq-source-audit.md` | 341 | PASS；source facts、20 AutoMQ blobs、15 Nereus blobs and gap inventory locked |
-| `02-ranged-entry-api-and-object-format.md` | 599 | PASS；additive API、read boundary、NCP2/NTC2 bytes/limits/goldens closed |
-| `03-kafka-fork-log-and-broker-integration.md` | 573 | PASS；planned classes、stock-file method map、disabled fallback and ordering closed |
-| `04-oxia-binding-session-checkpoint-and-lifecycle.md` | 634 | PASS；keys/codec order/CAS/session/NKC1/lifecycle/scanners closed |
-| `05-producer-state-transactions-compaction-and-retention.md` | 624 | PASS；native state owners、replay、retention and no-resurrection compaction closed |
-| `06-runtime-configuration-rollout-and-observability.md` | 487 | PASS；defaults/validation/activation/shutdown/metrics/alerts/runbooks closed |
-| `07-implementation-plan-and-gates.md` | 519 | PASS；file ownership、M0–M7 DAG、tasks/review stops/definition of done closed |
-| `08-scenario-evidence-matrix.md` | 264 | PASS as planned contract；146 unique `KF-*` IDs，all remain `PLANNED` |
+| Artifact                                                     | Lines at review | Review result                                                                    |
+|--------------------------------------------------------------|----------------:|----------------------------------------------------------------------------------|
+| `01-current-contract-and-automq-source-audit.md`             |             341 | PASS；source facts、20 AutoMQ blobs、15 Nereus blobs and gap inventory locked       |
+| `02-ranged-entry-api-and-object-format.md`                   |             599 | PASS；additive API、read boundary、NCP2/NTC2 bytes/limits/goldens closed            |
+| `03-kafka-fork-log-and-broker-integration.md`                |             573 | PASS；planned classes、stock-file method map、disabled fallback and ordering closed |
+| `04-oxia-binding-session-checkpoint-and-lifecycle.md`        |             634 | PASS；keys/codec order/CAS/session/NKC1/lifecycle/scanners closed                 |
+| `05-producer-state-transactions-compaction-and-retention.md` |             624 | PASS；native state owners、replay、retention and no-resurrection compaction closed  |
+| `06-runtime-configuration-rollout-and-observability.md`      |             487 | PASS；defaults/validation/activation/shutdown/metrics/alerts/runbooks closed      |
+| `07-implementation-plan-and-gates.md`                        |             519 | PASS；file ownership、M0–M7 DAG、tasks/review stops/definition of done closed       |
+| `08-scenario-evidence-matrix.md`                             |             264 | PASS as planned contract；146 unique `KF-*` IDs，all remain `PLANNED`              |
 
 The eight normative target documents contain 4,041 lines at this review. Line count is inventory only，not a quality
 or future compatibility signal。
 
 ## 3. Gate evidence
 
-| M0 requirement | Evidence | Result |
-| --- | --- | --- |
-| Reference source lock | document 01 §2 locks AutoMQ commit/version and 20 relevant blob IDs；§4 locks 15 current Nereus blob IDs | PASS |
-| Current gap is code-specific | document 01 §5–§10 names API、session、reader、V1 format classes/method behavior and target owner | PASS |
-| F5/F9 separation | roadmap、design index、overall architecture、terminology、F5/F9 future docs、ADR 0005 and phase register distinguish both paths | PASS |
-| API compatibility | document 02 §2–§4 preserves old descriptors/default exact-start behavior and adds protocol-neutral overloads | PASS |
-| Durable formats | document 02 §5–§10 plus document 04 §9 define identity、field/schema order、limits、checksums、dispatch and corruption matrix | PASS |
-| Kafka fork map | document 03 §2–§4 names planned classes and exact stock files/method seams；§13 requires narrow markers and disabled stock path | PASS |
-| Metadata/lifecycle | document 04 §2–§15 defines keys、wire fields、CAS guards、authority ordering、recovery、delete and bounded scanners | PASS |
-| Stateful Kafka semantics | document 05 defines producer/txn/internal-topic/epoch/segment/time/byte owners and all retention/compaction transitions | PASS |
-| Operations | document 06 defines typed configs、cross-validation、activation/capability records、startup/shutdown、metrics、alerts and runbooks | PASS |
-| Implementation ownership | document 07 maps every planned repository/package/file slice to an M1–M7 gate and mandatory review stop | PASS |
-| Scenario traceability | document 08 has 146 total IDs、146 unique IDs、zero duplicates；each row names owner、tier and gate | PASS |
-| Local Markdown links | read-only link audit over `README.md` and `docs/**/*.md` resolved every non-HTTP/non-anchor target | PASS |
-| Whitespace/patch validity | `git diff --check` | PASS |
-| Change scope | branch diff contains only `README.md` and `docs/**`；no production/build path | PASS |
+| M0 requirement               | Evidence                                                                                                                       | Result |
+|------------------------------|--------------------------------------------------------------------------------------------------------------------------------|--------|
+| Reference source lock        | document 01 §2 locks AutoMQ commit/version and 20 relevant blob IDs；§4 locks 15 current Nereus blob IDs                        | PASS   |
+| Current gap is code-specific | document 01 §5–§10 names API、session、reader、V1 format classes/method behavior and target owner                                 | PASS   |
+| F5/F9 separation             | roadmap、design index、overall architecture、terminology、F5/F9 future docs、ADR 0005 and phase register distinguish both paths     | PASS   |
+| API compatibility            | document 02 §2–§4 preserves old descriptors/default exact-start behavior and adds protocol-neutral overloads                   | PASS   |
+| Durable formats              | document 02 §5–§10 plus document 04 §9 define identity、field/schema order、limits、checksums、dispatch and corruption matrix      | PASS   |
+| Kafka fork map               | document 03 §2–§4 names planned classes and exact stock files/method seams；§13 requires narrow markers and disabled stock path | PASS   |
+| Metadata/lifecycle           | document 04 §2–§15 defines keys、wire fields、CAS guards、authority ordering、recovery、delete and bounded scanners                 | PASS   |
+| Stateful Kafka semantics     | document 05 defines producer/txn/internal-topic/epoch/segment/time/byte owners and all retention/compaction transitions        | PASS   |
+| Operations                   | document 06 defines typed configs、cross-validation、activation/capability records、startup/shutdown、metrics、alerts and runbooks  | PASS   |
+| Implementation ownership     | document 07 maps every planned repository/package/file slice to an M1–M7 gate and mandatory review stop                        | PASS   |
+| Scenario traceability        | document 08 has 146 total IDs、146 unique IDs、zero duplicates；each row names owner、tier and gate                                | PASS   |
+| Local Markdown links         | read-only link audit over `README.md` and `docs/**/*.md` resolved every non-HTTP/non-anchor target                             | PASS   |
+| Whitespace/patch validity    | `git diff --check`                                                                                                             | PASS   |
+| Change scope                 | branch diff contains only `README.md` and `docs/**`；no production/build path                                                   | PASS   |
 
 No executable F9 test was run because none exists and M0 forbids treating planned tests as evidence. Existing
 Pulsar/Nereus suites were not rerun：this change does not alter source、build files、golden bytes or runtime config。

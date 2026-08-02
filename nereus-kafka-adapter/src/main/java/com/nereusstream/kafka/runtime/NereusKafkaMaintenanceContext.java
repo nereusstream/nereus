@@ -17,13 +17,15 @@ package com.nereusstream.kafka.runtime;
 import com.nereusstream.kafka.retention.KafkaPartitionMaintenanceRuntime;
 import java.util.Objects;
 
-/** Fork-owned partition snapshot seam for product-owned checkpoint and retention maintenance. */
+/**
+ * Fork-owned partition snapshot seam for product-owned checkpoint and retention maintenance.
+ */
 public record NereusKafkaMaintenanceContext(
-    NereusKafkaMaintenanceConfiguration configuration,
-    KafkaPartitionMaintenanceRuntime.OwnedPartitionSource ownedPartitions) {
+        NereusKafkaMaintenanceConfiguration configuration,
+        KafkaPartitionMaintenanceRuntime.OwnedPartitionSource ownedPartitions) {
 
-  public NereusKafkaMaintenanceContext {
-    Objects.requireNonNull(configuration, "configuration");
-    Objects.requireNonNull(ownedPartitions, "ownedPartitions");
-  }
+    public NereusKafkaMaintenanceContext {
+        Objects.requireNonNull(configuration, "configuration");
+        Objects.requireNonNull(ownedPartitions, "ownedPartitions");
+    }
 }

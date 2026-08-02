@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.capability;
 
 import java.util.concurrent.CompletableFuture;
@@ -8,6 +9,5 @@ import java.util.concurrent.CompletableFuture;
  * protocol facade that created it.
  */
 public interface GenerationProjectionAuthorityReader {
-    CompletableFuture<GenerationProjectionAuthoritySnapshot> capture(
-            LiveProjectionSubject subject);
+    CompletableFuture<GenerationProjectionAuthoritySnapshot> capture(LiveProjectionSubject subject);
 }

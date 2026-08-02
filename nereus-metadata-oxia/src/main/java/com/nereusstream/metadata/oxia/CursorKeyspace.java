@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.keys.KeyComponentCodec;
 import java.util.Objects;
 
-/** The only durable key and partition-key constructor for F3 cursor metadata. */
+/**
+ * The only durable key and partition-key constructor for F3 cursor metadata.
+ */
 public final class CursorKeyspace {
     private final OxiaKeyspace l0;
 
@@ -14,9 +17,7 @@ public final class CursorKeyspace {
     }
 
     public String cursorStateKey(StreamId streamId, String cursorName) {
-        return cursorStatePrefix(streamId)
-                + CursorNames.cursorNameHash(cursorName)
-                + "/state";
+        return cursorStatePrefix(streamId) + CursorNames.cursorNameHash(cursorName) + "/state";
     }
 
     public String cursorStateScanFrom(StreamId streamId) {
@@ -54,5 +55,4 @@ public final class CursorKeyspace {
                 + KeyComponentCodec.encodeComponent(streamId.value())
                 + "/facade/managed-ledger/cursors/v1/";
     }
-
 }

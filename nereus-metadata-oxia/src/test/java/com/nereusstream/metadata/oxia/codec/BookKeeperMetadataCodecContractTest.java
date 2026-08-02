@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.BookKeeperMetadataTestValues;
 import com.nereusstream.metadata.oxia.records.AllocationSlotLifecycle;
 import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
@@ -41,7 +41,8 @@ class BookKeeperMetadataCodecContractTest {
             byte[] encoded = encode(sample);
             assertThat(decode(sample, encoded)).as(sample.name()).isEqualTo(sample.value());
             assertThat(factoryDecode(sample, encoded)).as(sample.name()).isEqualTo(sample.value());
-            assertThat(sha256(encoded)).as(sample.name() + " frozen envelope SHA-256")
+            assertThat(sha256(encoded))
+                    .as(sample.name() + " frozen envelope SHA-256")
                     .isEqualTo(golden.get(sample.name()));
         }
     }
@@ -82,9 +83,16 @@ class BookKeeperMetadataCodecContractTest {
                 new Sample("allocation", BookKeeperMetadataTestValues.allocation(), LedgerAllocationIntentRecord.class),
                 new Sample("slot", BookKeeperMetadataTestValues.slot(), BookKeeperAllocationSlotRecord.class),
                 new Sample("root", BookKeeperMetadataTestValues.root(), BookKeeperLedgerRootRecord.class),
-                new Sample("reservation", BookKeeperMetadataTestValues.reservation(), BookKeeperAppendReservationRecord.class),
-                new Sample("protection", BookKeeperMetadataTestValues.protection(), BookKeeperLedgerProtectionRecord.class),
-                new Sample("reader", BookKeeperMetadataTestValues.readerLease(), BookKeeperLedgerReaderLeaseRecord.class));
+                new Sample(
+                        "reservation",
+                        BookKeeperMetadataTestValues.reservation(),
+                        BookKeeperAppendReservationRecord.class),
+                new Sample(
+                        "protection",
+                        BookKeeperMetadataTestValues.protection(),
+                        BookKeeperLedgerProtectionRecord.class),
+                new Sample(
+                        "reader", BookKeeperMetadataTestValues.readerLease(), BookKeeperLedgerReaderLeaseRecord.class));
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -103,9 +111,12 @@ class BookKeeperMetadataCodecContractTest {
     }
 
     private static String sha256(byte[] bytes) {
-        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)); }
-        catch (Exception impossible) { throw new IllegalStateException(impossible); }
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (Exception impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
-    private record Sample(String name, Object value, Class<?> type) { }
+    private record Sample(String name, Object value, Class<?> type) {}
 }

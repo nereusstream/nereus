@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -21,44 +22,36 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.zip.CRC32C;
 
-/** Full-file checksum plus strict Parquet verification used before an output may be published. */
+/**
+ * Full-file checksum plus strict Parquet verification used before an output may be published.
+ */
 public final class CompactedObjectVerifier {
     private static final int HASH_CHUNK_BYTES = 8 << 20;
     private static final int VERIFY_RECORDS_PER_READ = 4_096;
-    private static final int VERIFY_PAYLOAD_BYTES_PER_READ =
-            CompactedObjectFormatV1.MAX_ROW_GROUP_BUFFER_BYTES;
+    private static final int VERIFY_PAYLOAD_BYTES_PER_READ = CompactedObjectFormatV1.MAX_ROW_GROUP_BUFFER_BYTES;
 
     private final ObjectStore objectStore;
     private final CompactedObjectReader reader;
 
-    public CompactedObjectVerifier(
-            ObjectStore objectStore,
-            CompactedObjectReader reader) {
+    public CompactedObjectVerifier(ObjectStore objectStore, CompactedObjectReader reader) {
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
         this.reader = Objects.requireNonNull(reader, "reader");
     }
 
-    public CompletableFuture<CompactedObjectMetadata> verify(
-            CompactedObjectVerificationRequest request) {
+    public CompletableFuture<CompactedObjectMetadata> verify(CompactedObjectVerificationRequest request) {
         if (request == null) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.INVALID_ARGUMENT,
-                    false,
-                    "compacted verification request is required"));
+                    ErrorCode.INVALID_ARGUMENT, false, "compacted verification request is required"));
         }
         try {
             VerificationDeadline deadline = new VerificationDeadline(request.timeout());
             HashState hashes = new HashState();
             CompletableFuture<CompactedObjectMetadata> operation = hashNext(request, deadline, hashes, 0)
                     .thenApply(ignored -> hashes.finish(request))
-                    .thenCompose(ignored -> scanNext(
-                            request,
-                            deadline,
-                            request.sourceCoverage().startOffset(),
-                            null,
-                            0,
-                            0));
-            return operation.handle((value, failure) -> failure == null
+                    .thenCompose(ignored ->
+                            scanNext(request, deadline, request.sourceCoverage().startOffset(), null, 0, 0));
+            return operation
+                    .handle((value, failure) -> failure == null
                             ? CompletableFuture.completedFuture(value)
                             : CompletableFuture.<CompactedObjectMetadata>failedFuture(mapFailure(failure)))
                     .thenCompose(value -> value);
@@ -68,8 +61,7 @@ public final class CompactedObjectVerifier {
     }
 
     public CompletableFuture<Void> verifyExact(
-            CompactedObjectVerificationRequest request,
-            CompactedObjectWriteRequest expected) {
+            CompactedObjectVerificationRequest request, CompactedObjectWriteRequest expected) {
         Objects.requireNonNull(expected, "expected");
         return verify(request).thenApply(metadata -> {
             requireExpectedMetadata(metadata, expected);
@@ -78,23 +70,20 @@ public final class CompactedObjectVerifier {
     }
 
     private CompletableFuture<Void> hashNext(
-            CompactedObjectVerificationRequest request,
-            VerificationDeadline deadline,
-            HashState hashes,
-            long offset) {
+            CompactedObjectVerificationRequest request, VerificationDeadline deadline, HashState hashes, long offset) {
         if (offset == request.target().objectLength()) {
             return CompletableFuture.completedFuture(null);
         }
-        int count = Math.toIntExact(Math.min(
-                HASH_CHUNK_BYTES,
-                request.target().objectLength() - offset));
+        int count = Math.toIntExact(Math.min(HASH_CHUNK_BYTES, request.target().objectLength() - offset));
         CompletableFuture<RangeReadResult> read;
         try {
-            read = Objects.requireNonNull(objectStore.readRange(
-                    request.target().objectKey(),
-                    offset,
-                    count,
-                    new RangeReadOptions(Optional.empty(), deadline.remaining())), "range-read future");
+            read = Objects.requireNonNull(
+                    objectStore.readRange(
+                            request.target().objectKey(),
+                            offset,
+                            count,
+                            new RangeReadOptions(Optional.empty(), deadline.remaining())),
+                    "range-read future");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(mapFailure(failure));
         }
@@ -137,8 +126,7 @@ public final class CompactedObjectVerifier {
         return read.thenCompose(result -> {
             CompactedObjectMetadata metadata = result.metadata();
             if (expectedMetadata != null && !metadata.equals(expectedMetadata)) {
-                throw new CompactedObjectFormatException(
-                        "compacted metadata changed between verification ranges");
+                throw new CompactedObjectFormatException("compacted metadata changed between verification ranges");
             }
             long records = Math.addExact(verifiedRecords, result.rows().size());
             long payloadBytes = verifiedPayloadBytes;
@@ -150,26 +138,16 @@ public final class CompactedObjectVerifier {
                 requireCompleteScan(metadata, records, payloadBytes);
                 return CompletableFuture.completedFuture(metadata);
             }
-            if (nextOffset <= startOffset
-                    || !request.sourceCoverage().contains(nextOffset)) {
+            if (nextOffset <= startOffset || !request.sourceCoverage().contains(nextOffset)) {
                 throw new CompactedObjectFormatException(
                         "strict compacted verification made no forward coverage progress");
             }
-            return scanNext(
-                    request,
-                    deadline,
-                    nextOffset,
-                    metadata,
-                    records,
-                    payloadBytes);
+            return scanNext(request, deadline, nextOffset, metadata, records, payloadBytes);
         });
     }
 
     private static void requireExactRange(
-            CompactedObjectVerificationRequest request,
-            long offset,
-            int count,
-            RangeReadResult result) {
+            CompactedObjectVerificationRequest request, long offset, int count, RangeReadResult result) {
         if (!result.key().equals(request.target().objectKey())
                 || result.offset() != offset
                 || result.length() != count
@@ -179,27 +157,21 @@ public final class CompactedObjectVerifier {
         }
         result.checksum().ifPresent(checksum -> {
             if (!checksum.equals(Crc32cChecksums.checksum(result.payload()))) {
-                throw new CompactedObjectFormatException(
-                        "object store returned a mismatched range checksum");
+                throw new CompactedObjectFormatException("object store returned a mismatched range checksum");
             }
         });
     }
 
     private static void requireCompleteScan(
-            CompactedObjectMetadata metadata,
-            long verifiedRecords,
-            long verifiedPayloadBytes) {
+            CompactedObjectMetadata metadata, long verifiedRecords, long verifiedPayloadBytes) {
         if (verifiedRecords != metadata.outputRecordCount()
-                || (metadata.view() == ReadView.COMMITTED
-                        && verifiedPayloadBytes != metadata.logicalBytes())) {
+                || (metadata.view() == ReadView.COMMITTED && verifiedPayloadBytes != metadata.logicalBytes())) {
             throw new CompactedObjectFormatException(
                     "strict compacted verification record/byte accounting is incomplete");
         }
     }
 
-    private static void requireExpectedMetadata(
-            CompactedObjectMetadata actual,
-            CompactedObjectWriteRequest expected) {
+    private static void requireExpectedMetadata(CompactedObjectMetadata actual, CompactedObjectWriteRequest expected) {
         if (actual.view() != expected.view()
                 || !actual.streamId().equals(expected.streamId())
                 || !actual.sourceCoverage().equals(expected.sourceCoverage())
@@ -218,8 +190,7 @@ public final class CompactedObjectVerifier {
                 || !actual.compression().equals(expected.compression())
                 || actual.targetRowGroupRecords() != expected.targetRowGroupRecords()
                 || !actual.topicCompaction().equals(expected.topicCompaction())) {
-            throw new CompactedObjectFormatException(
-                    "compacted file metadata does not match its frozen write request");
+            throw new CompactedObjectFormatException("compacted file metadata does not match its frozen write request");
         }
     }
 
@@ -232,14 +203,10 @@ public final class CompactedObjectVerifier {
             return current;
         }
         if (current instanceof IllegalArgumentException || current instanceof ArithmeticException) {
-            return new CompactedObjectFormatException(
-                    "invalid compacted verification state", current);
+            return new CompactedObjectFormatException("invalid compacted verification state", current);
         }
         return new NereusException(
-                ErrorCode.OBJECT_READ_FAILED,
-                true,
-                "full compacted object verification failed",
-                current);
+                ErrorCode.OBJECT_READ_FAILED, true, "full compacted object verification failed", current);
     }
 
     private static final class HashState {
@@ -266,16 +233,13 @@ public final class CompactedObjectVerifier {
 
         private Void finish(CompactedObjectVerificationRequest request) {
             Checksum crc = Crc32cChecksums.checksum((int) crc32c.getValue());
-            Checksum sha = new Checksum(
-                    ChecksumType.SHA256,
-                    HexFormat.of().formatHex(sha256.digest()));
+            Checksum sha = new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(sha256.digest()));
             String keyHash = contentHashFromKey(request.target().objectKey().value());
             if (bytes != request.target().objectLength()
                     || !crc.equals(request.storageCrc32c())
                     || !sha.equals(request.contentSha256())
                     || !sha.value().equals(keyHash)) {
-                throw new CompactedObjectFormatException(
-                        "complete compacted object checksum/key identity mismatch");
+                throw new CompactedObjectFormatException("complete compacted object checksum/key identity mismatch");
             }
             return null;
         }
@@ -284,20 +248,16 @@ public final class CompactedObjectVerifier {
             int slash = key.lastIndexOf('/');
             int dash = slash < 0 ? -1 : key.indexOf('-', slash + 1);
             if (slash < 0 || dash != slash + 65) {
-                throw new CompactedObjectFormatException(
-                        "compacted object key content hash is not canonical");
+                throw new CompactedObjectFormatException("compacted object key content hash is not canonical");
             }
             String value = key.substring(slash + 1, dash);
             if (value.length() != 64) {
-                throw new CompactedObjectFormatException(
-                        "compacted object key content hash is not canonical");
+                throw new CompactedObjectFormatException("compacted object key content hash is not canonical");
             }
             for (int index = 0; index < value.length(); index++) {
                 char character = value.charAt(index);
-                if (!((character >= '0' && character <= '9')
-                        || (character >= 'a' && character <= 'f'))) {
-                    throw new CompactedObjectFormatException(
-                            "compacted object key content hash is not canonical");
+                if (!((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f'))) {
+                    throw new CompactedObjectFormatException("compacted object key content hash is not canonical");
                 }
             }
             return value;
@@ -327,10 +287,7 @@ public final class CompactedObjectVerifier {
         private Duration remaining() {
             long remaining = deadlineNanos - System.nanoTime();
             if (remaining <= 0) {
-                throw new NereusException(
-                        ErrorCode.TIMEOUT,
-                        true,
-                        "compacted object verification deadline expired");
+                throw new NereusException(ErrorCode.TIMEOUT, true, "compacted object verification deadline expired");
             }
             return Duration.ofNanos(remaining);
         }

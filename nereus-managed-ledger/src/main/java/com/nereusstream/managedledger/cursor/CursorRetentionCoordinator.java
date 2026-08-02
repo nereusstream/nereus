@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.metadata.oxia.CursorIds;
@@ -10,19 +11,19 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Crash-recoverable protection, floor reconciliation, and logical-trim coordination. */
+/**
+ * Crash-recoverable protection, floor reconciliation, and logical-trim coordination.
+ */
 public interface CursorRetentionCoordinator extends AutoCloseable {
     CompletableFuture<CursorRetentionView> claimAndRecover(CursorOwnerSession owner);
 
-    CompletableFuture<ProtectionLease> beginProtection(
-            CursorOwnerSession owner, ProtectionRequest request);
+    CompletableFuture<ProtectionLease> beginProtection(CursorOwnerSession owner, ProtectionRequest request);
 
     CompletableFuture<CursorRetentionView> completeProtection(ProtectionLease lease);
 
     CompletableFuture<CursorRetentionView> reconcileFloor(CursorOwnerSession owner);
 
-    CompletableFuture<CursorRetentionView> requestTrim(
-            CursorOwnerSession owner, long candidateOffset, String reason);
+    CompletableFuture<CursorRetentionView> requestTrim(CursorOwnerSession owner, long candidateOffset, String reason);
 
     @Override
     void close();
@@ -48,10 +49,8 @@ public interface CursorRetentionCoordinator extends AutoCloseable {
                 throw new IllegalArgumentException("targetMarkDeleteOffset must be non-negative");
             }
             targetPartialBatch = Objects.requireNonNull(targetPartialBatch, "targetPartialBatch");
-            initialPositionProperties = immutableMap(
-                    initialPositionProperties, "initialPositionProperties");
-            initialCursorProperties = immutableMap(
-                    initialCursorProperties, "initialCursorProperties");
+            initialPositionProperties = immutableMap(initialPositionProperties, "initialPositionProperties");
+            initialCursorProperties = immutableMap(initialCursorProperties, "initialCursorProperties");
             switch (kind) {
                 case CREATE -> {
                     if (expectedCursorGeneration != 0
@@ -62,8 +61,7 @@ public interface CursorRetentionCoordinator extends AutoCloseable {
                 }
                 case RECREATE -> {
                     if (expectedCursorGeneration < 1
-                            || targetCursorGeneration
-                                    != Math.addExact(expectedCursorGeneration, 1)
+                            || targetCursorGeneration != Math.addExact(expectedCursorGeneration, 1)
                             || targetPartialBatch.isPresent()) {
                         throw new IllegalArgumentException(
                                 "RECREATE protection has invalid generation or partial state");
@@ -91,10 +89,7 @@ public interface CursorRetentionCoordinator extends AutoCloseable {
         }
     }
 
-    record ProtectionLease(
-            CursorOwnerSession owner,
-            String attemptId,
-            long retentionMetadataVersion) {
+    record ProtectionLease(CursorOwnerSession owner, String attemptId, long retentionMetadataVersion) {
         public ProtectionLease {
             Objects.requireNonNull(owner, "owner");
             attemptId = CursorIds.requireRandomId(attemptId, "attemptId");

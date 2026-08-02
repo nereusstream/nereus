@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import java.util.concurrent.CompletableFuture;
@@ -10,6 +11,5 @@ public interface GcReferenceDomain {
 
     CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query);
 
-    CompletableFuture<Boolean> stillMatches(
-            GcReferenceQuery query, GcReferenceSnapshot snapshot);
+    CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot);
 }

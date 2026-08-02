@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
 import java.util.ArrayList;
 
-/** Closed field-order codec for the cluster-wide Kafka storage activation authority. */
+/**
+ * Closed field-order codec for the cluster-wide Kafka storage activation authority.
+ */
 public final class KafkaStorageProtocolActivationRecordCodecV1
         extends AbstractF4RecordCodecV1<KafkaStorageProtocolActivationRecord> {
     public KafkaStorageProtocolActivationRecordCodecV1() {

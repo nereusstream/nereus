@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.bookkeeper.BookKeeperDeletionActivationCoordinator;
@@ -16,8 +17,7 @@ import java.util.concurrent.CompletionStage;
  * One-shot startup owner that installs or rebinds producer-owned BookKeeper deletion proofs before
  * the retention scanner starts.
  */
-public final class KafkaBookKeeperDeletionActivationService
-        implements KafkaRuntimeBackgroundService {
+public final class KafkaBookKeeperDeletionActivationService implements KafkaRuntimeBackgroundService {
     private final BookKeeperPrimaryWalRuntime runtime;
     private final BookKeeperDeletionActivationCoordinator coordinator;
     private final String runId;
@@ -32,14 +32,9 @@ public final class KafkaBookKeeperDeletionActivationService
             String runId,
             Duration timeout) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
-        this.coordinator =
-                runtime.createDeletionActivationCoordinator(
-                        Objects.requireNonNull(
-                                gcConfiguration,
-                                "gcConfiguration"),
-                        Objects.requireNonNull(
-                                streamCoverage,
-                                "streamCoverage"));
+        this.coordinator = runtime.createDeletionActivationCoordinator(
+                Objects.requireNonNull(gcConfiguration, "gcConfiguration"),
+                Objects.requireNonNull(streamCoverage, "streamCoverage"));
         this.runId = text(runId, "runId");
         this.timeout = positive(timeout, "timeout");
     }
@@ -61,38 +56,23 @@ public final class KafkaBookKeeperDeletionActivationService
     }
 
     private CompletableFuture<Void> activate() {
-        BookKeeperOperationDeadline deadline =
-                new BookKeeperOperationDeadline(timeout);
-        return deadline.bound(
-                        runtime.activationStore()
-                                .read(
-                                        runtime.configuration(),
-                                        runtime.namespace(),
-                                        deadline.remaining()))
-                .thenCompose(
-                        optional -> {
-                            long expectedVersion =
-                                    optional.orElseThrow(
-                                                    () ->
-                                                            new IllegalStateException(
-                                                                    "BookKeeper publication activation is absent"))
-                                            .metadataVersion();
-                            return coordinator.activate(
-                                    new BookKeeperDeletionActivationRequest(
-                                            runId,
-                                            expectedVersion,
-                                            deadline.remaining()));
-                        })
+        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(timeout);
+        return deadline.bound(runtime.activationStore()
+                        .read(runtime.configuration(), runtime.namespace(), deadline.remaining()))
+                .thenCompose(optional -> {
+                    long expectedVersion = optional.orElseThrow(
+                                    () -> new IllegalStateException("BookKeeper publication activation is absent"))
+                            .metadataVersion();
+                    return coordinator.activate(
+                            new BookKeeperDeletionActivationRequest(runId, expectedVersion, deadline.remaining()));
+                })
                 .thenApply(ignored -> null);
     }
 
     private static Duration positive(Duration value, String name) {
         Duration exact = Objects.requireNonNull(value, name);
-        if (exact.isZero()
-                || exact.isNegative()
-                || exact.toMillis() <= 0) {
-            throw new IllegalArgumentException(
-                    name + " must be positive and millisecond-representable");
+        if (exact.isZero() || exact.isNegative() || exact.toMillis() <= 0) {
+            throw new IllegalArgumentException(name + " must be positive and millisecond-representable");
         }
         return exact;
     }
@@ -100,8 +80,7 @@ public final class KafkaBookKeeperDeletionActivationService
     private static String text(String value, String name) {
         String exact = Objects.requireNonNull(value, name);
         if (exact.isBlank()) {
-            throw new IllegalArgumentException(
-                    name + " cannot be blank");
+            throw new IllegalArgumentException(name + " cannot be blank");
         }
         return exact;
     }

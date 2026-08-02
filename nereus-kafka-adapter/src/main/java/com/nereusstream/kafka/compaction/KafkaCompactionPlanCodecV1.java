@@ -44,734 +44,707 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
-/** Strict restart-safe V1 codec for {@link KafkaCompactionPlan}. */
+/**
+ * Strict restart-safe V1 codec for {@link KafkaCompactionPlan}.
+ */
 public final class KafkaCompactionPlanCodecV1 {
-  public static final int MAX_ENCODED_BYTES = 60 << 10;
-  public static final int MAX_TRANSACTION_FACTS =
-      KafkaCompactionPassOneCollector.MAX_TRANSACTION_FACTS;
+    public static final int MAX_ENCODED_BYTES = 60 << 10;
+    public static final int MAX_TRANSACTION_FACTS = KafkaCompactionPassOneCollector.MAX_TRANSACTION_FACTS;
 
-  private static final int MAGIC = 0x4b435031; // KCP1
-  private static final int VERSION = 1;
-  private static final int MAX_STRING_BYTES = 65_535;
-  private static final String IDENTITY_DOMAIN = "NEREUS_KAFKA_COMPACTION_PLAN_V1";
-  private static final int COMPRESSED_SOURCE_MAGIC = 0x4b435331; // KCS1
-  private static final int COMPRESSED_SOURCE_VERSION = 1;
+    private static final int MAGIC = 0x4b435031; // KCP1
+    private static final int VERSION = 1;
+    private static final int MAX_STRING_BYTES = 65_535;
+    private static final String IDENTITY_DOMAIN = "NEREUS_KAFKA_COMPACTION_PLAN_V1";
+    private static final int COMPRESSED_SOURCE_MAGIC = 0x4b435331; // KCS1
+    private static final int COMPRESSED_SOURCE_VERSION = 1;
 
-  private final ExactSourceSetCodecV1 sourceSetCodec;
+    private final ExactSourceSetCodecV1 sourceSetCodec;
 
-  public KafkaCompactionPlanCodecV1() {
-    this(new ExactSourceSetCodecV1());
-  }
-
-  KafkaCompactionPlanCodecV1(ExactSourceSetCodecV1 sourceSetCodec) {
-    this.sourceSetCodec = Objects.requireNonNull(sourceSetCodec, "sourceSetCodec");
-  }
-
-  public byte[] encode(KafkaCompactionPlan plan) {
-    KafkaCompactionPlan exact = Objects.requireNonNull(plan, "plan");
-    try {
-      Writer writer = new Writer();
-      writer.intValue(MAGIC);
-      writer.shortValue(VERSION);
-      writer.text(exact.planId());
-      writer.raw(canonicalBody(exact, sourceEncoding(exact)));
-      byte[] encoded = writer.bytes();
-      if (encoded.length > MAX_ENCODED_BYTES) {
-        throw new IllegalArgumentException("Kafka compaction plan exceeds its byte limit");
-      }
-      return encoded;
-    } catch (IOException failure) {
-      throw new IllegalStateException("in-memory Kafka compaction plan encoding failed", failure);
+    public KafkaCompactionPlanCodecV1() {
+        this(new ExactSourceSetCodecV1());
     }
-  }
 
-  public KafkaCompactionPlan decode(byte[] bytes) {
-    byte[] exact = Objects.requireNonNull(bytes, "bytes").clone();
-    if (exact.length == 0 || exact.length > MAX_ENCODED_BYTES) {
-      throw malformed("payload has an invalid length", null);
+    KafkaCompactionPlanCodecV1(ExactSourceSetCodecV1 sourceSetCodec) {
+        this.sourceSetCodec = Objects.requireNonNull(sourceSetCodec, "sourceSetCodec");
     }
-    try {
-      Reader reader = new Reader(exact);
-      if (reader.intValue("magic") != MAGIC || reader.unsignedShort("version") != VERSION) {
-        throw malformed("unsupported header", null);
-      }
-      String planId = reader.text("planId");
-      if (!reader.text("identityDomain").equals(IDENTITY_DOMAIN)) {
-        throw malformed("identity domain changed", null);
-      }
-      StreamId streamId = new StreamId(reader.text("streamId"));
-      String materializationTaskId = reader.text("materializationTaskId");
-      long bindingMetadataVersion = reader.longValue("bindingMetadataVersion");
-      long lastStableOffset = reader.longValue("lastStableOffset");
-      long highWatermark = reader.longValue("highWatermark");
-      Candidate candidate = readCandidate(reader);
-      ExactSourceSet decisionSources =
-          decodeDecisionSources(
-              reader.byteArray("decisionSources", MAX_ENCODED_BYTES));
-      int outputSourceCount = reader.intValue("outputSourceCount");
-      Checksum outputSourceSetSha256 = reader.checksum("outputSourceSetSha256");
-      Checksum materializationPolicySha256 = reader.checksum("materializationPolicySha256");
-      Snapshot snapshot = readSnapshot(reader);
-      Compatibility compatibility = readCompatibility(reader);
-      reader.requireConsumed();
-      return new KafkaCompactionPlan(
-          planId,
-          streamId,
-          materializationTaskId,
-          bindingMetadataVersion,
-          lastStableOffset,
-          highWatermark,
-          candidate,
-          decisionSources,
-          outputSourceCount,
-          outputSourceSetSha256,
-          materializationPolicySha256,
-          snapshot,
-          compatibility);
-    } catch (IllegalArgumentException failure) {
-      if (failure.getMessage() != null
-          && failure.getMessage().startsWith("malformed Kafka compaction plan:")) {
-        throw failure;
-      }
-      throw malformed("invalid canonical fields: " + failure.getMessage(), failure);
-    }
-  }
 
-  static String planIdFor(
-      StreamId streamId,
-      String materializationTaskId,
-      long bindingMetadataVersion,
-      long lastStableOffset,
-      long highWatermark,
-      Candidate candidate,
-      ExactSourceSet decisionSources,
-      int outputSourceCount,
-      Checksum outputSourceSetSha256,
-      Checksum materializationPolicySha256,
-      Snapshot snapshot,
-      Compatibility compatibility) {
-    KafkaCompactionPlanCodecV1 codec = new KafkaCompactionPlanCodecV1();
-    try {
-      byte[] body =
-          codec.canonicalBody(
-              streamId,
-              materializationTaskId,
-              bindingMetadataVersion,
-              lastStableOffset,
-              highWatermark,
-              candidate,
-              decisionSources,
-              outputSourceCount,
-              outputSourceSetSha256,
-              materializationPolicySha256,
-              snapshot,
-              compatibility,
-              DecisionSourceEncoding.IDENTITY_RAW_EXTENDED);
-      return "kcp1-" + DeterministicIds.stableHashBytes(body);
-    } catch (IOException failure) {
-      throw new IllegalStateException("in-memory Kafka compaction plan identity failed", failure);
-    }
-  }
-
-  private byte[] canonicalBody(KafkaCompactionPlan plan) throws IOException {
-    return canonicalBody(plan, sourceEncoding(plan));
-  }
-
-  private byte[] canonicalBody(
-      KafkaCompactionPlan plan, DecisionSourceEncoding sourceEncoding) throws IOException {
-    return canonicalBody(
-        plan.streamId(),
-        plan.materializationTaskId(),
-        plan.bindingMetadataVersion(),
-        plan.lastStableOffset(),
-        plan.highWatermark(),
-        plan.candidate(),
-        plan.decisionSources(),
-        plan.outputSourceCount(),
-        plan.outputSourceSetSha256(),
-        plan.materializationPolicySha256(),
-        plan.passOneSnapshot(),
-        plan.compatibility(),
-        sourceEncoding);
-  }
-
-  private byte[] canonicalBody(
-      StreamId streamId,
-      String materializationTaskId,
-      long bindingMetadataVersion,
-      long lastStableOffset,
-      long highWatermark,
-      Candidate candidate,
-      ExactSourceSet decisionSources,
-      int outputSourceCount,
-      Checksum outputSourceSetSha256,
-      Checksum materializationPolicySha256,
-      Snapshot snapshot,
-      Compatibility compatibility,
-      DecisionSourceEncoding sourceEncoding)
-      throws IOException {
-    Writer writer = new Writer();
-    writer.text(IDENTITY_DOMAIN);
-    writer.text(Objects.requireNonNull(streamId, "streamId").value());
-    writer.text(Objects.requireNonNull(materializationTaskId, "materializationTaskId"));
-    writer.longValue(bindingMetadataVersion);
-    writer.longValue(lastStableOffset);
-    writer.longValue(highWatermark);
-    writeCandidate(writer, Objects.requireNonNull(candidate, "candidate"));
-    writer.byteArray(
-        encodeDecisionSources(
-            Objects.requireNonNull(decisionSources, "decisionSources"),
-            Objects.requireNonNull(sourceEncoding, "sourceEncoding")),
-        sourceEncoding == DecisionSourceEncoding.IDENTITY_RAW_EXTENDED
-            ? ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES
-            : MAX_ENCODED_BYTES);
-    writer.intValue(outputSourceCount);
-    writer.checksum(outputSourceSetSha256);
-    writer.checksum(materializationPolicySha256);
-    writeSnapshot(writer, Objects.requireNonNull(snapshot, "snapshot"));
-    writeCompatibility(writer, Objects.requireNonNull(compatibility, "compatibility"));
-    return writer.bytes();
-  }
-
-  static boolean matchesPlanId(
-      String planId,
-      StreamId streamId,
-      String materializationTaskId,
-      long bindingMetadataVersion,
-      long lastStableOffset,
-      long highWatermark,
-      Candidate candidate,
-      ExactSourceSet decisionSources,
-      int outputSourceCount,
-      Checksum outputSourceSetSha256,
-      Checksum materializationPolicySha256,
-      Snapshot snapshot,
-      Compatibility compatibility) {
-    String exact = Objects.requireNonNull(planId, "planId");
-    if (exact.equals(
-        planIdFor(
-            streamId,
-            materializationTaskId,
-            bindingMetadataVersion,
-            lastStableOffset,
-            highWatermark,
-            candidate,
-            decisionSources,
-            outputSourceCount,
-            outputSourceSetSha256,
-            materializationPolicySha256,
-            snapshot,
-            compatibility))) {
-      return true;
-    }
-    try {
-      return exact.equals(
-          legacyPlanIdFor(
-              streamId,
-              materializationTaskId,
-              bindingMetadataVersion,
-              lastStableOffset,
-              highWatermark,
-              candidate,
-              decisionSources,
-              outputSourceCount,
-              outputSourceSetSha256,
-              materializationPolicySha256,
-              snapshot,
-              compatibility));
-    } catch (IllegalArgumentException legacyEncodingUnavailable) {
-      return false;
-    }
-  }
-
-  static String legacyPlanIdFor(
-      StreamId streamId,
-      String materializationTaskId,
-      long bindingMetadataVersion,
-      long lastStableOffset,
-      long highWatermark,
-      Candidate candidate,
-      ExactSourceSet decisionSources,
-      int outputSourceCount,
-      Checksum outputSourceSetSha256,
-      Checksum materializationPolicySha256,
-      Snapshot snapshot,
-      Compatibility compatibility) {
-    KafkaCompactionPlanCodecV1 codec = new KafkaCompactionPlanCodecV1();
-    try {
-      byte[] body =
-          codec.canonicalBody(
-              streamId,
-              materializationTaskId,
-              bindingMetadataVersion,
-              lastStableOffset,
-              highWatermark,
-              candidate,
-              decisionSources,
-              outputSourceCount,
-              outputSourceSetSha256,
-              materializationPolicySha256,
-              snapshot,
-              compatibility,
-              DecisionSourceEncoding.LEGACY_RAW);
-      return "kcp1-" + DeterministicIds.stableHashBytes(body);
-    } catch (IOException failure) {
-      throw new IllegalStateException(
-          "in-memory legacy Kafka compaction plan identity failed", failure);
-    }
-  }
-
-  private DecisionSourceEncoding sourceEncoding(KafkaCompactionPlan plan) {
-    try {
-      String legacy =
-          legacyPlanIdFor(
-              plan.streamId(),
-              plan.materializationTaskId(),
-              plan.bindingMetadataVersion(),
-              plan.lastStableOffset(),
-              plan.highWatermark(),
-              plan.candidate(),
-              plan.decisionSources(),
-              plan.outputSourceCount(),
-              plan.outputSourceSetSha256(),
-              plan.materializationPolicySha256(),
-              plan.passOneSnapshot(),
-              plan.compatibility());
-      if (plan.planId().equals(legacy)) {
-        return DecisionSourceEncoding.LEGACY_RAW;
-      }
-    } catch (IllegalArgumentException legacyEncodingUnavailable) {
-      // Extended source sets have no legal legacy representation.
-    }
-    return DecisionSourceEncoding.COMPRESSED;
-  }
-
-  private byte[] encodeDecisionSources(
-      ExactSourceSet decisionSources, DecisionSourceEncoding sourceEncoding) {
-    if (sourceEncoding == DecisionSourceEncoding.LEGACY_RAW) {
-      return sourceSetCodec.encode(decisionSources);
-    }
-    if (sourceEncoding == DecisionSourceEncoding.IDENTITY_RAW_EXTENDED) {
-      return sourceSetCodec.encode(
-          decisionSources,
-          ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES,
-          ExactSourceSetCodecV1.MAX_EXTENDED_SOURCE_RANGES);
-    }
-    byte[] raw =
-        sourceSetCodec.encode(
-            decisionSources,
-            ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES,
-            ExactSourceSetCodecV1.MAX_EXTENDED_SOURCE_RANGES);
-    Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION, true);
-    try {
-      deflater.setInput(raw);
-      deflater.finish();
-      ByteArrayOutputStream compressed = new ByteArrayOutputStream();
-      byte[] buffer = new byte[8 << 10];
-      while (!deflater.finished()) {
-        int written = deflater.deflate(buffer);
-        if (written <= 0) {
-          throw new IllegalStateException(
-              "deterministic decision source-set compression made no progress");
+    public byte[] encode(KafkaCompactionPlan plan) {
+        KafkaCompactionPlan exact = Objects.requireNonNull(plan, "plan");
+        try {
+            Writer writer = new Writer();
+            writer.intValue(MAGIC);
+            writer.shortValue(VERSION);
+            writer.text(exact.planId());
+            writer.raw(canonicalBody(exact, sourceEncoding(exact)));
+            byte[] encoded = writer.bytes();
+            if (encoded.length > MAX_ENCODED_BYTES) {
+                throw new IllegalArgumentException("Kafka compaction plan exceeds its byte limit");
+            }
+            return encoded;
+        } catch (IOException failure) {
+            throw new IllegalStateException("in-memory Kafka compaction plan encoding failed", failure);
         }
-        compressed.write(buffer, 0, written);
-        if (compressed.size() + Integer.BYTES + Short.BYTES + Integer.BYTES
-            > MAX_ENCODED_BYTES) {
-          throw new IllegalArgumentException(
-              "compressed decision source-set exceeds the Kafka plan byte limit");
+    }
+
+    public KafkaCompactionPlan decode(byte[] bytes) {
+        byte[] exact = Objects.requireNonNull(bytes, "bytes").clone();
+        if (exact.length == 0 || exact.length > MAX_ENCODED_BYTES) {
+            throw malformed("payload has an invalid length", null);
         }
-      }
-      ByteArrayOutputStream payload = new ByteArrayOutputStream();
-      DataOutputStream output = new DataOutputStream(payload);
-      output.writeInt(COMPRESSED_SOURCE_MAGIC);
-      output.writeShort(COMPRESSED_SOURCE_VERSION);
-      output.writeInt(raw.length);
-      compressed.writeTo(output);
-      output.flush();
-      return payload.toByteArray();
-    } catch (IOException failure) {
-      throw new IllegalStateException(
-          "in-memory decision source-set compression failed", failure);
-    } finally {
-      deflater.end();
-    }
-  }
-
-  private ExactSourceSet decodeDecisionSources(byte[] payload) {
-    byte[] exact = Objects.requireNonNull(payload, "decision source-set payload");
-    int headerBytes = Integer.BYTES + Short.BYTES + Integer.BYTES;
-    if (exact.length < headerBytes
-        || ByteBuffer.wrap(exact).order(ByteOrder.BIG_ENDIAN).getInt()
-            != COMPRESSED_SOURCE_MAGIC) {
-      return sourceSetCodec.decode(exact);
-    }
-    ByteBuffer header = ByteBuffer.wrap(exact).order(ByteOrder.BIG_ENDIAN);
-    header.getInt();
-    int version = Short.toUnsignedInt(header.getShort());
-    int expectedRawBytes = header.getInt();
-    if (version != COMPRESSED_SOURCE_VERSION
-        || expectedRawBytes <= 0
-        || expectedRawBytes > ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES
-        || !header.hasRemaining()) {
-      throw new IllegalArgumentException(
-          "malformed compressed decision source-set header");
-    }
-    byte[] compressed = new byte[header.remaining()];
-    header.get(compressed);
-    Inflater inflater = new Inflater(true);
-    try {
-      inflater.setInput(compressed);
-      ByteArrayOutputStream raw = new ByteArrayOutputStream(expectedRawBytes);
-      byte[] buffer = new byte[8 << 10];
-      while (!inflater.finished()) {
-        int written = inflater.inflate(buffer);
-        if (written > 0) {
-          raw.write(buffer, 0, written);
-          if (raw.size() > expectedRawBytes) {
-            throw new IllegalArgumentException(
-                "compressed decision source-set exceeds its declared length");
-          }
-          continue;
+        try {
+            Reader reader = new Reader(exact);
+            if (reader.intValue("magic") != MAGIC || reader.unsignedShort("version") != VERSION) {
+                throw malformed("unsupported header", null);
+            }
+            String planId = reader.text("planId");
+            if (!reader.text("identityDomain").equals(IDENTITY_DOMAIN)) {
+                throw malformed("identity domain changed", null);
+            }
+            StreamId streamId = new StreamId(reader.text("streamId"));
+            String materializationTaskId = reader.text("materializationTaskId");
+            long bindingMetadataVersion = reader.longValue("bindingMetadataVersion");
+            long lastStableOffset = reader.longValue("lastStableOffset");
+            long highWatermark = reader.longValue("highWatermark");
+            Candidate candidate = readCandidate(reader);
+            ExactSourceSet decisionSources =
+                    decodeDecisionSources(reader.byteArray("decisionSources", MAX_ENCODED_BYTES));
+            int outputSourceCount = reader.intValue("outputSourceCount");
+            Checksum outputSourceSetSha256 = reader.checksum("outputSourceSetSha256");
+            Checksum materializationPolicySha256 = reader.checksum("materializationPolicySha256");
+            Snapshot snapshot = readSnapshot(reader);
+            Compatibility compatibility = readCompatibility(reader);
+            reader.requireConsumed();
+            return new KafkaCompactionPlan(
+                    planId,
+                    streamId,
+                    materializationTaskId,
+                    bindingMetadataVersion,
+                    lastStableOffset,
+                    highWatermark,
+                    candidate,
+                    decisionSources,
+                    outputSourceCount,
+                    outputSourceSetSha256,
+                    materializationPolicySha256,
+                    snapshot,
+                    compatibility);
+        } catch (IllegalArgumentException failure) {
+            if (failure.getMessage() != null && failure.getMessage().startsWith("malformed Kafka compaction plan:")) {
+                throw failure;
+            }
+            throw malformed("invalid canonical fields: " + failure.getMessage(), failure);
         }
-        if (inflater.needsDictionary() || inflater.needsInput()) {
-          throw new IllegalArgumentException(
-              "compressed decision source-set is truncated or requires a dictionary");
+    }
+
+    static String planIdFor(
+            StreamId streamId,
+            String materializationTaskId,
+            long bindingMetadataVersion,
+            long lastStableOffset,
+            long highWatermark,
+            Candidate candidate,
+            ExactSourceSet decisionSources,
+            int outputSourceCount,
+            Checksum outputSourceSetSha256,
+            Checksum materializationPolicySha256,
+            Snapshot snapshot,
+            Compatibility compatibility) {
+        KafkaCompactionPlanCodecV1 codec = new KafkaCompactionPlanCodecV1();
+        try {
+            byte[] body = codec.canonicalBody(
+                    streamId,
+                    materializationTaskId,
+                    bindingMetadataVersion,
+                    lastStableOffset,
+                    highWatermark,
+                    candidate,
+                    decisionSources,
+                    outputSourceCount,
+                    outputSourceSetSha256,
+                    materializationPolicySha256,
+                    snapshot,
+                    compatibility,
+                    DecisionSourceEncoding.IDENTITY_RAW_EXTENDED);
+            return "kcp1-" + DeterministicIds.stableHashBytes(body);
+        } catch (IOException failure) {
+            throw new IllegalStateException("in-memory Kafka compaction plan identity failed", failure);
         }
-        throw new IllegalArgumentException(
-            "compressed decision source-set decompression made no progress");
-      }
-      if (raw.size() != expectedRawBytes || inflater.getRemaining() != 0) {
-        throw new IllegalArgumentException(
-            "compressed decision source-set length or trailing bytes changed");
-      }
-      return sourceSetCodec.decode(
-          raw.toByteArray(),
-          ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES,
-          ExactSourceSetCodecV1.MAX_EXTENDED_SOURCE_RANGES);
-    } catch (DataFormatException failure) {
-      throw new IllegalArgumentException(
-          "compressed decision source-set payload is malformed", failure);
-    } finally {
-      inflater.end();
-    }
-  }
-
-  private enum DecisionSourceEncoding {
-    LEGACY_RAW,
-    IDENTITY_RAW_EXTENDED,
-    COMPRESSED
-  }
-
-  private static void writeCandidate(Writer writer, Candidate candidate) throws IOException {
-    writer.range(candidate.outputCoverage());
-    writer.range(candidate.decisionHorizon());
-    writer.intValue(candidate.selectedSegmentCount());
-    writePolicy(writer, candidate.policy());
-    writer.optional(candidate.previousMandatoryCoverage().isPresent());
-    if (candidate.previousMandatoryCoverage().isPresent()) {
-      MandatoryCoverage coverage = candidate.previousMandatoryCoverage().orElseThrow();
-      writer.longValue(coverage.startOffset());
-      writer.longValue(coverage.endOffset());
-      writer.longValue(coverage.activationEpoch());
-      writer.checksum(coverage.generationSetSha256());
-      writer.checksum(coverage.policySha256());
-    }
-    writer.longValue(candidate.evaluatedAtMillis());
-  }
-
-  private static Candidate readCandidate(Reader reader) {
-    OffsetRange outputCoverage = reader.range("outputCoverage");
-    OffsetRange decisionHorizon = reader.range("decisionHorizon");
-    int selectedSegmentCount = reader.intValue("selectedSegmentCount");
-    Policy policy = readPolicy(reader);
-    Optional<MandatoryCoverage> previous =
-        reader.optional("previousMandatoryCoveragePresent")
-            ? Optional.of(
-                new MandatoryCoverage(
-                    reader.longValue("mandatoryStart"),
-                    reader.longValue("mandatoryEnd"),
-                    reader.longValue("mandatoryActivationEpoch"),
-                    reader.checksum("mandatoryGenerationSetSha256"),
-                    reader.checksum("mandatoryPolicySha256")))
-            : Optional.empty();
-    return new Candidate(
-        outputCoverage,
-        decisionHorizon,
-        selectedSegmentCount,
-        policy,
-        previous,
-        reader.longValue("evaluatedAtMillis"));
-  }
-
-  private static void writePolicy(Writer writer, Policy policy) throws IOException {
-    writer.longValue(policy.metadataOffset());
-    writer.checksum(policy.configDigest());
-    writer.longValue(policy.minCompactionLagMs());
-    writer.longValue(policy.maxCompactionLagMs());
-    writer.longValue(policy.deleteRetentionMs());
-    writer.intValue(policy.cleanupPolicyFlags());
-  }
-
-  private static Policy readPolicy(Reader reader) {
-    return new Policy(
-        reader.longValue("policyMetadataOffset"),
-        reader.checksum("policyConfigDigest"),
-        reader.longValue("minCompactionLagMs"),
-        reader.longValue("maxCompactionLagMs"),
-        reader.longValue("deleteRetentionMs"),
-        reader.intValue("cleanupPolicyFlags"));
-  }
-
-  private static void writeSnapshot(Writer writer, Snapshot snapshot) throws IOException {
-    writer.range(snapshot.outputCoverage());
-    writer.range(snapshot.decisionHorizon());
-    writer.longValue(snapshot.transactionStateEndOffset());
-    writer.longValue(snapshot.nowMillis());
-    writer.longValue(snapshot.deleteRetentionMs());
-    writer.longValue(snapshot.maxDecodedRecords());
-    writer.intValue(snapshot.maxKeyBytes());
-    writer.longValue(snapshot.maxInMemoryKeyBytes());
-    writer.intValue(snapshot.abortedTransactions().size());
-    for (AbortedTransactionRange aborted : snapshot.abortedTransactions()) {
-      writer.longValue(aborted.producerId());
-      writer.longValue(aborted.firstOffset());
-      writer.longValue(aborted.markerOffset());
-    }
-    writer.intValue(snapshot.openTransactions().size());
-    for (OpenTransactionRange open : snapshot.openTransactions()) {
-      writer.longValue(open.producerId());
-      writer.longValue(open.firstOffset());
-    }
-    writer.intValue(snapshot.markerDecisions().size());
-    for (MarkerDecision marker : snapshot.markerDecisions()) {
-      writer.longValue(marker.markerOffset());
-      writer.intValue(marker.status().ordinal());
-    }
-  }
-
-  private static Snapshot readSnapshot(Reader reader) {
-    OffsetRange outputCoverage = reader.range("snapshotOutputCoverage");
-    OffsetRange decisionHorizon = reader.range("snapshotDecisionHorizon");
-    long transactionStateEnd = reader.longValue("transactionStateEndOffset");
-    long nowMillis = reader.longValue("snapshotNowMillis");
-    long deleteRetentionMs = reader.longValue("snapshotDeleteRetentionMs");
-    long maxDecodedRecords = reader.longValue("maxDecodedRecords");
-    int maxKeyBytes = reader.intValue("maxKeyBytes");
-    long maxInMemoryKeyBytes = reader.longValue("maxInMemoryKeyBytes");
-    int abortedCount =
-        reader.count("abortedTransactionCount", MAX_TRANSACTION_FACTS, Long.BYTES * 3);
-    ArrayList<AbortedTransactionRange> aborted = new ArrayList<>(abortedCount);
-    for (int index = 0; index < abortedCount; index++) {
-      aborted.add(
-          new AbortedTransactionRange(
-              reader.longValue("abortedProducerId"),
-              reader.longValue("abortedFirstOffset"),
-              reader.longValue("abortedMarkerOffset")));
-    }
-    int openCount = reader.count("openTransactionCount", MAX_TRANSACTION_FACTS, Long.BYTES * 2);
-    ArrayList<OpenTransactionRange> open = new ArrayList<>(openCount);
-    for (int index = 0; index < openCount; index++) {
-      open.add(
-          new OpenTransactionRange(
-              reader.longValue("openProducerId"), reader.longValue("openFirstOffset")));
-    }
-    int markerCount =
-        reader.count("markerDecisionCount", MAX_TRANSACTION_FACTS, Long.BYTES + Integer.BYTES);
-    ArrayList<MarkerDecision> markers = new ArrayList<>(markerCount);
-    KafkaCompactionStrategyV1.MarkerStatus[] statuses =
-        KafkaCompactionStrategyV1.MarkerStatus.values();
-    for (int index = 0; index < markerCount; index++) {
-      long markerOffset = reader.longValue("markerOffset");
-      int statusId = reader.intValue("markerStatus");
-      if (statusId < 0 || statusId >= statuses.length) {
-        throw malformed("unknown marker status", null);
-      }
-      markers.add(new MarkerDecision(markerOffset, statuses[statusId]));
-    }
-    return new Snapshot(
-        outputCoverage,
-        decisionHorizon,
-        transactionStateEnd,
-        nowMillis,
-        deleteRetentionMs,
-        maxDecodedRecords,
-        maxKeyBytes,
-        maxInMemoryKeyBytes,
-        aborted,
-        open,
-        markers);
-  }
-
-  private static void writeCompatibility(Writer writer, Compatibility compatibility)
-      throws IOException {
-    writer.text(compatibility.strategyId());
-    writer.longValue(compatibility.strategyVersion());
-    writer.text(compatibility.keyCodecId());
-    writer.text(compatibility.rewriteCodecId());
-    writer.checksum(compatibility.messageFormatSha256());
-  }
-
-  private static Compatibility readCompatibility(Reader reader) {
-    return new Compatibility(
-        reader.text("strategyId"),
-        reader.longValue("strategyVersion"),
-        reader.text("keyCodecId"),
-        reader.text("rewriteCodecId"),
-        reader.checksum("messageFormatSha256"));
-  }
-
-  private static IllegalArgumentException malformed(String message, Throwable cause) {
-    return new IllegalArgumentException("malformed Kafka compaction plan: " + message, cause);
-  }
-
-  private static final class Writer {
-    private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-    private final DataOutputStream output = new DataOutputStream(bytes);
-
-    void shortValue(int value) throws IOException {
-      if (value < 0 || value > 0xffff) {
-        throw new IllegalArgumentException("unsigned short value is out of range");
-      }
-      output.writeShort(value);
     }
 
-    void intValue(int value) throws IOException {
-      output.writeInt(value);
+    private byte[] canonicalBody(KafkaCompactionPlan plan) throws IOException {
+        return canonicalBody(plan, sourceEncoding(plan));
     }
 
-    void longValue(long value) throws IOException {
-      output.writeLong(value);
+    private byte[] canonicalBody(KafkaCompactionPlan plan, DecisionSourceEncoding sourceEncoding) throws IOException {
+        return canonicalBody(
+                plan.streamId(),
+                plan.materializationTaskId(),
+                plan.bindingMetadataVersion(),
+                plan.lastStableOffset(),
+                plan.highWatermark(),
+                plan.candidate(),
+                plan.decisionSources(),
+                plan.outputSourceCount(),
+                plan.outputSourceSetSha256(),
+                plan.materializationPolicySha256(),
+                plan.passOneSnapshot(),
+                plan.compatibility(),
+                sourceEncoding);
     }
 
-    void range(OffsetRange range) throws IOException {
-      output.writeLong(range.startOffset());
-      output.writeLong(range.endOffset());
+    private byte[] canonicalBody(
+            StreamId streamId,
+            String materializationTaskId,
+            long bindingMetadataVersion,
+            long lastStableOffset,
+            long highWatermark,
+            Candidate candidate,
+            ExactSourceSet decisionSources,
+            int outputSourceCount,
+            Checksum outputSourceSetSha256,
+            Checksum materializationPolicySha256,
+            Snapshot snapshot,
+            Compatibility compatibility,
+            DecisionSourceEncoding sourceEncoding)
+            throws IOException {
+        Writer writer = new Writer();
+        writer.text(IDENTITY_DOMAIN);
+        writer.text(Objects.requireNonNull(streamId, "streamId").value());
+        writer.text(Objects.requireNonNull(materializationTaskId, "materializationTaskId"));
+        writer.longValue(bindingMetadataVersion);
+        writer.longValue(lastStableOffset);
+        writer.longValue(highWatermark);
+        writeCandidate(writer, Objects.requireNonNull(candidate, "candidate"));
+        writer.byteArray(
+                encodeDecisionSources(
+                        Objects.requireNonNull(decisionSources, "decisionSources"),
+                        Objects.requireNonNull(sourceEncoding, "sourceEncoding")),
+                sourceEncoding == DecisionSourceEncoding.IDENTITY_RAW_EXTENDED
+                        ? ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES
+                        : MAX_ENCODED_BYTES);
+        writer.intValue(outputSourceCount);
+        writer.checksum(outputSourceSetSha256);
+        writer.checksum(materializationPolicySha256);
+        writeSnapshot(writer, Objects.requireNonNull(snapshot, "snapshot"));
+        writeCompatibility(writer, Objects.requireNonNull(compatibility, "compatibility"));
+        return writer.bytes();
     }
 
-    void optional(boolean present) throws IOException {
-      output.writeByte(present ? 1 : 0);
+    static boolean matchesPlanId(
+            String planId,
+            StreamId streamId,
+            String materializationTaskId,
+            long bindingMetadataVersion,
+            long lastStableOffset,
+            long highWatermark,
+            Candidate candidate,
+            ExactSourceSet decisionSources,
+            int outputSourceCount,
+            Checksum outputSourceSetSha256,
+            Checksum materializationPolicySha256,
+            Snapshot snapshot,
+            Compatibility compatibility) {
+        String exact = Objects.requireNonNull(planId, "planId");
+        if (exact.equals(planIdFor(
+                streamId,
+                materializationTaskId,
+                bindingMetadataVersion,
+                lastStableOffset,
+                highWatermark,
+                candidate,
+                decisionSources,
+                outputSourceCount,
+                outputSourceSetSha256,
+                materializationPolicySha256,
+                snapshot,
+                compatibility))) {
+            return true;
+        }
+        try {
+            return exact.equals(legacyPlanIdFor(
+                    streamId,
+                    materializationTaskId,
+                    bindingMetadataVersion,
+                    lastStableOffset,
+                    highWatermark,
+                    candidate,
+                    decisionSources,
+                    outputSourceCount,
+                    outputSourceSetSha256,
+                    materializationPolicySha256,
+                    snapshot,
+                    compatibility));
+        } catch (IllegalArgumentException legacyEncodingUnavailable) {
+            return false;
+        }
     }
 
-    void checksum(Checksum checksum) throws IOException {
-      Objects.requireNonNull(checksum, "checksum");
-      if (checksum.type() != ChecksumType.SHA256) {
-        throw new IllegalArgumentException("Kafka compaction plan checksum must use SHA256");
-      }
-      text(checksum.value());
+    static String legacyPlanIdFor(
+            StreamId streamId,
+            String materializationTaskId,
+            long bindingMetadataVersion,
+            long lastStableOffset,
+            long highWatermark,
+            Candidate candidate,
+            ExactSourceSet decisionSources,
+            int outputSourceCount,
+            Checksum outputSourceSetSha256,
+            Checksum materializationPolicySha256,
+            Snapshot snapshot,
+            Compatibility compatibility) {
+        KafkaCompactionPlanCodecV1 codec = new KafkaCompactionPlanCodecV1();
+        try {
+            byte[] body = codec.canonicalBody(
+                    streamId,
+                    materializationTaskId,
+                    bindingMetadataVersion,
+                    lastStableOffset,
+                    highWatermark,
+                    candidate,
+                    decisionSources,
+                    outputSourceCount,
+                    outputSourceSetSha256,
+                    materializationPolicySha256,
+                    snapshot,
+                    compatibility,
+                    DecisionSourceEncoding.LEGACY_RAW);
+            return "kcp1-" + DeterministicIds.stableHashBytes(body);
+        } catch (IOException failure) {
+            throw new IllegalStateException("in-memory legacy Kafka compaction plan identity failed", failure);
+        }
     }
 
-    void text(String value) throws IOException {
-      byte[] encoded = Objects.requireNonNull(value, "value").getBytes(StandardCharsets.UTF_8);
-      if (encoded.length > MAX_STRING_BYTES) {
-        throw new IllegalArgumentException("Kafka compaction plan string exceeds its byte limit");
-      }
-      output.writeInt(encoded.length);
-      output.write(encoded);
+    private DecisionSourceEncoding sourceEncoding(KafkaCompactionPlan plan) {
+        try {
+            String legacy = legacyPlanIdFor(
+                    plan.streamId(),
+                    plan.materializationTaskId(),
+                    plan.bindingMetadataVersion(),
+                    plan.lastStableOffset(),
+                    plan.highWatermark(),
+                    plan.candidate(),
+                    plan.decisionSources(),
+                    plan.outputSourceCount(),
+                    plan.outputSourceSetSha256(),
+                    plan.materializationPolicySha256(),
+                    plan.passOneSnapshot(),
+                    plan.compatibility());
+            if (plan.planId().equals(legacy)) {
+                return DecisionSourceEncoding.LEGACY_RAW;
+            }
+        } catch (IllegalArgumentException legacyEncodingUnavailable) {
+            // Extended source sets have no legal legacy representation.
+        }
+        return DecisionSourceEncoding.COMPRESSED;
     }
 
-    void byteArray(byte[] value, int maximum) throws IOException {
-      byte[] exact = Objects.requireNonNull(value, "value");
-      if (exact.length > maximum) {
-        throw new IllegalArgumentException("Kafka compaction plan byte array exceeds its limit");
-      }
-      output.writeInt(exact.length);
-      output.write(exact);
+    private byte[] encodeDecisionSources(ExactSourceSet decisionSources, DecisionSourceEncoding sourceEncoding) {
+        if (sourceEncoding == DecisionSourceEncoding.LEGACY_RAW) {
+            return sourceSetCodec.encode(decisionSources);
+        }
+        if (sourceEncoding == DecisionSourceEncoding.IDENTITY_RAW_EXTENDED) {
+            return sourceSetCodec.encode(
+                    decisionSources,
+                    ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES,
+                    ExactSourceSetCodecV1.MAX_EXTENDED_SOURCE_RANGES);
+        }
+        byte[] raw = sourceSetCodec.encode(
+                decisionSources,
+                ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES,
+                ExactSourceSetCodecV1.MAX_EXTENDED_SOURCE_RANGES);
+        Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION, true);
+        try {
+            deflater.setInput(raw);
+            deflater.finish();
+            ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8 << 10];
+            while (!deflater.finished()) {
+                int written = deflater.deflate(buffer);
+                if (written <= 0) {
+                    throw new IllegalStateException("deterministic decision source-set compression made no progress");
+                }
+                compressed.write(buffer, 0, written);
+                if (compressed.size() + Integer.BYTES + Short.BYTES + Integer.BYTES > MAX_ENCODED_BYTES) {
+                    throw new IllegalArgumentException(
+                            "compressed decision source-set exceeds the Kafka plan byte limit");
+                }
+            }
+            ByteArrayOutputStream payload = new ByteArrayOutputStream();
+            DataOutputStream output = new DataOutputStream(payload);
+            output.writeInt(COMPRESSED_SOURCE_MAGIC);
+            output.writeShort(COMPRESSED_SOURCE_VERSION);
+            output.writeInt(raw.length);
+            compressed.writeTo(output);
+            output.flush();
+            return payload.toByteArray();
+        } catch (IOException failure) {
+            throw new IllegalStateException("in-memory decision source-set compression failed", failure);
+        } finally {
+            deflater.end();
+        }
     }
 
-    void raw(byte[] value) throws IOException {
-      output.write(value);
+    private ExactSourceSet decodeDecisionSources(byte[] payload) {
+        byte[] exact = Objects.requireNonNull(payload, "decision source-set payload");
+        int headerBytes = Integer.BYTES + Short.BYTES + Integer.BYTES;
+        if (exact.length < headerBytes
+                || ByteBuffer.wrap(exact).order(ByteOrder.BIG_ENDIAN).getInt() != COMPRESSED_SOURCE_MAGIC) {
+            return sourceSetCodec.decode(exact);
+        }
+        ByteBuffer header = ByteBuffer.wrap(exact).order(ByteOrder.BIG_ENDIAN);
+        header.getInt();
+        int version = Short.toUnsignedInt(header.getShort());
+        int expectedRawBytes = header.getInt();
+        if (version != COMPRESSED_SOURCE_VERSION
+                || expectedRawBytes <= 0
+                || expectedRawBytes > ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES
+                || !header.hasRemaining()) {
+            throw new IllegalArgumentException("malformed compressed decision source-set header");
+        }
+        byte[] compressed = new byte[header.remaining()];
+        header.get(compressed);
+        Inflater inflater = new Inflater(true);
+        try {
+            inflater.setInput(compressed);
+            ByteArrayOutputStream raw = new ByteArrayOutputStream(expectedRawBytes);
+            byte[] buffer = new byte[8 << 10];
+            while (!inflater.finished()) {
+                int written = inflater.inflate(buffer);
+                if (written > 0) {
+                    raw.write(buffer, 0, written);
+                    if (raw.size() > expectedRawBytes) {
+                        throw new IllegalArgumentException(
+                                "compressed decision source-set exceeds its declared length");
+                    }
+                    continue;
+                }
+                if (inflater.needsDictionary() || inflater.needsInput()) {
+                    throw new IllegalArgumentException(
+                            "compressed decision source-set is truncated or requires a dictionary");
+                }
+                throw new IllegalArgumentException("compressed decision source-set decompression made no progress");
+            }
+            if (raw.size() != expectedRawBytes || inflater.getRemaining() != 0) {
+                throw new IllegalArgumentException("compressed decision source-set length or trailing bytes changed");
+            }
+            return sourceSetCodec.decode(
+                    raw.toByteArray(),
+                    ExactSourceSetCodecV1.MAX_EXTENDED_ENCODED_BYTES,
+                    ExactSourceSetCodecV1.MAX_EXTENDED_SOURCE_RANGES);
+        } catch (DataFormatException failure) {
+            throw new IllegalArgumentException("compressed decision source-set payload is malformed", failure);
+        } finally {
+            inflater.end();
+        }
     }
 
-    byte[] bytes() throws IOException {
-      output.flush();
-      return bytes.toByteArray();
-    }
-  }
-
-  private static final class Reader {
-    private final ByteBuffer input;
-
-    Reader(byte[] bytes) {
-      input = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
+    private enum DecisionSourceEncoding {
+        LEGACY_RAW,
+        IDENTITY_RAW_EXTENDED,
+        COMPRESSED
     }
 
-    int unsignedShort(String field) {
-      require(Short.BYTES, field);
-      return Short.toUnsignedInt(input.getShort());
+    private static void writeCandidate(Writer writer, Candidate candidate) throws IOException {
+        writer.range(candidate.outputCoverage());
+        writer.range(candidate.decisionHorizon());
+        writer.intValue(candidate.selectedSegmentCount());
+        writePolicy(writer, candidate.policy());
+        writer.optional(candidate.previousMandatoryCoverage().isPresent());
+        if (candidate.previousMandatoryCoverage().isPresent()) {
+            MandatoryCoverage coverage = candidate.previousMandatoryCoverage().orElseThrow();
+            writer.longValue(coverage.startOffset());
+            writer.longValue(coverage.endOffset());
+            writer.longValue(coverage.activationEpoch());
+            writer.checksum(coverage.generationSetSha256());
+            writer.checksum(coverage.policySha256());
+        }
+        writer.longValue(candidate.evaluatedAtMillis());
     }
 
-    int intValue(String field) {
-      require(Integer.BYTES, field);
-      return input.getInt();
+    private static Candidate readCandidate(Reader reader) {
+        OffsetRange outputCoverage = reader.range("outputCoverage");
+        OffsetRange decisionHorizon = reader.range("decisionHorizon");
+        int selectedSegmentCount = reader.intValue("selectedSegmentCount");
+        Policy policy = readPolicy(reader);
+        Optional<MandatoryCoverage> previous = reader.optional("previousMandatoryCoveragePresent")
+                ? Optional.of(new MandatoryCoverage(
+                        reader.longValue("mandatoryStart"),
+                        reader.longValue("mandatoryEnd"),
+                        reader.longValue("mandatoryActivationEpoch"),
+                        reader.checksum("mandatoryGenerationSetSha256"),
+                        reader.checksum("mandatoryPolicySha256")))
+                : Optional.empty();
+        return new Candidate(
+                outputCoverage,
+                decisionHorizon,
+                selectedSegmentCount,
+                policy,
+                previous,
+                reader.longValue("evaluatedAtMillis"));
     }
 
-    long longValue(String field) {
-      require(Long.BYTES, field);
-      return input.getLong();
+    private static void writePolicy(Writer writer, Policy policy) throws IOException {
+        writer.longValue(policy.metadataOffset());
+        writer.checksum(policy.configDigest());
+        writer.longValue(policy.minCompactionLagMs());
+        writer.longValue(policy.maxCompactionLagMs());
+        writer.longValue(policy.deleteRetentionMs());
+        writer.intValue(policy.cleanupPolicyFlags());
     }
 
-    OffsetRange range(String field) {
-      return new OffsetRange(longValue(field + "Start"), longValue(field + "End"));
+    private static Policy readPolicy(Reader reader) {
+        return new Policy(
+                reader.longValue("policyMetadataOffset"),
+                reader.checksum("policyConfigDigest"),
+                reader.longValue("minCompactionLagMs"),
+                reader.longValue("maxCompactionLagMs"),
+                reader.longValue("deleteRetentionMs"),
+                reader.intValue("cleanupPolicyFlags"));
     }
 
-    boolean optional(String field) {
-      require(1, field);
-      byte value = input.get();
-      if (value != 0 && value != 1) {
-        throw malformed(field + " is not a canonical boolean", null);
-      }
-      return value == 1;
+    private static void writeSnapshot(Writer writer, Snapshot snapshot) throws IOException {
+        writer.range(snapshot.outputCoverage());
+        writer.range(snapshot.decisionHorizon());
+        writer.longValue(snapshot.transactionStateEndOffset());
+        writer.longValue(snapshot.nowMillis());
+        writer.longValue(snapshot.deleteRetentionMs());
+        writer.longValue(snapshot.maxDecodedRecords());
+        writer.intValue(snapshot.maxKeyBytes());
+        writer.longValue(snapshot.maxInMemoryKeyBytes());
+        writer.intValue(snapshot.abortedTransactions().size());
+        for (AbortedTransactionRange aborted : snapshot.abortedTransactions()) {
+            writer.longValue(aborted.producerId());
+            writer.longValue(aborted.firstOffset());
+            writer.longValue(aborted.markerOffset());
+        }
+        writer.intValue(snapshot.openTransactions().size());
+        for (OpenTransactionRange open : snapshot.openTransactions()) {
+            writer.longValue(open.producerId());
+            writer.longValue(open.firstOffset());
+        }
+        writer.intValue(snapshot.markerDecisions().size());
+        for (MarkerDecision marker : snapshot.markerDecisions()) {
+            writer.longValue(marker.markerOffset());
+            writer.intValue(marker.status().ordinal());
+        }
     }
 
-    Checksum checksum(String field) {
-      return new Checksum(ChecksumType.SHA256, text(field));
+    private static Snapshot readSnapshot(Reader reader) {
+        OffsetRange outputCoverage = reader.range("snapshotOutputCoverage");
+        OffsetRange decisionHorizon = reader.range("snapshotDecisionHorizon");
+        long transactionStateEnd = reader.longValue("transactionStateEndOffset");
+        long nowMillis = reader.longValue("snapshotNowMillis");
+        long deleteRetentionMs = reader.longValue("snapshotDeleteRetentionMs");
+        long maxDecodedRecords = reader.longValue("maxDecodedRecords");
+        int maxKeyBytes = reader.intValue("maxKeyBytes");
+        long maxInMemoryKeyBytes = reader.longValue("maxInMemoryKeyBytes");
+        int abortedCount = reader.count("abortedTransactionCount", MAX_TRANSACTION_FACTS, Long.BYTES * 3);
+        ArrayList<AbortedTransactionRange> aborted = new ArrayList<>(abortedCount);
+        for (int index = 0; index < abortedCount; index++) {
+            aborted.add(new AbortedTransactionRange(
+                    reader.longValue("abortedProducerId"),
+                    reader.longValue("abortedFirstOffset"),
+                    reader.longValue("abortedMarkerOffset")));
+        }
+        int openCount = reader.count("openTransactionCount", MAX_TRANSACTION_FACTS, Long.BYTES * 2);
+        ArrayList<OpenTransactionRange> open = new ArrayList<>(openCount);
+        for (int index = 0; index < openCount; index++) {
+            open.add(new OpenTransactionRange(reader.longValue("openProducerId"), reader.longValue("openFirstOffset")));
+        }
+        int markerCount = reader.count("markerDecisionCount", MAX_TRANSACTION_FACTS, Long.BYTES + Integer.BYTES);
+        ArrayList<MarkerDecision> markers = new ArrayList<>(markerCount);
+        KafkaCompactionStrategyV1.MarkerStatus[] statuses = KafkaCompactionStrategyV1.MarkerStatus.values();
+        for (int index = 0; index < markerCount; index++) {
+            long markerOffset = reader.longValue("markerOffset");
+            int statusId = reader.intValue("markerStatus");
+            if (statusId < 0 || statusId >= statuses.length) {
+                throw malformed("unknown marker status", null);
+            }
+            markers.add(new MarkerDecision(markerOffset, statuses[statusId]));
+        }
+        return new Snapshot(
+                outputCoverage,
+                decisionHorizon,
+                transactionStateEnd,
+                nowMillis,
+                deleteRetentionMs,
+                maxDecodedRecords,
+                maxKeyBytes,
+                maxInMemoryKeyBytes,
+                aborted,
+                open,
+                markers);
     }
 
-    String text(String field) {
-      byte[] bytes = byteArray(field, MAX_STRING_BYTES);
-      try {
-        return StandardCharsets.UTF_8
-            .newDecoder()
-            .onMalformedInput(CodingErrorAction.REPORT)
-            .onUnmappableCharacter(CodingErrorAction.REPORT)
-            .decode(ByteBuffer.wrap(bytes))
-            .toString();
-      } catch (CharacterCodingException failure) {
-        throw malformed(field + " is not strict UTF-8", failure);
-      }
+    private static void writeCompatibility(Writer writer, Compatibility compatibility) throws IOException {
+        writer.text(compatibility.strategyId());
+        writer.longValue(compatibility.strategyVersion());
+        writer.text(compatibility.keyCodecId());
+        writer.text(compatibility.rewriteCodecId());
+        writer.checksum(compatibility.messageFormatSha256());
     }
 
-    byte[] byteArray(String field, int maximum) {
-      int length = intValue(field + "Length");
-      if (length < 0 || length > maximum) {
-        throw malformed(field + " length exceeds its bound", null);
-      }
-      require(length, field);
-      byte[] value = new byte[length];
-      input.get(value);
-      return value;
+    private static Compatibility readCompatibility(Reader reader) {
+        return new Compatibility(
+                reader.text("strategyId"),
+                reader.longValue("strategyVersion"),
+                reader.text("keyCodecId"),
+                reader.text("rewriteCodecId"),
+                reader.checksum("messageFormatSha256"));
     }
 
-    int count(String field, int maximum, int minimumBytesPerItem) {
-      int count = intValue(field);
-      if (count < 0
-          || count > maximum
-          || (minimumBytesPerItem > 0 && count > input.remaining() / minimumBytesPerItem)) {
-        throw malformed(field + " is outside its bound", null);
-      }
-      return count;
+    private static IllegalArgumentException malformed(String message, Throwable cause) {
+        return new IllegalArgumentException("malformed Kafka compaction plan: " + message, cause);
     }
 
-    void requireConsumed() {
-      if (input.hasRemaining()) {
-        throw malformed("payload contains trailing bytes", null);
-      }
+    private static final class Writer {
+        private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        private final DataOutputStream output = new DataOutputStream(bytes);
+
+        void shortValue(int value) throws IOException {
+            if (value < 0 || value > 0xffff) {
+                throw new IllegalArgumentException("unsigned short value is out of range");
+            }
+            output.writeShort(value);
+        }
+
+        void intValue(int value) throws IOException {
+            output.writeInt(value);
+        }
+
+        void longValue(long value) throws IOException {
+            output.writeLong(value);
+        }
+
+        void range(OffsetRange range) throws IOException {
+            output.writeLong(range.startOffset());
+            output.writeLong(range.endOffset());
+        }
+
+        void optional(boolean present) throws IOException {
+            output.writeByte(present ? 1 : 0);
+        }
+
+        void checksum(Checksum checksum) throws IOException {
+            Objects.requireNonNull(checksum, "checksum");
+            if (checksum.type() != ChecksumType.SHA256) {
+                throw new IllegalArgumentException("Kafka compaction plan checksum must use SHA256");
+            }
+            text(checksum.value());
+        }
+
+        void text(String value) throws IOException {
+            byte[] encoded = Objects.requireNonNull(value, "value").getBytes(StandardCharsets.UTF_8);
+            if (encoded.length > MAX_STRING_BYTES) {
+                throw new IllegalArgumentException("Kafka compaction plan string exceeds its byte limit");
+            }
+            output.writeInt(encoded.length);
+            output.write(encoded);
+        }
+
+        void byteArray(byte[] value, int maximum) throws IOException {
+            byte[] exact = Objects.requireNonNull(value, "value");
+            if (exact.length > maximum) {
+                throw new IllegalArgumentException("Kafka compaction plan byte array exceeds its limit");
+            }
+            output.writeInt(exact.length);
+            output.write(exact);
+        }
+
+        void raw(byte[] value) throws IOException {
+            output.write(value);
+        }
+
+        byte[] bytes() throws IOException {
+            output.flush();
+            return bytes.toByteArray();
+        }
     }
 
-    private void require(int bytes, String field) {
-      if (bytes < 0 || input.remaining() < bytes) {
-        throw malformed("truncated " + field, null);
-      }
+    private static final class Reader {
+        private final ByteBuffer input;
+
+        Reader(byte[] bytes) {
+            input = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
+        }
+
+        int unsignedShort(String field) {
+            require(Short.BYTES, field);
+            return Short.toUnsignedInt(input.getShort());
+        }
+
+        int intValue(String field) {
+            require(Integer.BYTES, field);
+            return input.getInt();
+        }
+
+        long longValue(String field) {
+            require(Long.BYTES, field);
+            return input.getLong();
+        }
+
+        OffsetRange range(String field) {
+            return new OffsetRange(longValue(field + "Start"), longValue(field + "End"));
+        }
+
+        boolean optional(String field) {
+            require(1, field);
+            byte value = input.get();
+            if (value != 0 && value != 1) {
+                throw malformed(field + " is not a canonical boolean", null);
+            }
+            return value == 1;
+        }
+
+        Checksum checksum(String field) {
+            return new Checksum(ChecksumType.SHA256, text(field));
+        }
+
+        String text(String field) {
+            byte[] bytes = byteArray(field, MAX_STRING_BYTES);
+            try {
+                return StandardCharsets.UTF_8
+                        .newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        .decode(ByteBuffer.wrap(bytes))
+                        .toString();
+            } catch (CharacterCodingException failure) {
+                throw malformed(field + " is not strict UTF-8", failure);
+            }
+        }
+
+        byte[] byteArray(String field, int maximum) {
+            int length = intValue(field + "Length");
+            if (length < 0 || length > maximum) {
+                throw malformed(field + " length exceeds its bound", null);
+            }
+            require(length, field);
+            byte[] value = new byte[length];
+            input.get(value);
+            return value;
+        }
+
+        int count(String field, int maximum, int minimumBytesPerItem) {
+            int count = intValue(field);
+            if (count < 0
+                    || count > maximum
+                    || (minimumBytesPerItem > 0 && count > input.remaining() / minimumBytesPerItem)) {
+                throw malformed(field + " is outside its bound", null);
+            }
+            return count;
+        }
+
+        void requireConsumed() {
+            if (input.hasRemaining()) {
+                throw malformed("payload contains trailing bytes", null);
+            }
+        }
+
+        private void require(int bytes, String field) {
+            if (bytes < 0 || input.remaining() < bytes) {
+                throw malformed("truncated " + field, null);
+            }
+        }
     }
-  }
 }

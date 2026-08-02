@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.ErrorCode;
@@ -20,7 +21,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import org.apache.bookkeeper.client.api.LedgerMetadata;
 
-/** Mark/drain/delete/dual-absence convergence for exact Nereus-owned BookKeeper ledgers. */
+/**
+ * Mark/drain/delete/dual-absence convergence for exact Nereus-owned BookKeeper ledgers.
+ */
 public final class BookKeeperLedgerRetentionManager {
     private final String cluster;
     private final BookKeeperWalConfiguration configuration;
@@ -56,14 +59,15 @@ public final class BookKeeperLedgerRetentionManager {
         this.deletePermits = new Semaphore(gcConfiguration.maxConcurrentDeletes());
     }
 
-    /** Conditionally freezes one twice-validated SEALED candidate. */
+    /**
+     * Conditionally freezes one twice-validated SEALED candidate.
+     */
     public CompletableFuture<BookKeeperLedgerGcResult> mark(
-            BookKeeperLedgerRetirementCandidate candidate,
-            Duration timeout) {
+            BookKeeperLedgerRetirementCandidate candidate, Duration timeout) {
         BookKeeperLedgerRetirementCandidate expected = Objects.requireNonNull(candidate, "candidate");
         if (!gcConfiguration.enabled()) {
-            return CompletableFuture.completedFuture(BookKeeperLedgerGcResult.of(
-                    BookKeeperLedgerGcAction.DISABLED, expected.root()));
+            return CompletableFuture.completedFuture(
+                    BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.DISABLED, expected.root()));
         }
         return gate.evaluate(expected.root(), bounded(timeout)).thenCompose(reloaded -> {
             if (reloaded.candidate().isEmpty()) {
@@ -76,8 +80,8 @@ public final class BookKeeperLedgerRetentionManager {
                         exact.root(), java.util.Set.of(BookKeeperRetentionBlocker.ROOT_CHANGED_OR_INELIGIBLE)));
             }
             if (gcConfiguration.dryRun()) {
-                return CompletableFuture.completedFuture(BookKeeperLedgerGcResult.of(
-                        BookKeeperLedgerGcAction.DRY_RUN_ADMITTED, exact.root()));
+                return CompletableFuture.completedFuture(
+                        BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.DRY_RUN_ADMITTED, exact.root()));
             }
             long now = clock.millis();
             long deleteNotBefore = add(now, gcConfiguration.drainGrace());
@@ -98,10 +102,11 @@ public final class BookKeeperLedgerRetentionManager {
         });
     }
 
-    /** Advances at most one durable/provider step; waits are represented as results, never sleeps. */
+    /**
+     * Advances at most one durable/provider step; waits are represented as results, never sleeps.
+     */
     public CompletableFuture<BookKeeperLedgerGcResult> converge(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> observed,
-            Duration timeout) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> observed, Duration timeout) {
         BookKeeperVersionedValue<BookKeeperLedgerRootRecord> expected = Objects.requireNonNull(observed, "observed");
         if (!gcConfiguration.enabled()) {
             return CompletableFuture.completedFuture(
@@ -114,42 +119,63 @@ public final class BookKeeperLedgerRetentionManager {
         return reloadExact(expected).thenCompose(root -> switch (root.value().lifecycle()) {
             case MARKED -> advanceMarked(root, bounded(timeout));
             case DELETING -> advanceDeleting(root, bounded(timeout));
-            case DELETED, ABORTED, QUARANTINED -> CompletableFuture.completedFuture(
-                    BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.ALREADY_TERMINAL, root));
-            default -> CompletableFuture.completedFuture(BookKeeperLedgerGcResult.blocked(
-                    root, java.util.Set.of(BookKeeperRetentionBlocker.ROOT_CHANGED_OR_INELIGIBLE)));
+            case DELETED, ABORTED, QUARANTINED ->
+                CompletableFuture.completedFuture(
+                        BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.ALREADY_TERMINAL, root));
+            default ->
+                CompletableFuture.completedFuture(BookKeeperLedgerGcResult.blocked(
+                        root, java.util.Set.of(BookKeeperRetentionBlocker.ROOT_CHANGED_OR_INELIGIBLE)));
         });
     }
 
     private CompletableFuture<BookKeeperLedgerGcResult> advanceMarked(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            Duration timeout) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, Duration timeout) {
         if (clock.millis() < root.value().deleteNotBeforeMillis()) {
             return CompletableFuture.completedFuture(
                     BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.WAITING_DRAIN, root));
         }
         return gate.evaluateMarked(root, timeout).thenCompose(evaluation -> {
             if (evaluation.candidate().isEmpty()
-                    || !evaluation.candidate().orElseThrow().referenceSetSha256().value()
+                    || !evaluation
+                            .candidate()
+                            .orElseThrow()
+                            .referenceSetSha256()
+                            .value()
                             .equals(root.value().referenceSetSha256())) {
                 BookKeeperLedgerRootRecord sealed = root(
-                        root.value(), BookKeeperLedgerLifecycle.SEALED, root.value().lifecycleEpoch() + 1,
-                        "", "", 0, 0, 0, 0, 0, "");
+                        root.value(),
+                        BookKeeperLedgerLifecycle.SEALED,
+                        root.value().lifecycleEpoch() + 1,
+                        "",
+                        "",
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        "");
                 return metadata.compareAndSetRoot(cluster, sealed, root.metadataVersion())
                         .thenApply(value -> BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.UNMARKED, value));
             }
             BookKeeperLedgerRootRecord deleting = root(
-                    root.value(), BookKeeperLedgerLifecycle.DELETING, root.value().lifecycleEpoch() + 1,
-                    root.value().gcAttemptId(), root.value().referenceSetSha256(),
-                    root.value().markedAtMillis(), root.value().deleteNotBeforeMillis(), clock.millis(), 0, 0, "");
+                    root.value(),
+                    BookKeeperLedgerLifecycle.DELETING,
+                    root.value().lifecycleEpoch() + 1,
+                    root.value().gcAttemptId(),
+                    root.value().referenceSetSha256(),
+                    root.value().markedAtMillis(),
+                    root.value().deleteNotBeforeMillis(),
+                    clock.millis(),
+                    0,
+                    0,
+                    "");
             return metadata.compareAndSetRoot(cluster, deleting, root.metadataVersion())
                     .thenApply(value -> BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.DELETING, value));
         });
     }
 
     private CompletableFuture<BookKeeperLedgerGcResult> advanceDeleting(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            Duration timeout) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, Duration timeout) {
         if (root.value().firstAbsentAtMillis() > 0) {
             if (clock.millis() < add(root.value().firstAbsentAtMillis(), gcConfiguration.lateCreateAuditGrace())) {
                 return CompletableFuture.completedFuture(
@@ -168,19 +194,28 @@ public final class BookKeeperLedgerRetentionManager {
                         }
                         long deletedAt = Math.max(clock.millis(), root.value().firstAbsentAtMillis() + 1);
                         BookKeeperLedgerRootRecord deleted = root(
-                                root.value(), BookKeeperLedgerLifecycle.DELETED,
-                                root.value().lifecycleEpoch() + 1, root.value().gcAttemptId(),
-                                root.value().referenceSetSha256(), root.value().markedAtMillis(),
-                                root.value().deleteNotBeforeMillis(), root.value().deleteStartedAtMillis(),
-                                root.value().firstAbsentAtMillis(), deletedAt, "");
+                                root.value(),
+                                BookKeeperLedgerLifecycle.DELETED,
+                                root.value().lifecycleEpoch() + 1,
+                                root.value().gcAttemptId(),
+                                root.value().referenceSetSha256(),
+                                root.value().markedAtMillis(),
+                                root.value().deleteNotBeforeMillis(),
+                                root.value().deleteStartedAtMillis(),
+                                root.value().firstAbsentAtMillis(),
+                                deletedAt,
+                                "");
                         return metadata.compareAndSetRoot(cluster, deleted, root.metadataVersion())
-                                .thenApply(value -> BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.DELETED, value));
+                                .thenApply(
+                                        value -> BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.DELETED, value));
                     });
         }
         return requireDeletionAuthority(root, timeout)
                 .thenCompose(ignored -> observeMetadata(root, timeout))
                 .thenCompose(provider -> {
-                    if (provider.isEmpty()) return recordFirstAbsence(root);
+                    if (provider.isEmpty()) {
+                        return recordFirstAbsence(root);
+                    }
                     try {
                         requireProviderExact(root.value(), provider.orElseThrow());
                     } catch (RuntimeException mismatch) {
@@ -191,54 +226,68 @@ public final class BookKeeperLedgerRetentionManager {
     }
 
     private CompletableFuture<BookKeeperLedgerGcResult> deletePresent(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            Duration timeout) {
-        return gate.evaluateDeleting(root, timeout).handle((evaluation, failure) -> {
-            if (failure == null) return CompletableFuture.completedFuture(evaluation);
-            if (isNotFound(failure)) return CompletableFuture.<BookKeeperRetentionEvaluation>completedFuture(null);
-            return CompletableFuture.<BookKeeperRetentionEvaluation>failedFuture(unwrap(failure));
-        }).thenCompose(java.util.function.Function.identity()).thenCompose(evaluation -> {
-            if (evaluation == null) return recordFirstAbsence(root);
-            if (evaluation.candidate().isEmpty()) {
-                if (evaluation.blockers().contains(BookKeeperRetentionBlocker.PROVIDER_METADATA_MISMATCH)) {
-                    return quarantine(root, "provider metadata changed before physical delete");
-                }
-                return CompletableFuture.completedFuture(BookKeeperLedgerGcResult.blocked(root, evaluation.blockers()));
-            }
-            if (!evaluation.candidate().orElseThrow().referenceSetSha256().value()
-                    .equals(root.value().referenceSetSha256())) {
-                return CompletableFuture.completedFuture(BookKeeperLedgerGcResult.blocked(
-                        root, java.util.Set.of(BookKeeperRetentionBlocker.PROTECTION_PRESENT)));
-            }
-            if (!deletePermits.tryAcquire()) {
-                return CompletableFuture.completedFuture(BookKeeperLedgerGcResult.of(
-                        BookKeeperLedgerGcAction.DELETE_RETRY_REQUIRED, root));
-            }
-            CompletableFuture<Void> deletion;
-            try {
-                deletion = client.delete(root.value().ledgerId(), new BookKeeperOperationDeadline(min(
-                        timeout, configuration.deleteTimeout())));
-            } catch (Throwable failure) {
-                deletion = CompletableFuture.failedFuture(failure);
-            }
-            return deletion.handle((ignored, deleteFailure) -> {
-                        deletePermits.release();
-                        return observeMetadata(root, timeout);
-                    })
-                    .thenCompose(java.util.function.Function.identity())
-                    .thenCompose(provider -> {
-                        if (provider.isPresent()) {
-                            try {
-                                requireProviderExact(root.value(), provider.orElseThrow());
-                                return CompletableFuture.completedFuture(BookKeeperLedgerGcResult.of(
-                                        BookKeeperLedgerGcAction.DELETE_RETRY_REQUIRED, root));
-                            } catch (RuntimeException mismatch) {
-                                return quarantine(root, "provider metadata changed after delete response loss");
-                            }
-                        }
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, Duration timeout) {
+        return gate.evaluateDeleting(root, timeout)
+                .handle((evaluation, failure) -> {
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(evaluation);
+                    }
+                    if (isNotFound(failure)) {
+                        return CompletableFuture.<BookKeeperRetentionEvaluation>completedFuture(null);
+                    }
+                    return CompletableFuture.<BookKeeperRetentionEvaluation>failedFuture(unwrap(failure));
+                })
+                .thenCompose(java.util.function.Function.identity())
+                .thenCompose(evaluation -> {
+                    if (evaluation == null) {
                         return recordFirstAbsence(root);
-                    });
-        });
+                    }
+                    if (evaluation.candidate().isEmpty()) {
+                        if (evaluation.blockers().contains(BookKeeperRetentionBlocker.PROVIDER_METADATA_MISMATCH)) {
+                            return quarantine(root, "provider metadata changed before physical delete");
+                        }
+                        return CompletableFuture.completedFuture(
+                                BookKeeperLedgerGcResult.blocked(root, evaluation.blockers()));
+                    }
+                    if (!evaluation
+                            .candidate()
+                            .orElseThrow()
+                            .referenceSetSha256()
+                            .value()
+                            .equals(root.value().referenceSetSha256())) {
+                        return CompletableFuture.completedFuture(BookKeeperLedgerGcResult.blocked(
+                                root, java.util.Set.of(BookKeeperRetentionBlocker.PROTECTION_PRESENT)));
+                    }
+                    if (!deletePermits.tryAcquire()) {
+                        return CompletableFuture.completedFuture(
+                                BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.DELETE_RETRY_REQUIRED, root));
+                    }
+                    CompletableFuture<Void> deletion;
+                    try {
+                        deletion = client.delete(
+                                root.value().ledgerId(),
+                                new BookKeeperOperationDeadline(min(timeout, configuration.deleteTimeout())));
+                    } catch (Throwable failure) {
+                        deletion = CompletableFuture.failedFuture(failure);
+                    }
+                    return deletion.handle((ignored, deleteFailure) -> {
+                                deletePermits.release();
+                                return observeMetadata(root, timeout);
+                            })
+                            .thenCompose(java.util.function.Function.identity())
+                            .thenCompose(provider -> {
+                                if (provider.isPresent()) {
+                                    try {
+                                        requireProviderExact(root.value(), provider.orElseThrow());
+                                        return CompletableFuture.completedFuture(BookKeeperLedgerGcResult.of(
+                                                BookKeeperLedgerGcAction.DELETE_RETRY_REQUIRED, root));
+                                    } catch (RuntimeException mismatch) {
+                                        return quarantine(root, "provider metadata changed after delete response loss");
+                                    }
+                                }
+                                return recordFirstAbsence(root);
+                            });
+                });
     }
 
     private CompletableFuture<BookKeeperLedgerGcResult> recordFirstAbsence(
@@ -247,29 +296,34 @@ public final class BookKeeperLedgerRetentionManager {
                 Math.max(clock.millis(), root.value().deleteStartedAtMillis()),
                 root.value().firstAbsentAtMillis() + 1);
         BookKeeperLedgerRootRecord absent = root(
-                root.value(), BookKeeperLedgerLifecycle.DELETING,
-                root.value().lifecycleEpoch() + 1, root.value().gcAttemptId(),
-                root.value().referenceSetSha256(), root.value().markedAtMillis(),
-                root.value().deleteNotBeforeMillis(), root.value().deleteStartedAtMillis(),
-                firstAbsent, 0, "");
+                root.value(),
+                BookKeeperLedgerLifecycle.DELETING,
+                root.value().lifecycleEpoch() + 1,
+                root.value().gcAttemptId(),
+                root.value().referenceSetSha256(),
+                root.value().markedAtMillis(),
+                root.value().deleteNotBeforeMillis(),
+                root.value().deleteStartedAtMillis(),
+                firstAbsent,
+                0,
+                "");
         return metadata.compareAndSetRoot(cluster, absent, root.metadataVersion())
-                .thenApply(value -> BookKeeperLedgerGcResult.of(
-                        BookKeeperLedgerGcAction.FIRST_ABSENCE_RECORDED, value));
+                .thenApply(
+                        value -> BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.FIRST_ABSENCE_RECORDED, value));
     }
 
     private CompletableFuture<Void> requireDeletionAuthority(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            Duration timeout) {
-        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(min(
-                Objects.requireNonNull(timeout, "timeout"),
-                configuration.operationTimeout()));
-        var namespace = deadline.bound(
-                namespaceVerifier.requireActive(configuration, deadline.remaining()));
-        var activation = deadline.bound(
-                activationVerifier.requireActive(deadline.remaining()));
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, Duration timeout) {
+        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(
+                min(Objects.requireNonNull(timeout, "timeout"), configuration.operationTimeout()));
+        var namespace = deadline.bound(namespaceVerifier.requireActive(configuration, deadline.remaining()));
+        var activation = deadline.bound(activationVerifier.requireActive(deadline.remaining()));
         return CompletableFuture.allOf(namespace, activation).thenApply(ignored -> {
             activation.join().requireExact(configuration, namespace.join());
-            if (!namespace.join().ledgerIdNamespaceSha256().value()
+            if (!namespace
+                    .join()
+                    .ledgerIdNamespaceSha256()
+                    .value()
                     .equals(root.value().ledgerIdNamespaceSha256())) {
                 throw invariant("BookKeeper namespace authority changed during physical deletion");
             }
@@ -278,8 +332,7 @@ public final class BookKeeperLedgerRetentionManager {
     }
 
     private CompletableFuture<Optional<LedgerMetadata>> observeMetadata(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            Duration timeout) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, Duration timeout) {
         CompletableFuture<LedgerMetadata> future;
         try {
             future = client.metadata(root.value().ledgerId(), new BookKeeperOperationDeadline(timeout));
@@ -287,25 +340,40 @@ public final class BookKeeperLedgerRetentionManager {
             future = CompletableFuture.failedFuture(failure);
         }
         return future.handle((value, failure) -> {
-            if (failure == null) return Optional.of(value);
-            if (isNotFound(failure)) return Optional.empty();
+            if (failure == null) {
+                return Optional.of(value);
+            }
+            if (isNotFound(failure)) {
+                return Optional.empty();
+            }
             throw new java.util.concurrent.CompletionException(unwrap(failure));
         });
     }
 
     private CompletableFuture<BookKeeperLedgerGcResult> quarantine(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            String reason) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, String reason) {
         BookKeeperLedgerRootRecord quarantined = root(
-                root.value(), BookKeeperLedgerLifecycle.QUARANTINED,
-                root.value().lifecycleEpoch() + 1, "", "", 0, 0, 0, 0, 0, reason);
+                root.value(),
+                BookKeeperLedgerLifecycle.QUARANTINED,
+                root.value().lifecycleEpoch() + 1,
+                "",
+                "",
+                0,
+                0,
+                0,
+                0,
+                0,
+                reason);
         return metadata.compareAndSetRoot(cluster, quarantined, root.metadataVersion())
                 .thenApply(value -> BookKeeperLedgerGcResult.of(BookKeeperLedgerGcAction.QUARANTINED, value));
     }
 
     private CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerRootRecord>> reloadExact(
             BookKeeperVersionedValue<BookKeeperLedgerRootRecord> observed) {
-        return metadata.getRoot(cluster, configuration.providerScopeSha256(), observed.value().ledgerId())
+        return metadata.getRoot(
+                        cluster,
+                        configuration.providerScopeSha256(),
+                        observed.value().ledgerId())
                 .thenApply(optional -> {
                     var current = optional.orElseThrow(() -> invariant("BookKeeper GC root disappeared"));
                     if (current.metadataVersion() != observed.metadataVersion()
@@ -317,14 +385,14 @@ public final class BookKeeperLedgerRetentionManager {
     }
 
     private static boolean sameCandidate(
-            BookKeeperLedgerRetirementCandidate left,
-            BookKeeperLedgerRetirementCandidate right) {
+            BookKeeperLedgerRetirementCandidate left, BookKeeperLedgerRetirementCandidate right) {
         return left.root().metadataVersion() == right.root().metadataVersion()
                 && left.root().durableValueSha256().equals(right.root().durableValueSha256())
                 && left.referenceSetSha256().equals(right.referenceSetSha256())
                 && left.activationProof().activationMetadataVersion()
                         == right.activationProof().activationMetadataVersion()
-                && left.activationProof().activationRecordSha256()
+                && left.activationProof()
+                        .activationRecordSha256()
                         .equals(right.activationProof().activationRecordSha256());
     }
 
@@ -351,17 +419,45 @@ public final class BookKeeperLedgerRetentionManager {
             long deletedAtMillis,
             String stateReason) {
         return new BookKeeperLedgerRootRecord(
-                before.schemaVersion(), before.ledgerIdentitySha256(), before.clusterAlias(),
-                before.providerScopeSha256(), before.ledgerId(), before.streamId(), before.segmentSequence(),
-                before.allocationId(), before.allocationSlot(), before.configurationBindingSha256(),
-                before.ledgerIdNamespaceSha256(), before.lateCreateHazard(), before.writerId(),
-                before.writerRunIdHash(), before.appendSessionEpoch(), before.fencingTokenHash(),
-                before.ensembleSize(), before.writeQuorumSize(), before.ackQuorumSize(), before.digestType(),
-                before.customMetadataSha256(), lifecycle, lifecycleEpoch, before.createdAtMillis(),
-                before.activatedAtMillis(), before.sealStartedAtMillis(), before.sealedAtMillis(),
-                before.sealedLastEntryId(), before.sealedLength(), before.sealReason(), gcAttemptId,
-                referenceSetSha256, markedAtMillis, deleteNotBeforeMillis, deleteStartedAtMillis,
-                firstAbsentAtMillis, deletedAtMillis, stateReason, 0);
+                before.schemaVersion(),
+                before.ledgerIdentitySha256(),
+                before.clusterAlias(),
+                before.providerScopeSha256(),
+                before.ledgerId(),
+                before.streamId(),
+                before.segmentSequence(),
+                before.allocationId(),
+                before.allocationSlot(),
+                before.configurationBindingSha256(),
+                before.ledgerIdNamespaceSha256(),
+                before.lateCreateHazard(),
+                before.writerId(),
+                before.writerRunIdHash(),
+                before.appendSessionEpoch(),
+                before.fencingTokenHash(),
+                before.ensembleSize(),
+                before.writeQuorumSize(),
+                before.ackQuorumSize(),
+                before.digestType(),
+                before.customMetadataSha256(),
+                lifecycle,
+                lifecycleEpoch,
+                before.createdAtMillis(),
+                before.activatedAtMillis(),
+                before.sealStartedAtMillis(),
+                before.sealedAtMillis(),
+                before.sealedLastEntryId(),
+                before.sealedLength(),
+                before.sealReason(),
+                gcAttemptId,
+                referenceSetSha256,
+                markedAtMillis,
+                deleteNotBeforeMillis,
+                deleteStartedAtMillis,
+                firstAbsentAtMillis,
+                deletedAtMillis,
+                stateReason,
+                0);
     }
 
     private static String attemptId(BookKeeperLedgerRetirementCandidate candidate) {
@@ -393,8 +489,7 @@ public final class BookKeeperLedgerRetentionManager {
 
     private static boolean isNotFound(Throwable failure) {
         Throwable current = unwrap(failure);
-        return current instanceof NereusException nereus
-                && nereus.code() == ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND;
+        return current instanceof NereusException nereus && nereus.code() == ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND;
     }
 
     private static Throwable unwrap(Throwable failure) {
@@ -427,7 +522,9 @@ public final class BookKeeperLedgerRetentionManager {
 
     private static String text(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 }

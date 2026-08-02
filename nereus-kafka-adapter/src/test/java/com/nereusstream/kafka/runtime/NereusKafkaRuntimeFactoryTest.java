@@ -1,8 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
-import com.nereusstream.api.StreamStorage;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.api.StorageProfile;
+import com.nereusstream.api.StreamStorage;
 import com.nereusstream.kafka.metadata.KafkaMaterializationStreamRegistration;
 import com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageManager;
 import com.nereusstream.kafka.partition.KafkaPartitionStorageManager;
@@ -22,26 +25,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 class NereusKafkaRuntimeFactoryTest {
     @Test
     void lateBindsAndOwnsTheBackgroundServiceAroundThePartitionManager() {
         List<String> closes = new ArrayList<>();
         StreamStorage streams = proxy(StreamStorage.class, "streams", closes);
-        KafkaPartitionMetadataStore metadata = proxy(
-                KafkaPartitionMetadataStore.class, "metadata", closes);
+        KafkaPartitionMetadataStore metadata = proxy(KafkaPartitionMetadataStore.class, "metadata", closes);
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        GenerationMetadataStore generations =
-                GenerationMetadataStoreTestFactory.inMemory(Clock.systemUTC());
+        GenerationMetadataStore generations = GenerationMetadataStoreTestFactory.inMemory(Clock.systemUTC());
         AtomicReference<KafkaPartitionStorageManager> capturedManager = new AtomicReference<>();
         AtomicInteger backgroundStarts = new AtomicInteger();
         AtomicInteger backgroundCloses = new AtomicInteger();
         try {
             KafkaMaterializationStreamRegistration materializations =
-                    new KafkaMaterializationStreamRegistration(
-                            "nereus", generations, Clock.systemUTC());
+                    new KafkaMaterializationStreamRegistration("nereus", generations, Clock.systemUTC());
             NereusKafkaRuntime runtime = NereusKafkaRuntimeFactory.create(
                     configuration(),
                     dependencies(
@@ -52,8 +49,7 @@ class NereusKafkaRuntimeFactoryTest {
                             scheduler,
                             () -> CompletableFuture.completedFuture(null),
                             List.of()),
-                    KafkaRuntimeStartup.from(
-                            () -> CompletableFuture.completedFuture(null)),
+                    KafkaRuntimeStartup.from(() -> CompletableFuture.completedFuture(null)),
                     materializations,
                     manager -> {
                         capturedManager.set(manager);
@@ -91,8 +87,7 @@ class NereusKafkaRuntimeFactoryTest {
     void assemblesOneManagerAndClosesOwnedProviderGraphInReverseOrder() {
         List<String> closes = new ArrayList<>();
         StreamStorage streams = proxy(StreamStorage.class, "streams", closes);
-        KafkaPartitionMetadataStore metadata = proxy(
-                KafkaPartitionMetadataStore.class, "metadata", closes);
+        KafkaPartitionMetadataStore metadata = proxy(KafkaPartitionMetadataStore.class, "metadata", closes);
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         AtomicInteger starts = new AtomicInteger();
         try {
@@ -108,11 +103,9 @@ class NereusKafkaRuntimeFactoryTest {
                                 starts.incrementAndGet();
                                 return CompletableFuture.completedFuture(null);
                             },
-                            List.of(KafkaRuntimeResources.Resource.owned(
-                                    "provider", () -> closes.add("provider")))));
+                            List.of(KafkaRuntimeResources.Resource.owned("provider", () -> closes.add("provider")))));
 
-            assertThat(runtime.partitionStorageManager())
-                    .isInstanceOf(DefaultKafkaPartitionStorageManager.class);
+            assertThat(runtime.partitionStorageManager()).isInstanceOf(DefaultKafkaPartitionStorageManager.class);
             runtime.start().toCompletableFuture().join();
             runtime.start().toCompletableFuture().join();
             assertThat(starts).hasValue(1);
@@ -132,8 +125,7 @@ class NereusKafkaRuntimeFactoryTest {
     void borrowedProviderGraphIsNeverClosed() {
         List<String> closes = new ArrayList<>();
         StreamStorage streams = proxy(StreamStorage.class, "streams", closes);
-        KafkaPartitionMetadataStore metadata = proxy(
-                KafkaPartitionMetadataStore.class, "metadata", closes);
+        KafkaPartitionMetadataStore metadata = proxy(KafkaPartitionMetadataStore.class, "metadata", closes);
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             NereusKafkaRuntime runtime = NereusKafkaRuntimeFactory.create(
@@ -160,8 +152,7 @@ class NereusKafkaRuntimeFactoryTest {
     void rejectsDuplicateResourceIdentityBeforeOwnershipTransfer() {
         List<String> closes = new ArrayList<>();
         StreamStorage streams = proxy(StreamStorage.class, "streams", closes);
-        KafkaPartitionMetadataStore metadata = proxy(
-                KafkaPartitionMetadataStore.class, "metadata", closes);
+        KafkaPartitionMetadataStore metadata = proxy(KafkaPartitionMetadataStore.class, "metadata", closes);
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             NereusKafkaRuntimeDependencies dependencies = dependencies(
@@ -185,45 +176,45 @@ class NereusKafkaRuntimeFactoryTest {
     @Test
     void validatesDurationsAndOwnerEpochBeforeAssembly() {
         assertThatThrownBy(() -> new NereusKafkaRuntimeConfiguration(
-                "nereus",
-                "kraft",
-                "broker-run",
-                Duration.ofSeconds(30),
-                Duration.ofSeconds(30),
-                "broker-run",
-                1,
-                Duration.ofSeconds(30),
-                100_000,
-                256 * 1024 * 1024,
-                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)))
+                        "nereus",
+                        "kraft",
+                        "broker-run",
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(30),
+                        "broker-run",
+                        1,
+                        Duration.ofSeconds(30),
+                        100_000,
+                        256 * 1024 * 1024,
+                        Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("shorter");
         assertThatThrownBy(() -> new NereusKafkaRuntimeConfiguration(
-                "nereus",
-                "kraft",
-                "broker-run",
-                Duration.ofSeconds(30),
-                Duration.ofSeconds(10),
-                "broker-run",
-                0,
-                Duration.ofSeconds(30),
-                100_000,
-                256 * 1024 * 1024,
-                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)))
+                        "nereus",
+                        "kraft",
+                        "broker-run",
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(10),
+                        "broker-run",
+                        0,
+                        Duration.ofSeconds(30),
+                        100_000,
+                        256 * 1024 * 1024,
+                        Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("operationOwnerEpoch");
         assertThatThrownBy(() -> new NereusKafkaRuntimeConfiguration(
-                "nereus",
-                "kraft",
-                "broker-run",
-                Duration.ofSeconds(30),
-                Duration.ofSeconds(10),
-                "broker-run",
-                1,
-                Duration.ofSeconds(30),
-                0,
-                1_024,
-                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)))
+                        "nereus",
+                        "kraft",
+                        "broker-run",
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(10),
+                        "broker-run",
+                        1,
+                        Duration.ofSeconds(30),
+                        0,
+                        1_024,
+                        Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("recovery chunk");
     }
@@ -266,9 +257,7 @@ class NereusKafkaRuntimeFactoryTest {
     @SuppressWarnings("unchecked")
     private static <T> T proxy(Class<T> type, String name, List<String> closes) {
         return (T) Proxy.newProxyInstance(
-                type.getClassLoader(),
-                new Class<?>[] {type},
-                (proxy, method, arguments) -> switch (method.getName()) {
+                type.getClassLoader(), new Class<?>[] {type}, (proxy, method, arguments) -> switch (method.getName()) {
                     case "close" -> {
                         closes.add(name);
                         yield null;

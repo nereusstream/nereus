@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.kafka.codec.KafkaAppendBatchEncoder;
@@ -10,16 +11,16 @@ import com.nereusstream.kafka.partition.DefaultKafkaPartitionOpener;
 import com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageManager;
 import com.nereusstream.kafka.retention.KafkaPartitionMaintenanceFactory;
 import com.nereusstream.metadata.oxia.KafkaPartitionKeyspace;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Product-owned, Kafka-type-free assembly of the native Kafka partition runtime. */
+/**
+ * Product-owned, Kafka-type-free assembly of the native Kafka partition runtime.
+ */
 public final class NereusKafkaRuntimeFactory {
-    private static final String PARTITION_METADATA_STORE_RESOURCE =
-            "kafka-partition-metadata-store";
+    private static final String PARTITION_METADATA_STORE_RESOURCE = "kafka-partition-metadata-store";
     private static final String STREAM_STORAGE_RESOURCE = "stream-storage";
 
     private NereusKafkaRuntimeFactory() {}
@@ -30,8 +31,7 @@ public final class NereusKafkaRuntimeFactory {
      * closed in reverse order after partition drain.
      */
     public static NereusKafkaRuntime create(
-            NereusKafkaRuntimeConfiguration configuration,
-            NereusKafkaRuntimeDependencies dependencies) {
+            NereusKafkaRuntimeConfiguration configuration, NereusKafkaRuntimeDependencies dependencies) {
         return create(
                 configuration,
                 dependencies,
@@ -39,7 +39,9 @@ public final class NereusKafkaRuntimeFactory {
                         Objects.requireNonNull(dependencies, "dependencies").startupAction()));
     }
 
-    /** Assembles the same product graph with a startup component that can observe admission. */
+    /**
+     * Assembles the same product graph with a startup component that can observe admission.
+     */
     public static NereusKafkaRuntime create(
             NereusKafkaRuntimeConfiguration configuration,
             NereusKafkaRuntimeDependencies dependencies,
@@ -63,13 +65,7 @@ public final class NereusKafkaRuntimeFactory {
             KafkaRuntimeStartup startup,
             KafkaMaterializationStreamRegistration materializations,
             KafkaRuntimeBackgroundServiceFactory backgroundServices) {
-        return create(
-                configuration,
-                dependencies,
-                startup,
-                materializations,
-                backgroundServices,
-                Optional.empty());
+        return create(configuration, dependencies, startup, materializations, backgroundServices, Optional.empty());
     }
 
     public static NereusKafkaRuntime create(
@@ -79,10 +75,8 @@ public final class NereusKafkaRuntimeFactory {
             KafkaMaterializationStreamRegistration materializations,
             KafkaRuntimeBackgroundServiceFactory backgroundServices,
             Optional<KafkaPartitionMaintenanceFactory> maintenanceFactory) {
-        NereusKafkaRuntimeConfiguration exactConfiguration =
-                Objects.requireNonNull(configuration, "configuration");
-        NereusKafkaRuntimeDependencies exactDependencies =
-                Objects.requireNonNull(dependencies, "dependencies");
+        NereusKafkaRuntimeConfiguration exactConfiguration = Objects.requireNonNull(configuration, "configuration");
+        NereusKafkaRuntimeDependencies exactDependencies = Objects.requireNonNull(dependencies, "dependencies");
         KafkaRuntimeStartup exactStartup = Objects.requireNonNull(startup, "startup");
         KafkaRuntimeBackgroundServiceFactory exactBackgroundServices =
                 Objects.requireNonNull(backgroundServices, "backgroundServices");
@@ -91,9 +85,7 @@ public final class NereusKafkaRuntimeFactory {
         KafkaRuntimeResources resources = resources(exactDependencies);
         try {
             KafkaPartitionKeyspace keyspace =
-                    new KafkaPartitionKeyspace(
-                            exactConfiguration.nereusCluster(),
-                            exactConfiguration.kafkaClusterId());
+                    new KafkaPartitionKeyspace(exactConfiguration.nereusCluster(), exactConfiguration.kafkaClusterId());
             KafkaPartitionLifecycleCoordinator lifecycle = materializations == null
                     ? new KafkaPartitionLifecycleCoordinator(
                             exactDependencies.partitionMetadataStore(),
@@ -107,57 +99,44 @@ public final class NereusKafkaRuntimeFactory {
                             exactDependencies.clock(),
                             materializations);
             KafkaRecordBatchCodec codec = new KafkaRecordBatchCodec();
-            DefaultKafkaPartitionOpener opener =
-                    exactMaintenanceFactory
-                            .map(
-                                    maintenance ->
-                                            new DefaultKafkaPartitionOpener(
-                                                    exactDependencies.streamStorage(),
-                                                    exactConfiguration.writerId(),
-                                                    exactConfiguration.appendSessionTtl(),
-                                                    exactConfiguration
-                                                            .appendSessionRenewalInterval(),
-                                                    exactDependencies.renewalScheduler(),
-                                                    exactDependencies.recoveryLauncher(),
-                                                    new KafkaAppendBatchEncoder(codec),
-                                                    new KafkaFetchAssembler(codec),
-                                                    exactDependencies.partitionMetadataStore(),
-                                                    exactDependencies.activatedGenerations(),
-                                                    maintenance,
-                                                    exactDependencies.clock()))
-                            .orElseGet(
-                                    () ->
-                                            new DefaultKafkaPartitionOpener(
-                                                    exactDependencies.streamStorage(),
-                                                    exactConfiguration.writerId(),
-                                                    exactConfiguration.appendSessionTtl(),
-                                                    exactConfiguration
-                                                            .appendSessionRenewalInterval(),
-                                                    exactDependencies.renewalScheduler(),
-                                                    exactDependencies.recoveryLauncher(),
-                                                    new KafkaAppendBatchEncoder(codec),
-                                                    new KafkaFetchAssembler(codec),
-                                                    exactDependencies.partitionMetadataStore(),
-                                                    exactDependencies.activatedGenerations(),
-                                                    exactDependencies.clock()));
-            DefaultKafkaPartitionStorageManager manager =
-                    new DefaultKafkaPartitionStorageManager(
-                            lifecycle,
-                            opener,
-                            exactDependencies.clock(),
-                            exactConfiguration.operationOwnerId(),
-                            exactConfiguration.operationOwnerEpoch(),
-                            exactConfiguration.operationTtl(),
-                            exactConfiguration.executableProfiles());
+            DefaultKafkaPartitionOpener opener = exactMaintenanceFactory
+                    .map(maintenance -> new DefaultKafkaPartitionOpener(
+                            exactDependencies.streamStorage(),
+                            exactConfiguration.writerId(),
+                            exactConfiguration.appendSessionTtl(),
+                            exactConfiguration.appendSessionRenewalInterval(),
+                            exactDependencies.renewalScheduler(),
+                            exactDependencies.recoveryLauncher(),
+                            new KafkaAppendBatchEncoder(codec),
+                            new KafkaFetchAssembler(codec),
+                            exactDependencies.partitionMetadataStore(),
+                            exactDependencies.activatedGenerations(),
+                            maintenance,
+                            exactDependencies.clock()))
+                    .orElseGet(() -> new DefaultKafkaPartitionOpener(
+                            exactDependencies.streamStorage(),
+                            exactConfiguration.writerId(),
+                            exactConfiguration.appendSessionTtl(),
+                            exactConfiguration.appendSessionRenewalInterval(),
+                            exactDependencies.renewalScheduler(),
+                            exactDependencies.recoveryLauncher(),
+                            new KafkaAppendBatchEncoder(codec),
+                            new KafkaFetchAssembler(codec),
+                            exactDependencies.partitionMetadataStore(),
+                            exactDependencies.activatedGenerations(),
+                            exactDependencies.clock()));
+            DefaultKafkaPartitionStorageManager manager = new DefaultKafkaPartitionStorageManager(
+                    lifecycle,
+                    opener,
+                    exactDependencies.clock(),
+                    exactConfiguration.operationOwnerId(),
+                    exactConfiguration.operationOwnerEpoch(),
+                    exactConfiguration.operationTtl(),
+                    exactConfiguration.executableProfiles());
             KafkaRuntimeBackgroundService backgroundService = Objects.requireNonNull(
-                    exactBackgroundServices.create(manager),
-                    "Kafka background service factory returned null");
+                    exactBackgroundServices.create(manager), "Kafka background service factory returned null");
             return new DefaultNereusKafkaRuntime(
-                    new KafkaStorageAdmission(),
-                    manager,
-                    exactStartup,
-                    backgroundService,
-                    resources);
+                    new KafkaStorageAdmission(), manager, exactStartup, backgroundService, resources);
         } catch (RuntimeException | Error failure) {
             closeAfterFailure(resources, failure);
             throw failure;
@@ -165,18 +144,13 @@ public final class NereusKafkaRuntimeFactory {
     }
 
     private static KafkaRuntimeResources resources(NereusKafkaRuntimeDependencies dependencies) {
-        List<KafkaRuntimeResources.Resource> resources =
-                new ArrayList<>(dependencies.providerResources());
-        resources.add(
-                new KafkaRuntimeResources.Resource(
-                        PARTITION_METADATA_STORE_RESOURCE,
-                        dependencies.partitionMetadataStore(),
-                        dependencies.partitionMetadataStoreOwnership()));
-        resources.add(
-                new KafkaRuntimeResources.Resource(
-                        STREAM_STORAGE_RESOURCE,
-                        dependencies.streamStorage(),
-                        dependencies.streamStorageOwnership()));
+        List<KafkaRuntimeResources.Resource> resources = new ArrayList<>(dependencies.providerResources());
+        resources.add(new KafkaRuntimeResources.Resource(
+                PARTITION_METADATA_STORE_RESOURCE,
+                dependencies.partitionMetadataStore(),
+                dependencies.partitionMetadataStoreOwnership()));
+        resources.add(new KafkaRuntimeResources.Resource(
+                STREAM_STORAGE_RESOURCE, dependencies.streamStorage(), dependencies.streamStorageOwnership()));
         return new KafkaRuntimeResources(resources);
     }
 

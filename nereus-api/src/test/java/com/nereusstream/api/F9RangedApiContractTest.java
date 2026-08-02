@@ -16,7 +16,6 @@ package com.nereusstream.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import java.time.Duration;
 import java.util.Collections;
@@ -32,8 +31,8 @@ import org.junit.jupiter.api.Test;
 
 class F9RangedApiContractTest {
     private static final StreamId STREAM_ID = new StreamId("f9-api-stream");
-    private static final ReadOptions READ_OPTIONS = new ReadOptions(
-            100, 1024, ReadIsolation.COMMITTED, Duration.ofSeconds(1));
+    private static final ReadOptions READ_OPTIONS =
+            new ReadOptions(100, 1024, ReadIsolation.COMMITTED, Duration.ofSeconds(1));
 
     @Test
     void kafkaBatchAcceptsRangedEntriesAndPreservesCallerOrder() {
@@ -65,8 +64,7 @@ class F9RangedApiContractTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("overflows int");
         assertThatThrownBy(() -> kafkaBatch(
-                Collections.nCopies(ApiLimits.MAX_APPEND_ENTRIES + 1, one),
-                ApiLimits.MAX_APPEND_ENTRIES + 1))
+                        Collections.nCopies(ApiLimits.MAX_APPEND_ENTRIES + 1, one), ApiLimits.MAX_APPEND_ENTRIES + 1))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maximum append entry count");
     }
@@ -91,15 +89,15 @@ class F9RangedApiContractTest {
         assertThat(batch.checksum()).contains(checksum);
         AppendEntry changed = new AppendEntry(new byte[] {4, 3}, 3, 1, Map.of());
         assertThatThrownBy(() -> new AppendBatch(
-                PayloadFormat.KAFKA_RECORD_BATCH,
-                List.of(first, changed),
-                5,
-                2,
-                1,
-                1,
-                List.of(),
-                Map.of(),
-                Optional.of(checksum)))
+                        PayloadFormat.KAFKA_RECORD_BATCH,
+                        List.of(first, changed),
+                        5,
+                        2,
+                        1,
+                        1,
+                        List.of(),
+                        Map.of(),
+                        Optional.of(checksum)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("checksum mismatch");
     }
@@ -109,15 +107,15 @@ class F9RangedApiContractTest {
         AppendEntry ranged = new AppendEntry(new byte[] {1}, 2, 1, Map.of());
 
         assertThatThrownBy(() -> new AppendBatch(
-                PayloadFormat.OPAQUE_RECORD_BATCH,
-                List.of(ranged),
-                2,
-                1,
-                1,
-                1,
-                List.of(),
-                Map.of(),
-                Optional.empty()))
+                        PayloadFormat.OPAQUE_RECORD_BATCH,
+                        List.of(ranged),
+                        2,
+                        1,
+                        1,
+                        1,
+                        List.of(),
+                        Map.of(),
+                        Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("recordCount == 1");
     }
@@ -125,7 +123,8 @@ class F9RangedApiContractTest {
     @Test
     void appendPreconditionIsClosedAndNonNegative() {
         assertThat(AppendPrecondition.none().expectedStartOffset()).isEmpty();
-        assertThat(AppendPrecondition.expectedStartOffset(0).expectedStartOffset()).hasValue(0);
+        assertThat(AppendPrecondition.expectedStartOffset(0).expectedStartOffset())
+                .hasValue(0);
         assertThatThrownBy(() -> AppendPrecondition.expectedStartOffset(-1))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -133,16 +132,15 @@ class F9RangedApiContractTest {
     @Test
     void legacyProviderDelegatesOnlyEmptyAppendPrecondition() {
         LegacyStorage storage = new LegacyStorage();
-        AppendBatch batch = kafkaBatch(
-                List.of(new AppendEntry(new byte[] {1}, 2, 1, Map.of())), 2);
+        AppendBatch batch = kafkaBatch(List.of(new AppendEntry(new byte[] {1}, 2, 1, Map.of())), 2);
         AppendOptions options = appendOptions();
 
         assertThat(storage.append(STREAM_ID, batch, options, AppendPrecondition.none()))
                 .isSameAs(storage.appendResult);
         assertThat(storage.appendCalls).hasValue(1);
 
-        NereusException failure = failure(storage.append(
-                STREAM_ID, batch, options, AppendPrecondition.expectedStartOffset(2)));
+        NereusException failure =
+                failure(storage.append(STREAM_ID, batch, options, AppendPrecondition.expectedStartOffset(2)));
         assertThat(failure.code()).isEqualTo(ErrorCode.UNSUPPORTED_APPEND_PRECONDITION);
         assertThat(failure.retriable()).isFalse();
         assertThat(storage.appendCalls).hasValue(1);
@@ -153,17 +151,15 @@ class F9RangedApiContractTest {
         LegacyStorage storage = new LegacyStorage();
         AppendSessionOptions options = new AppendSessionOptions("writer", Duration.ofSeconds(1), false);
 
-        AcquiredAppendSession acquired = storage.acquireAppendSession(
-                STREAM_ID, AppendSessionRequest.legacy(options)).join();
+        AcquiredAppendSession acquired = storage.acquireAppendSession(STREAM_ID, AppendSessionRequest.legacy(options))
+                .join();
 
         assertThat(acquired.session()).isEqualTo(storage.appendSession);
         assertThat(acquired.authority()).isEmpty();
         assertThat(storage.sessionCalls).hasValue(1);
         NereusException failure = failure(storage.acquireAppendSession(
                 STREAM_ID,
-                AppendSessionRequest.authoritative(
-                        options,
-                        new AppendAuthority("authority", "id", 1, "owner", 2))));
+                AppendSessionRequest.authoritative(options, new AppendAuthority("authority", "id", 1, "owner", 2))));
         assertThat(failure.code()).isEqualTo(ErrorCode.UNSUPPORTED_APPEND_AUTHORITY);
         assertThat(storage.sessionCalls).hasValue(1);
     }
@@ -172,12 +168,14 @@ class F9RangedApiContractTest {
     void legacyProviderRejectsExplicitSessionRenewalWithoutThrowingFromValidation() {
         LegacyStorage storage = new LegacyStorage();
 
-        assertThat(failure(storage.renewAppendSession(storage.appendSession, Duration.ofSeconds(1))).code())
+        assertThat(failure(storage.renewAppendSession(storage.appendSession, Duration.ofSeconds(1)))
+                        .code())
                 .isEqualTo(ErrorCode.UNSUPPORTED_APPEND_AUTHORITY);
-        assertThat(failure(storage.renewAppendSession(storage.appendSession, Duration.ofNanos(1))).code())
+        assertThat(failure(storage.renewAppendSession(storage.appendSession, Duration.ofNanos(1)))
+                        .code())
                 .isEqualTo(ErrorCode.INVALID_ARGUMENT);
-        assertThat(failure(storage.renewAppendSession(
-                        storage.appendSession, Duration.ofSeconds(Long.MAX_VALUE))).code())
+        assertThat(failure(storage.renewAppendSession(storage.appendSession, Duration.ofSeconds(Long.MAX_VALUE)))
+                        .code())
                 .isEqualTo(ErrorCode.INVALID_ARGUMENT);
     }
 
@@ -204,8 +202,7 @@ class F9RangedApiContractTest {
                 ReadBoundaryMode.CONTAINING_ENTRY,
                 FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
                 READ_OPTIONS);
-        assertThat(failure(storage.read(STREAM_ID, containing)).code())
-                .isEqualTo(ErrorCode.UNSUPPORTED_READ_SEMANTICS);
+        assertThat(failure(storage.read(STREAM_ID, containing)).code()).isEqualTo(ErrorCode.UNSUPPORTED_READ_SEMANTICS);
         assertThat(storage.readCalls).hasValue(1);
     }
 
@@ -218,22 +215,19 @@ class F9RangedApiContractTest {
                 FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
                 READ_OPTIONS);
         ReadResult valid = new ReadResult(
-                STREAM_ID,
-                12,
-                15,
-                List.of(readBatch(new OffsetRange(10, 15), new OffsetRange(10, 15))),
-                false);
+                STREAM_ID, 12, 15, List.of(readBatch(new OffsetRange(10, 15), new OffsetRange(10, 15))), false);
 
-        assertThat(SemanticReadResult.forRequest(containing, valid, 15).result()).isEqualTo(valid);
+        assertThat(SemanticReadResult.forRequest(containing, valid, 15).result())
+                .isEqualTo(valid);
         assertThatThrownBy(() -> SemanticReadResult.forRequest(
-                new ReadRequest(
-                        12,
-                        ReadView.COMMITTED,
-                        ReadBoundaryMode.EXACT_START,
-                        FirstEntryPolicy.LEGACY_STRICT_LIMIT,
-                        READ_OPTIONS),
-                valid,
-                15))
+                        new ReadRequest(
+                                12,
+                                ReadView.COMMITTED,
+                                ReadBoundaryMode.EXACT_START,
+                                FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                                READ_OPTIONS),
+                        valid,
+                        15))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("EXACT_START");
         assertThatThrownBy(() -> new SemanticReadResult(ReadView.COMMITTED, valid, 16))
@@ -255,22 +249,35 @@ class F9RangedApiContractTest {
 
     @Test
     void newStreamStorageMethodsRemainBinarySafeDefaults() throws NoSuchMethodException {
-        assertThat(StreamStorage.class.getMethod(
-                "append",
-                StreamId.class,
-                AppendBatch.class,
-                AppendOptions.class,
-                AppendPrecondition.class).isDefault()).isTrue();
-        assertThat(StreamStorage.class.getMethod(
-                "read", StreamId.class, ReadRequest.class).isDefault()).isTrue();
-        assertThat(StreamStorage.class.getMethod(
-                "acquireAppendSession", StreamId.class, AppendSessionRequest.class).isDefault()).isTrue();
-        assertThat(StreamStorage.class.getMethod(
-                "renewAppendSession", AppendSession.class, Duration.class).isDefault()).isTrue();
-        assertThat(StreamStorage.class.getMethod(
-                "append", StreamId.class, AppendBatch.class, AppendOptions.class).isDefault()).isFalse();
-        assertThat(StreamStorage.class.getMethod(
-                "read", StreamId.class, long.class, ReadOptions.class).isDefault()).isFalse();
+        assertThat(StreamStorage.class
+                        .getMethod(
+                                "append",
+                                StreamId.class,
+                                AppendBatch.class,
+                                AppendOptions.class,
+                                AppendPrecondition.class)
+                        .isDefault())
+                .isTrue();
+        assertThat(StreamStorage.class
+                        .getMethod("read", StreamId.class, ReadRequest.class)
+                        .isDefault())
+                .isTrue();
+        assertThat(StreamStorage.class
+                        .getMethod("acquireAppendSession", StreamId.class, AppendSessionRequest.class)
+                        .isDefault())
+                .isTrue();
+        assertThat(StreamStorage.class
+                        .getMethod("renewAppendSession", AppendSession.class, Duration.class)
+                        .isDefault())
+                .isTrue();
+        assertThat(StreamStorage.class
+                        .getMethod("append", StreamId.class, AppendBatch.class, AppendOptions.class)
+                        .isDefault())
+                .isFalse();
+        assertThat(StreamStorage.class
+                        .getMethod("read", StreamId.class, long.class, ReadOptions.class)
+                        .isDefault())
+                .isFalse();
     }
 
     private static AppendBatch kafkaBatch(List<AppendEntry> entries, int recordCount) {
@@ -287,23 +294,12 @@ class F9RangedApiContractTest {
     }
 
     private static AppendOptions appendOptions() {
-        return new AppendOptions(
-                Optional.empty(),
-                DurabilityLevel.WAL_DURABLE,
-                Duration.ofSeconds(1),
-                true,
-                Map.of());
+        return new AppendOptions(Optional.empty(), DurabilityLevel.WAL_DURABLE, Duration.ofSeconds(1), true, Map.of());
     }
 
     private static ReadBatch readBatch(OffsetRange range, OffsetRange resolvedRange) {
         EntryIndexRef index = new EntryIndexRef(
-                EntryIndexLocation.OBJECT_FOOTER,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                0,
-                1,
-                crc32c());
+                EntryIndexLocation.OBJECT_FOOTER, Optional.empty(), Optional.empty(), Optional.empty(), 0, 1, crc32c());
         ObjectSliceReadTarget target = new ObjectSliceReadTarget(
                 1,
                 new ObjectId("f9-read-object"),
@@ -316,19 +312,9 @@ class F9RangedApiContractTest {
                 1,
                 crc32c(),
                 index);
-        ReadSourceRef source = new ReadSourceRef(
-                resolvedRange,
-                0,
-                1,
-                target,
-                ReadTargetIdentities.sha256(target));
+        ReadSourceRef source = new ReadSourceRef(resolvedRange, 0, 1, target, ReadTargetIdentities.sha256(target));
         return new ReadBatch(
-                range,
-                PayloadFormat.KAFKA_RECORD_BATCH,
-                new byte[] {1},
-                List.of(),
-                Optional.empty(),
-                source);
+                range, PayloadFormat.KAFKA_RECORD_BATCH, new byte[] {1}, List.of(), Optional.empty(), source);
     }
 
     private static Checksum crc32c() {
@@ -341,9 +327,7 @@ class F9RangedApiContractTest {
             byte[] payload = entry.payload();
             crc32c.update(payload, 0, payload.length);
         }
-        return new Checksum(
-                ChecksumType.CRC32C,
-                String.format(Locale.ROOT, "%08x", crc32c.getValue()));
+        return new Checksum(ChecksumType.CRC32C, String.format(Locale.ROOT, "%08x", crc32c.getValue()));
     }
 
     private static NereusException failure(CompletableFuture<?> future) {
@@ -358,28 +342,24 @@ class F9RangedApiContractTest {
 
     private static final class LegacyStorage implements StreamStorage {
         private final CompletableFuture<AppendResult> appendResult = new CompletableFuture<>();
-        private final AppendSession appendSession =
-                new AppendSession(STREAM_ID, "writer", 1, "token", 1, 1_000);
+        private final AppendSession appendSession = new AppendSession(STREAM_ID, "writer", 1, "token", 1, 1_000);
         private final AtomicInteger appendCalls = new AtomicInteger();
         private final AtomicInteger sessionCalls = new AtomicInteger();
         private final AtomicInteger readCalls = new AtomicInteger();
 
         @Override
-        public CompletableFuture<StreamMetadata> createOrGetStream(
-                StreamName streamName, StreamCreateOptions options) {
+        public CompletableFuture<StreamMetadata> createOrGetStream(StreamName streamName, StreamCreateOptions options) {
             return unsupported();
         }
 
         @Override
-        public CompletableFuture<AppendSession> acquireAppendSession(
-                StreamId streamId, AppendSessionOptions options) {
+        public CompletableFuture<AppendSession> acquireAppendSession(StreamId streamId, AppendSessionOptions options) {
             sessionCalls.incrementAndGet();
             return CompletableFuture.completedFuture(appendSession);
         }
 
         @Override
-        public CompletableFuture<AppendResult> append(
-                StreamId streamId, AppendBatch batch, AppendOptions options) {
+        public CompletableFuture<AppendResult> append(StreamId streamId, AppendBatch batch, AppendOptions options) {
             appendCalls.incrementAndGet();
             return appendResult;
         }
@@ -391,22 +371,19 @@ class F9RangedApiContractTest {
         }
 
         @Override
-        public CompletableFuture<ReadResult> read(
-                StreamId streamId, long startOffset, ReadOptions options) {
+        public CompletableFuture<ReadResult> read(StreamId streamId, long startOffset, ReadOptions options) {
             readCalls.incrementAndGet();
             return CompletableFuture.completedFuture(
                     new ReadResult(streamId, startOffset, startOffset, List.of(), true));
         }
 
         @Override
-        public CompletableFuture<ResolveResult> resolve(
-                StreamId streamId, long startOffset, ResolveOptions options) {
+        public CompletableFuture<ResolveResult> resolve(StreamId streamId, long startOffset, ResolveOptions options) {
             return unsupported();
         }
 
         @Override
-        public CompletableFuture<Void> trim(
-                StreamId streamId, long beforeOffset, TrimOptions options) {
+        public CompletableFuture<Void> trim(StreamId streamId, long beforeOffset, TrimOptions options) {
             return unsupported();
         }
 
@@ -426,8 +403,7 @@ class F9RangedApiContractTest {
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
 
         private static <T> CompletableFuture<T> unsupported() {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());

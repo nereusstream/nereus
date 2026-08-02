@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -14,9 +14,9 @@ import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
-import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.ProjectionType;
+import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
@@ -43,9 +43,9 @@ import com.nereusstream.metadata.oxia.VersionedRecoveryCheckpointRoot;
 import com.nereusstream.metadata.oxia.codec.GenerationIndexRecordCodecV1;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
+import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
-import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointReferenceRecord;
@@ -87,11 +87,9 @@ class HigherGenerationPreDrainCoordinatorTest {
     private static final String CLUSTER = "cluster-pre-drain";
     private static final StreamId STREAM = new StreamId("tenant/ns/pre-drain");
     private static final String PROJECTION_IDENTITY = ProjectionIdentity.encode(
-            Optional.of(new ProjectionRef(
-                    ProjectionType.VIRTUAL_LEDGER, "projection-pre-drain")));
+            Optional.of(new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "projection-pre-drain")));
 
-    private final ScheduledExecutorService scheduler =
-            Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     @AfterEach
     void closeScheduler() {
@@ -102,22 +100,18 @@ class HigherGenerationPreDrainCoordinatorTest {
     void committedSourceDrainsOnlyAfterExactRecoveryReplacementCoverage() {
         Fixture fixture = fixture(GenerationLifecycle.COMMITTED);
         StoreState state = new StoreState(fixture);
-        HigherGenerationPreDrainCoordinator coordinator = coordinator(
-                fixture, state, false, false);
+        HigherGenerationPreDrainCoordinator coordinator = coordinator(fixture, state, false, false);
 
-        HigherGenerationPreDrainResult result = coordinator.preDrain(
-                fixture.candidate()).join();
+        HigherGenerationPreDrainResult result =
+                coordinator.preDrain(fixture.candidate()).join();
 
-        assertThat(result.status())
-                .isEqualTo(HigherGenerationPreDrainStatus.DRAINING_READY);
+        assertThat(result.status()).isEqualTo(HigherGenerationPreDrainStatus.DRAINING_READY);
         assertThat(result.transitionedCount()).isEqualTo(1);
         assertThat(result.alreadyDrainingCount()).isZero();
         assertThat(result.drainingIndexes()).singleElement().satisfies(index -> {
-            assertThat(index.value().lifecycle())
-                    .isEqualTo(GenerationLifecycle.DRAINING);
+            assertThat(index.value().lifecycle()).isEqualTo(GenerationLifecycle.DRAINING);
             assertThat(index.value().stateReason())
-                    .isEqualTo("physical-gc-pre-drain:"
-                            + fixture.candidate().candidateId());
+                    .isEqualTo("physical-gc-pre-drain:" + fixture.candidate().candidateId());
         });
         assertThat(state.casCalls).hasValue(1);
         assertThat(state.openCalls).hasValueGreaterThanOrEqualTo(1);
@@ -129,24 +123,20 @@ class HigherGenerationPreDrainCoordinatorTest {
         Fixture fixture = fixture(GenerationLifecycle.COMMITTED);
         StoreState state = new StoreState(fixture);
 
-        HigherGenerationPreDrainResult result = coordinator(
-                        fixture, state, false, false)
+        HigherGenerationPreDrainResult result = coordinator(fixture, state, false, false)
                 .preDrain(fixture.candidate())
                 .join();
 
-        assertThat(fixture.source().value().projectionRef())
-                .isEqualTo(PROJECTION_IDENTITY);
-        assertThat(result.status())
-                .isEqualTo(HigherGenerationPreDrainStatus.DRAINING_READY);
+        assertThat(fixture.source().value().projectionRef()).isEqualTo(PROJECTION_IDENTITY);
+        assertThat(result.status()).isEqualTo(HigherGenerationPreDrainStatus.DRAINING_READY);
     }
 
     @Test
     void differentNonEmptyNrc1ProjectionVetoesBeforeTheSourceCas() {
         Fixture base = fixture(GenerationLifecycle.COMMITTED);
-        String differentProjection = ProjectionIdentity.encode(Optional.of(
-                new ProjectionRef(ProjectionType.ENTRY_INDEX, "different")));
-        Fixture fixture = base.withEntry(entryWithProjection(
-                base.entry(), differentProjection));
+        String differentProjection =
+                ProjectionIdentity.encode(Optional.of(new ProjectionRef(ProjectionType.ENTRY_INDEX, "different")));
+        Fixture fixture = base.withEntry(entryWithProjection(base.entry(), differentProjection));
         StoreState state = new StoreState(fixture);
 
         assertThatThrownBy(() -> coordinator(fixture, state, false, false)
@@ -162,28 +152,24 @@ class HigherGenerationPreDrainCoordinatorTest {
         Fixture fixture = fixture(GenerationLifecycle.QUARANTINED);
         StoreState state = new StoreState(fixture);
 
-        HigherGenerationPreDrainResult result = coordinator(
-                        fixture, state, false, false)
+        HigherGenerationPreDrainResult result = coordinator(fixture, state, false, false)
                 .preDrain(fixture.candidate())
                 .join();
 
         assertThat(result.transitionedCount()).isEqualTo(1);
-        assertThat(state.source.get().value().lifecycle())
-                .isEqualTo(GenerationLifecycle.DRAINING);
+        assertThat(state.source.get().value().lifecycle()).isEqualTo(GenerationLifecycle.DRAINING);
     }
 
     @Test
     void markedReplacementRootVetoesBeforeTheSourceCas() {
         Fixture base = fixture(GenerationLifecycle.COMMITTED);
-        Fixture fixture = base.withReplacementRoot(
-                markedRoot(base.replacementRoot()));
+        Fixture fixture = base.withReplacementRoot(markedRoot(base.replacementRoot()));
         StoreState state = new StoreState(fixture);
 
         assertThatThrownBy(() -> coordinator(fixture, state, false, false)
                         .preDrain(fixture.candidate())
                         .join())
-                .hasRootCauseMessage(
-                        "higher-generation source has no current healthy NRC1 replacement");
+                .hasRootCauseMessage("higher-generation source has no current healthy NRC1 replacement");
         assertThat(state.casCalls).hasValue(0);
     }
 
@@ -196,8 +182,7 @@ class HigherGenerationPreDrainCoordinatorTest {
         assertThatThrownBy(() -> coordinator(fixture, state, false, false)
                         .preDrain(fixture.candidate())
                         .join())
-                .hasRootCauseMessage(
-                        "higher-generation source has no current healthy NRC1 replacement");
+                .hasRootCauseMessage("higher-generation source has no current healthy NRC1 replacement");
         assertThat(state.casCalls).hasValue(0);
         assertThat(state.replacementRootReads).hasValue(0);
     }
@@ -207,14 +192,12 @@ class HigherGenerationPreDrainCoordinatorTest {
         Fixture fixture = fixture(GenerationLifecycle.COMMITTED);
         StoreState state = new StoreState(fixture);
 
-        HigherGenerationPreDrainResult result = coordinator(
-                        fixture, state, true, false)
+        HigherGenerationPreDrainResult result = coordinator(fixture, state, true, false)
                 .preDrain(fixture.candidate())
                 .join();
 
         assertThat(result.transitionedCount()).isEqualTo(1);
-        assertThat(result.drainingIndexes()).singleElement().isEqualTo(
-                state.source.get());
+        assertThat(result.drainingIndexes()).singleElement().isEqualTo(state.source.get());
         assertThat(state.casCalls).hasValue(1);
     }
 
@@ -226,8 +209,7 @@ class HigherGenerationPreDrainCoordinatorTest {
         assertThatThrownBy(() -> coordinator(fixture, state, false, true)
                         .preDrain(fixture.candidate())
                         .join())
-                .hasRootCauseMessage(
-                        "candidate physical root changed before higher-generation pre-drain");
+                .hasRootCauseMessage("candidate physical root changed before higher-generation pre-drain");
         assertThat(state.casCalls).hasValue(0);
         assertThat(state.candidateRootReads).hasValue(2);
     }
@@ -235,30 +217,26 @@ class HigherGenerationPreDrainCoordinatorTest {
     @Test
     void alreadyDrainingSourceStillRequiresCurrentHealthyCoverage() {
         Fixture base = fixture(GenerationLifecycle.DRAINING);
-        Fixture fixture = base.withReplacementRoot(
-                markedRoot(base.replacementRoot()));
+        Fixture fixture = base.withReplacementRoot(markedRoot(base.replacementRoot()));
         StoreState state = new StoreState(fixture);
 
         assertThatThrownBy(() -> coordinator(fixture, state, false, false)
                         .preDrain(fixture.candidate())
                         .join())
-                .hasRootCauseMessage(
-                        "higher-generation source has no current healthy NRC1 replacement");
+                .hasRootCauseMessage("higher-generation source has no current healthy NRC1 replacement");
         assertThat(state.casCalls).hasValue(0);
     }
 
     @Test
     void incompleteNrc1TilingCountsVetoBeforeTheSourceCas() {
         Fixture base = fixture(GenerationLifecycle.COMMITTED);
-        Fixture fixture = base.withSource(
-                sourceWithEntryCount(base.source(), 2));
+        Fixture fixture = base.withSource(sourceWithEntryCount(base.source(), 2));
         StoreState state = new StoreState(fixture);
 
         assertThatThrownBy(() -> coordinator(fixture, state, false, false)
                         .preDrain(fixture.candidate())
                         .join())
-                .hasRootCauseMessage(
-                        "higher-generation NRC1 tiling does not reproduce source counts or schemas");
+                .hasRootCauseMessage("higher-generation NRC1 tiling does not reproduce source counts or schemas");
         assertThat(state.casCalls).hasValue(0);
     }
 
@@ -276,11 +254,10 @@ class HigherGenerationPreDrainCoordinatorTest {
                 fixedClock(),
                 scheduler);
 
-        HigherGenerationPreDrainResult result = coordinator.preDrain(
-                fixture.candidate()).join();
+        HigherGenerationPreDrainResult result =
+                coordinator.preDrain(fixture.candidate()).join();
 
-        assertThat(result.status())
-                .isEqualTo(HigherGenerationPreDrainStatus.MUTATION_DISABLED);
+        assertThat(result.status()).isEqualTo(HigherGenerationPreDrainStatus.MUTATION_DISABLED);
         assertThat(state.scanCalls).hasValue(0);
         assertThat(state.l0Reads).hasValue(0);
         assertThat(state.candidateRootReads).hasValue(0);
@@ -302,13 +279,10 @@ class HigherGenerationPreDrainCoordinatorTest {
                 source.discoveredAtMillis(),
                 101);
 
-        HigherGenerationPreDrainResult result = coordinator(
-                        fixture, state, false, false)
-                .preDrain(future)
-                .join();
+        HigherGenerationPreDrainResult result =
+                coordinator(fixture, state, false, false).preDrain(future).join();
 
-        assertThat(result.status())
-                .isEqualTo(HigherGenerationPreDrainStatus.NOT_ELIGIBLE_YET);
+        assertThat(result.status()).isEqualTo(HigherGenerationPreDrainStatus.NOT_ELIGIBLE_YET);
         assertThat(state.scanCalls).hasValue(0);
         assertThat(state.l0Reads).hasValue(0);
         assertThat(state.candidateRootReads).hasValue(0);
@@ -327,35 +301,31 @@ class HigherGenerationPreDrainCoordinatorTest {
                 checkpointCodec(state),
                 enabledConfig());
 
-        List<GcPlannedMetadataRemoval> removals = planner.build(
-                fixture.candidate()).join();
+        List<GcPlannedMetadataRemoval> removals =
+                planner.build(fixture.candidate()).join();
 
-        assertThat(removals).containsExactly(new GcPlannedMetadataRemoval(
-                HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
-                state.source.get().key(),
-                state.source.get().metadataVersion(),
-                state.source.get().durableValueSha256()));
+        assertThat(removals)
+                .containsExactly(new GcPlannedMetadataRemoval(
+                        HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
+                        state.source.get().key(),
+                        state.source.get().metadataVersion(),
+                        state.source.get().durableValueSha256()));
         assertThat(state.publicationReads).hasValueGreaterThanOrEqualTo(2);
     }
 
     @Test
     void topicCompactedSourceUsesAHealthySameViewReplacement() {
-        Fixture fixture = fixture(
-                ReadView.TOPIC_COMPACTED,
-                GenerationLifecycle.COMMITTED);
+        Fixture fixture = fixture(ReadView.TOPIC_COMPACTED, GenerationLifecycle.COMMITTED);
         StoreState state = new StoreState(fixture);
 
-        HigherGenerationPreDrainResult result = coordinator(
-                        fixture, state, false, false)
+        HigherGenerationPreDrainResult result = coordinator(fixture, state, false, false)
                 .preDrain(fixture.candidate())
                 .join();
 
         assertThat(result.transitionedCount()).isEqualTo(1);
         assertThat(result.drainingIndexes()).singleElement().satisfies(index -> {
-            assertThat(index.value().readViewId())
-                    .isEqualTo(ReadView.TOPIC_COMPACTED.wireId());
-            assertThat(index.value().lifecycle())
-                    .isEqualTo(GenerationLifecycle.DRAINING);
+            assertThat(index.value().readViewId()).isEqualTo(ReadView.TOPIC_COMPACTED.wireId());
+            assertThat(index.value().lifecycle()).isEqualTo(GenerationLifecycle.DRAINING);
         });
         assertThat(state.openCalls).hasValue(0);
         assertThat(state.publicationReads).hasValue(0);
@@ -364,26 +334,20 @@ class HigherGenerationPreDrainCoordinatorTest {
 
     @Test
     void topicCompactedMarkedReplacementVetoesBeforeTheSourceCas() {
-        Fixture base = fixture(
-                ReadView.TOPIC_COMPACTED,
-                GenerationLifecycle.COMMITTED);
-        Fixture fixture = base.withReplacementRoot(
-                markedRoot(base.replacementRoot()));
+        Fixture base = fixture(ReadView.TOPIC_COMPACTED, GenerationLifecycle.COMMITTED);
+        Fixture fixture = base.withReplacementRoot(markedRoot(base.replacementRoot()));
         StoreState state = new StoreState(fixture);
 
         assertThatThrownBy(() -> coordinator(fixture, state, false, false)
                         .preDrain(fixture.candidate())
                         .join())
-                .hasRootCauseMessage(
-                        "TOPIC_COMPACTED source has no current healthy same-view replacement");
+                .hasRootCauseMessage("TOPIC_COMPACTED source has no current healthy same-view replacement");
         assertThat(state.casCalls).hasValue(0);
     }
 
     @Test
     void drainingTopicRemovalPlannerReprovesTheSameViewReplacement() {
-        Fixture fixture = fixture(
-                ReadView.TOPIC_COMPACTED,
-                GenerationLifecycle.DRAINING);
+        Fixture fixture = fixture(ReadView.TOPIC_COMPACTED, GenerationLifecycle.DRAINING);
         StoreState state = new StoreState(fixture);
         SourceRetirementPlanBuilder planner = new SourceRetirementPlanBuilder(
                 CLUSTER,
@@ -394,30 +358,27 @@ class HigherGenerationPreDrainCoordinatorTest {
                 checkpointCodec(state),
                 enabledConfig());
 
-        List<GcPlannedMetadataRemoval> removals = planner.build(
-                fixture.candidate()).join();
+        List<GcPlannedMetadataRemoval> removals =
+                planner.build(fixture.candidate()).join();
 
-        assertThat(removals).containsExactly(new GcPlannedMetadataRemoval(
-                HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
-                state.source.get().key(),
-                state.source.get().metadataVersion(),
-                state.source.get().durableValueSha256()));
+        assertThat(removals)
+                .containsExactly(new GcPlannedMetadataRemoval(
+                        HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
+                        state.source.get().key(),
+                        state.source.get().metadataVersion(),
+                        state.source.get().durableValueSha256()));
         assertThat(state.openCalls).hasValue(0);
         assertThat(state.replacementRootReads).hasValueGreaterThanOrEqualTo(2);
     }
 
     @Test
     void completedTrimDrainsTopicSourceWithoutReplacementOrCheckpointReads() {
-        Fixture base = fixture(
-                ReadView.TOPIC_COMPACTED,
-                GenerationLifecycle.COMMITTED);
-        Fixture fixture = base.withReplacementRoot(
-                markedRoot(base.replacementRoot()));
+        Fixture base = fixture(ReadView.TOPIC_COMPACTED, GenerationLifecycle.COMMITTED);
+        Fixture fixture = base.withReplacementRoot(markedRoot(base.replacementRoot()));
         StoreState state = new StoreState(fixture);
         state.streamSnapshot.set(snapshot(12));
 
-        HigherGenerationPreDrainResult result = coordinator(
-                        fixture, state, false, false)
+        HigherGenerationPreDrainResult result = coordinator(fixture, state, false, false)
                 .preDrain(fixture.candidate())
                 .join();
 
@@ -430,9 +391,7 @@ class HigherGenerationPreDrainCoordinatorTest {
 
     @Test
     void completedTrimDriftVetoesBeforeTheSourceCas() {
-        Fixture fixture = fixture(
-                ReadView.TOPIC_COMPACTED,
-                GenerationLifecycle.COMMITTED);
+        Fixture fixture = fixture(ReadView.TOPIC_COMPACTED, GenerationLifecycle.COMMITTED);
         StoreState state = new StoreState(fixture);
         state.streamSnapshot.set(snapshot(12));
         state.loseCompletedTrimOnRevalidation.set(true);
@@ -440,17 +399,13 @@ class HigherGenerationPreDrainCoordinatorTest {
         assertThatThrownBy(() -> coordinator(fixture, state, false, false)
                         .preDrain(fixture.candidate())
                         .join())
-                .hasRootCauseMessage(
-                        "completed trim changed while retirement facts were frozen");
+                .hasRootCauseMessage("completed trim changed while retirement facts were frozen");
         assertThat(state.casCalls).hasValue(0);
         assertThat(state.replacementRootReads).hasValue(0);
     }
 
     private HigherGenerationPreDrainCoordinator coordinator(
-            Fixture fixture,
-            StoreState state,
-            boolean loseCasResponse,
-            boolean changeCandidateRootAtFinalFence) {
+            Fixture fixture, StoreState state, boolean loseCasResponse, boolean changeCandidateRootAtFinalFence) {
         return new HigherGenerationPreDrainCoordinator(
                 CLUSTER,
                 l0Store(state),
@@ -466,32 +421,16 @@ class HigherGenerationPreDrainCoordinatorTest {
         return fixture(ReadView.COMMITTED, sourceLifecycle);
     }
 
-    private static Fixture fixture(
-            ReadView view,
-            GenerationLifecycle sourceLifecycle) {
-        ObjectSliceReadTarget sourceTarget = target(
-                view,
-                "source-object",
-                "objects/source-object",
-                "11223344");
-        ObjectSliceReadTarget replacementTarget = target(
-                view,
-                "replacement-object",
-                "objects/replacement-object",
-                "55667788");
-        VersionedGenerationIndex source = generation(
-                view, 1, "p".repeat(52), sourceTarget, sourceLifecycle, 5);
-        VersionedGenerationIndex replacement = generation(
-                view,
-                2,
-                "q".repeat(52),
-                replacementTarget,
-                GenerationLifecycle.COMMITTED,
-                6);
+    private static Fixture fixture(ReadView view, GenerationLifecycle sourceLifecycle) {
+        ObjectSliceReadTarget sourceTarget = target(view, "source-object", "objects/source-object", "11223344");
+        ObjectSliceReadTarget replacementTarget =
+                target(view, "replacement-object", "objects/replacement-object", "55667788");
+        VersionedGenerationIndex source = generation(view, 1, "p".repeat(52), sourceTarget, sourceLifecycle, 5);
+        VersionedGenerationIndex replacement =
+                generation(view, 2, "q".repeat(52), replacementTarget, GenerationLifecycle.COMMITTED, 6);
 
         StreamCommitTargetRecord commit = commit(sourceTarget);
-        byte[] commitBytes = MetadataRecordCodecFactory.encodeEnvelope(
-                commit, StreamCommitTargetRecord.class);
+        byte[] commitBytes = MetadataRecordCodecFactory.encodeEnvelope(commit, StreamCommitTargetRecord.class);
         RecoveryCheckpointEntry entry = new RecoveryCheckpointEntry(
                 1,
                 new OffsetRange(0, 12),
@@ -521,8 +460,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                 1,
                 1);
         Checksum checkpointContent = sha('b');
-        ObjectKey checkpointKey = RecoveryCheckpointFormatV1.objectKey(
-                header, checkpointContent);
+        ObjectKey checkpointKey = RecoveryCheckpointFormatV1.objectKey(header, checkpointContent);
         RecoveryCheckpointDirectory directory = new RecoveryCheckpointDirectory(
                 100,
                 Integer.BYTES,
@@ -575,17 +513,14 @@ class HigherGenerationPreDrainCoordinatorTest {
                 commit.commitId(),
                 commit.commitId(),
                 List.of(reference),
-                RecoveryCheckpointRootDigests.checkpointSetSha256(
-                        List.of(reference)).value(),
+                RecoveryCheckpointRootDigests.checkpointSetSha256(List.of(reference))
+                        .value(),
                 commit.commitId(),
                 1,
                 20,
                 5);
         VersionedRecoveryCheckpointRoot recoveryRoot = new VersionedRecoveryCheckpointRoot(
-                new F4Keyspace(CLUSTER).recoveryRootKey(STREAM),
-                rootValue,
-                rootValue.metadataVersion(),
-                sha('d'));
+                new F4Keyspace(CLUSTER).recoveryRootKey(STREAM), rootValue, rootValue.metadataVersion(), sha('d'));
 
         VersionedPhysicalObjectRoot candidateRoot = activeRoot(
                 sourceTarget,
@@ -601,14 +536,10 @@ class HigherGenerationPreDrainCoordinatorTest {
                         : PhysicalObjectKind.TOPIC_COMPACTED,
                 4,
                 sha('f'));
-        PhysicalObjectIdentity object = PhysicalObjectIdentity.from(
-                candidateRoot.value());
+        PhysicalObjectIdentity object = PhysicalObjectIdentity.from(candidateRoot.value());
         Checksum evidence = sha('1');
-        GcReferenceQuery query = GcReferenceQuery.create(
-                GcReferenceQueryKind.REFERENCED_OBJECT,
-                object,
-                List.of(STREAM),
-                evidence);
+        GcReferenceQuery query =
+                GcReferenceQuery.create(GcReferenceQueryKind.REFERENCED_OBJECT, object, List.of(STREAM), evidence);
         GcCandidate candidate = new GcCandidate(
                 "s".repeat(52),
                 object,
@@ -639,15 +570,15 @@ class HigherGenerationPreDrainCoordinatorTest {
             GenerationLifecycle lifecycle,
             long metadataVersion) {
         var encoded = ReadTargetCodecRegistry.phase15().encode(target);
-        boolean committed = lifecycle != GenerationLifecycle.PREPARED
-                && lifecycle != GenerationLifecycle.ABORTED;
-        String reason = switch (lifecycle) {
-            case QUARANTINED -> "quarantined-before-pre-drain";
-            case DRAINING -> "earlier-safe-pre-drain";
-            case RETIRED -> "retired";
-            case ABORTED -> "aborted";
-            default -> "";
-        };
+        boolean committed = lifecycle != GenerationLifecycle.PREPARED && lifecycle != GenerationLifecycle.ABORTED;
+        String reason =
+                switch (lifecycle) {
+                    case QUARANTINED -> "quarantined-before-pre-drain";
+                    case DRAINING -> "earlier-safe-pre-drain";
+                    case RETIRED -> "retired";
+                    case ABORTED -> "aborted";
+                    default -> "";
+                };
         GenerationIndexRecord value = new GenerationIndexRecord(
                 1,
                 STREAM.value(),
@@ -679,18 +610,12 @@ class HigherGenerationPreDrainCoordinatorTest {
                 reason,
                 lifecycle == GenerationLifecycle.COMMITTED ? 2 : 3,
                 metadataVersion);
-        String key = new F4Keyspace(CLUSTER).generationIndexKey(
-                STREAM, view, 12, generation);
+        String key = new F4Keyspace(CLUSTER).generationIndexKey(STREAM, view, 12, generation);
         return new VersionedGenerationIndex(
-                key,
-                value,
-                metadataVersion,
-                GenerationIndexDigests.durableValueSha256(
-                        value.withMetadataVersion(0)));
+                key, value, metadataVersion, GenerationIndexDigests.durableValueSha256(value.withMetadataVersion(0)));
     }
 
-    private static RecoveryCheckpointPublication publication(
-            GenerationIndexRecord value) {
+    private static RecoveryCheckpointPublication publication(GenerationIndexRecord value) {
         GenerationIndexRecord embedded = value.withMetadataVersion(0);
         byte[] canonical = new GenerationIndexRecordCodecV1().encode(embedded);
         return new RecoveryCheckpointPublication(
@@ -701,9 +626,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                 GenerationIndexDigests.canonicalRecordSha256(embedded));
     }
 
-    private static VersionedGenerationIndex sourceWithEntryCount(
-            VersionedGenerationIndex source,
-            int entryCount) {
+    private static VersionedGenerationIndex sourceWithEntryCount(VersionedGenerationIndex source, int entryCount) {
         GenerationIndexRecord value = source.value();
         GenerationIndexRecord changed = new GenerationIndexRecord(
                 value.schemaVersion(),
@@ -740,12 +663,10 @@ class HigherGenerationPreDrainCoordinatorTest {
                 source.key(),
                 changed,
                 source.metadataVersion(),
-                GenerationIndexDigests.durableValueSha256(
-                        changed.withMetadataVersion(0)));
+                GenerationIndexDigests.durableValueSha256(changed.withMetadataVersion(0)));
     }
 
-    private static StreamCommitTargetRecord commit(
-            ObjectSliceReadTarget sourceTarget) {
+    private static StreamCommitTargetRecord commit(ObjectSliceReadTarget sourceTarget) {
         return new StreamCommitTargetRecord(
                 STREAM.value(),
                 "commit-pre-drain",
@@ -772,11 +693,9 @@ class HigherGenerationPreDrainCoordinatorTest {
                 0);
     }
 
-    private static RecoveryCheckpointEntry entryWithProjection(
-            RecoveryCheckpointEntry entry, String projectionRef) {
+    private static RecoveryCheckpointEntry entryWithProjection(RecoveryCheckpointEntry entry, String projectionRef) {
         StreamCommitTargetRecord value = MetadataRecordCodecFactory.decodeEnvelope(
-                bytes(entry.canonicalCommitRecord()),
-                StreamCommitTargetRecord.class);
+                bytes(entry.canonicalCommitRecord()), StreamCommitTargetRecord.class);
         StreamCommitTargetRecord changed = new StreamCommitTargetRecord(
                 value.streamId(),
                 value.commitId(),
@@ -801,8 +720,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                 value.maxEventTimeMillis(),
                 value.preparedAtMillis(),
                 value.metadataVersion());
-        byte[] canonical = MetadataRecordCodecFactory.encodeEnvelope(
-                changed, StreamCommitTargetRecord.class);
+        byte[] canonical = MetadataRecordCodecFactory.encodeEnvelope(changed, StreamCommitTargetRecord.class);
         return new RecoveryCheckpointEntry(
                 entry.commitVersion(),
                 entry.range(),
@@ -821,11 +739,7 @@ class HigherGenerationPreDrainCoordinatorTest {
         return result;
     }
 
-    private static ObjectSliceReadTarget target(
-            ReadView view,
-            String objectId,
-            String objectKey,
-            String checksum) {
+    private static ObjectSliceReadTarget target(ReadView view, String objectId, String objectKey, String checksum) {
         EntryIndexRef entryIndex = new EntryIndexRef(
                 EntryIndexLocation.INLINE,
                 Optional.empty(),
@@ -839,9 +753,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                 new ObjectId(objectId),
                 new ObjectKey(objectKey),
                 ObjectType.STREAM_COMPACTED_OBJECT,
-                view == ReadView.COMMITTED
-                        ? "NEREUS_COMPACTED_PARQUET_V1"
-                        : "NEREUS_TOPIC_COMPACTED_PARQUET_V1",
+                view == ReadView.COMMITTED ? "NEREUS_COMPACTED_PARQUET_V1" : "NEREUS_TOPIC_COMPACTED_PARQUET_V1",
                 PayloadFormat.PULSAR_ENTRY_BATCH.name(),
                 "slice-" + objectId,
                 0,
@@ -851,10 +763,7 @@ class HigherGenerationPreDrainCoordinatorTest {
     }
 
     private static VersionedPhysicalObjectRoot activeRoot(
-            ObjectSliceReadTarget target,
-            PhysicalObjectKind kind,
-            long metadataVersion,
-            Checksum digest) {
+            ObjectSliceReadTarget target, PhysicalObjectKind kind, long metadataVersion, Checksum digest) {
         ObjectKeyHash hash = ObjectKeyHash.from(target.objectKey());
         PhysicalObjectRootRecord value = new PhysicalObjectRootRecord(
                 1,
@@ -882,14 +791,10 @@ class HigherGenerationPreDrainCoordinatorTest {
                 "",
                 metadataVersion);
         return new VersionedPhysicalObjectRoot(
-                new F4Keyspace(CLUSTER).physicalRootKey(hash),
-                value,
-                metadataVersion,
-                digest);
+                new F4Keyspace(CLUSTER).physicalRootKey(hash), value, metadataVersion, digest);
     }
 
-    private static VersionedPhysicalObjectRoot markedRoot(
-            VersionedPhysicalObjectRoot source) {
+    private static VersionedPhysicalObjectRoot markedRoot(VersionedPhysicalObjectRoot source) {
         PhysicalObjectRootRecord value = source.value();
         long version = Math.addExact(source.metadataVersion(), 1);
         PhysicalObjectRootRecord changed = new PhysicalObjectRootRecord(
@@ -917,8 +822,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                 "",
                 "",
                 version);
-        return new VersionedPhysicalObjectRoot(
-                source.key(), changed, version, sha('4'));
+        return new VersionedPhysicalObjectRoot(source.key(), changed, version, sha('4'));
     }
 
     private static OxiaMetadataStore l0Store(StoreState state) {
@@ -933,13 +837,11 @@ class HigherGenerationPreDrainCoordinatorTest {
                         case "getStreamSnapshot" -> {
                             int read = state.l0Reads.incrementAndGet();
                             StreamMetadataSnapshot snapshot = state.streamSnapshot.get();
-                            if (state.loseCompletedTrimOnRevalidation.get()
-                                    && read > 1) {
-                                snapshot = snapshot(Math.subtractExact(
-                                        snapshot.trim().trimOffset(), 1));
+                            if (state.loseCompletedTrimOnRevalidation.get() && read > 1) {
+                                snapshot = snapshot(
+                                        Math.subtractExact(snapshot.trim().trimOffset(), 1));
                             }
-                            yield CompletableFuture.completedFuture(
-                                    snapshot);
+                            yield CompletableFuture.completedFuture(snapshot);
                         }
                         case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
@@ -960,15 +862,11 @@ class HigherGenerationPreDrainCoordinatorTest {
                         1,
                         1,
                         version),
-                new CommittedEndOffsetRecord(
-                        STREAM.value(), 12, 12, 1, version),
-                new TrimRecord(
-                        STREAM.value(), trimOffset, "test", 2, version));
+                new CommittedEndOffsetRecord(STREAM.value(), 12, 12, 1, version),
+                new TrimRecord(STREAM.value(), trimOffset, "test", 2, version));
     }
 
-    private static GenerationMetadataStore generationStore(
-            StoreState state,
-            boolean loseCasResponse) {
+    private static GenerationMetadataStore generationStore(StoreState state, boolean loseCasResponse) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -981,23 +879,18 @@ class HigherGenerationPreDrainCoordinatorTest {
                             state.scanCalls.incrementAndGet();
                             ReadView sourceView = ReadView.fromWireId(
                                     state.source.get().value().readViewId());
-                            yield CompletableFuture.completedFuture(
-                                    new GenerationScanPage(
-                                            args[2] == sourceView
-                                                    ? List.of(
-                                                            state.source.get(),
-                                                            state.replacement.get())
-                                                    : List.of(),
-                                            Optional.empty()));
+                            yield CompletableFuture.completedFuture(new GenerationScanPage(
+                                    args[2] == sourceView
+                                            ? List.of(state.source.get(), state.replacement.get())
+                                            : List.of(),
+                                    Optional.empty()));
                         }
-                        case "getRecoveryRoot" -> CompletableFuture.completedFuture(
-                                Optional.of(state.fixture.recoveryRoot()));
+                        case "getRecoveryRoot" ->
+                            CompletableFuture.completedFuture(Optional.of(state.fixture.recoveryRoot()));
                         case "getIndex" -> {
-                            GenerationIndexIdentity identity =
-                                    (GenerationIndexIdentity) args[1];
+                            GenerationIndexIdentity identity = (GenerationIndexIdentity) args[1];
                             if (identity.equals(identity(state.source.get()))) {
-                                yield CompletableFuture.completedFuture(
-                                        Optional.of(state.source.get()));
+                                yield CompletableFuture.completedFuture(Optional.of(state.source.get()));
                             }
                             yield CompletableFuture.completedFuture(
                                     identity.equals(identity(state.replacement.get()))
@@ -1007,8 +900,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                         case "getCandidateByKey" -> {
                             String key = (String) args[3];
                             if (key.equals(state.source.get().key())) {
-                                yield CompletableFuture.completedFuture(
-                                        Optional.of(state.source.get()));
+                                yield CompletableFuture.completedFuture(Optional.of(state.source.get()));
                             }
                             yield CompletableFuture.completedFuture(
                                     key.equals(state.replacement.get().key())
@@ -1017,17 +909,14 @@ class HigherGenerationPreDrainCoordinatorTest {
                         }
                         case "compareAndSetIndex" -> {
                             state.casCalls.incrementAndGet();
-                            GenerationIndexRecord requested =
-                                    (GenerationIndexRecord) args[1];
+                            GenerationIndexRecord requested = (GenerationIndexRecord) args[1];
                             long expectedVersion = (long) args[2];
                             VersionedGenerationIndex current = state.source.get();
                             if (current.metadataVersion() != expectedVersion) {
-                                yield CompletableFuture.failedFuture(
-                                        new IllegalStateException("version mismatch"));
+                                yield CompletableFuture.failedFuture(new IllegalStateException("version mismatch"));
                             }
                             long version = Math.addExact(expectedVersion, 1);
-                            GenerationIndexRecord stored = requested.withMetadataVersion(
-                                    version);
+                            GenerationIndexRecord stored = requested.withMetadataVersion(version);
                             VersionedGenerationIndex updated = new VersionedGenerationIndex(
                                     current.key(),
                                     stored,
@@ -1035,8 +924,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                                     GenerationIndexDigests.durableValueSha256(requested));
                             state.source.set(updated);
                             if (loseCasResponse) {
-                                yield CompletableFuture.failedFuture(
-                                        new IllegalStateException("lost CAS response"));
+                                yield CompletableFuture.failedFuture(new IllegalStateException("lost CAS response"));
                             }
                             yield CompletableFuture.completedFuture(updated);
                         }
@@ -1047,8 +935,7 @@ class HigherGenerationPreDrainCoordinatorTest {
     }
 
     private static PhysicalObjectMetadataStore physicalStore(
-            StoreState state,
-            boolean changeCandidateRootAtFinalFence) {
+            StoreState state, boolean changeCandidateRootAtFinalFence) {
         return (PhysicalObjectMetadataStore) Proxy.newProxyInstance(
                 PhysicalObjectMetadataStore.class.getClassLoader(),
                 new Class<?>[] {PhysicalObjectMetadataStore.class},
@@ -1059,24 +946,17 @@ class HigherGenerationPreDrainCoordinatorTest {
                     return switch (method.getName()) {
                         case "getRoot" -> {
                             ObjectKeyHash object = (ObjectKeyHash) args[1];
-                            VersionedPhysicalObjectRoot candidate =
-                                    state.candidateRoot.get();
-                            if (object.value().equals(
-                                    candidate.value().objectKeyHash())) {
+                            VersionedPhysicalObjectRoot candidate = state.candidateRoot.get();
+                            if (object.value().equals(candidate.value().objectKeyHash())) {
                                 int read = state.candidateRootReads.incrementAndGet();
                                 VersionedPhysicalObjectRoot returned =
-                                        changeCandidateRootAtFinalFence && read > 1
-                                                ? markedRoot(candidate)
-                                                : candidate;
-                                yield CompletableFuture.completedFuture(
-                                        Optional.of(returned));
+                                        changeCandidateRootAtFinalFence && read > 1 ? markedRoot(candidate) : candidate;
+                                yield CompletableFuture.completedFuture(Optional.of(returned));
                             }
-                            VersionedPhysicalObjectRoot replacement =
-                                    state.replacementRoot.get();
+                            VersionedPhysicalObjectRoot replacement = state.replacementRoot.get();
                             state.replacementRootReads.incrementAndGet();
                             yield CompletableFuture.completedFuture(
-                                    object.value().equals(
-                                                    replacement.value().objectKeyHash())
+                                    object.value().equals(replacement.value().objectKeyHash())
                                             ? Optional.of(replacement)
                                             : Optional.empty());
                         }
@@ -1097,18 +977,14 @@ class HigherGenerationPreDrainCoordinatorTest {
                     return switch (method.getName()) {
                         case "openAndVerify" -> {
                             state.openCalls.incrementAndGet();
-                            yield CompletableFuture.completedFuture(
-                                    state.fixture.checkpoint());
+                            yield CompletableFuture.completedFuture(state.fixture.checkpoint());
                         }
                         case "findCommitCoveringOffset" ->
-                                CompletableFuture.completedFuture(
-                                        Optional.of(state.fixture.entry()));
+                            CompletableFuture.completedFuture(Optional.of(state.fixture.entry()));
                         case "scanPublications" -> {
                             state.publicationReads.incrementAndGet();
-                            yield CompletableFuture.completedFuture(
-                                    new RecoveryCheckpointPublicationPage(
-                                            List.of(state.fixture.publication()),
-                                            OptionalInt.empty()));
+                            yield CompletableFuture.completedFuture(new RecoveryCheckpointPublicationPage(
+                                    List.of(state.fixture.publication()), OptionalInt.empty()));
                         }
                         default -> throw new UnsupportedOperationException(method.getName());
                     };
@@ -1139,14 +1015,10 @@ class HigherGenerationPreDrainCoordinatorTest {
         };
     }
 
-    private static GenerationIndexIdentity identity(
-            VersionedGenerationIndex index) {
+    private static GenerationIndexIdentity identity(VersionedGenerationIndex index) {
         GenerationIndexRecord value = index.value();
         return new GenerationIndexIdentity(
-                STREAM,
-                ReadView.fromWireId(value.readViewId()),
-                value.offsetEnd(),
-                value.generation());
+                STREAM, ReadView.fromWireId(value.readViewId()), value.offsetEnd(), value.generation());
     }
 
     private static PhysicalGcConfig enabledConfig() {
@@ -1177,21 +1049,19 @@ class HigherGenerationPreDrainCoordinatorTest {
     }
 
     private static Clock fixedClock() {
-        return Clock.fixed(
-                Instant.ofEpochMilli(100), ZoneOffset.UTC);
+        return Clock.fixed(Instant.ofEpochMilli(100), ZoneOffset.UTC);
     }
 
     private static Checksum sha(char value) {
-        return new Checksum(
-                ChecksumType.SHA256, String.valueOf(value).repeat(64));
+        return new Checksum(ChecksumType.SHA256, String.valueOf(value).repeat(64));
     }
 
     private static Checksum sha256(byte[] bytes) {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(
-                            MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException(failure);
         }
@@ -1204,8 +1074,7 @@ class HigherGenerationPreDrainCoordinatorTest {
         private final AtomicReference<VersionedPhysicalObjectRoot> candidateRoot;
         private final AtomicReference<VersionedPhysicalObjectRoot> replacementRoot;
         private final AtomicReference<StreamMetadataSnapshot> streamSnapshot;
-        private final AtomicBoolean loseCompletedTrimOnRevalidation =
-                new AtomicBoolean();
+        private final AtomicBoolean loseCompletedTrimOnRevalidation = new AtomicBoolean();
         private final AtomicInteger l0Reads = new AtomicInteger();
         private final AtomicInteger scanCalls = new AtomicInteger();
         private final AtomicInteger openCalls = new AtomicInteger();
@@ -1234,8 +1103,7 @@ class HigherGenerationPreDrainCoordinatorTest {
             VersionedPhysicalObjectRoot candidateRoot,
             VersionedPhysicalObjectRoot replacementRoot,
             GcCandidate candidate) {
-        private Fixture withReplacementRoot(
-                VersionedPhysicalObjectRoot replacement) {
+        private Fixture withReplacementRoot(VersionedPhysicalObjectRoot replacement) {
             return new Fixture(
                     source,
                     this.replacement,
@@ -1274,8 +1142,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                     candidate);
         }
 
-        private Fixture withPublication(
-                RecoveryCheckpointPublication replacementPublication) {
+        private Fixture withPublication(RecoveryCheckpointPublication replacementPublication) {
             return new Fixture(
                     source,
                     replacement,

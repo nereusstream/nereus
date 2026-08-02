@@ -14,7 +14,9 @@
 
 package com.nereusstream.managedledger.projection;
 
-/** Signals that durable projection identity or a role-specific Position is inconsistent. */
+/**
+ * Signals that durable projection identity or a role-specific Position is inconsistent.
+ */
 public final class ProjectionValidationException extends IllegalArgumentException {
     public ProjectionValidationException(String message) {
         super(message);

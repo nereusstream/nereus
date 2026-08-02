@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.CursorAckRangeRecord;
@@ -12,7 +13,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-/** Explicit canonical binary V1 codec for {@link CursorStateRecord}. */
+/**
+ * Explicit canonical binary V1 codec for {@link CursorStateRecord}.
+ */
 public final class CursorStateRecordCodecV1 implements MetadataRecordCodec<CursorStateRecord> {
     private static final int VERSION = 1;
 
@@ -74,29 +77,29 @@ public final class CursorStateRecordCodecV1 implements MetadataRecordCodec<Curso
             String cursorName = reader.readString("cursorName");
             String cursorNameHash = reader.readString("cursorNameHash");
             long generation = reader.readLong("cursorGeneration");
-            CursorRecordLifecycle lifecycle = CursorRecordLifecycle.fromId(
-                    reader.readUnsignedByte("lifecycleId"));
+            CursorRecordLifecycle lifecycle = CursorRecordLifecycle.fromId(reader.readUnsignedByte("lifecycleId"));
             long sequence = reader.readLong("mutationSequence");
             long ackStateEpoch = reader.readLong("ackStateEpoch");
             String attempt = reader.readString("lastProtectionAttemptId");
             long markDelete = reader.readLong("markDeleteOffset");
-            Optional<CursorSnapshotReferenceRecord> snapshot = switch (
-                    reader.readUnsignedByte("snapshotPresent")) {
-                case 0 -> Optional.empty();
-                case 1 -> Optional.of(readSnapshotReference(reader));
-                default -> throw new MetadataCodecException("invalid snapshot-present flag");
-            };
+            Optional<CursorSnapshotReferenceRecord> snapshot =
+                    switch (reader.readUnsignedByte("snapshotPresent")) {
+                        case 0 -> Optional.empty();
+                        case 1 -> Optional.of(readSnapshotReference(reader));
+                        default -> throw new MetadataCodecException("invalid snapshot-present flag");
+                    };
             List<CursorAckRangeRecord> ranges = readRanges(reader);
             List<CursorPartialBatchAckRecord> partials = readPartials(reader);
             var positionProperties = F3Binary.readLongMap(reader, "positionProperties");
             var cursorProperties = F3Binary.readStringMap(reader, "cursorProperties");
             long createdAt = reader.readLong("createdAtMillis");
             long updatedAt = reader.readLong("updatedAtMillis");
-            OptionalLong deletedAt = switch (reader.readUnsignedByte("deletedAtPresent")) {
-                case 0 -> OptionalLong.empty();
-                case 1 -> OptionalLong.of(reader.readLong("deletedAtMillis"));
-                default -> throw new MetadataCodecException("invalid deleted-at-present flag");
-            };
+            OptionalLong deletedAt =
+                    switch (reader.readUnsignedByte("deletedAtPresent")) {
+                        case 0 -> OptionalLong.empty();
+                        case 1 -> OptionalLong.of(reader.readLong("deletedAtMillis"));
+                        default -> throw new MetadataCodecException("invalid deleted-at-present flag");
+                    };
             reader.requireConsumed();
             return new CursorStateRecord(
                     metadataVersion,
@@ -172,9 +175,8 @@ public final class CursorStateRecordCodecV1 implements MetadataRecordCodec<Curso
         int count = reader.readCount("wholeRangeCount", Long.BYTES * 2);
         List<CursorAckRangeRecord> ranges = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
-            ranges.add(new CursorAckRangeRecord(
-                    reader.readLong("range startOffset"),
-                    reader.readLong("range endOffset")));
+            ranges.add(
+                    new CursorAckRangeRecord(reader.readLong("range startOffset"), reader.readLong("range endOffset")));
         }
         return List.copyOf(ranges);
     }
@@ -193,8 +195,7 @@ public final class CursorStateRecordCodecV1 implements MetadataRecordCodec<Curso
         return List.copyOf(partials);
     }
 
-    private static void writeSnapshotReference(
-            F3Binary.Writer writer, CursorSnapshotReferenceRecord reference) {
+    private static void writeSnapshotReference(F3Binary.Writer writer, CursorSnapshotReferenceRecord reference) {
         writer.writeString(reference.objectKey());
         writer.writeString(reference.snapshotId());
         writer.writeLong(reference.cursorGeneration());

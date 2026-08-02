@@ -14,7 +14,9 @@
 
 package com.nereusstream.kafka.codec;
 
-/** Protocol-neutral form of one Kafka Fetch aborted-transaction fact. */
+/**
+ * Protocol-neutral form of one Kafka Fetch aborted-transaction fact.
+ */
 public record KafkaAbortedTransaction(long producerId, long firstOffset) {
     public KafkaAbortedTransaction {
         if (producerId < 0 || firstOffset < 0) {

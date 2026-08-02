@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
-/** Closed durable NTC2 disposition IDs; Java ordinals are never serialized. */
+/**
+ * Closed durable NTC2 disposition IDs; Java ordinals are never serialized.
+ */
 public enum KafkaCompactionDispositionV2 {
     RETAIN_VALUE(1),
     RETAIN_TOMBSTONE(2),

@@ -1,6 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.kafka.activation.KafkaBrokerCapabilitySpecification;
@@ -16,8 +19,8 @@ import com.nereusstream.objectstore.ObjectStoreSecretResolver;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -25,23 +28,17 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 class NereusKafkaObjectWalRuntimeFactoryTest {
     @Test
     void canonicalizesKafkaUuidProcessIdentityForDurableReadLeases() {
         String kafkaRuntimeInstanceId = "92efbd60-15c3-4fbd-bf80-86186a79740b";
 
-        String durableProcessRunId =
-                NereusKafkaObjectWalRuntimeFactory.durableProcessRunId(
-                        kafkaRuntimeInstanceId);
+        String durableProcessRunId = NereusKafkaObjectWalRuntimeFactory.durableProcessRunId(kafkaRuntimeInstanceId);
 
         assertThat(durableProcessRunId)
                 .hasSize(52)
                 .matches("[a-z2-7]+")
-                .isEqualTo(NereusKafkaObjectWalRuntimeFactory.durableProcessRunId(
-                        kafkaRuntimeInstanceId));
+                .isEqualTo(NereusKafkaObjectWalRuntimeFactory.durableProcessRunId(kafkaRuntimeInstanceId));
         assertThat(durableProcessRunId).isNotEqualTo(kafkaRuntimeInstanceId);
     }
 
@@ -51,16 +48,16 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             assertThatThrownBy(() -> NereusKafkaObjectWalRuntimeFactory.createUnactivatedForTesting(
-                    configuration(provider),
-                    new NereusKafkaObjectWalRuntimeContext(
-                            provider,
-                            reference -> Optional.empty(),
-                            scheduler,
-                            request -> {
-                                throw new AssertionError("recovery not expected");
-                            },
-                            Clock.systemUTC(),
-                            () -> CompletableFuture.completedFuture(null))))
+                            configuration(provider),
+                            new NereusKafkaObjectWalRuntimeContext(
+                                    provider,
+                                    reference -> Optional.empty(),
+                                    scheduler,
+                                    request -> {
+                                        throw new AssertionError("recovery not expected");
+                                    },
+                                    Clock.systemUTC(),
+                                    () -> CompletableFuture.completedFuture(null))))
                     .isInstanceOf(IllegalStateException.class)
                     .hasRootCauseMessage("object store creation failed");
         } finally {
@@ -76,9 +73,9 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             assertThatThrownBy(() -> NereusKafkaObjectWalRuntimeFactory.createActivated(
-                    configuration(provider),
-                    context(provider, scheduler),
-                    activationContext("another-kafka-cluster")))
+                            configuration(provider),
+                            context(provider, scheduler),
+                            activationContext("another-kafka-cluster")))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("activation capability Kafka cluster must match the runtime");
         } finally {
@@ -88,8 +85,7 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
     }
 
     private static NereusKafkaObjectWalRuntimeContext context(
-            ObjectStoreProvider provider,
-            ScheduledExecutorService scheduler) {
+            ObjectStoreProvider provider, ScheduledExecutorService scheduler) {
         return new NereusKafkaObjectWalRuntimeContext(
                 provider,
                 reference -> Optional.empty(),
@@ -110,9 +106,7 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
                 "4.3.0",
                 "nereus-test",
                 "21",
-                Set.of(
-                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT),
+                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT, StorageProfile.OBJECT_WAL_ASYNC_OBJECT),
                 StorageProfile.OBJECT_WAL_SYNC_OBJECT,
                 bytes(1),
                 bytes(2),
@@ -136,12 +130,13 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
 
     private static byte[] bytes(int seed) {
         byte[] value = new byte[32];
-        for (int index = 0; index < value.length; index++) value[index] = (byte) (seed + index);
+        for (int index = 0; index < value.length; index++) {
+            value[index] = (byte) (seed + index);
+        }
         return value;
     }
 
-    private static NereusKafkaObjectWalRuntimeConfiguration configuration(
-            ObjectStoreProvider provider) {
+    private static NereusKafkaObjectWalRuntimeConfiguration configuration(ObjectStoreProvider provider) {
         NereusKafkaRuntimeConfiguration runtime = new NereusKafkaRuntimeConfiguration(
                 "nereus",
                 "kraft",
@@ -153,9 +148,7 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
                 Duration.ofSeconds(30),
                 100_000,
                 256 * 1024 * 1024,
-                Set.of(
-                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT));
+                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT, StorageProfile.OBJECT_WAL_ASYNC_OBJECT));
         return new NereusKafkaObjectWalRuntimeConfiguration(
                 runtime,
                 streams(),
@@ -213,9 +206,8 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
         private final AtomicBoolean closed = new AtomicBoolean();
 
         @Override
-        public ObjectStore create(
-                ObjectStoreConfiguration configuration,
-                ObjectStoreSecretResolver secretResolver) throws Exception {
+        public ObjectStore create(ObjectStoreConfiguration configuration, ObjectStoreSecretResolver secretResolver)
+                throws Exception {
             throw new Exception("object store creation failed");
         }
 

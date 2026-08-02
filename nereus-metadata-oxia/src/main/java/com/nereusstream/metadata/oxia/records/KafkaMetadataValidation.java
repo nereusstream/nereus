@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import java.nio.charset.StandardCharsets;
@@ -9,7 +10,7 @@ import java.util.Objects;
 final class KafkaMetadataValidation {
     static final int SHA256_BYTES = 32;
 
-    private KafkaMetadataValidation() { }
+    private KafkaMetadataValidation() {}
 
     static String text(String value, String name) {
         Objects.requireNonNull(value, name);

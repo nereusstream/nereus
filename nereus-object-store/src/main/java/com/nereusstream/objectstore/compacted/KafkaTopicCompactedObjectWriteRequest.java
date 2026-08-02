@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -7,7 +8,9 @@ import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-/** Immutable NTC2 writer facts copied into the closed Kafka topic-compacted metadata map. */
+/**
+ * Immutable NTC2 writer facts copied into the closed Kafka topic-compacted metadata map.
+ */
 public record KafkaTopicCompactedObjectWriteRequest(
         String cluster,
         StreamId streamId,

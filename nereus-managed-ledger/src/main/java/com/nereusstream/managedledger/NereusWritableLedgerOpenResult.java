@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import com.nereusstream.managedledger.cursor.CursorHandle;
@@ -12,7 +13,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** Fully stabilized writable-open result published only after durable cursor hydration. */
+/**
+ * Fully stabilized writable-open result published only after durable cursor hydration.
+ */
 public record NereusWritableLedgerOpenResult(
         NereusLedgerOpenResult ledger,
         CursorOwnerSession cursorOwnerSession,
@@ -47,8 +50,7 @@ public record NereusWritableLedgerOpenResult(
                     || !handle.identity().ledger().equals(expectedLedger)
                     || !handle.state().ownerSessionId().equals(cursorOwnerSession.ownerSessionId())
                     || handle.state().lifecycle() != CursorLifecycle.ACTIVE) {
-                throw new IllegalArgumentException(
-                        "durable cursor handle does not match the writable owner session");
+                throw new IllegalArgumentException("durable cursor handle does not match the writable owner session");
             }
             if (!exactNames.add(handle.identity().cursorName())) {
                 throw new IllegalArgumentException("durable cursor names must be unique");

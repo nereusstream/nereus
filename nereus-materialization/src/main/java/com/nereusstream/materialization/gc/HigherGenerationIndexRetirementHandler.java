@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -18,9 +19,10 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
-/** Exact DRAINING-to-RETIRED transition for one journaled higher-generation index. */
-public final class HigherGenerationIndexRetirementHandler
-        implements GcMetadataRetirementHandler {
+/**
+ * Exact DRAINING-to-RETIRED transition for one journaled higher-generation index.
+ */
+public final class HigherGenerationIndexRetirementHandler implements GcMetadataRetirementHandler {
     public static final String REMOVAL_TYPE = "generation-index";
     private static final String REASON_PREFIX = "physical-gc:";
 
@@ -28,19 +30,12 @@ public final class HigherGenerationIndexRetirementHandler
     private final GenerationCandidateLoader candidateLoader;
     private final HigherGenerationIndexCas indexCas;
 
-    public HigherGenerationIndexRetirementHandler(
-            String cluster,
-            GenerationMetadataStore generations) {
-        this(
-                cluster,
-                loader(cluster, generations),
-                cas(cluster, generations));
+    public HigherGenerationIndexRetirementHandler(String cluster, GenerationMetadataStore generations) {
+        this(cluster, loader(cluster, generations), cas(cluster, generations));
     }
 
     HigherGenerationIndexRetirementHandler(
-            String cluster,
-            GenerationCandidateLoader candidateLoader,
-            HigherGenerationIndexCas indexCas) {
+            String cluster, GenerationCandidateLoader candidateLoader, HigherGenerationIndexCas indexCas) {
         this.keys = new F4Keyspace(requireText(cluster, "cluster"));
         this.candidateLoader = Objects.requireNonNull(candidateLoader, "candidateLoader");
         this.indexCas = Objects.requireNonNull(indexCas, "indexCas");
@@ -53,9 +48,7 @@ public final class HigherGenerationIndexRetirementHandler
 
     @Override
     public CompletableFuture<GcMetadataRetirementOutcome> retire(
-            GcMetadataRetirementContext context,
-            GcPlannedMetadataRemoval removal,
-            MaterializationDeadline deadline) {
+            GcMetadataRetirementContext context, GcPlannedMetadataRemoval removal, MaterializationDeadline deadline) {
         GcMetadataRetirementContext exactContext = Objects.requireNonNull(context, "context");
         GcPlannedMetadataRemoval exactRemoval = Objects.requireNonNull(removal, "removal");
         Objects.requireNonNull(deadline, "deadline");
@@ -71,68 +64,57 @@ public final class HigherGenerationIndexRetirementHandler
         }
         return load(identity, exactRemoval.key(), deadline).thenCompose(optional -> {
             if (optional.isEmpty()) {
-                return CompletableFuture.completedFuture(
-                        GcMetadataRetirementOutcome.ALREADY_ABSENT);
+                return CompletableFuture.completedFuture(GcMetadataRetirementOutcome.ALREADY_ABSENT);
             }
             VersionedGenerationCandidate candidate = optional.orElseThrow();
             if (!(candidate instanceof VersionedGenerationIndex higher)) {
-                return CompletableFuture.failedFuture(invariant(
-                        "higher-generation key decoded as a generation-zero record"));
+                return CompletableFuture.failedFuture(
+                        invariant("higher-generation key decoded as a generation-zero record"));
             }
             if (isExactRetiredProgress(higher, exactContext, exactRemoval)) {
-                return CompletableFuture.completedFuture(
-                        GcMetadataRetirementOutcome.ALREADY_ABSENT);
+                return CompletableFuture.completedFuture(GcMetadataRetirementOutcome.ALREADY_ABSENT);
             }
             requireExactDraining(higher, exactRemoval, exactContext);
-            GenerationIndexRecord replacement = retired(
-                    higher.value(), exactContext);
+            GenerationIndexRecord replacement = retired(higher.value(), exactContext);
             CompletableFuture<VersionedGenerationIndex> cas = deadline.bound(
                     () -> indexCas.compareAndSet(replacement, higher.metadataVersion()),
                     "CAS exact higher-generation index DRAINING to RETIRED");
             return cas.handle((retired, failure) -> {
-                if (failure == null) {
-                    requireExactReplacement(retired, replacement, exactRemoval.key());
-                    return CompletableFuture.completedFuture(
-                            GcMetadataRetirementOutcome.RETIRED);
-                }
-                Throwable original = unwrap(failure);
-                return load(identity, exactRemoval.key(), deadline).thenCompose(reloaded -> {
-                    if (reloaded.isEmpty()) {
-                        return CompletableFuture.completedFuture(
-                                GcMetadataRetirementOutcome.ALREADY_ABSENT);
-                    }
-                    VersionedGenerationCandidate current = reloaded.orElseThrow();
-                    if (current instanceof VersionedGenerationIndex currentHigher
-                            && isExactRetiredProgress(
-                                    currentHigher, exactContext, exactRemoval)) {
-                        return CompletableFuture.completedFuture(
-                                GcMetadataRetirementOutcome.RETIRED);
-                    }
-                    if (matchesPlanned(current, exactRemoval)) {
-                        return CompletableFuture.failedFuture(original);
-                    }
-                    return CompletableFuture.failedFuture(invariant(
-                            "higher-generation index changed after uncertain retirement CAS"));
-                });
-            }).thenCompose(Function.identity());
+                        if (failure == null) {
+                            requireExactReplacement(retired, replacement, exactRemoval.key());
+                            return CompletableFuture.completedFuture(GcMetadataRetirementOutcome.RETIRED);
+                        }
+                        Throwable original = unwrap(failure);
+                        return load(identity, exactRemoval.key(), deadline).thenCompose(reloaded -> {
+                            if (reloaded.isEmpty()) {
+                                return CompletableFuture.completedFuture(GcMetadataRetirementOutcome.ALREADY_ABSENT);
+                            }
+                            VersionedGenerationCandidate current = reloaded.orElseThrow();
+                            if (current instanceof VersionedGenerationIndex currentHigher
+                                    && isExactRetiredProgress(currentHigher, exactContext, exactRemoval)) {
+                                return CompletableFuture.completedFuture(GcMetadataRetirementOutcome.RETIRED);
+                            }
+                            if (matchesPlanned(current, exactRemoval)) {
+                                return CompletableFuture.failedFuture(original);
+                            }
+                            return CompletableFuture.failedFuture(
+                                    invariant("higher-generation index changed after uncertain retirement CAS"));
+                        });
+                    })
+                    .thenCompose(Function.identity());
         });
     }
 
     private CompletableFuture<Optional<VersionedGenerationCandidate>> load(
-            GenerationCandidateKeyIdentity identity,
-            String key,
-            MaterializationDeadline deadline) {
+            GenerationCandidateKeyIdentity identity, String key, MaterializationDeadline deadline) {
         return deadline.bound(
-                () -> candidateLoader.load(identity.streamId(), identity.view(), key),
-                "reload exact higher-generation index")
-                .thenApply(value -> Objects.requireNonNull(
-                        value, "higher-generation candidate lookup result"));
+                        () -> candidateLoader.load(identity.streamId(), identity.view(), key),
+                        "reload exact higher-generation index")
+                .thenApply(value -> Objects.requireNonNull(value, "higher-generation candidate lookup result"));
     }
 
     private static void requireExactDraining(
-            VersionedGenerationIndex higher,
-            GcPlannedMetadataRemoval removal,
-            GcMetadataRetirementContext context) {
+            VersionedGenerationIndex higher, GcPlannedMetadataRemoval removal, GcMetadataRetirementContext context) {
         if (!matchesPlanned(higher, removal)) {
             throw invariant("higher-generation index no longer matches the sealed journal");
         }
@@ -146,20 +128,15 @@ public final class HigherGenerationIndexRetirementHandler
     }
 
     private static boolean isExactRetiredProgress(
-            VersionedGenerationIndex candidate,
-            GcMetadataRetirementContext context,
-            GcPlannedMetadataRemoval removal) {
+            VersionedGenerationIndex candidate, GcMetadataRetirementContext context, GcPlannedMetadataRemoval removal) {
         return candidate.value().lifecycle() == GenerationLifecycle.RETIRED
                 && candidate.key().equals(removal.key())
-                && candidate.value().stateReason().equals(
-                        retirementReason(context))
+                && candidate.value().stateReason().equals(retirementReason(context))
                 && candidate.value().stateChangedAtMillis()
                         == context.deletingRoot().value().deleteStartedAtMillis();
     }
 
-    private static GenerationIndexRecord retired(
-            GenerationIndexRecord current,
-            GcMetadataRetirementContext context) {
+    private static GenerationIndexRecord retired(GenerationIndexRecord current, GcMetadataRetirementContext context) {
         return new GenerationIndexRecord(
                 current.schemaVersion(),
                 current.streamId(),
@@ -194,18 +171,14 @@ public final class HigherGenerationIndexRetirementHandler
     }
 
     private static void requireExactReplacement(
-            VersionedGenerationIndex actual,
-            GenerationIndexRecord expected,
-            String expectedKey) {
+            VersionedGenerationIndex actual, GenerationIndexRecord expected, String expectedKey) {
         if (!actual.key().equals(expectedKey)
                 || !actual.value().withMetadataVersion(0).equals(expected)) {
             throw invariant("higher-generation retirement CAS returned another value");
         }
     }
 
-    private static boolean matchesPlanned(
-            VersionedGenerationCandidate candidate,
-            GcPlannedMetadataRemoval removal) {
+    private static boolean matchesPlanned(VersionedGenerationCandidate candidate, GcPlannedMetadataRemoval removal) {
         return candidate.key().equals(removal.key())
                 && candidate.metadataVersion() == removal.metadataVersion()
                 && candidate.durableValueSha256().equals(removal.durableValueSha256());
@@ -218,26 +191,19 @@ public final class HigherGenerationIndexRetirementHandler
                 + context.journal().referenceSetSha256().value();
     }
 
-    private static GenerationCandidateLoader loader(
-            String cluster,
-            GenerationMetadataStore generations) {
+    private static GenerationCandidateLoader loader(String cluster, GenerationMetadataStore generations) {
         GenerationMetadataStore exact = Objects.requireNonNull(generations, "generations");
-        return (streamId, view, key) -> exact.getCandidateByKey(
-                cluster, streamId, view, key);
+        return (streamId, view, key) -> exact.getCandidateByKey(cluster, streamId, view, key);
     }
 
-    private static HigherGenerationIndexCas cas(
-            String cluster,
-            GenerationMetadataStore generations) {
+    private static HigherGenerationIndexCas cas(String cluster, GenerationMetadataStore generations) {
         GenerationMetadataStore exact = Objects.requireNonNull(generations, "generations");
-        return (replacement, expectedVersion) -> exact.compareAndSetIndex(
-                cluster, replacement, expectedVersion);
+        return (replacement, expectedVersion) -> exact.compareAndSetIndex(cluster, replacement, expectedVersion);
     }
 
     private static void requireType(GcPlannedMetadataRemoval removal) {
         if (!REMOVAL_TYPE.equals(removal.removalType())) {
-            throw new IllegalArgumentException(
-                    "higher-generation handler received another removal type");
+            throw new IllegalArgumentException("higher-generation handler received another removal type");
         }
     }
 
@@ -250,8 +216,7 @@ public final class HigherGenerationIndexRetirementHandler
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static Throwable unwrap(Throwable supplied) {

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import java.util.List;
@@ -15,10 +16,8 @@ public interface KafkaRuntimeBackgroundService {
 
     CompletionStage<Void> closeAsync();
 
-    static KafkaRuntimeBackgroundService composite(
-            List<? extends KafkaRuntimeBackgroundService> services) {
-        List<KafkaRuntimeBackgroundService> exact = List.copyOf(
-                Objects.requireNonNull(services, "services"));
+    static KafkaRuntimeBackgroundService composite(List<? extends KafkaRuntimeBackgroundService> services) {
+        List<KafkaRuntimeBackgroundService> exact = List.copyOf(Objects.requireNonNull(services, "services"));
         exact.forEach(service -> Objects.requireNonNull(service, "backgroundService"));
         if (exact.isEmpty()) {
             return none();

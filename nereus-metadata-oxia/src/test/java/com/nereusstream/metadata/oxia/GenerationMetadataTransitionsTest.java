@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
@@ -22,8 +22,7 @@ class GenerationMetadataTransitionsTest {
     void generationIndexAllowsOnlyTheClosedLifecycleAndImmutablePublicationIdentity() {
         GenerationIndexRecord prepared = F4MetadataTestValues.generation(GenerationLifecycle.PREPARED);
         GenerationIndexRecord committed = F4MetadataTestValues.generation(GenerationLifecycle.COMMITTED);
-        GenerationIndexRecord quarantined =
-                F4MetadataTestValues.generation(GenerationLifecycle.QUARANTINED);
+        GenerationIndexRecord quarantined = F4MetadataTestValues.generation(GenerationLifecycle.QUARANTINED);
         GenerationIndexRecord draining = F4MetadataTestValues.generation(GenerationLifecycle.DRAINING);
 
         assertThatCode(() -> GenerationMetadataTransitions.requireValidIndexReplacement(prepared, committed))
@@ -52,20 +51,15 @@ class GenerationMetadataTransitionsTest {
                 .doesNotThrowAnyException();
         assertThatCode(() -> GenerationMetadataTransitions.requireValidTaskReplacement(claimed, outputReady, 1_000))
                 .doesNotThrowAnyException();
-        assertThatCode(() -> GenerationMetadataTransitions.requireValidTaskReplacement(
-                        outputReady, publishing, 1_000))
+        assertThatCode(() -> GenerationMetadataTransitions.requireValidTaskReplacement(outputReady, publishing, 1_000))
                 .doesNotThrowAnyException();
-        assertThatCode(() -> GenerationMetadataTransitions.requireValidTaskReplacement(
-                        publishing, allocated, 1_000))
+        assertThatCode(() -> GenerationMetadataTransitions.requireValidTaskReplacement(publishing, allocated, 1_000))
                 .doesNotThrowAnyException();
-        assertThatCode(() -> GenerationMetadataTransitions.requireValidTaskReplacement(
-                        allocated, published, 1_000))
+        assertThatCode(() -> GenerationMetadataTransitions.requireValidTaskReplacement(allocated, published, 1_000))
                 .doesNotThrowAnyException();
 
-        assertInvariant(() -> GenerationMetadataTransitions.requireValidTaskReplacement(
-                outputReady, allocated, 1_000));
-        assertInvariant(() -> GenerationMetadataTransitions.requireValidTaskReplacement(
-                published, claimed, 1_000));
+        assertInvariant(() -> GenerationMetadataTransitions.requireValidTaskReplacement(outputReady, allocated, 1_000));
+        assertInvariant(() -> GenerationMetadataTransitions.requireValidTaskReplacement(published, claimed, 1_000));
         assertInvariant(() -> GenerationMetadataTransitions.requireValidTaskReplacement(
                 claimed, taskWithPolicy(outputReady, "other-policy"), 1_000));
     }
@@ -82,8 +76,8 @@ class GenerationMetadataTransitionsTest {
         assertThatCode(() -> GenerationMetadataTransitions.requireValidRetentionStatsReplacement(
                         stats, statsWithVerification(stats, 4_000)))
                 .doesNotThrowAnyException();
-        assertInvariant(() -> GenerationMetadataTransitions.requireValidRetentionStatsReplacement(
-                stats, statsWithStart(stats, 1)));
+        assertInvariant(() ->
+                GenerationMetadataTransitions.requireValidRetentionStatsReplacement(stats, statsWithStart(stats, 1)));
 
         MaterializationStreamRegistrationRecord registration =
                 F4MetadataTestValues.registration(F4MetadataTestValues.STREAM, 7);
@@ -101,101 +95,201 @@ class GenerationMetadataTransitionsTest {
                 bootstrap, recoveryWithSequence(full, 2)));
     }
 
-    private static GenerationIndexRecord generationWithTask(
-            GenerationIndexRecord value,
-            String taskId) {
+    private static GenerationIndexRecord generationWithTask(GenerationIndexRecord value, String taskId) {
         return new GenerationIndexRecord(
-                value.schemaVersion(), value.streamId(), value.readViewId(), value.offsetStart(), value.offsetEnd(),
-                value.generation(), value.publicationId(), taskId, value.lifecycle(), value.sourceSetSha256(),
-                value.policySha256(), value.readTarget(), value.targetIdentitySha256(),
-                value.materializationPolicySha256(), value.payloadFormat(), value.sourceRecordCount(),
-                value.outputRecordCount(), value.entryCount(), value.logicalBytes(), value.cumulativeSizeAtStart(),
-                value.cumulativeSizeAtEnd(), value.firstCommitVersion(), value.lastCommitVersion(),
-                value.schemaRefs(), value.projectionRef(), value.createdAtMillis(), value.committedAtMillis(),
-                value.stateReason(), value.stateChangedAtMillis(), 0);
+                value.schemaVersion(),
+                value.streamId(),
+                value.readViewId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.generation(),
+                value.publicationId(),
+                taskId,
+                value.lifecycle(),
+                value.sourceSetSha256(),
+                value.policySha256(),
+                value.readTarget(),
+                value.targetIdentitySha256(),
+                value.materializationPolicySha256(),
+                value.payloadFormat(),
+                value.sourceRecordCount(),
+                value.outputRecordCount(),
+                value.entryCount(),
+                value.logicalBytes(),
+                value.cumulativeSizeAtStart(),
+                value.cumulativeSizeAtEnd(),
+                value.firstCommitVersion(),
+                value.lastCommitVersion(),
+                value.schemaRefs(),
+                value.projectionRef(),
+                value.createdAtMillis(),
+                value.committedAtMillis(),
+                value.stateReason(),
+                value.stateChangedAtMillis(),
+                0);
     }
 
-    private static GenerationIndexRecord repairedGeneration(
-            GenerationIndexRecord value) {
+    private static GenerationIndexRecord repairedGeneration(GenerationIndexRecord value) {
         return new GenerationIndexRecord(
-                value.schemaVersion(), value.streamId(), value.readViewId(), value.offsetStart(),
-                value.offsetEnd(), value.generation(), value.publicationId(), value.taskId(),
-                GenerationLifecycle.COMMITTED, value.sourceSetSha256(), value.policySha256(),
-                value.readTarget(), value.targetIdentitySha256(), value.materializationPolicySha256(),
-                value.payloadFormat(), value.sourceRecordCount(), value.outputRecordCount(),
-                value.entryCount(), value.logicalBytes(), value.cumulativeSizeAtStart(),
-                value.cumulativeSizeAtEnd(), value.firstCommitVersion(), value.lastCommitVersion(),
-                value.schemaRefs(), value.projectionRef(), value.createdAtMillis(),
-                value.committedAtMillis(), "", value.stateChangedAtMillis(), 0);
+                value.schemaVersion(),
+                value.streamId(),
+                value.readViewId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.generation(),
+                value.publicationId(),
+                value.taskId(),
+                GenerationLifecycle.COMMITTED,
+                value.sourceSetSha256(),
+                value.policySha256(),
+                value.readTarget(),
+                value.targetIdentitySha256(),
+                value.materializationPolicySha256(),
+                value.payloadFormat(),
+                value.sourceRecordCount(),
+                value.outputRecordCount(),
+                value.entryCount(),
+                value.logicalBytes(),
+                value.cumulativeSizeAtStart(),
+                value.cumulativeSizeAtEnd(),
+                value.firstCommitVersion(),
+                value.lastCommitVersion(),
+                value.schemaRefs(),
+                value.projectionRef(),
+                value.createdAtMillis(),
+                value.committedAtMillis(),
+                "",
+                value.stateChangedAtMillis(),
+                0);
     }
 
-    private static MaterializationTaskRecord taskWithPolicy(
-            MaterializationTaskRecord value,
-            String policyId) {
+    private static MaterializationTaskRecord taskWithPolicy(MaterializationTaskRecord value, String policyId) {
         return new MaterializationTaskRecord(
-                value.schemaVersion(), value.taskId(), value.taskSequence(), value.streamId(), value.readViewId(),
-                value.taskKindId(), value.offsetStart(), value.offsetEnd(), value.sources(), value.sourceSetSha256(),
-                policyId, value.policyVersion(), value.policySha256(), policyWithId(value.policy(), policyId),
-                value.lifecycle(), value.attempt(),
-                value.workerClaim(), value.output(), value.allocatedGeneration(), value.publicationId(),
-                value.failureClassId(), value.failureMessage(), value.retryNotBeforeMillis(), value.createdAtMillis(),
-                value.updatedAtMillis(), 0);
+                value.schemaVersion(),
+                value.taskId(),
+                value.taskSequence(),
+                value.streamId(),
+                value.readViewId(),
+                value.taskKindId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.sources(),
+                value.sourceSetSha256(),
+                policyId,
+                value.policyVersion(),
+                value.policySha256(),
+                policyWithId(value.policy(), policyId),
+                value.lifecycle(),
+                value.attempt(),
+                value.workerClaim(),
+                value.output(),
+                value.allocatedGeneration(),
+                value.publicationId(),
+                value.failureClassId(),
+                value.failureMessage(),
+                value.retryNotBeforeMillis(),
+                value.createdAtMillis(),
+                value.updatedAtMillis(),
+                0);
     }
 
-    private static MaterializationPolicyRecord policyWithId(
-            MaterializationPolicyRecord value,
-            String policyId) {
+    private static MaterializationPolicyRecord policyWithId(MaterializationPolicyRecord value, String policyId) {
         return new MaterializationPolicyRecord(
-                policyId, value.policyVersion(), value.readViewId(), value.taskKindId(),
-                value.targetPhysicalFormat(), value.minMergeSourceRanges(), value.maxSourceRanges(),
-                value.maxRangeRecords(), value.targetObjectBytes(), value.targetRowGroupRecords(),
-                value.compression(), value.topicStrategyId(), value.topicStrategyVersion(), value.topicKeyCodecId());
+                policyId,
+                value.policyVersion(),
+                value.readViewId(),
+                value.taskKindId(),
+                value.targetPhysicalFormat(),
+                value.minMergeSourceRanges(),
+                value.maxSourceRanges(),
+                value.maxRangeRecords(),
+                value.targetObjectBytes(),
+                value.targetRowGroupRecords(),
+                value.compression(),
+                value.topicStrategyId(),
+                value.topicStrategyVersion(),
+                value.topicKeyCodecId());
     }
 
     private static RangeRetentionStatsRecord statsWithVerification(
-            RangeRetentionStatsRecord value,
-            long verifiedAtMillis) {
+            RangeRetentionStatsRecord value, long verifiedAtMillis) {
         return new RangeRetentionStatsRecord(
-                value.schemaVersion(), value.streamId(), value.offsetStart(), value.offsetEnd(), value.commitVersion(),
-                value.cumulativeSizeAtStart(), value.cumulativeSizeAtEnd(), value.minPublishTimeMillis(),
-                value.maxPublishTimeMillis(), value.sourceIndexKey(), value.sourceIndexIdentitySha256(),
-                value.sourceIndexMetadataVersion(), value.verifierBuild(), verifiedAtMillis, 0);
+                value.schemaVersion(),
+                value.streamId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.commitVersion(),
+                value.cumulativeSizeAtStart(),
+                value.cumulativeSizeAtEnd(),
+                value.minPublishTimeMillis(),
+                value.maxPublishTimeMillis(),
+                value.sourceIndexKey(),
+                value.sourceIndexIdentitySha256(),
+                value.sourceIndexMetadataVersion(),
+                value.verifierBuild(),
+                verifiedAtMillis,
+                0);
     }
 
-    private static RangeRetentionStatsRecord statsWithStart(
-            RangeRetentionStatsRecord value,
-            long offsetStart) {
+    private static RangeRetentionStatsRecord statsWithStart(RangeRetentionStatsRecord value, long offsetStart) {
         return new RangeRetentionStatsRecord(
-                value.schemaVersion(), value.streamId(), offsetStart, value.offsetEnd(), value.commitVersion(),
-                value.cumulativeSizeAtStart(), value.cumulativeSizeAtEnd(), value.minPublishTimeMillis(),
-                value.maxPublishTimeMillis(), value.sourceIndexKey(), value.sourceIndexIdentitySha256(),
-                value.sourceIndexMetadataVersion(), value.verifierBuild(), value.verifiedAtMillis(), 0);
+                value.schemaVersion(),
+                value.streamId(),
+                offsetStart,
+                value.offsetEnd(),
+                value.commitVersion(),
+                value.cumulativeSizeAtStart(),
+                value.cumulativeSizeAtEnd(),
+                value.minPublishTimeMillis(),
+                value.maxPublishTimeMillis(),
+                value.sourceIndexKey(),
+                value.sourceIndexIdentitySha256(),
+                value.sourceIndexMetadataVersion(),
+                value.verifierBuild(),
+                value.verifiedAtMillis(),
+                0);
     }
 
     private static MaterializationStreamRegistrationRecord registrationWithHint(
-            MaterializationStreamRegistrationRecord value,
-            long hint,
-            long updatedAtMillis) {
+            MaterializationStreamRegistrationRecord value, long hint, long updatedAtMillis) {
         return new MaterializationStreamRegistrationRecord(
-                value.schemaVersion(), value.streamId(), value.projectionRef(), value.projectionIdentitySha256(),
-                value.storageProfile(), value.registeredAtMillis(), hint, updatedAtMillis, 0);
+                value.schemaVersion(),
+                value.streamId(),
+                value.projectionRef(),
+                value.projectionIdentitySha256(),
+                value.storageProfile(),
+                value.registeredAtMillis(),
+                hint,
+                updatedAtMillis,
+                0);
     }
 
     private static RecoveryCheckpointRootRecord recoveryWithSequence(
-            RecoveryCheckpointRootRecord value,
-            long sequence) {
+            RecoveryCheckpointRootRecord value, long sequence) {
         return new RecoveryCheckpointRootRecord(
-                value.schemaVersion(), value.streamId(), sequence, value.coveredStartOffset(), value.coveredEndOffset(),
-                value.firstCommitVersion(), value.lastCommitVersion(), value.cumulativeSizeAtStart(),
-                value.cumulativeSizeAtEnd(), value.firstCommitId(), value.lastCommitId(), value.checkpoints(),
-                value.checkpointSetSha256(), value.sourceHeadCommitId(), value.sourceHeadCommitVersion(),
-                value.publishedAtMillis(), 0);
+                value.schemaVersion(),
+                value.streamId(),
+                sequence,
+                value.coveredStartOffset(),
+                value.coveredEndOffset(),
+                value.firstCommitVersion(),
+                value.lastCommitVersion(),
+                value.cumulativeSizeAtStart(),
+                value.cumulativeSizeAtEnd(),
+                value.firstCommitId(),
+                value.lastCommitId(),
+                value.checkpoints(),
+                value.checkpointSetSha256(),
+                value.sourceHeadCommitId(),
+                value.sourceHeadCommitVersion(),
+                value.publishedAtMillis(),
+                0);
     }
 
     private static void assertInvariant(Runnable operation) {
         assertThatThrownBy(operation::run)
-                .isInstanceOfSatisfying(NereusException.class, error ->
-                        org.assertj.core.api.Assertions.assertThat(error.code())
+                .isInstanceOfSatisfying(
+                        NereusException.class, error -> org.assertj.core.api.Assertions.assertThat(error.code())
                                 .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
     }
 }

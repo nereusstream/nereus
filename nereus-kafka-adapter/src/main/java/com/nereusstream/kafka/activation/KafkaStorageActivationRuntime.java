@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.activation;
 
 import com.nereusstream.api.ErrorCode;
@@ -17,7 +18,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-/** Broker startup/health component that owns capability renewal and bounded activation polling. */
+/**
+ * Broker startup/health component that owns capability renewal and bounded activation polling.
+ */
 public final class KafkaStorageActivationRuntime implements KafkaRuntimeStartup, AutoCloseable {
     private final Object guard = new Object();
     private final KafkaStorageActivationMetadataStore store;
@@ -60,12 +63,13 @@ public final class KafkaStorageActivationRuntime implements KafkaRuntimeStartup,
 
     @Override
     public CompletionStage<Void> start(KafkaStorageAdmission suppliedAdmission) {
-        KafkaStorageAdmission exactAdmission = Objects.requireNonNull(
-                suppliedAdmission, "suppliedAdmission");
+        KafkaStorageAdmission exactAdmission = Objects.requireNonNull(suppliedAdmission, "suppliedAdmission");
         CompletableFuture<Void> operation;
         KafkaBrokerCapabilityPublisher exactPublisher;
         synchronized (guard) {
-            if (closed) return CompletableFuture.failedFuture(closedFailure());
+            if (closed) {
+                return CompletableFuture.failedFuture(closedFailure());
+            }
             if (startOperation != null) {
                 if (admission != exactAdmission) {
                     return CompletableFuture.failedFuture(new IllegalArgumentException(
@@ -77,10 +81,8 @@ public final class KafkaStorageActivationRuntime implements KafkaRuntimeStartup,
             startOperation = new CompletableFuture<>();
             operation = startOperation;
             deadlineMillis = addExact(clock.millis(), activationWaitTimeout.toMillis());
-            remainingVerificationAttempts = verificationAttempts(
-                    activationWaitTimeout, activationPollInterval);
-            publisher = new KafkaBrokerCapabilityPublisher(
-                    store, capability, scheduler, clock, this::failHeartbeat);
+            remainingVerificationAttempts = verificationAttempts(activationWaitTimeout, activationPollInterval);
+            publisher = new KafkaBrokerCapabilityPublisher(store, capability, scheduler, clock, this::failHeartbeat);
             exactPublisher = publisher;
         }
         exactPublisher.start().whenComplete((ignored, failure) -> {
@@ -95,11 +97,13 @@ public final class KafkaStorageActivationRuntime implements KafkaRuntimeStartup,
 
     private void verifyOrRetry() {
         synchronized (guard) {
-            if (closed || startOperation == null || startOperation.isDone()) return;
+            if (closed || startOperation == null || startOperation.isDone()) {
+                return;
+            }
             pendingPoll = null;
         }
-        KafkaStorageActivationVerifier verifier = new KafkaStorageActivationVerifier(
-                store, capability, clusterSnapshots, clock);
+        KafkaStorageActivationVerifier verifier =
+                new KafkaStorageActivationVerifier(store, capability, clusterSnapshots, clock);
         verifier.verifyCurrent().whenComplete((ignored, failure) -> {
             if (failure == null) {
                 runDownstreamStartup();
@@ -130,7 +134,9 @@ public final class KafkaStorageActivationRuntime implements KafkaRuntimeStartup,
         long delay = Math.min(activationPollInterval.toMillis(), remaining);
         try {
             synchronized (guard) {
-                if (closed || startOperation == null || startOperation.isDone()) return;
+                if (closed || startOperation == null || startOperation.isDone()) {
+                    return;
+                }
                 pendingPoll = scheduler.schedule(this::verifyOrRetry, delay, TimeUnit.MILLISECONDS);
             }
         } catch (Throwable scheduleFailure) {
@@ -141,21 +147,25 @@ public final class KafkaStorageActivationRuntime implements KafkaRuntimeStartup,
     private void runDownstreamStartup() {
         CompletionStage<Void> downstream;
         try {
-            downstream = Objects.requireNonNull(
-                    downstreamStartup.get(), "downstream startup future");
+            downstream = Objects.requireNonNull(downstreamStartup.get(), "downstream startup future");
         } catch (Throwable failure) {
             failStart(failure);
             return;
         }
         downstream.whenComplete((ignored, failure) -> {
-            if (failure == null) completeStart();
-            else failStart(unwrap(failure));
+            if (failure == null) {
+                completeStart();
+            } else {
+                failStart(unwrap(failure));
+            }
         });
     }
 
     private void completeStart() {
         synchronized (guard) {
-            if (startOperation == null || startOperation.isDone()) return;
+            if (startOperation == null || startOperation.isDone()) {
+                return;
+            }
             if (closed) {
                 startOperation.completeExceptionally(closedFailure());
             } else {
@@ -167,7 +177,9 @@ public final class KafkaStorageActivationRuntime implements KafkaRuntimeStartup,
     private void failStart(Throwable supplied) {
         Throwable failure = unwrap(supplied);
         synchronized (guard) {
-            if (pendingPoll != null) pendingPoll.cancel(false);
+            if (pendingPoll != null) {
+                pendingPoll.cancel(false);
+            }
             if (startOperation != null && !startOperation.isDone()) {
                 startOperation.completeExceptionally(failure);
             }
@@ -190,15 +202,21 @@ public final class KafkaStorageActivationRuntime implements KafkaRuntimeStartup,
     public void close() {
         KafkaBrokerCapabilityPublisher exactPublisher;
         synchronized (guard) {
-            if (closed) return;
+            if (closed) {
+                return;
+            }
             closed = true;
-            if (pendingPoll != null) pendingPoll.cancel(false);
+            if (pendingPoll != null) {
+                pendingPoll.cancel(false);
+            }
             exactPublisher = publisher;
             if (startOperation != null && !startOperation.isDone()) {
                 startOperation.completeExceptionally(closedFailure());
             }
         }
-        if (exactPublisher != null) exactPublisher.close();
+        if (exactPublisher != null) {
+            exactPublisher.close();
+        }
     }
 
     private static Duration positive(Duration value, String name) {
@@ -229,7 +247,9 @@ public final class KafkaStorageActivationRuntime implements KafkaRuntimeStartup,
         long timeoutMillis = timeout.toMillis();
         long pollMillis = pollInterval.toMillis();
         long retries = timeoutMillis / pollMillis;
-        if (timeoutMillis % pollMillis != 0) retries++;
+        if (timeoutMillis % pollMillis != 0) {
+            retries++;
+        }
         if (retries >= 1_000_000) {
             throw new IllegalArgumentException("activation wait permits too many polling attempts");
         }

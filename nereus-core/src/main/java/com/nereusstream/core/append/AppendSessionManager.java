@@ -14,8 +14,8 @@
 
 package com.nereusstream.core.append;
 
-import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AcquiredAppendSession;
+import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.AppendSessionRequest;
@@ -37,10 +37,7 @@ public final class AppendSessionManager {
     private final Clock clock;
     private final ConcurrentHashMap<StreamId, AppendSession> cache = new ConcurrentHashMap<>();
 
-    public AppendSessionManager(
-            StreamStorageConfig config,
-            OxiaMetadataStore metadataStore,
-            Clock clock) {
+    public AppendSessionManager(StreamStorageConfig config, OxiaMetadataStore metadataStore, Clock clock) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -55,12 +52,12 @@ public final class AppendSessionManager {
                     false,
                     "append session writerId must match StreamStorageConfig.writerId");
         }
-        return metadataStore.acquireAppendSession(config.cluster(), streamId, options)
+        return metadataStore
+                .acquireAppendSession(config.cluster(), streamId, options)
                 .thenApply(this::cacheRecord);
     }
 
-    public CompletableFuture<AcquiredAppendSession> acquire(
-            StreamId streamId, AppendSessionRequest request) {
+    public CompletableFuture<AcquiredAppendSession> acquire(StreamId streamId, AppendSessionRequest request) {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(request, "request");
         if (!config.writerId().equals(request.options().writerId())) {
@@ -69,7 +66,8 @@ public final class AppendSessionManager {
                     false,
                     "append session writerId must match StreamStorageConfig.writerId");
         }
-        return metadataStore.acquireAppendSession(config.cluster(), streamId, request)
+        return metadataStore
+                .acquireAppendSession(config.cluster(), streamId, request)
                 .thenApply(record -> new AcquiredAppendSession(cacheRecord(record), record.authority()));
     }
 
@@ -78,9 +76,7 @@ public final class AppendSessionManager {
         Objects.requireNonNull(ttl, "ttl");
         if (!config.writerId().equals(session.writerId())) {
             return NereusException.failedFuture(
-                    ErrorCode.FENCED_APPEND,
-                    false,
-                    "append session writerId must match StreamStorageConfig.writerId");
+                    ErrorCode.FENCED_APPEND, false, "append session writerId must match StreamStorageConfig.writerId");
         }
         long ttlMillis = durationMillis(ttl);
         if (ttl.isZero() || ttl.isNegative() || ttlMillis <= 0 || ttlMillis == Long.MAX_VALUE) {
@@ -89,7 +85,8 @@ public final class AppendSessionManager {
                     false,
                     "append session renewal TTL must be positive and millisecond-representable");
         }
-        return metadataStore.renewAppendSession(
+        return metadataStore
+                .renewAppendSession(
                         config.cluster(),
                         session.streamId(),
                         session.writerId(),
@@ -100,15 +97,11 @@ public final class AppendSessionManager {
     }
 
     CompletableFuture<AppendSession> ensureSession(
-            StreamId streamId,
-            Optional<AppendSession> supplied,
-            boolean autoAcquire,
-            AppendDeadline deadline) {
+            StreamId streamId, Optional<AppendSession> supplied, boolean autoAcquire, AppendDeadline deadline) {
         AppendSession selected;
         try {
             Optional<AppendSession> validatedSupplied = selectSupplied(streamId, supplied);
-            if (validatedSupplied.isPresent()
-                    && validatedSupplied.get().expiresAtMillis() > clock.millis()) {
+            if (validatedSupplied.isPresent() && validatedSupplied.get().expiresAtMillis() > clock.millis()) {
                 selected = validatedSupplied.get();
             } else if (autoAcquire && config.autoAcquireAppendSession()) {
                 selected = cache.get(streamId);
@@ -131,8 +124,8 @@ public final class AppendSessionManager {
                     AppendOutcome.KNOWN_NOT_COMMITTED,
                     "append requires a live session and auto-acquire is disabled");
         }
-        AppendSessionOptions acquireOptions = new AppendSessionOptions(
-                config.writerId(), config.appendSessionTtl(), true);
+        AppendSessionOptions acquireOptions =
+                new AppendSessionOptions(config.writerId(), config.appendSessionTtl(), true);
         return deadline.bound(
                         () -> metadataStore.acquireAppendSession(config.cluster(), streamId, acquireOptions),
                         AppendOutcome.KNOWN_NOT_COMMITTED,
@@ -141,9 +134,7 @@ public final class AppendSessionManager {
                 .thenCompose(session -> ensureCommitWindow(session, deadline));
     }
 
-    CompletableFuture<AppendSession> ensureCommitWindow(
-            AppendSession session,
-            AppendDeadline deadline) {
+    CompletableFuture<AppendSession> ensureCommitWindow(AppendSession session, AppendDeadline deadline) {
         long minimumMillis = durationMillis(config.appendSessionMinCommitRemaining());
         long remainingMillis = session.expiresAtMillis() - clock.millis();
         if (remainingMillis >= minimumMillis) {
@@ -166,9 +157,7 @@ public final class AppendSessionManager {
         cache.remove(streamId);
     }
 
-    private Optional<AppendSession> selectSupplied(
-            StreamId streamId,
-            Optional<AppendSession> supplied) {
+    private Optional<AppendSession> selectSupplied(StreamId streamId, Optional<AppendSession> supplied) {
         Objects.requireNonNull(supplied, "appendSession");
         if (supplied.isEmpty()) {
             return Optional.empty();
@@ -199,12 +188,15 @@ public final class AppendSessionManager {
                 record.fencingToken(),
                 record.leaseVersion(),
                 record.expiresAtMillis());
-        AppendSession retained = cache.compute(session.streamId(), (ignored, existing) ->
-                existing == null || session.leaseVersion() >= existing.leaseVersion() ? session : existing);
+        AppendSession retained = cache.compute(
+                session.streamId(),
+                (ignored, existing) ->
+                        existing == null || session.leaseVersion() >= existing.leaseVersion() ? session : existing);
         while (cache.size() > config.maxCachedStreams()) {
             Optional<java.util.Map.Entry<StreamId, AppendSession>> earliest = cache.entrySet().stream()
                     .filter(entry -> !entry.getKey().equals(session.streamId()))
-                    .min(java.util.Comparator.comparingLong(entry -> entry.getValue().expiresAtMillis()));
+                    .min(java.util.Comparator.comparingLong(
+                            entry -> entry.getValue().expiresAtMillis()));
             if (earliest.isEmpty()) {
                 break;
             }

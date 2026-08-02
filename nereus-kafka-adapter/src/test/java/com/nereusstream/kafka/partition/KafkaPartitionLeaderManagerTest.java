@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
@@ -131,8 +131,7 @@ class KafkaPartitionLeaderManagerTest {
         return KafkaPartitionStorageTestSupport.openPlan(authority);
     }
 
-    private static void assertFailureCode(
-            CompletableFuture<?> completion, ErrorCode expected) {
+    private static void assertFailureCode(CompletableFuture<?> completion, ErrorCode expected) {
         assertThatThrownBy(completion::join)
                 .isInstanceOf(CompletionException.class)
                 .satisfies(failure -> {
@@ -142,13 +141,11 @@ class KafkaPartitionLeaderManagerTest {
     }
 
     private static final class ControlledOpener implements KafkaPartitionOpener {
-        private final Map<KafkaLeaderAuthority, CompletableFuture<KafkaPartitionStorage>> attempts =
-                new HashMap<>();
+        private final Map<KafkaLeaderAuthority, CompletableFuture<KafkaPartitionStorage>> attempts = new HashMap<>();
         private final AtomicInteger calls = new AtomicInteger();
 
         @Override
-        public synchronized CompletableFuture<KafkaPartitionStorage> open(
-                KafkaPartitionOpenPlan plan) {
+        public synchronized CompletableFuture<KafkaPartitionStorage> open(KafkaPartitionOpenPlan plan) {
             calls.incrementAndGet();
             CompletableFuture<KafkaPartitionStorage> result = new CompletableFuture<>();
             if (attempts.putIfAbsent(plan.authority(), result) != null) {
@@ -157,8 +154,7 @@ class KafkaPartitionLeaderManagerTest {
             return result;
         }
 
-        private synchronized void complete(
-                KafkaLeaderAuthority authority, KafkaPartitionStorage storage) {
+        private synchronized void complete(KafkaLeaderAuthority authority, KafkaPartitionStorage storage) {
             attempts.get(authority).complete(storage);
         }
 
@@ -212,8 +208,8 @@ class KafkaPartitionLeaderManagerTest {
 
         @Override
         public CompletableFuture<KafkaStorageReadResult> read(KafkaStorageReadRequest request) {
-            return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.STORAGE_CLOSED, false, "leader manager test storage does not read"));
+            return CompletableFuture.failedFuture(
+                    new NereusException(ErrorCode.STORAGE_CLOSED, false, "leader manager test storage does not read"));
         }
 
         @Override

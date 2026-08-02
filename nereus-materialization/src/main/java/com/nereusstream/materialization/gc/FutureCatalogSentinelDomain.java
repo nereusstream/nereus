@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.core.physical.GcAuthorityToken;
@@ -16,7 +17,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** Cluster capability/domain-set sentinel that fails deletion closed for unknown future owners. */
+/**
+ * Cluster capability/domain-set sentinel that fails deletion closed for unknown future owners.
+ */
 public final class FutureCatalogSentinelDomain implements GcReferenceDomain {
     public static final String DOMAIN_ID = "future-catalog-sentinel-v1";
     public static final int PROTOCOL_VERSION = 1;
@@ -33,11 +36,9 @@ public final class FutureCatalogSentinelDomain implements GcReferenceDomain {
             GcReferenceDomainConfig config,
             List<GcReferenceDomainVersion> installedDomains) {
         this.cluster = requireText(cluster, "cluster");
-        this.activationStore = Objects.requireNonNull(
-                activationStore, "activationStore");
+        this.activationStore = Objects.requireNonNull(activationStore, "activationStore");
         this.config = Objects.requireNonNull(config, "config");
-        this.installedDomains = GenerationProtocolDomainSets.canonicalInstalled(
-                installedDomains);
+        this.installedDomains = GenerationProtocolDomainSets.canonicalInstalled(installedDomains);
         this.keys = new F4Keyspace(cluster);
     }
 
@@ -54,34 +55,26 @@ public final class FutureCatalogSentinelDomain implements GcReferenceDomain {
     @Override
     public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
         Objects.requireNonNull(query, "query");
-        GcReferenceSnapshotBuilder builder = new GcReferenceSnapshotBuilder(
-                DOMAIN_ID, PROTOCOL_VERSION, query, config);
+        GcReferenceSnapshotBuilder builder = new GcReferenceSnapshotBuilder(DOMAIN_ID, PROTOCOL_VERSION, query, config);
         return activationStore.get(cluster).thenApply(optional -> {
             if (optional.isEmpty()) {
                 String key = keys.generationProtocolActivationKey();
-                builder.addAuthority(new GcAuthorityToken(
-                        key,
-                        0,
-                        GlobalReferenceScopeIdentityDigests.activationAbsence(key)));
+                builder.addAuthority(
+                        new GcAuthorityToken(key, 0, GlobalReferenceScopeIdentityDigests.activationAbsence(key)));
                 builder.markIncomplete();
                 return builder.build();
             }
             VersionedGenerationProtocolActivation activation = optional.orElseThrow();
             builder.addAuthority(new GcAuthorityToken(
-                    activation.key(),
-                    activation.metadataVersion(),
-                    activation.durableValueSha256()));
-            if (activation.value().lifecycle()
-                    != GenerationProtocolActivationLifecycle.ACTIVE) {
+                    activation.key(), activation.metadataVersion(), activation.durableValueSha256()));
+            if (activation.value().lifecycle() != GenerationProtocolActivationLifecycle.ACTIVE) {
                 builder.markIncomplete();
-            } else if (!GenerationProtocolDomainSets.exactMatch(
-                    activation.value(), installedDomains)) {
+            } else if (!GenerationProtocolDomainSets.exactMatch(activation.value(), installedDomains)) {
                 builder.veto();
             } else if (!activation.value().physicalDeleteEnabled()
                     || !activation.value().cursorSnapshotDeleteEnabled()) {
                 builder.veto();
-            } else if (!GenerationProtocolDomainSets.deletionReady(
-                    activation.value(), installedDomains)) {
+            } else if (!GenerationProtocolDomainSets.deletionReady(activation.value(), installedDomains)) {
                 builder.markIncomplete();
             }
             return builder.build();
@@ -89,8 +82,7 @@ public final class FutureCatalogSentinelDomain implements GcReferenceDomain {
     }
 
     @Override
-    public CompletableFuture<Boolean> stillMatches(
-            GcReferenceQuery query, GcReferenceSnapshot snapshot) {
+    public CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot) {
         Objects.requireNonNull(query, "query");
         Objects.requireNonNull(snapshot, "snapshot");
         if (!snapshot.domainId().equals(DOMAIN_ID)

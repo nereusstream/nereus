@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.partition;
 
 import com.nereusstream.kafka.metadata.KafkaPartitionBinding;
@@ -6,7 +7,9 @@ import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Exact immutable inputs handed to one authority-acquire and recovery operation. */
+/**
+ * Exact immutable inputs handed to one authority-acquire and recovery operation.
+ */
 public record KafkaPartitionOpenPlan(
         KafkaLeaderAuthority authority,
         KafkaPartitionBinding binding,
@@ -22,7 +25,10 @@ public record KafkaPartitionOpenPlan(
         }
         if (!binding.identity().equals(authority.identity())
                 || binding.durableRoot().value().lifecycle() != KafkaPartitionLifecycle.ACTIVE
-                || !binding.durableRoot().value().storageProfile().equals(profilePolicy.storageProfile().name())) {
+                || !binding.durableRoot()
+                        .value()
+                        .storageProfile()
+                        .equals(profilePolicy.storageProfile().name())) {
             throw new IllegalArgumentException("Kafka partition open requires the exact ACTIVE binding and profile");
         }
     }

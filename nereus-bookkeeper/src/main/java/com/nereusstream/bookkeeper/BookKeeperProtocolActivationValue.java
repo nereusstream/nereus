@@ -1,9 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import java.util.Objects;
 
-/** Stored NBKA1 activation value; Oxia key/version/value digest are attached after an authoritative read. */
+/**
+ * Stored NBKA1 activation value; Oxia key/version/value digest are attached after an authoritative read.
+ */
 public record BookKeeperProtocolActivationValue(
         int schemaVersion,
         BookKeeperProtocolActivationLifecycle lifecycle,
@@ -32,16 +35,11 @@ public record BookKeeperProtocolActivationValue(
         clusterAlias = text(clusterAlias, "clusterAlias");
         providerScopeSha256 = sha(providerScopeSha256, "providerScopeSha256");
         brokerReadinessSha256 = sha(brokerReadinessSha256, "brokerReadinessSha256");
-        configurationBindingSha256 = sha(
-                configurationBindingSha256, "configurationBindingSha256");
-        ledgerIdNamespaceSha256 = sha(
-                ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256");
-        rootCoverageProofSha256 = sha(
-                rootCoverageProofSha256, "rootCoverageProofSha256");
-        streamCoverageProofSha256 = sha(
-                streamCoverageProofSha256, "streamCoverageProofSha256");
-        bookKeeperScopeProofSha256 = sha(
-                bookKeeperScopeProofSha256, "bookKeeperScopeProofSha256");
+        configurationBindingSha256 = sha(configurationBindingSha256, "configurationBindingSha256");
+        ledgerIdNamespaceSha256 = sha(ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256");
+        rootCoverageProofSha256 = sha(rootCoverageProofSha256, "rootCoverageProofSha256");
+        streamCoverageProofSha256 = sha(streamCoverageProofSha256, "streamCoverageProofSha256");
+        bookKeeperScopeProofSha256 = sha(bookKeeperScopeProofSha256, "bookKeeperScopeProofSha256");
         if (brokerReadinessEpoch <= 0 || activatedAtMillis < 0) {
             throw new IllegalArgumentException("BookKeeper activation epochs/timestamps are invalid");
         }
@@ -61,9 +59,7 @@ public record BookKeeperProtocolActivationValue(
                         || ledgerDeletionEnabled
                         || activatedAtMillis != 0
                         || !proofsAreZero(
-                                rootCoverageProofSha256,
-                                streamCoverageProofSha256,
-                                bookKeeperScopeProofSha256))) {
+                                rootCoverageProofSha256, streamCoverageProofSha256, bookKeeperScopeProofSha256))) {
             throw new IllegalArgumentException("PREPARED activation cannot publish capabilities");
         }
         if (lifecycle == BookKeeperProtocolActivationLifecycle.ACTIVE
@@ -77,10 +73,7 @@ public record BookKeeperProtocolActivationValue(
             throw new IllegalArgumentException("ledger deletion requires nonzero coverage proofs");
         }
         if (!ledgerDeletionEnabled
-                && !proofsAreZero(
-                        rootCoverageProofSha256,
-                        streamCoverageProofSha256,
-                        bookKeeperScopeProofSha256)) {
+                && !proofsAreZero(rootCoverageProofSha256, streamCoverageProofSha256, bookKeeperScopeProofSha256)) {
             throw new IllegalArgumentException("coverage proofs cannot be published before ledger deletion");
         }
     }
@@ -113,38 +106,26 @@ public record BookKeeperProtocolActivationValue(
     }
 
     public BookKeeperProtocolActivation materialize(
-            String canonicalKey,
-            long metadataVersion,
-            com.nereusstream.api.Checksum storedValueSha256) {
-        return new BookKeeperProtocolActivation(
-                this,
-                metadataVersion,
-                storedValueSha256,
-                canonicalKey);
+            String canonicalKey, long metadataVersion, com.nereusstream.api.Checksum storedValueSha256) {
+        return new BookKeeperProtocolActivation(this, metadataVersion, storedValueSha256, canonicalKey);
     }
 
     static void requireValidReplacement(
-            BookKeeperProtocolActivationValue current,
-            BookKeeperProtocolActivationValue replacement) {
+            BookKeeperProtocolActivationValue current, BookKeeperProtocolActivationValue replacement) {
         Objects.requireNonNull(current, "current");
         Objects.requireNonNull(replacement, "replacement");
         if (current.schemaVersion != replacement.schemaVersion
                 || current.protocolVersion != replacement.protocolVersion
                 || !current.clusterAlias.equals(replacement.clusterAlias)
                 || !current.providerScopeSha256.equals(replacement.providerScopeSha256)
-                || !current.configurationBindingSha256.equals(
-                        replacement.configurationBindingSha256)
-                || !current.ledgerIdNamespaceSha256.equals(
-                        replacement.ledgerIdNamespaceSha256)) {
+                || !current.configurationBindingSha256.equals(replacement.configurationBindingSha256)
+                || !current.ledgerIdNamespaceSha256.equals(replacement.ledgerIdNamespaceSha256)) {
             throw new IllegalArgumentException("BookKeeper activation identity is immutable");
         }
-        boolean readinessEpochChanged = replacement.brokerReadinessEpoch
-                != current.brokerReadinessEpoch;
-        boolean readinessDigestChanged = !replacement.brokerReadinessSha256.equals(
-                current.brokerReadinessSha256);
+        boolean readinessEpochChanged = replacement.brokerReadinessEpoch != current.brokerReadinessEpoch;
+        boolean readinessDigestChanged = !replacement.brokerReadinessSha256.equals(current.brokerReadinessSha256);
         if (readinessEpochChanged != readinessDigestChanged) {
-            throw new IllegalArgumentException(
-                    "BookKeeper readiness epoch and digest must change atomically");
+            throw new IllegalArgumentException("BookKeeper readiness epoch and digest must change atomically");
         }
         if ((current.walOnlyPublicationEnabled && !replacement.walOnlyPublicationEnabled)
                 || (current.asyncPublicationEnabled && !replacement.asyncPublicationEnabled)
@@ -156,18 +137,14 @@ public record BookKeeperProtocolActivationValue(
                 && replacement.lifecycle != BookKeeperProtocolActivationLifecycle.ACTIVE) {
             throw new IllegalArgumentException("BookKeeper activation lifecycle cannot regress");
         }
-        boolean deletionProofChanged = !current.rootCoverageProofSha256.equals(
-                        replacement.rootCoverageProofSha256)
-                || !current.streamCoverageProofSha256.equals(
-                        replacement.streamCoverageProofSha256)
-                || !current.bookKeeperScopeProofSha256.equals(
-                        replacement.bookKeeperScopeProofSha256);
+        boolean deletionProofChanged = !current.rootCoverageProofSha256.equals(replacement.rootCoverageProofSha256)
+                || !current.streamCoverageProofSha256.equals(replacement.streamCoverageProofSha256)
+                || !current.bookKeeperScopeProofSha256.equals(replacement.bookKeeperScopeProofSha256);
         if (current.ledgerDeletionEnabled
                 && replacement.ledgerDeletionEnabled
                 && !readinessEpochChanged
                 && deletionProofChanged) {
-            throw new IllegalArgumentException(
-                    "BookKeeper deletion proofs require a new readiness identity");
+            throw new IllegalArgumentException("BookKeeper deletion proofs require a new readiness identity");
         }
         if (replacement.activatedAtMillis < current.activatedAtMillis) {
             throw new IllegalArgumentException("BookKeeper activation timestamp cannot regress");
@@ -179,9 +156,7 @@ public record BookKeeperProtocolActivationValue(
     }
 
     private static boolean proofsAreZero(String root, String stream, String scope) {
-        return ZERO_SHA256.equals(root)
-                && ZERO_SHA256.equals(stream)
-                && ZERO_SHA256.equals(scope);
+        return ZERO_SHA256.equals(root) && ZERO_SHA256.equals(stream) && ZERO_SHA256.equals(scope);
     }
 
     private static String sha(String value, String name) {

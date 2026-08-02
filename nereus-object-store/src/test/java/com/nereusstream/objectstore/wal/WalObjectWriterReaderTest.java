@@ -16,7 +16,6 @@ package com.nereusstream.objectstore.wal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.Checksum;
@@ -77,13 +76,14 @@ class WalObjectWriterReaderTest {
     @Test
     void writeOneSliceWalObjectAndReadItBack() {
         LocalFileObjectStore store = new LocalFileObjectStore(root);
-        WalWriteResult result = writer(store).write(new WalWriteRequest(
-                "tenant/ns",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("a", "b"))),
-                options(false, 1 << 20)))
+        WalWriteResult result = writer(store)
+                .write(new WalWriteRequest(
+                        "tenant/ns",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("a", "b"))),
+                        options(false, 1 << 20)))
                 .join();
 
         assertThat(result.objectKey().value()).contains("/wal/2026/07/08/");
@@ -92,10 +92,8 @@ class WalObjectWriterReaderTest {
         assertThat(decoded.objectId()).isEqualTo(result.objectId());
         assertThat(decoded.slices()).hasSize(1);
 
-        WalReadResult readResult = reader(store).readWithStats(
-                0,
-                List.of(resolved(result.slices().get(0), result, 0)),
-                readOptions(10, 100))
+        WalReadResult readResult = reader(store)
+                .readWithStats(0, List.of(resolved(result.slices().get(0), result, 0)), readOptions(10, 100))
                 .join();
         List<ReadBatch> batches = readResult.batches();
 
@@ -104,13 +102,16 @@ class WalObjectWriterReaderTest {
         assertThat(new String(batches.get(1).payload(), StandardCharsets.UTF_8)).isEqualTo("b");
         assertThat(batches.get(0).range()).isEqualTo(new OffsetRange(0, 1));
         assertThat(batches.get(1).range()).isEqualTo(new OffsetRange(1, 2));
-        assertThat(batches.get(0).sourceObjectOffset()).isEqualTo(result.slices().get(0).objectOffset());
+        assertThat(batches.get(0).sourceObjectOffset())
+                .isEqualTo(result.slices().get(0).objectOffset());
         assertThat(batches.get(0).sourceObjectLength()).isEqualTo(1);
-        assertThat(batches.get(1).sourceObjectOffset()).isEqualTo(result.slices().get(0).objectOffset() + 1);
+        assertThat(batches.get(1).sourceObjectOffset())
+                .isEqualTo(result.slices().get(0).objectOffset() + 1);
         assertThat(batches.get(1).sourceObjectLength()).isEqualTo(1);
         assertThat(readResult.sliceStats()).singleElement().satisfies(stats -> {
             assertThat(stats.objectId()).isEqualTo(result.objectId());
-            assertThat(stats.objectOffset()).isEqualTo(result.slices().getFirst().objectOffset());
+            assertThat(stats.objectOffset())
+                    .isEqualTo(result.slices().getFirst().objectOffset());
             assertThat(stats.fullSlicePayloadBytes()).isEqualTo(2);
             assertThat(stats.entryIndexBytes()).isPositive();
             assertThat(stats.returnedPayloadBytes()).isEqualTo(2);
@@ -121,96 +122,116 @@ class WalObjectWriterReaderTest {
     @Test
     void rangedKafkaEntriesHonorExactContainingAndFirstOverflowPolicies() {
         LocalFileObjectStore store = new LocalFileObjectStore(root);
-        WalWriteResult result = writer(store).write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(
-                        new StreamId("stream-a"),
-                        rangedKafkaBatch(List.of("aaa", "bb"), List.of(3, 2)))),
-                options(false, 1 << 20))).join();
+        WalWriteResult result = writer(store)
+                .write(new WalWriteRequest(
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(
+                                new StreamId("stream-a"), rangedKafkaBatch(List.of("aaa", "bb"), List.of(3, 2)))),
+                        options(false, 1 << 20)))
+                .join();
         ResolvedObjectRange range = resolved(result.slices().get(0), result, 10);
 
-        WalReadResult exact = reader(store).readWithStats(
-                request(10, ReadBoundaryMode.EXACT_START,
-                        FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 100),
-                List.of(range)).join();
-        assertThat(exact.batches()).extracting(ReadBatch::range)
+        WalReadResult exact = reader(store)
+                .readWithStats(
+                        request(10, ReadBoundaryMode.EXACT_START, FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 100),
+                        List.of(range))
+                .join();
+        assertThat(exact.batches())
+                .extracting(ReadBatch::range)
                 .containsExactly(new OffsetRange(10, 13), new OffsetRange(13, 15));
-        assertThat(exact.batches()).extracting(ReadBatch::payloadFormat)
-                .containsOnly(PayloadFormat.KAFKA_RECORD_BATCH);
+        assertThat(exact.batches()).extracting(ReadBatch::payloadFormat).containsOnly(PayloadFormat.KAFKA_RECORD_BATCH);
 
-        assertCode(() -> reader(store).readWithStats(
-                        request(11, ReadBoundaryMode.EXACT_START,
-                                FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 100),
-                        List.of(range)).join(),
+        assertCode(
+                () -> reader(store)
+                        .readWithStats(
+                                request(
+                                        11,
+                                        ReadBoundaryMode.EXACT_START,
+                                        FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                                        10,
+                                        100),
+                                List.of(range))
+                        .join(),
                 ErrorCode.OFFSET_NOT_AVAILABLE);
 
-        WalReadResult containingFirst = reader(store).readWithStats(
-                request(11, ReadBoundaryMode.CONTAINING_ENTRY,
-                        FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 100),
-                List.of(range)).join();
-        assertThat(containingFirst.batches()).extracting(ReadBatch::range)
+        WalReadResult containingFirst = reader(store)
+                .readWithStats(
+                        request(11, ReadBoundaryMode.CONTAINING_ENTRY, FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 100),
+                        List.of(range))
+                .join();
+        assertThat(containingFirst.batches())
+                .extracting(ReadBatch::range)
                 .containsExactly(new OffsetRange(10, 13), new OffsetRange(13, 15));
-        WalReadResult containingLast = reader(store).readWithStats(
-                request(14, ReadBoundaryMode.CONTAINING_ENTRY,
-                        FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 100),
-                List.of(range)).join();
-        assertThat(containingLast.batches()).extracting(ReadBatch::range)
-                .containsExactly(new OffsetRange(13, 15));
+        WalReadResult containingLast = reader(store)
+                .readWithStats(
+                        request(14, ReadBoundaryMode.CONTAINING_ENTRY, FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 100),
+                        List.of(range))
+                .join();
+        assertThat(containingLast.batches()).extracting(ReadBatch::range).containsExactly(new OffsetRange(13, 15));
 
-        WalReadResult overflow = reader(store).readWithStats(
-                request(11, ReadBoundaryMode.CONTAINING_ENTRY,
-                        FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW, 1, 1),
-                List.of(range)).join();
+        WalReadResult overflow = reader(store)
+                .readWithStats(
+                        request(
+                                11,
+                                ReadBoundaryMode.CONTAINING_ENTRY,
+                                FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
+                                1,
+                                1),
+                        List.of(range))
+                .join();
         assertThat(overflow.batches()).singleElement().satisfies(batch -> {
             assertThat(batch.range()).isEqualTo(new OffsetRange(10, 13));
             assertThat(new String(batch.payload(), StandardCharsets.UTF_8)).isEqualTo("aaa");
         });
 
-        WalReadResult strictRecordLimit = reader(store).readWithStats(
-                request(10, ReadBoundaryMode.EXACT_START,
-                        FirstEntryPolicy.LEGACY_STRICT_LIMIT, 1, 100),
-                List.of(range)).join();
+        WalReadResult strictRecordLimit = reader(store)
+                .readWithStats(
+                        request(10, ReadBoundaryMode.EXACT_START, FirstEntryPolicy.LEGACY_STRICT_LIMIT, 1, 100),
+                        List.of(range))
+                .join();
         assertThat(strictRecordLimit.batches()).isEmpty();
-        assertCode(() -> reader(store).readWithStats(
-                        request(10, ReadBoundaryMode.EXACT_START,
-                                FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 1),
-                        List.of(range)).join(),
+        assertCode(
+                () -> reader(store)
+                        .readWithStats(
+                                request(10, ReadBoundaryMode.EXACT_START, FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 1),
+                                List.of(range))
+                        .join(),
                 ErrorCode.READ_LIMIT_TOO_SMALL);
     }
 
     @Test
     void writeMultiSliceWalObjectAndReadEachSliceByRange() {
         LocalFileObjectStore store = new LocalFileObjectStore(root);
-        WalWriteResult result = writer(store).write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(
-                        new WalStreamSliceInput(new StreamId("stream-b"), batch("b1", "b2")),
-                        new WalStreamSliceInput(new StreamId("stream-a"), batch("a1", "a2"))),
-                options(false, 1 << 20)))
+        WalWriteResult result = writer(store)
+                .write(new WalWriteRequest(
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(
+                                new WalStreamSliceInput(new StreamId("stream-b"), batch("b1", "b2")),
+                                new WalStreamSliceInput(new StreamId("stream-a"), batch("a1", "a2"))),
+                        options(false, 1 << 20)))
                 .join();
 
-        assertThat(result.slices()).extracting(slice -> slice.streamId().value())
+        assertThat(result.slices())
+                .extracting(slice -> slice.streamId().value())
                 .containsExactly("stream-a", "stream-b");
-        List<ReadBatch> streamA = reader(store).read(
-                10,
-                List.of(resolved(result.slices().get(0), result, 10)),
-                readOptions(10, 100))
+        List<ReadBatch> streamA = reader(store)
+                .read(10, List.of(resolved(result.slices().get(0), result, 10)), readOptions(10, 100))
                 .join();
-        List<ReadBatch> streamB = reader(store).read(
-                20,
-                List.of(resolved(result.slices().get(1), result, 20)),
-                readOptions(10, 100))
+        List<ReadBatch> streamB = reader(store)
+                .read(20, List.of(resolved(result.slices().get(1), result, 20)), readOptions(10, 100))
                 .join();
 
-        assertThat(streamA).extracting(batch -> new String(batch.payload(), StandardCharsets.UTF_8))
+        assertThat(streamA)
+                .extracting(batch -> new String(batch.payload(), StandardCharsets.UTF_8))
                 .containsExactly("a1", "a2");
-        assertThat(streamB).extracting(batch -> new String(batch.payload(), StandardCharsets.UTF_8))
+        assertThat(streamB)
+                .extracting(batch -> new String(batch.payload(), StandardCharsets.UTF_8))
                 .containsExactly("b1", "b2");
     }
 
@@ -219,37 +240,38 @@ class WalObjectWriterReaderTest {
         CountingObjectStore store = new CountingObjectStore(new LocalFileObjectStore(root));
         WalObjectWriter writer = writer(store);
 
-        assertCode(() -> writer.write(new WalWriteRequest(
-                        "cluster",
-                        "writer",
-                        RUN_HASH,
-                        7,
-                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
-                        options(false, 64)))
-                .join(), ErrorCode.INVALID_ARGUMENT);
-        assertCode(() -> writer.write(new WalWriteRequest(
-                        "cluster",
-                        "writer",
-                        RUN_HASH,
-                        7,
-                        List.of(
-                                new WalStreamSliceInput(new StreamId("stream-a"), batch("a")),
-                                new WalStreamSliceInput(new StreamId("stream-b"), batch("b"))),
-                        options(true, 1 << 20)))
-                .join(), ErrorCode.INVALID_ARGUMENT);
-        assertCode(() -> writer.write(new WalWriteRequest(
-                        "cluster",
-                        "writer",
-                        RUN_HASH,
-                        7,
-                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
-                        new WalWriteOptions(
-                                CompressionType.ZSTD,
-                                1024,
-                                1 << 20,
-                                Duration.ofSeconds(1),
-                                false)))
-                .join(), ErrorCode.UNSUPPORTED_FORMAT);
+        assertCode(
+                () -> writer.write(new WalWriteRequest(
+                                "cluster",
+                                "writer",
+                                RUN_HASH,
+                                7,
+                                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
+                                options(false, 64)))
+                        .join(),
+                ErrorCode.INVALID_ARGUMENT);
+        assertCode(
+                () -> writer.write(new WalWriteRequest(
+                                "cluster",
+                                "writer",
+                                RUN_HASH,
+                                7,
+                                List.of(
+                                        new WalStreamSliceInput(new StreamId("stream-a"), batch("a")),
+                                        new WalStreamSliceInput(new StreamId("stream-b"), batch("b"))),
+                                options(true, 1 << 20)))
+                        .join(),
+                ErrorCode.INVALID_ARGUMENT);
+        assertCode(
+                () -> writer.write(new WalWriteRequest(
+                                "cluster",
+                                "writer",
+                                RUN_HASH,
+                                7,
+                                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
+                                new WalWriteOptions(CompressionType.ZSTD, 1024, 1 << 20, Duration.ofSeconds(1), false)))
+                        .join(),
+                ErrorCode.UNSUPPORTED_FORMAT);
 
         assertThat(store.puts()).isZero();
     }
@@ -259,18 +281,14 @@ class WalObjectWriterReaderTest {
         RecordingObjectStore store = new RecordingObjectStore(new LocalFileObjectStore(root));
         Duration timeout = Duration.ofMillis(1234);
 
-        WalWriteResult result = writer(store).write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
-                new WalWriteOptions(
-                        CompressionType.NONE,
-                        1,
-                        1 << 20,
-                        timeout,
-                        false)))
+        WalWriteResult result = writer(store)
+                .write(new WalWriteRequest(
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
+                        new WalWriteOptions(CompressionType.NONE, 1, 1 << 20, timeout, false)))
                 .join();
 
         assertThat(result.objectLength()).isGreaterThan(1);
@@ -280,20 +298,22 @@ class WalObjectWriterReaderTest {
     @Test
     void payloadAndEntryIndexReadsShareOneDecreasingDeadline() {
         LocalFileObjectStore local = new LocalFileObjectStore(root);
-        WalWriteResult result = writer(local).write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("a"))),
-                options(false, 1 << 20)))
+        WalWriteResult result = writer(local)
+                .write(new WalWriteRequest(
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("a"))),
+                        options(false, 1 << 20)))
                 .join();
         TimeoutRecordingObjectStore recording = new TimeoutRecordingObjectStore(local);
 
-        new DefaultWalObjectReader(recording).read(
-                0,
-                List.of(resolved(result.slices().getFirst(), result, 0)),
-                new ReadOptions(10, 100, ReadIsolation.COMMITTED, Duration.ofSeconds(1)))
+        new DefaultWalObjectReader(recording)
+                .read(
+                        0,
+                        List.of(resolved(result.slices().getFirst(), result, 0)),
+                        new ReadOptions(10, 100, ReadIsolation.COMMITTED, Duration.ofSeconds(1)))
                 .join();
 
         assertThat(recording.timeouts()).hasSize(2);
@@ -304,26 +324,30 @@ class WalObjectWriterReaderTest {
     void storageChecksumMismatchFailsBeforeMetadataCommit() {
         ObjectStore store = new WrongChecksumObjectStore(new LocalFileObjectStore(root));
 
-        assertCode(() -> writer(store).write(new WalWriteRequest(
-                        "cluster",
-                        "writer",
-                        RUN_HASH,
-                        7,
-                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
-                        options(false, 1 << 20)))
-                .join(), ErrorCode.OBJECT_CHECKSUM_MISMATCH);
+        assertCode(
+                () -> writer(store)
+                        .write(new WalWriteRequest(
+                                "cluster",
+                                "writer",
+                                RUN_HASH,
+                                7,
+                                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
+                                options(false, 1 << 20)))
+                        .join(),
+                ErrorCode.OBJECT_CHECKSUM_MISMATCH);
     }
 
     @Test
     void corruptedSliceOrEntryIndexChecksumFailsRead() {
         LocalFileObjectStore store = new LocalFileObjectStore(root);
-        WalWriteResult result = writer(store).write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("a", "b"))),
-                options(false, 1 << 20)))
+        WalWriteResult result = writer(store)
+                .write(new WalWriteRequest(
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("a", "b"))),
+                        options(false, 1 << 20)))
                 .join();
         WrittenStreamSlice slice = result.slices().get(0);
         ResolvedObjectRange corrupted = new ResolvedObjectRange(
@@ -341,7 +365,10 @@ class WalObjectWriterReaderTest {
                 Optional.empty(),
                 1);
 
-        assertCode(() -> reader(store).read(0, List.of(corrupted), readOptions(10, 100)).join(),
+        assertCode(
+                () -> reader(store)
+                        .read(0, List.of(corrupted), readOptions(10, 100))
+                        .join(),
                 ErrorCode.OBJECT_CHECKSUM_MISMATCH);
     }
 
@@ -350,47 +377,50 @@ class WalObjectWriterReaderTest {
         LocalFileObjectStore store = new LocalFileObjectStore(root);
         DefaultWalObjectWriter writer = writer(store);
         WalWriteResult one = writer.write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("a"))),
-                options(false, 1 << 20)))
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("a"))),
+                        options(false, 1 << 20)))
                 .join();
         WalWriteResult positiveAfterBudget = writer.write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("b"))),
-                options(false, 1 << 20)))
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("b"))),
+                        options(false, 1 << 20)))
                 .join();
         WalWriteResult zeroAfterBudget = writer.write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch(""))),
-                options(false, 1 << 20)))
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch(""))),
+                        options(false, 1 << 20)))
                 .join();
 
-        List<ReadBatch> stoppedBeforePositive = reader(store).read(
-                0,
-                List.of(
-                        resolved(one.slices().get(0), one, 0),
-                        resolved(positiveAfterBudget.slices().get(0), positiveAfterBudget, 1)),
-                readOptions(10, 1))
+        List<ReadBatch> stoppedBeforePositive = reader(store)
+                .read(
+                        0,
+                        List.of(
+                                resolved(one.slices().get(0), one, 0),
+                                resolved(positiveAfterBudget.slices().get(0), positiveAfterBudget, 1)),
+                        readOptions(10, 1))
                 .join();
 
         assertThat(stoppedBeforePositive).hasSize(1);
-        assertThat(new String(stoppedBeforePositive.get(0).payload(), StandardCharsets.UTF_8)).isEqualTo("a");
+        assertThat(new String(stoppedBeforePositive.get(0).payload(), StandardCharsets.UTF_8))
+                .isEqualTo("a");
 
-        List<ReadBatch> includesZeroByte = reader(store).read(
-                0,
-                List.of(
-                        resolved(one.slices().get(0), one, 0),
-                        resolved(zeroAfterBudget.slices().get(0), zeroAfterBudget, 1)),
-                readOptions(10, 1))
+        List<ReadBatch> includesZeroByte = reader(store)
+                .read(
+                        0,
+                        List.of(
+                                resolved(one.slices().get(0), one, 0),
+                                resolved(zeroAfterBudget.slices().get(0), zeroAfterBudget, 1)),
+                        readOptions(10, 1))
                 .join();
 
         assertThat(includesZeroByte).hasSize(2);
@@ -403,19 +433,18 @@ class WalObjectWriterReaderTest {
     @Test
     void readZeroByteEntryAfterExactByteBudgetWithinSameSlice() {
         LocalFileObjectStore store = new LocalFileObjectStore(root);
-        WalWriteResult result = writer(store).write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("a", "", "b"))),
-                options(false, 1 << 20)))
+        WalWriteResult result = writer(store)
+                .write(new WalWriteRequest(
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("a", "", "b"))),
+                        options(false, 1 << 20)))
                 .join();
 
-        List<ReadBatch> batches = reader(store).read(
-                0,
-                List.of(resolved(result.slices().get(0), result, 0)),
-                readOptions(10, 1))
+        List<ReadBatch> batches = reader(store)
+                .read(0, List.of(resolved(result.slices().get(0), result, 0)), readOptions(10, 1))
                 .join();
 
         assertThat(batches).hasSize(2);
@@ -427,13 +456,14 @@ class WalObjectWriterReaderTest {
     void unsupportedEntryIndexLocationsFailBeforeObjectIo() {
         LocalFileObjectStore local = new LocalFileObjectStore(root);
         CountingObjectStore counting = new CountingObjectStore(local);
-        WalWriteResult result = writer(counting).write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
-                options(false, 1 << 20)))
+        WalWriteResult result = writer(counting)
+                .write(new WalWriteRequest(
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
+                        options(false, 1 << 20)))
                 .join();
         WrittenStreamSlice slice = result.slices().get(0);
         int readsBefore = counting.reads();
@@ -454,28 +484,26 @@ class WalObjectWriterReaderTest {
                 1,
                 Crc32cChecksums.checksum(new byte[] {1}));
 
-        assertCode(() -> reader(counting).read(
-                        0,
-                        List.of(resolved(slice, result, 0, inline)),
-                        readOptions(10, 100))
-                .join(), ErrorCode.UNSUPPORTED_FORMAT);
-        assertCode(() -> reader(counting).read(
-                        0,
-                        List.of(resolved(slice, result, 0, indexObject)),
-                        readOptions(10, 100))
-                .join(), ErrorCode.UNSUPPORTED_FORMAT);
+        assertCode(
+                () -> reader(counting)
+                        .read(0, List.of(resolved(slice, result, 0, inline)), readOptions(10, 100))
+                        .join(),
+                ErrorCode.UNSUPPORTED_FORMAT);
+        assertCode(
+                () -> reader(counting)
+                        .read(0, List.of(resolved(slice, result, 0, indexObject)), readOptions(10, 100))
+                        .join(),
+                ErrorCode.UNSUPPORTED_FORMAT);
         assertThat(counting.reads()).isEqualTo(readsBefore);
     }
 
     @Test
     void entryIndexEncodingHasStableGoldenBytes() {
-        EntryIndex index = new EntryIndex(
-                1,
-                1,
-                List.of(new EntryIndexItem(0, 0, 1, 0, 3, 11, Map.of("k", "v"))));
+        EntryIndex index = new EntryIndex(1, 1, List.of(new EntryIndexItem(0, 0, 1, 0, 3, 11, Map.of("k", "v"))));
 
         assertThat(HexFormat.of().formatHex(EntryIndexEncoder.encode(index)))
-                .isEqualTo("010000000100000000000000000000000000000001000000000000000000000003000000000000000b0000000000000001000000010000006b0100000076");
+                .isEqualTo("010000000100000000000000000000000000000001000000000000000000000003"
+                        + "000000000000000b0000000000000001000000010000006b0100000076");
     }
 
     @Test
@@ -486,8 +514,7 @@ class WalObjectWriterReaderTest {
                 .putInt(1)
                 .array();
 
-        assertCode(() -> EntryIndexDecoder.decode(corruptCounts, 0, 0, Long.MAX_VALUE),
-                ErrorCode.UNSUPPORTED_FORMAT);
+        assertCode(() -> EntryIndexDecoder.decode(corruptCounts, 0, 0, Long.MAX_VALUE), ErrorCode.UNSUPPORTED_FORMAT);
     }
 
     @Test
@@ -503,20 +530,22 @@ class WalObjectWriterReaderTest {
         writer.int64(10);
         writer.int32(0);
 
-        assertCode(() -> EntryIndexDecoder.decode(writer.toByteArray(), 1, 0, Long.MAX_VALUE),
+        assertCode(
+                () -> EntryIndexDecoder.decode(writer.toByteArray(), 1, 0, Long.MAX_VALUE),
                 ErrorCode.UNSUPPORTED_FORMAT);
     }
 
     @Test
     void layoutDecoderRejectsCorruptHeaderAndObjectChecksum() {
         LocalFileObjectStore store = new LocalFileObjectStore(root);
-        WalWriteResult result = writer(store).write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
-                options(false, 1 << 20)))
+        WalWriteResult result = writer(store)
+                .write(new WalWriteRequest(
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
+                        options(false, 1 << 20)))
                 .join();
         byte[] bytes = storedBytes(store, result);
 
@@ -533,10 +562,8 @@ class WalObjectWriterReaderTest {
     void layoutDecoderRejectsChecksumConsistentDescriptorOutOfBounds() {
         ObjectId objectId = new ObjectId("object-with-bad-descriptor");
         byte[] payload = "x".getBytes(StandardCharsets.UTF_8);
-        byte[] entryIndexBytes = EntryIndexEncoder.encode(new EntryIndex(
-                1,
-                1,
-                List.of(new EntryIndexItem(0, 0, 1, 0, 1, 10, Map.of()))));
+        byte[] entryIndexBytes = EntryIndexEncoder.encode(
+                new EntryIndex(1, 1, List.of(new EntryIndexItem(0, 0, 1, 0, 1, 10, Map.of()))));
         StreamSliceDescriptor badDescriptor = new StreamSliceDescriptor(
                 0,
                 new StreamId("stream-a"),
@@ -592,10 +619,8 @@ class WalObjectWriterReaderTest {
     void layoutDecoderWrapsChecksumConsistentInvalidDescriptorMetadataAsUnsupportedFormat() {
         ObjectId objectId = new ObjectId("object-with-bad-descriptor-metadata");
         byte[] payload = "x".getBytes(StandardCharsets.UTF_8);
-        byte[] entryIndexBytes = EntryIndexEncoder.encode(new EntryIndex(
-                1,
-                1,
-                List.of(new EntryIndexItem(0, 0, 1, 0, 1, 10, Map.of()))));
+        byte[] entryIndexBytes = EntryIndexEncoder.encode(
+                new EntryIndex(1, 1, List.of(new EntryIndexItem(0, 0, 1, 0, 1, 10, Map.of()))));
         StreamSliceDescriptor descriptor = new StreamSliceDescriptor(
                 0,
                 new StreamId("stream-a"),
@@ -651,13 +676,14 @@ class WalObjectWriterReaderTest {
     void readResourceGuardRejectsBeforeObjectIo() {
         LocalFileObjectStore local = new LocalFileObjectStore(root);
         CountingObjectStore counting = new CountingObjectStore(local);
-        WalWriteResult result = writer(counting).write(new WalWriteRequest(
-                "cluster",
-                "writer",
-                RUN_HASH,
-                7,
-                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
-                options(false, 1 << 20)))
+        WalWriteResult result = writer(counting)
+                .write(new WalWriteRequest(
+                        "cluster",
+                        "writer",
+                        RUN_HASH,
+                        7,
+                        List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("payload"))),
+                        options(false, 1 << 20)))
                 .join();
         int readsBefore = counting.reads();
         WalObjectReader guarded = new DefaultWalObjectReader(
@@ -667,11 +693,10 @@ class WalObjectWriterReaderTest {
                 },
                 WalReadObserver.noop());
 
-        assertCode(() -> guarded.read(
-                        0,
-                        List.of(resolved(result.slices().get(0), result, 0)),
-                        readOptions(10, 100))
-                .join(), ErrorCode.BACKPRESSURE_REJECTED);
+        assertCode(
+                () -> guarded.read(0, List.of(resolved(result.slices().get(0), result, 0)), readOptions(10, 100))
+                        .join(),
+                ErrorCode.BACKPRESSURE_REJECTED);
         assertThat(counting.reads()).isEqualTo(readsBefore);
     }
 
@@ -696,10 +721,7 @@ class WalObjectWriterReaderTest {
         List<AppendEntry> entries = new ArrayList<>();
         for (int i = 0; i < payloads.length; i++) {
             entries.add(new AppendEntry(
-                    payloads[i].getBytes(StandardCharsets.UTF_8),
-                    1,
-                    10 + i,
-                    Map.of("entry", Integer.toString(i))));
+                    payloads[i].getBytes(StandardCharsets.UTF_8), 1, 10 + i, Map.of("entry", Integer.toString(i))));
         }
         return new AppendBatch(
                 PayloadFormat.OPAQUE_RECORD_BATCH,
@@ -744,11 +766,7 @@ class WalObjectWriterReaderTest {
             int maxRecords,
             int maxBytes) {
         return new ReadRequest(
-                startOffset,
-                ReadView.COMMITTED,
-                boundaryMode,
-                firstEntryPolicy,
-                readOptions(maxRecords, maxBytes));
+                startOffset, ReadView.COMMITTED, boundaryMode, firstEntryPolicy, readOptions(maxRecords, maxBytes));
     }
 
     private ReadOptions readOptions(int maxRecords, int maxBytes) {
@@ -760,10 +778,7 @@ class WalObjectWriterReaderTest {
     }
 
     private ResolvedObjectRange resolved(
-            WrittenStreamSlice slice,
-            WalWriteResult result,
-            long startOffset,
-            EntryIndexRef entryIndexRef) {
+            WrittenStreamSlice slice, WalWriteResult result, long startOffset, EntryIndexRef entryIndexRef) {
         return new ResolvedObjectRange(
                 new OffsetRange(startOffset, startOffset + slice.recordCount()),
                 0,
@@ -829,21 +844,21 @@ class WalObjectWriterReaderTest {
         }
         byte[] payload = writer.toByteArray();
         int checksum = Crc32cChecksums.intValue(Crc32cChecksums.checksum(payload));
-        ByteBuffer.wrap(payload, 0, Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN).putInt(checksum);
+        ByteBuffer.wrap(payload, 0, Integer.BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .putInt(checksum);
         return payload;
     }
 
     private void assertCode(Runnable runnable, ErrorCode code) {
-        assertThatThrownBy(runnable::run)
-                .satisfies(throwable -> {
-                    Throwable current = throwable;
-                    if (current instanceof CompletionException) {
-                        current = current.getCause();
-                    }
-                    assertThat(current)
-                            .isInstanceOfSatisfying(NereusException.class, exception ->
-                                    assertThat(exception.code()).isEqualTo(code));
-                });
+        assertThatThrownBy(runnable::run).satisfies(throwable -> {
+            Throwable current = throwable;
+            if (current instanceof CompletionException) {
+                current = current.getCause();
+            }
+            assertThat(current).isInstanceOfSatisfying(NereusException.class, exception -> assertThat(exception.code())
+                    .isEqualTo(code));
+        });
     }
 
     private static final class CountingObjectStore implements ObjectStore {
@@ -864,19 +879,22 @@ class WalObjectWriterReaderTest {
         }
 
         @Override
-        public CompletableFuture<PutObjectResult> putObject(com.nereusstream.api.ObjectKey key, ByteBuffer payload, PutObjectOptions options) {
+        public CompletableFuture<PutObjectResult> putObject(
+                com.nereusstream.api.ObjectKey key, ByteBuffer payload, PutObjectOptions options) {
             puts.incrementAndGet();
             return delegate.putObject(key, payload, options);
         }
 
         @Override
-        public CompletableFuture<RangeReadResult> readRange(com.nereusstream.api.ObjectKey key, long offset, long length, RangeReadOptions options) {
+        public CompletableFuture<RangeReadResult> readRange(
+                com.nereusstream.api.ObjectKey key, long offset, long length, RangeReadOptions options) {
             reads.incrementAndGet();
             return delegate.readRange(key, offset, length, options);
         }
 
         @Override
-        public CompletableFuture<com.nereusstream.objectstore.HeadObjectResult> headObject(com.nereusstream.api.ObjectKey key, HeadObjectOptions options) {
+        public CompletableFuture<com.nereusstream.objectstore.HeadObjectResult> headObject(
+                com.nereusstream.api.ObjectKey key, HeadObjectOptions options) {
             return delegate.headObject(key, options);
         }
 
@@ -899,18 +917,21 @@ class WalObjectWriterReaderTest {
         }
 
         @Override
-        public CompletableFuture<PutObjectResult> putObject(com.nereusstream.api.ObjectKey key, ByteBuffer payload, PutObjectOptions options) {
+        public CompletableFuture<PutObjectResult> putObject(
+                com.nereusstream.api.ObjectKey key, ByteBuffer payload, PutObjectOptions options) {
             lastPutOptions = options;
             return delegate.putObject(key, payload, options);
         }
 
         @Override
-        public CompletableFuture<RangeReadResult> readRange(com.nereusstream.api.ObjectKey key, long offset, long length, RangeReadOptions options) {
+        public CompletableFuture<RangeReadResult> readRange(
+                com.nereusstream.api.ObjectKey key, long offset, long length, RangeReadOptions options) {
             return delegate.readRange(key, offset, length, options);
         }
 
         @Override
-        public CompletableFuture<com.nereusstream.objectstore.HeadObjectResult> headObject(com.nereusstream.api.ObjectKey key, HeadObjectOptions options) {
+        public CompletableFuture<com.nereusstream.objectstore.HeadObjectResult> headObject(
+                com.nereusstream.api.ObjectKey key, HeadObjectOptions options) {
             return delegate.headObject(key, options);
         }
 
@@ -934,18 +955,13 @@ class WalObjectWriterReaderTest {
 
         @Override
         public CompletableFuture<PutObjectResult> putObject(
-                com.nereusstream.api.ObjectKey key,
-                ByteBuffer payload,
-                PutObjectOptions options) {
+                com.nereusstream.api.ObjectKey key, ByteBuffer payload, PutObjectOptions options) {
             return delegate.putObject(key, payload, options);
         }
 
         @Override
         public CompletableFuture<RangeReadResult> readRange(
-                com.nereusstream.api.ObjectKey key,
-                long offset,
-                long length,
-                RangeReadOptions options) {
+                com.nereusstream.api.ObjectKey key, long offset, long length, RangeReadOptions options) {
             timeouts.add(options.timeout());
             if (timeouts.size() == 1) {
                 try {
@@ -960,8 +976,7 @@ class WalObjectWriterReaderTest {
 
         @Override
         public CompletableFuture<com.nereusstream.objectstore.HeadObjectResult> headObject(
-                com.nereusstream.api.ObjectKey key,
-                HeadObjectOptions options) {
+                com.nereusstream.api.ObjectKey key, HeadObjectOptions options) {
             return delegate.headObject(key, options);
         }
 
@@ -979,7 +994,8 @@ class WalObjectWriterReaderTest {
         }
 
         @Override
-        public CompletableFuture<PutObjectResult> putObject(com.nereusstream.api.ObjectKey key, ByteBuffer payload, PutObjectOptions options) {
+        public CompletableFuture<PutObjectResult> putObject(
+                com.nereusstream.api.ObjectKey key, ByteBuffer payload, PutObjectOptions options) {
             return delegate.putObject(key, payload, options)
                     .thenApply(result -> new PutObjectResult(
                             result.key(),
@@ -989,12 +1005,14 @@ class WalObjectWriterReaderTest {
         }
 
         @Override
-        public CompletableFuture<RangeReadResult> readRange(com.nereusstream.api.ObjectKey key, long offset, long length, RangeReadOptions options) {
+        public CompletableFuture<RangeReadResult> readRange(
+                com.nereusstream.api.ObjectKey key, long offset, long length, RangeReadOptions options) {
             return delegate.readRange(key, offset, length, options);
         }
 
         @Override
-        public CompletableFuture<com.nereusstream.objectstore.HeadObjectResult> headObject(com.nereusstream.api.ObjectKey key, HeadObjectOptions options) {
+        public CompletableFuture<com.nereusstream.objectstore.HeadObjectResult> headObject(
+                com.nereusstream.api.ObjectKey key, HeadObjectOptions options) {
             return delegate.headObject(key, options);
         }
 

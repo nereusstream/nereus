@@ -18,7 +18,9 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Committed reference to entry-index bytes for a stream slice. */
+/**
+ * Committed reference to entry-index bytes for a stream slice.
+ */
 public record EntryIndexRef(
         EntryIndexLocation location,
         Optional<ObjectId> objectId,
@@ -96,7 +98,8 @@ public record EntryIndexRef(
                     throw new IllegalArgumentException("OBJECT_FOOTER entry index cannot contain inlineData");
                 }
                 if (hasObjectId != hasObjectKey) {
-                    throw new IllegalArgumentException("OBJECT_FOOTER entry index objectId/objectKey must both be present or both empty");
+                    throw new IllegalArgumentException(
+                            "OBJECT_FOOTER entry index objectId/objectKey must both be present or both empty");
                 }
                 if (length <= 0) {
                     throw new IllegalArgumentException("OBJECT_FOOTER entry index length must be positive");

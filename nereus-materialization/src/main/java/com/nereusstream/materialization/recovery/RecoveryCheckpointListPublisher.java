@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.recovery;
 
 import java.util.List;
@@ -8,7 +9,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** Single-subscription synchronous list publisher with reentrant demand accounting. */
+/**
+ * Single-subscription synchronous list publisher with reentrant demand accounting.
+ */
 final class RecoveryCheckpointListPublisher<T> implements Flow.Publisher<T> {
     private final List<T> values;
     private final AtomicBoolean subscribed = new AtomicBoolean();
@@ -23,15 +26,12 @@ final class RecoveryCheckpointListPublisher<T> implements Flow.Publisher<T> {
         if (!subscribed.compareAndSet(false, true)) {
             subscriber.onSubscribe(new Flow.Subscription() {
                 @Override
-                public void request(long count) {
-                }
+                public void request(long count) {}
 
                 @Override
-                public void cancel() {
-                }
+                public void cancel() {}
             });
-            subscriber.onError(new IllegalStateException(
-                    "recovery checkpoint list publisher permits one subscriber"));
+            subscriber.onError(new IllegalStateException("recovery checkpoint list publisher permits one subscriber"));
             return;
         }
         subscriber.onSubscribe(new ListSubscription(subscriber));
@@ -54,8 +54,7 @@ final class RecoveryCheckpointListPublisher<T> implements Flow.Publisher<T> {
             if (count <= 0) {
                 if (terminal.compareAndSet(false, true)) {
                     cancelled = true;
-                    subscriber.onError(new IllegalArgumentException(
-                            "publisher demand must be positive"));
+                    subscriber.onError(new IllegalArgumentException("publisher demand must be positive"));
                 }
                 return;
             }
@@ -83,9 +82,7 @@ final class RecoveryCheckpointListPublisher<T> implements Flow.Publisher<T> {
                 if (emitted != 0 && requested != Long.MAX_VALUE) {
                     demand.addAndGet(-emitted);
                 }
-                if (!cancelled
-                        && index == values.size()
-                        && terminal.compareAndSet(false, true)) {
+                if (!cancelled && index == values.size() && terminal.compareAndSet(false, true)) {
                     cancelled = true;
                     subscriber.onComplete();
                 }

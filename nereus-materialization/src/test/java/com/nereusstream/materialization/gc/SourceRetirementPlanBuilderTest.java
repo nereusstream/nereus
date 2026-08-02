@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -45,9 +45,9 @@ import com.nereusstream.metadata.oxia.VersionedRecoveryCheckpointRoot;
 import com.nereusstream.metadata.oxia.codec.GenerationIndexRecordCodecV1;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
+import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
-import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointReferenceRecord;
@@ -89,8 +89,7 @@ class SourceRetirementPlanBuilderTest {
     @Test
     void freezesIndexMarkerAndCheckpointReplacedCommitThenReloadsExactFacts() {
         Fixture fixture = fixture();
-        AtomicReference<VersionedGenerationZeroMarker> marker = new AtomicReference<>(
-                fixture.marker());
+        AtomicReference<VersionedGenerationZeroMarker> marker = new AtomicReference<>(fixture.marker());
         AtomicInteger rootReads = new AtomicInteger();
         AtomicInteger physicalRootReads = new AtomicInteger();
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
@@ -102,22 +101,24 @@ class SourceRetirementPlanBuilderTest {
                 checkpointCodec(fixture),
                 PhysicalGcConfig.defaults());
 
-        List<GcPlannedMetadataRemoval> removals = builder.build(fixture.candidate()).join();
+        List<GcPlannedMetadataRemoval> removals =
+                builder.build(fixture.candidate()).join();
 
-        assertThat(removals).extracting(GcPlannedMetadataRemoval::removalType)
+        assertThat(removals)
+                .extracting(GcPlannedMetadataRemoval::removalType)
                 .containsExactlyInAnyOrder(
                         GenerationZeroIndexRetirementHandler.REMOVAL_TYPE,
                         GenerationZeroMarkerRetirementHandler.REMOVAL_TYPE,
                         GenerationZeroCommitRetirementHandler.REMOVAL_TYPE);
-        assertThat(removals).extracting(GcPlannedMetadataRemoval::key)
+        assertThat(removals)
+                .extracting(GcPlannedMetadataRemoval::key)
                 .containsExactlyInAnyOrder(
                         fixture.index().key(),
                         fixture.marker().key(),
                         fixture.commit().key());
         assertThat(rootReads).hasValue(4);
         assertThat(physicalRootReads).hasValue(4);
-        assertThat(builder.reload(fixture.candidate(), removals).join())
-                .isEqualTo(removals);
+        assertThat(builder.reload(fixture.candidate(), removals).join()).isEqualTo(removals);
         assertThat(rootReads).hasValue(6);
         assertThat(physicalRootReads).hasValue(6);
 
@@ -131,8 +132,7 @@ class SourceRetirementPlanBuilderTest {
                 fixture.marker().readTargetIdentitySha256(),
                 fixture.marker().metadataVersion() + 1,
                 sha('f')));
-        assertThat(builder.reload(fixture.candidate(), removals).join())
-                .isNotEqualTo(removals);
+        assertThat(builder.reload(fixture.candidate(), removals).join()).isNotEqualTo(removals);
     }
 
     @Test
@@ -149,8 +149,7 @@ class SourceRetirementPlanBuilderTest {
                 PhysicalGcConfig.defaults());
 
         assertThatThrownBy(() -> builder.build(fixture.candidate()).join())
-                .hasRootCauseMessage(
-                        "recovery root changed while source facts were frozen");
+                .hasRootCauseMessage("recovery root changed while source facts were frozen");
         assertThat(rootReads).hasValue(2);
     }
 
@@ -158,10 +157,7 @@ class SourceRetirementPlanBuilderTest {
     void quarantinedReplacementIndexCannotAuthorizeSourceRetirement() {
         Fixture fixture = fixture();
         Fixture quarantined = fixture.withReplacementIndex(
-                generationWithLifecycle(
-                        fixture.replacementIndex(),
-                        GenerationLifecycle.QUARANTINED,
-                        "target-corrupt"));
+                generationWithLifecycle(fixture.replacementIndex(), GenerationLifecycle.QUARANTINED, "target-corrupt"));
         AtomicInteger physicalReads = new AtomicInteger();
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
@@ -173,16 +169,14 @@ class SourceRetirementPlanBuilderTest {
                 PhysicalGcConfig.defaults());
 
         assertThatThrownBy(() -> builder.build(quarantined.candidate()).join())
-                .hasRootCauseMessage(
-                        "generation-zero source has no current healthy NRC1 replacement");
+                .hasRootCauseMessage("generation-zero source has no current healthy NRC1 replacement");
         assertThat(physicalReads).hasValue(0);
     }
 
     @Test
     void markedReplacementRootCannotAuthorizeSourceRetirement() {
         Fixture fixture = fixture();
-        Fixture marked = fixture.withReplacementRoot(
-                markedRoot(fixture.replacementRoot()));
+        Fixture marked = fixture.withReplacementRoot(markedRoot(fixture.replacementRoot()));
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
                 untrimmedL0(),
@@ -193,15 +187,13 @@ class SourceRetirementPlanBuilderTest {
                 PhysicalGcConfig.defaults());
 
         assertThatThrownBy(() -> builder.build(marked.candidate()).join())
-                .hasRootCauseMessage(
-                        "generation-zero source has no current healthy NRC1 replacement");
+                .hasRootCauseMessage("generation-zero source has no current healthy NRC1 replacement");
     }
 
     @Test
     void completedTrimAuthorizesGenerationZeroWithoutAHealthyReplacement() {
         Fixture base = fixture();
-        Fixture marked = base.withReplacementRoot(
-                markedRoot(base.replacementRoot()));
+        Fixture marked = base.withReplacementRoot(markedRoot(base.replacementRoot()));
         AtomicInteger physicalReads = new AtomicInteger();
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
@@ -212,10 +204,11 @@ class SourceRetirementPlanBuilderTest {
                 checkpointCodec(marked),
                 PhysicalGcConfig.defaults());
 
-        List<GcPlannedMetadataRemoval> removals = builder.build(
-                marked.candidate()).join();
+        List<GcPlannedMetadataRemoval> removals =
+                builder.build(marked.candidate()).join();
 
-        assertThat(removals).extracting(GcPlannedMetadataRemoval::removalType)
+        assertThat(removals)
+                .extracting(GcPlannedMetadataRemoval::removalType)
                 .containsExactlyInAnyOrder(
                         GenerationZeroIndexRetirementHandler.REMOVAL_TYPE,
                         GenerationZeroMarkerRetirementHandler.REMOVAL_TYPE,
@@ -238,8 +231,7 @@ class SourceRetirementPlanBuilderTest {
                 PhysicalGcConfig.defaults());
 
         assertThatThrownBy(() -> builder.build(fixture.candidate()).join())
-                .hasRootCauseMessage(
-                        "completed trim changed while retirement facts were frozen");
+                .hasRootCauseMessage("completed trim changed while retirement facts were frozen");
         assertThat(trimReads).hasValue(2);
         assertThat(physicalReads).hasValue(0);
     }
@@ -251,20 +243,14 @@ class SourceRetirementPlanBuilderTest {
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
                 untrimmedL0(),
-                generationStore(
-                        fixture,
-                        new AtomicInteger(),
-                        false,
-                        indexReads,
-                        true),
+                generationStore(fixture, new AtomicInteger(), false, indexReads, true),
                 physicalStore(fixture, new AtomicInteger(), false),
                 sourceStore(fixture, new AtomicReference<>(fixture.marker())),
                 checkpointCodec(fixture),
                 PhysicalGcConfig.defaults());
 
         assertThatThrownBy(() -> builder.build(fixture.candidate()).join())
-                .hasRootCauseMessage(
-                        "healthy NRC1 replacement index changed while source facts were frozen");
+                .hasRootCauseMessage("healthy NRC1 replacement index changed while source facts were frozen");
         assertThat(indexReads).hasValue(2);
     }
 
@@ -282,29 +268,24 @@ class SourceRetirementPlanBuilderTest {
                 PhysicalGcConfig.defaults());
 
         assertThatThrownBy(() -> builder.build(fixture.candidate()).join())
-                .hasRootCauseMessage(
-                        "healthy NRC1 replacement root changed while source facts were frozen");
+                .hasRootCauseMessage("healthy NRC1 replacement root changed while source facts were frozen");
         assertThat(physicalReads).hasValue(2);
     }
 
     @Test
     void revalidatorRejectsAnUnboundExtraSourceRemoval() {
         Fixture fixture = fixture();
-        VersionedGenerationZeroCommit unbound = commitWithId(
-                fixture.commit(), "unbound-commit", 11, sha('f'));
+        VersionedGenerationZeroCommit unbound = commitWithId(fixture.commit(), "unbound-commit", 11, sha('f'));
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
                 untrimmedL0(),
                 generationStore(fixture, new AtomicInteger(), false),
                 physicalStore(fixture, new AtomicInteger(), false),
-                sourceStore(
-                        fixture,
-                        new AtomicReference<>(fixture.marker()),
-                        Optional.of(unbound)),
+                sourceStore(fixture, new AtomicReference<>(fixture.marker()), Optional.of(unbound)),
                 checkpointCodec(fixture),
                 PhysicalGcConfig.defaults());
-        List<GcPlannedMetadataRemoval> removals = builder.build(
-                fixture.candidate()).join();
+        List<GcPlannedMetadataRemoval> removals =
+                builder.build(fixture.candidate()).join();
         List<GcPlannedMetadataRemoval> withExtra = new java.util.ArrayList<>(removals);
         withExtra.add(new GcPlannedMetadataRemoval(
                 GenerationZeroCommitRetirementHandler.REMOVAL_TYPE,
@@ -313,28 +294,18 @@ class SourceRetirementPlanBuilderTest {
                 unbound.durableValueSha256()));
         withExtra.sort(GcPlanValidation.METADATA_ORDER);
 
-        assertThatThrownBy(() -> builder.reload(
-                        fixture.candidate(), withExtra).join())
-                .hasRootCauseMessage(
-                        "source-retirement removals are not exactly bound to the candidate");
+        assertThatThrownBy(() -> builder.reload(fixture.candidate(), withExtra).join())
+                .hasRootCauseMessage("source-retirement removals are not exactly bound to the candidate");
     }
 
     @Test
     void checkpointEntryWithAnotherCanonicalCommitCannotAuthorizeSourceRetirement() {
         Fixture fixture = fixture();
-        StreamCommitTargetRecord different = withReadTargetIdentity(
-                fixture.commit().canonicalCommit(), sha('f').value());
-        byte[] bytes = MetadataRecordCodecFactory.encodeEnvelope(
-                different, StreamCommitTargetRecord.class);
+        StreamCommitTargetRecord different =
+                withReadTargetIdentity(fixture.commit().canonicalCommit(), sha('f').value());
+        byte[] bytes = MetadataRecordCodecFactory.encodeEnvelope(different, StreamCommitTargetRecord.class);
         RecoveryCheckpointEntry differentEntry = new RecoveryCheckpointEntry(
-                1,
-                new OffsetRange(0, 12),
-                12,
-                COMMIT_ID,
-                "",
-                ByteBuffer.wrap(bytes),
-                sha256(bytes),
-                List.of(0));
+                1, new OffsetRange(0, 12), 12, COMMIT_ID, "", ByteBuffer.wrap(bytes), sha256(bytes), List.of(0));
         Fixture conflicting = fixture.withEntry(differentEntry);
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
@@ -346,8 +317,7 @@ class SourceRetirementPlanBuilderTest {
                 PhysicalGcConfig.defaults());
 
         assertThatThrownBy(() -> builder.build(conflicting.candidate()).join())
-                .hasRootCauseMessage(
-                        "checkpoint-replaced commit does not match generation-zero index facts");
+                .hasRootCauseMessage("checkpoint-replaced commit does not match generation-zero index facts");
     }
 
     private static Fixture fixture() {
@@ -377,8 +347,7 @@ class SourceRetirementPlanBuilderTest {
                 0,
                 10,
                 0);
-        byte[] canonicalBytes = MetadataRecordCodecFactory.encodeEnvelope(
-                canonical, StreamCommitTargetRecord.class);
+        byte[] canonicalBytes = MetadataRecordCodecFactory.encodeEnvelope(canonical, StreamCommitTargetRecord.class);
         Checksum canonicalSha = sha256(canonicalBytes);
         OffsetIndexEntry indexValue = new OffsetIndexEntry(
                 STREAM,
@@ -395,16 +364,10 @@ class SourceRetirementPlanBuilderTest {
                 1,
                 false,
                 7);
-        String indexKey = new F4Keyspace(CLUSTER).generationIndexKey(
-                STREAM, ReadView.COMMITTED, 12, 0);
+        String indexKey = new F4Keyspace(CLUSTER).generationIndexKey(STREAM, ReadView.COMMITTED, 12, 0);
         VersionedGenerationZeroIndex index = new VersionedGenerationZeroIndex(
-                indexKey,
-                GenerationZeroIndexEncoding.GENERIC_OFFSET_INDEX_TARGET_RECORD,
-                indexValue,
-                7,
-                sha('a'));
-        GenericCommittedAppendIdentity markerIdentity =
-                new GenericCommittedAppendIdentity(COMMIT_ID);
+                indexKey, GenerationZeroIndexEncoding.GENERIC_OFFSET_INDEX_TARGET_RECORD, indexValue, 7, sha('a'));
+        GenericCommittedAppendIdentity markerIdentity = new GenericCommittedAppendIdentity(COMMIT_ID);
         OxiaKeyspace l0Keys = new OxiaKeyspace(CLUSTER);
         VersionedGenerationZeroMarker marker = new VersionedGenerationZeroMarker(
                 l0Keys.committedAppendKey(STREAM, COMMIT_ID),
@@ -413,9 +376,7 @@ class SourceRetirementPlanBuilderTest {
                 0,
                 12,
                 1,
-                Optional.of(new Checksum(
-                        ChecksumType.SHA256,
-                        encodedTarget.identityChecksumValue())),
+                Optional.of(new Checksum(ChecksumType.SHA256, encodedTarget.identityChecksumValue())),
                 8,
                 sha('b'));
         VersionedGenerationZeroCommit commit = new VersionedGenerationZeroCommit(
@@ -432,8 +393,7 @@ class SourceRetirementPlanBuilderTest {
                 9,
                 sha('c'));
         ObjectSliceReadTarget replacementTarget = replacementTarget();
-        var encodedReplacement = ReadTargetCodecRegistry.phase15().encode(
-                replacementTarget);
+        var encodedReplacement = ReadTargetCodecRegistry.phase15().encode(replacementTarget);
         String publicationId = "p".repeat(52);
         GenerationIndexRecord replacementValue = new GenerationIndexRecord(
                 1,
@@ -466,25 +426,21 @@ class SourceRetirementPlanBuilderTest {
                 "",
                 2,
                 6);
-        String replacementKey = new F4Keyspace(CLUSTER).generationIndexKey(
-                STREAM, ReadView.COMMITTED, 12, 1);
+        String replacementKey = new F4Keyspace(CLUSTER).generationIndexKey(STREAM, ReadView.COMMITTED, 12, 1);
         VersionedGenerationIndex replacementIndex = new VersionedGenerationIndex(
                 replacementKey,
                 replacementValue,
                 replacementValue.metadataVersion(),
-                GenerationIndexDigests.durableValueSha256(
-                        replacementValue.withMetadataVersion(0)));
+                GenerationIndexDigests.durableValueSha256(replacementValue.withMetadataVersion(0)));
         GenerationIndexRecord embeddedReplacement = replacementValue.withMetadataVersion(0);
-        byte[] publicationBytes = new GenerationIndexRecordCodecV1().encode(
-                embeddedReplacement);
+        byte[] publicationBytes = new GenerationIndexRecordCodecV1().encode(embeddedReplacement);
         RecoveryCheckpointPublication publication = new RecoveryCheckpointPublication(
                 1,
                 new PublicationId(publicationId),
                 new OffsetRange(0, 12),
                 ByteBuffer.wrap(publicationBytes),
                 GenerationIndexDigests.canonicalRecordSha256(embeddedReplacement));
-        ObjectKeyHash replacementHash = ObjectKeyHash.from(
-                replacementTarget.objectKey());
+        ObjectKeyHash replacementHash = ObjectKeyHash.from(replacementTarget.objectKey());
         PhysicalObjectRootRecord replacementRootValue = new PhysicalObjectRootRecord(
                 1,
                 replacementHash.value(),
@@ -533,8 +489,7 @@ class SourceRetirementPlanBuilderTest {
                 1,
                 1);
         Checksum checkpointContent = sha('1');
-        ObjectKey checkpointKey = RecoveryCheckpointFormatV1.objectKey(
-                header, checkpointContent);
+        ObjectKey checkpointKey = RecoveryCheckpointFormatV1.objectKey(header, checkpointContent);
         RecoveryCheckpointDirectory directory = new RecoveryCheckpointDirectory(
                 100,
                 Integer.BYTES,
@@ -570,8 +525,8 @@ class SourceRetirementPlanBuilderTest {
                 checkpoint.objectKey().value(),
                 checkpoint.objectKey().value().isEmpty()
                         ? ""
-                        : com.nereusstream.api.ObjectKeyHash.from(
-                                checkpoint.objectKey()).value(),
+                        : com.nereusstream.api.ObjectKeyHash.from(checkpoint.objectKey())
+                                .value(),
                 checkpointLength,
                 "01020304",
                 checkpointContent.value(),
@@ -590,17 +545,14 @@ class SourceRetirementPlanBuilderTest {
                 COMMIT_ID,
                 COMMIT_ID,
                 List.of(reference),
-                RecoveryCheckpointRootDigests.checkpointSetSha256(
-                        List.of(reference)).value(),
+                RecoveryCheckpointRootDigests.checkpointSetSha256(List.of(reference))
+                        .value(),
                 COMMIT_ID,
                 1,
                 20,
                 5);
         VersionedRecoveryCheckpointRoot root = new VersionedRecoveryCheckpointRoot(
-                new F4Keyspace(CLUSTER).recoveryRootKey(STREAM),
-                rootValue,
-                5,
-                sha('d'));
+                new F4Keyspace(CLUSTER).recoveryRootKey(STREAM), rootValue, 5, sha('d'));
         RecoveryCheckpointEntry entry = new RecoveryCheckpointEntry(
                 1,
                 new OffsetRange(0, 12),
@@ -619,21 +571,10 @@ class SourceRetirementPlanBuilderTest {
                 Optional.empty(),
                 Optional.empty());
         Checksum evidence = sha('9');
-        GcReferenceQuery query = GcReferenceQuery.create(
-                GcReferenceQueryKind.REFERENCED_OBJECT,
-                object,
-                List.of(STREAM),
-                evidence);
+        GcReferenceQuery query =
+                GcReferenceQuery.create(GcReferenceQueryKind.REFERENCED_OBJECT, object, List.of(STREAM), evidence);
         GcCandidate candidate = new GcCandidate(
-                "a".repeat(52),
-                object,
-                query,
-                evidence,
-                GcCandidateRootState.ACTIVE_DISCOVERY,
-                3,
-                1,
-                30,
-                30);
+                "a".repeat(52), object, query, evidence, GcCandidateRootState.ACTIVE_DISCOVERY, 3, 1, 30, 30);
         return new Fixture(
                 index,
                 marker,
@@ -648,15 +589,8 @@ class SourceRetirementPlanBuilderTest {
     }
 
     private static GenerationMetadataStore generationStore(
-            Fixture fixture,
-            AtomicInteger rootReads,
-            boolean loseRootOnFinalReload) {
-        return generationStore(
-                fixture,
-                rootReads,
-                loseRootOnFinalReload,
-                new AtomicInteger(),
-                false);
+            Fixture fixture, AtomicInteger rootReads, boolean loseRootOnFinalReload) {
+        return generationStore(fixture, rootReads, loseRootOnFinalReload, new AtomicInteger(), false);
     }
 
     private static GenerationMetadataStore generationStore(
@@ -673,30 +607,25 @@ class SourceRetirementPlanBuilderTest {
                         return objectMethod(proxy, method.getName(), args);
                     }
                     return switch (method.getName()) {
-                        case "scanIndex" -> CompletableFuture.completedFuture(
-                                new GenerationScanPage(
-                                        args[2] == ReadView.COMMITTED
-                                                ? List.of(
-                                                        fixture.index(),
-                                                        fixture.replacementIndex())
-                                                : List.of(),
-                                        Optional.empty()));
+                        case "scanIndex" ->
+                            CompletableFuture.completedFuture(new GenerationScanPage(
+                                    args[2] == ReadView.COMMITTED
+                                            ? List.of(fixture.index(), fixture.replacementIndex())
+                                            : List.of(),
+                                    Optional.empty()));
                         case "getRecoveryRoot" -> {
                             int read = rootReads.incrementAndGet();
                             yield CompletableFuture.completedFuture(
-                                    loseRootOnFinalReload && read > 1
-                                            ? Optional.empty()
-                                            : Optional.of(fixture.root()));
+                                    loseRootOnFinalReload && read > 1 ? Optional.empty() : Optional.of(fixture.root()));
                         }
                         case "getIndex" -> {
                             int read = indexReads.incrementAndGet();
-                            VersionedGenerationIndex value =
-                                    changeIndexOnFinalReload && read > 1
-                                            ? generationWithLifecycle(
-                                                    fixture.replacementIndex(),
-                                                    GenerationLifecycle.QUARANTINED,
-                                                    "target-changed")
-                                            : fixture.replacementIndex();
+                            VersionedGenerationIndex value = changeIndexOnFinalReload && read > 1
+                                    ? generationWithLifecycle(
+                                            fixture.replacementIndex(),
+                                            GenerationLifecycle.QUARANTINED,
+                                            "target-changed")
+                                    : fixture.replacementIndex();
                             yield CompletableFuture.completedFuture(
                                     replacementIdentity(fixture).equals(args[1])
                                             ? Optional.of(value)
@@ -705,8 +634,7 @@ class SourceRetirementPlanBuilderTest {
                         case "getCandidateByKey" -> {
                             String key = (String) args[3];
                             if (fixture.index().key().equals(key)) {
-                                yield CompletableFuture.completedFuture(
-                                        Optional.of(fixture.index()));
+                                yield CompletableFuture.completedFuture(Optional.of(fixture.index()));
                             }
                             yield CompletableFuture.completedFuture(
                                     fixture.replacementIndex().key().equals(key)
@@ -720,9 +648,7 @@ class SourceRetirementPlanBuilderTest {
     }
 
     private static PhysicalObjectMetadataStore physicalStore(
-            Fixture fixture,
-            AtomicInteger rootReads,
-            boolean changeOnFinalReload) {
+            Fixture fixture, AtomicInteger rootReads, boolean changeOnFinalReload) {
         return (PhysicalObjectMetadataStore) Proxy.newProxyInstance(
                 PhysicalObjectMetadataStore.class.getClassLoader(),
                 new Class<?>[] {PhysicalObjectMetadataStore.class},
@@ -733,13 +659,11 @@ class SourceRetirementPlanBuilderTest {
                     return switch (method.getName()) {
                         case "getRoot" -> {
                             int read = rootReads.incrementAndGet();
-                            VersionedPhysicalObjectRoot value =
-                                    changeOnFinalReload && read > 1
-                                            ? markedRoot(fixture.replacementRoot())
-                                            : fixture.replacementRoot();
+                            VersionedPhysicalObjectRoot value = changeOnFinalReload && read > 1
+                                    ? markedRoot(fixture.replacementRoot())
+                                    : fixture.replacementRoot();
                             yield CompletableFuture.completedFuture(
-                                    new ObjectKeyHash(value.value().objectKeyHash())
-                                                    .equals(args[1])
+                                    new ObjectKeyHash(value.value().objectKeyHash()).equals(args[1])
                                             ? Optional.of(value)
                                             : Optional.empty());
                         }
@@ -750,8 +674,7 @@ class SourceRetirementPlanBuilderTest {
     }
 
     private static SourceRetirementMetadataStore sourceStore(
-            Fixture fixture,
-            AtomicReference<VersionedGenerationZeroMarker> marker) {
+            Fixture fixture, AtomicReference<VersionedGenerationZeroMarker> marker) {
         return sourceStore(fixture, marker, Optional.empty());
     }
 
@@ -772,16 +695,20 @@ class SourceRetirementPlanBuilderTest {
                             yield CompletableFuture.completedFuture(
                                     fixture.commit().key().equals(key)
                                             ? Optional.of(fixture.commit())
-                                            : extraCommit.filter(value -> value.key().equals(key)));
+                                            : extraCommit.filter(
+                                                    value -> value.key().equals(key)));
                         }
-                        case "getCommittedMarkerByKey" -> CompletableFuture.completedFuture(
-                                marker.get() != null && marker.get().key().equals(args[1])
-                                        ? Optional.of(marker.get())
-                                        : Optional.empty());
-                        case "getCommittedMarker" -> CompletableFuture.completedFuture(
-                                marker.get() != null && marker.get().identity().equals(args[2])
-                                        ? Optional.of(marker.get())
-                                        : Optional.empty());
+                        case "getCommittedMarkerByKey" ->
+                            CompletableFuture.completedFuture(
+                                    marker.get() != null && marker.get().key().equals(args[1])
+                                            ? Optional.of(marker.get())
+                                            : Optional.empty());
+                        case "getCommittedMarker" ->
+                            CompletableFuture.completedFuture(
+                                    marker.get() != null
+                                                    && marker.get().identity().equals(args[2])
+                                            ? Optional.of(marker.get())
+                                            : Optional.empty());
                         case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
                     };
@@ -797,14 +724,12 @@ class SourceRetirementPlanBuilderTest {
                         return objectMethod(proxy, method.getName(), args);
                     }
                     return switch (method.getName()) {
-                        case "openAndVerify" -> CompletableFuture.completedFuture(
-                                fixture.checkpoint());
-                        case "findCommitCoveringOffset" -> CompletableFuture.completedFuture(
-                                Optional.of(fixture.entry()));
-                        case "scanPublications" -> CompletableFuture.completedFuture(
-                                new RecoveryCheckpointPublicationPage(
-                                        List.of(fixture.publication()),
-                                        OptionalInt.empty()));
+                        case "openAndVerify" -> CompletableFuture.completedFuture(fixture.checkpoint());
+                        case "findCommitCoveringOffset" ->
+                            CompletableFuture.completedFuture(Optional.of(fixture.entry()));
+                        case "scanPublications" ->
+                            CompletableFuture.completedFuture(new RecoveryCheckpointPublicationPage(
+                                    List.of(fixture.publication()), OptionalInt.empty()));
                         default -> throw new UnsupportedOperationException(method.getName());
                     };
                 });
@@ -814,10 +739,7 @@ class SourceRetirementPlanBuilderTest {
         return l0Store(0, new AtomicInteger(), false);
     }
 
-    private static OxiaMetadataStore l0Store(
-            long trimOffset,
-            AtomicInteger reads,
-            boolean changeOnFinalReload) {
+    private static OxiaMetadataStore l0Store(long trimOffset, AtomicInteger reads, boolean changeOnFinalReload) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
@@ -828,11 +750,9 @@ class SourceRetirementPlanBuilderTest {
                     return switch (method.getName()) {
                         case "getStreamSnapshot" -> {
                             int read = reads.incrementAndGet();
-                            long currentTrim = changeOnFinalReload && read > 1
-                                    ? Math.subtractExact(trimOffset, 1)
-                                    : trimOffset;
-                            yield CompletableFuture.completedFuture(
-                                    snapshot(currentTrim));
+                            long currentTrim =
+                                    changeOnFinalReload && read > 1 ? Math.subtractExact(trimOffset, 1) : trimOffset;
+                            yield CompletableFuture.completedFuture(snapshot(currentTrim));
                         }
                         case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
@@ -853,19 +773,13 @@ class SourceRetirementPlanBuilderTest {
                         1,
                         1,
                         version),
-                new CommittedEndOffsetRecord(
-                        STREAM.value(), 12, 12, 1, version),
-                new TrimRecord(
-                        STREAM.value(), trimOffset, "test", 2, version));
+                new CommittedEndOffsetRecord(STREAM.value(), 12, 12, 1, version),
+                new TrimRecord(STREAM.value(), trimOffset, "test", 2, version));
     }
 
     private static GenerationIndexIdentity replacementIdentity(Fixture fixture) {
         GenerationIndexRecord value = fixture.replacementIndex().value();
-        return new GenerationIndexIdentity(
-                STREAM,
-                ReadView.COMMITTED,
-                value.offsetEnd(),
-                value.generation());
+        return new GenerationIndexIdentity(STREAM, ReadView.COMMITTED, value.offsetEnd(), value.generation());
     }
 
     private static Object objectMethod(Object proxy, String name, Object[] args) {
@@ -923,8 +837,7 @@ class SourceRetirementPlanBuilderTest {
                 entryIndex);
     }
 
-    private static VersionedPhysicalObjectRoot markedRoot(
-            VersionedPhysicalObjectRoot source) {
+    private static VersionedPhysicalObjectRoot markedRoot(VersionedPhysicalObjectRoot source) {
         PhysicalObjectRootRecord value = source.value();
         PhysicalObjectRootRecord changed = new PhysicalObjectRootRecord(
                 value.schemaVersion(),
@@ -951,17 +864,11 @@ class SourceRetirementPlanBuilderTest {
                 "",
                 "",
                 Math.addExact(source.metadataVersion(), 1));
-        return new VersionedPhysicalObjectRoot(
-                source.key(),
-                changed,
-                changed.metadataVersion(),
-                sha('6'));
+        return new VersionedPhysicalObjectRoot(source.key(), changed, changed.metadataVersion(), sha('6'));
     }
 
     private static VersionedGenerationIndex generationWithLifecycle(
-            VersionedGenerationIndex source,
-            GenerationLifecycle lifecycle,
-            String reason) {
+            VersionedGenerationIndex source, GenerationLifecycle lifecycle, String reason) {
         GenerationIndexRecord value = source.value();
         long version = Math.addExact(source.metadataVersion(), 1);
         GenerationIndexRecord changed = new GenerationIndexRecord(
@@ -999,13 +906,10 @@ class SourceRetirementPlanBuilderTest {
                 source.key(),
                 changed,
                 version,
-                GenerationIndexDigests.durableValueSha256(
-                        changed.withMetadataVersion(0)));
+                GenerationIndexDigests.durableValueSha256(changed.withMetadataVersion(0)));
     }
 
-    private static StreamCommitTargetRecord withReadTargetIdentity(
-            StreamCommitTargetRecord source,
-            String identity) {
+    private static StreamCommitTargetRecord withReadTargetIdentity(StreamCommitTargetRecord source, String identity) {
         var target = source.readTarget();
         var changedTarget = new com.nereusstream.metadata.oxia.records.ReadTargetRecord(
                 target.targetType(),
@@ -1041,10 +945,7 @@ class SourceRetirementPlanBuilderTest {
     }
 
     private static VersionedGenerationZeroCommit commitWithId(
-            VersionedGenerationZeroCommit source,
-            String commitId,
-            long metadataVersion,
-            Checksum durableDigest) {
+            VersionedGenerationZeroCommit source, String commitId, long metadataVersion, Checksum durableDigest) {
         StreamCommitTargetRecord value = source.canonicalCommit();
         StreamCommitTargetRecord changed = new StreamCommitTargetRecord(
                 value.streamId(),
@@ -1070,8 +971,7 @@ class SourceRetirementPlanBuilderTest {
                 value.maxEventTimeMillis(),
                 value.preparedAtMillis(),
                 value.metadataVersion());
-        byte[] bytes = MetadataRecordCodecFactory.encodeEnvelope(
-                changed, StreamCommitTargetRecord.class);
+        byte[] bytes = MetadataRecordCodecFactory.encodeEnvelope(changed, StreamCommitTargetRecord.class);
         return new VersionedGenerationZeroCommit(
                 new OxiaKeyspace(CLUSTER).streamCommitKey(STREAM, commitId),
                 STREAM,
@@ -1095,8 +995,8 @@ class SourceRetirementPlanBuilderTest {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(
-                            MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException(failure);
         }
@@ -1127,8 +1027,7 @@ class SourceRetirementPlanBuilderTest {
                     candidate);
         }
 
-        private Fixture withReplacementIndex(
-                VersionedGenerationIndex replacement) {
+        private Fixture withReplacementIndex(VersionedGenerationIndex replacement) {
             return new Fixture(
                     index,
                     marker,
@@ -1142,8 +1041,7 @@ class SourceRetirementPlanBuilderTest {
                     candidate);
         }
 
-        private Fixture withReplacementRoot(
-                VersionedPhysicalObjectRoot replacement) {
+        private Fixture withReplacementRoot(VersionedPhysicalObjectRoot replacement) {
             return new Fixture(
                     index,
                     marker,

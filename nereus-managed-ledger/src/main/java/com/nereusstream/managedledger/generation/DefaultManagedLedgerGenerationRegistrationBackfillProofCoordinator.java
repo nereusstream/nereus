@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.generation;
 
 import com.nereusstream.api.ErrorCode;
@@ -37,8 +38,7 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
     private final GenerationProtocolActivationStore activations;
     private final GenerationCapabilityReadinessProvider readinessProvider;
     private final List<ReferenceDomainVersionRecord> requiredDomains;
-    private final ManagedLedgerGenerationReadinessRolloverCoordinator
-            readinessRollover;
+    private final ManagedLedgerGenerationReadinessRolloverCoordinator readinessRollover;
     private final Clock clock;
     private final LongSupplier nanoTime;
 
@@ -53,9 +53,8 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
                 activations,
                 readinessProvider,
                 requiredDomains,
-                (completion, maxConcurrentStreams, timeout, current) ->
-                        CompletableFuture.failedFuture(notReady(
-                                "registration proof cannot advance readiness while deletion is enabled")),
+                (completion, maxConcurrentStreams, timeout, current) -> CompletableFuture.failedFuture(
+                        notReady("registration proof cannot advance readiness while deletion is enabled")),
                 clock,
                 System::nanoTime);
     }
@@ -67,14 +66,7 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
             List<ReferenceDomainVersionRecord> requiredDomains,
             ManagedLedgerGenerationReadinessRolloverCoordinator readinessRollover,
             Clock clock) {
-        this(
-                cluster,
-                activations,
-                readinessProvider,
-                requiredDomains,
-                readinessRollover,
-                clock,
-                System::nanoTime);
+        this(cluster, activations, readinessProvider, requiredDomains, readinessRollover, clock, System::nanoTime);
     }
 
     DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator(
@@ -86,61 +78,44 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
             Clock clock,
             LongSupplier nanoTime) {
         this.cluster = new OxiaKeyspace(cluster).cluster();
-        this.activations = Objects.requireNonNull(
-                activations, "activations");
-        this.readinessProvider = Objects.requireNonNull(
-                readinessProvider, "readinessProvider");
+        this.activations = Objects.requireNonNull(activations, "activations");
+        this.readinessProvider = Objects.requireNonNull(readinessProvider, "readinessProvider");
         this.requiredDomains = canonicalDomains(requiredDomains);
-        this.readinessRollover = Objects.requireNonNull(
-                readinessRollover, "readinessRollover");
+        this.readinessRollover = Objects.requireNonNull(readinessRollover, "readinessRollover");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
     }
 
     @Override
-    public CompletableFuture<Void> complete(
-            GenerationRegistrationBackfillCompletion completion) {
+    public CompletableFuture<Void> complete(GenerationRegistrationBackfillCompletion completion) {
         return complete(completion, 1, Duration.ofHours(1));
     }
 
     @Override
     public CompletableFuture<Void> complete(
-            GenerationRegistrationBackfillCompletion completion,
-            int maxConcurrentStreams,
-            Duration timeout) {
+            GenerationRegistrationBackfillCompletion completion, int maxConcurrentStreams, Duration timeout) {
         final GenerationRegistrationBackfillCompletion exact;
         final Deadline deadline;
         try {
             exact = Objects.requireNonNull(completion, "completion");
             if (exact.failureCount() != 0) {
-                throw notReady(
-                        "registration backfill contains failures");
+                throw notReady("registration backfill contains failures");
             }
             if (maxConcurrentStreams <= 0
-                    || maxConcurrentStreams
-                            > ManagedLedgerPhysicalDeletionActivationRequest
-                                    .MAX_CONCURRENT_STREAMS) {
-                throw new IllegalArgumentException(
-                        "maxConcurrentStreams must be in [1, 1024]");
+                    || maxConcurrentStreams > ManagedLedgerPhysicalDeletionActivationRequest.MAX_CONCURRENT_STREAMS) {
+                throw new IllegalArgumentException("maxConcurrentStreams must be in [1, 1024]");
             }
             deadline = Deadline.start(requireTimeout(timeout), nanoTime);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return deadline
-                .call(readinessProvider::requireGenerationCapabilityReadiness)
+        return deadline.call(readinessProvider::requireGenerationCapabilityReadiness)
                 .thenCompose(current -> {
                     requireExactReadiness(exact.readiness(), current);
                     return deadline.call(() -> activations.getOrCreate(cluster));
                 })
-                .thenCompose(current -> install(
-                        exact,
-                        maxConcurrentStreams,
-                        current,
-                        0,
-                        deadline))
-                .thenCompose(installed -> finalRevalidate(
-                        exact, installed, deadline));
+                .thenCompose(current -> install(exact, maxConcurrentStreams, current, 0, deadline))
+                .thenCompose(installed -> finalRevalidate(exact, installed, deadline));
     }
 
     private CompletableFuture<VersionedGenerationProtocolActivation> install(
@@ -151,103 +126,64 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
             Deadline deadline) {
         deadline.remaining();
         if (attempt >= MAX_CAS_ATTEMPTS) {
-            return CompletableFuture.failedFuture(notReady(
-                    "registration backfill proof CAS retry budget exhausted"));
+            return CompletableFuture.failedFuture(notReady("registration backfill proof CAS retry budget exhausted"));
         }
         GenerationProtocolActivationRecord value = current.value();
         requireDomainSet(value);
         long expectedEpoch = completion.readiness().brokerReadinessEpoch();
-        GenerationBackfillProofRecord proof =
-                value.streamRegistrationBackfill();
-        if (proof.complete()
-                && proof.brokerReadinessEpoch() == expectedEpoch) {
-            if (!proof.coverageSha256()
-                    .equals(completion.coverageSha256().value())) {
-                return CompletableFuture.failedFuture(invariant(
-                        "completed registration backfill has another coverage digest"));
+        GenerationBackfillProofRecord proof = value.streamRegistrationBackfill();
+        if (proof.complete() && proof.brokerReadinessEpoch() == expectedEpoch) {
+            if (!proof.coverageSha256().equals(completion.coverageSha256().value())) {
+                return CompletableFuture.failedFuture(
+                        invariant("completed registration backfill has another coverage digest"));
             }
             return CompletableFuture.completedFuture(current);
         }
-        if (value.physicalDeleteEnabled()
-                || value.cursorSnapshotDeleteEnabled()) {
-            return deadline.callWithRemaining(remaining ->
-                    readinessRollover.rollover(
-                            completion,
-                            maxConcurrentStreams,
-                            remaining,
-                            current));
+        if (value.physicalDeleteEnabled() || value.cursorSnapshotDeleteEnabled()) {
+            return deadline.callWithRemaining(
+                    remaining -> readinessRollover.rollover(completion, maxConcurrentStreams, remaining, current));
         }
 
         long completedAt = Math.max(1, clock.millis());
-        boolean changedEpoch =
-                expectedEpoch != value.brokerCapabilityReadinessEpoch();
-        GenerationBackfillProofRecord replacementProof =
-                new GenerationBackfillProofRecord(
-                        completion.runId(),
-                        expectedEpoch,
-                        completion.coverageSha256().value(),
-                        true,
-                        completedAt);
-        GenerationProtocolActivationRecord replacement =
-                new GenerationProtocolActivationRecord(
-                        value.schemaVersion(),
-                        value.protocolVersion(),
-                        value.lifecycle(),
-                        value.publicationEnabled(),
-                        value.physicalDeleteEnabled(),
-                        value.cursorSnapshotDeleteEnabled(),
-                        expectedEpoch,
-                        value.requiredReferenceDomains(),
-                        replacementProof,
-                        changedEpoch
-                                ? GenerationBackfillProofRecord.incomplete(
-                                        expectedEpoch)
-                                : value.physicalRootBackfill(),
-                        changedEpoch
-                                ? GenerationBackfillProofRecord.incomplete(
-                                        expectedEpoch)
-                                : value.cursorSnapshotBackfill(),
-                        changedEpoch
-                                ? ""
-                                : value.objectStoreCapabilitySha256(),
-                        value.activatingBrokerRunId(),
-                        value.preparedAtMillis(),
-                        value.activatedAtMillis(),
-                        Math.max(value.updatedAtMillis(), completedAt),
-                        0);
-        return deadline.call(() -> activations.compareAndSet(
-                                cluster,
-                                replacement,
-                                current.metadataVersion()))
+        boolean changedEpoch = expectedEpoch != value.brokerCapabilityReadinessEpoch();
+        GenerationBackfillProofRecord replacementProof = new GenerationBackfillProofRecord(
+                completion.runId(), expectedEpoch, completion.coverageSha256().value(), true, completedAt);
+        GenerationProtocolActivationRecord replacement = new GenerationProtocolActivationRecord(
+                value.schemaVersion(),
+                value.protocolVersion(),
+                value.lifecycle(),
+                value.publicationEnabled(),
+                value.physicalDeleteEnabled(),
+                value.cursorSnapshotDeleteEnabled(),
+                expectedEpoch,
+                value.requiredReferenceDomains(),
+                replacementProof,
+                changedEpoch ? GenerationBackfillProofRecord.incomplete(expectedEpoch) : value.physicalRootBackfill(),
+                changedEpoch ? GenerationBackfillProofRecord.incomplete(expectedEpoch) : value.cursorSnapshotBackfill(),
+                changedEpoch ? "" : value.objectStoreCapabilitySha256(),
+                value.activatingBrokerRunId(),
+                value.preparedAtMillis(),
+                value.activatedAtMillis(),
+                Math.max(value.updatedAtMillis(), completedAt),
+                0);
+        return deadline.call(() -> activations.compareAndSet(cluster, replacement, current.metadataVersion()))
                 .handle((updated, failure) -> {
                     if (failure == null) {
                         return CompletableFuture.completedFuture(updated);
                     }
                     Throwable cause = unwrap(failure);
-                    return deadline.call(() -> activations.get(cluster))
-                            .thenCompose(optional -> {
-                                VersionedGenerationProtocolActivation reloaded =
-                                        optional.orElseThrow(() -> notReady(
-                                                "generation activation disappeared after proof CAS"));
-                                requireDomainSet(reloaded.value());
-                                if (sameCoverage(
-                                        reloaded.value(),
-                                        completion)) {
-                                    return CompletableFuture.completedFuture(
-                                            reloaded);
-                                }
-                                if (cause
-                                        instanceof
-                                        F4MetadataConditionFailedException) {
-                                    return install(
-                                            completion,
-                                            maxConcurrentStreams,
-                                            reloaded,
-                                            attempt + 1,
-                                            deadline);
-                                }
-                                return CompletableFuture.failedFuture(cause);
-                            });
+                    return deadline.call(() -> activations.get(cluster)).thenCompose(optional -> {
+                        VersionedGenerationProtocolActivation reloaded = optional.orElseThrow(
+                                () -> notReady("generation activation disappeared after proof CAS"));
+                        requireDomainSet(reloaded.value());
+                        if (sameCoverage(reloaded.value(), completion)) {
+                            return CompletableFuture.completedFuture(reloaded);
+                        }
+                        if (cause instanceof F4MetadataConditionFailedException) {
+                            return install(completion, maxConcurrentStreams, reloaded, attempt + 1, deadline);
+                        }
+                        return CompletableFuture.failedFuture(cause);
+                    });
                 })
                 .thenCompose(Function.identity());
     }
@@ -257,103 +193,74 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
             VersionedGenerationProtocolActivation installed,
             Deadline deadline) {
         deadline.remaining();
-        Optional<GenerationCapabilityReadiness> readiness =
-                readinessProvider.currentGenerationCapabilityReadiness();
+        Optional<GenerationCapabilityReadiness> readiness = readinessProvider.currentGenerationCapabilityReadiness();
         if (readiness.isEmpty()) {
-            return CompletableFuture.failedFuture(notReady(
-                    "generation readiness was invalidated after proof CAS"));
+            return CompletableFuture.failedFuture(notReady("generation readiness was invalidated after proof CAS"));
         }
         try {
-            requireExactReadiness(
-                    expected.readiness(), readiness.orElseThrow());
+            requireExactReadiness(expected.readiness(), readiness.orElseThrow());
             requireDomainSet(installed.value());
             if (!sameCoverage(installed.value(), expected)) {
-                throw notReady(
-                        "installed registration backfill proof does not match completion");
+                throw notReady("installed registration backfill proof does not match completion");
             }
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return deadline.call(() -> activations.get(cluster))
-                .thenAccept(optional -> {
-                    VersionedGenerationProtocolActivation current =
-                            optional.orElseThrow(() -> notReady(
-                                    "generation activation disappeared after proof completion"));
-                    requireDomainSet(current.value());
-                    if (!sameCoverage(current.value(), expected)) {
-                        throw notReady(
-                                "registration backfill proof changed after completion");
-                    }
-                    requireExactReadiness(
-                            expected.readiness(),
-                            readinessProvider
-                                    .currentGenerationCapabilityReadiness()
-                                    .orElseThrow(() -> notReady(
-                                            "generation readiness was invalidated during final proof read")));
-                });
+        return deadline.call(() -> activations.get(cluster)).thenAccept(optional -> {
+            VersionedGenerationProtocolActivation current =
+                    optional.orElseThrow(() -> notReady("generation activation disappeared after proof completion"));
+            requireDomainSet(current.value());
+            if (!sameCoverage(current.value(), expected)) {
+                throw notReady("registration backfill proof changed after completion");
+            }
+            requireExactReadiness(
+                    expected.readiness(),
+                    readinessProvider
+                            .currentGenerationCapabilityReadiness()
+                            .orElseThrow(
+                                    () -> notReady("generation readiness was invalidated during final proof read")));
+        });
     }
 
-    private void requireDomainSet(
-            GenerationProtocolActivationRecord activation) {
-        if (!activation.requiredReferenceDomains()
-                .equals(requiredDomains)) {
-            throw invariant(
-                    "durable generation reference-domain set differs from the local runtime");
+    private void requireDomainSet(GenerationProtocolActivationRecord activation) {
+        if (!activation.requiredReferenceDomains().equals(requiredDomains)) {
+            throw invariant("durable generation reference-domain set differs from the local runtime");
         }
     }
 
     private static boolean sameCoverage(
-            GenerationProtocolActivationRecord activation,
-            GenerationRegistrationBackfillCompletion completion) {
-        GenerationBackfillProofRecord proof =
-                activation.streamRegistrationBackfill();
+            GenerationProtocolActivationRecord activation, GenerationRegistrationBackfillCompletion completion) {
+        GenerationBackfillProofRecord proof = activation.streamRegistrationBackfill();
         return activation.brokerCapabilityReadinessEpoch()
                         == completion.readiness().brokerReadinessEpoch()
                 && proof.complete()
-                && proof.brokerReadinessEpoch()
-                        == completion.readiness().brokerReadinessEpoch()
-                && proof.coverageSha256()
-                        .equals(completion.coverageSha256().value());
+                && proof.brokerReadinessEpoch() == completion.readiness().brokerReadinessEpoch()
+                && proof.coverageSha256().equals(completion.coverageSha256().value());
     }
 
     private static void requireExactReadiness(
-            GenerationCapabilityReadiness expected,
-            GenerationCapabilityReadiness actual) {
-        if (!Objects.requireNonNull(expected, "expected")
-                .equals(Objects.requireNonNull(actual, "actual"))) {
-            throw notReady(
-                    "broker generation readiness changed around registration proof");
+            GenerationCapabilityReadiness expected, GenerationCapabilityReadiness actual) {
+        if (!Objects.requireNonNull(expected, "expected").equals(Objects.requireNonNull(actual, "actual"))) {
+            throw notReady("broker generation readiness changed around registration proof");
         }
     }
 
     private static Duration requireTimeout(Duration value) {
         Objects.requireNonNull(value, "timeout");
-        if (value.isZero()
-                || value.isNegative()
-                || value.toMillis() <= 0) {
-            throw new IllegalArgumentException(
-                    "timeout must be positive and millisecond-representable");
+        if (value.isZero() || value.isNegative() || value.toMillis() <= 0) {
+            throw new IllegalArgumentException("timeout must be positive and millisecond-representable");
         }
         return value;
     }
 
-    private static List<ReferenceDomainVersionRecord> canonicalDomains(
-            List<ReferenceDomainVersionRecord> supplied) {
-        List<ReferenceDomainVersionRecord> domains = List.copyOf(
-                Objects.requireNonNull(supplied, "requiredDomains"));
-        if (domains.isEmpty()
-                || domains.size()
-                        > GenerationProtocolActivationRecord
-                                .MAX_REFERENCE_DOMAINS) {
-            throw new IllegalArgumentException(
-                    "requiredDomains must be non-empty and bounded");
+    private static List<ReferenceDomainVersionRecord> canonicalDomains(List<ReferenceDomainVersionRecord> supplied) {
+        List<ReferenceDomainVersionRecord> domains = List.copyOf(Objects.requireNonNull(supplied, "requiredDomains"));
+        if (domains.isEmpty() || domains.size() > GenerationProtocolActivationRecord.MAX_REFERENCE_DOMAINS) {
+            throw new IllegalArgumentException("requiredDomains must be non-empty and bounded");
         }
         for (int index = 1; index < domains.size(); index++) {
-            if (domains.get(index - 1)
-                            .compareTo(domains.get(index))
-                    >= 0) {
-                throw new IllegalArgumentException(
-                        "requiredDomains must be strictly sorted and unique");
+            if (domains.get(index - 1).compareTo(domains.get(index)) >= 0) {
+                throw new IllegalArgumentException("requiredDomains must be strictly sorted and unique");
             }
         }
         return domains;
@@ -361,25 +268,18 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while (current instanceof CompletionException
-                && current.getCause() != null) {
+        while (current instanceof CompletionException && current.getCause() != null) {
             current = current.getCause();
         }
         return current;
     }
 
     private static NereusException notReady(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_CONDITION_FAILED,
-                true,
-                message);
+        return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static final class Deadline {
@@ -391,53 +291,39 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
             this.nanoTime = nanoTime;
         }
 
-        private static Deadline start(
-                Duration timeout, LongSupplier nanoTime) {
+        private static Deadline start(Duration timeout, LongSupplier nanoTime) {
             Objects.requireNonNull(timeout, "timeout");
             Objects.requireNonNull(nanoTime, "nanoTime");
             try {
-                return new Deadline(
-                        Math.addExact(
-                                nanoTime.getAsLong(), timeout.toNanos()),
-                        nanoTime);
+                return new Deadline(Math.addExact(nanoTime.getAsLong(), timeout.toNanos()), nanoTime);
             } catch (ArithmeticException failure) {
-                throw new IllegalArgumentException(
-                        "registration proof deadline overflows",
-                        failure);
+                throw new IllegalArgumentException("registration proof deadline overflows", failure);
             }
         }
 
         private Duration remaining() {
             long nanos = deadlineNanos - nanoTime.getAsLong();
             if (nanos <= 0) {
-                throw new NereusException(
-                        ErrorCode.TIMEOUT,
-                        true,
-                        "registration proof timed out");
+                throw new NereusException(ErrorCode.TIMEOUT, true, "registration proof timed out");
             }
-            long millis = Math.max(
-                    1, (nanos + 999_999L) / 1_000_000L);
+            long millis = Math.max(1, (nanos + 999_999L) / 1_000_000L);
             return Duration.ofMillis(millis);
         }
 
-        private <T> CompletableFuture<T> call(
-                Supplier<CompletableFuture<T>> operation) {
+        private <T> CompletableFuture<T> call(Supplier<CompletableFuture<T>> operation) {
             return callWithRemaining(ignored -> operation.get());
         }
 
-        private <T> CompletableFuture<T> callWithRemaining(
-                Function<Duration, CompletableFuture<T>> operation) {
+        private <T> CompletableFuture<T> callWithRemaining(Function<Duration, CompletableFuture<T>> operation) {
             final Duration bounded;
             final CompletableFuture<T> future;
             try {
                 bounded = remaining();
-                future = Objects.requireNonNull(
-                        operation.apply(bounded), "operation future");
+                future = Objects.requireNonNull(operation.apply(bounded), "operation future");
             } catch (Throwable failure) {
                 return CompletableFuture.failedFuture(failure);
             }
-            return future.orTimeout(
-                    bounded.toMillis(), TimeUnit.MILLISECONDS);
+            return future.orTimeout(bounded.toMillis(), TimeUnit.MILLISECONDS);
         }
     }
 }

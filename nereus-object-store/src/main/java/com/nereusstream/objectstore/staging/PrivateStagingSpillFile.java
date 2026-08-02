@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.staging;
 
 import com.nereusstream.api.Checksum;
@@ -21,7 +22,9 @@ import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.Objects;
 
-/** Owner-only, checksum-verified temporary run file sharing the process staging-byte permit. */
+/**
+ * Owner-only, checksum-verified temporary run file sharing the process staging-byte permit.
+ */
 public final class PrivateStagingSpillFile implements ManagedStagingFile {
     private enum State {
         OPEN,
@@ -47,16 +50,11 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
     PrivateStagingSpillFile(StagingFileManager manager, Path path) throws IOException {
         this.manager = Objects.requireNonNull(manager, "manager");
         this.path = Objects.requireNonNull(path, "path");
-        this.writer = FileChannel.open(
-                path,
-                StandardOpenOption.READ,
-                StandardOpenOption.WRITE,
-                LinkOption.NOFOLLOW_LINKS);
+        this.writer =
+                FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
         try {
             BasicFileAttributes attributes = attributes();
-            if (!attributes.isRegularFile()
-                    || attributes.isSymbolicLink()
-                    || attributes.fileKey() == null) {
+            if (!attributes.isRegularFile() || attributes.isSymbolicLink() || attributes.fileKey() == null) {
                 throw new IOException("spill file identity is unavailable");
             }
             this.openedFileKey = attributes.fileKey();
@@ -92,8 +90,7 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
                 throw new IOException("spill file identity or length changed before seal");
             }
             sealedFileKey = openedFileKey;
-            sealedSha256 = new Checksum(
-                    ChecksumType.SHA256, HexFormat.of().formatHex(sha256.digest()));
+            sealedSha256 = new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(sha256.digest()));
             state = State.SEALED;
             return this;
         } catch (IOException | RuntimeException failure) {
@@ -126,7 +123,9 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
         return activeReader;
     }
 
-    /** Opens one identity-checked random reader for fixed-width checksum-protected run records. */
+    /**
+     * Opens one identity-checked random reader for fixed-width checksum-protected run records.
+     */
     public synchronized RandomAccessReader openRandomAccessReader() {
         requireState(State.SEALED, "spill file is not sealed");
         if (activeReader != null || activeRandomReader != null) {
@@ -211,8 +210,7 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
                     || attributes.isSymbolicLink()
                     || attributes.size() != writtenBytes
                     || !sealedFileKey.equals(attributes.fileKey())) {
-                throw new NereusException(
-                        ErrorCode.OBJECT_READ_FAILED, false, "sealed spill file identity changed");
+                throw new NereusException(ErrorCode.OBJECT_READ_FAILED, false, "sealed spill file identity changed");
             }
         } catch (IOException failure) {
             throw new NereusException(
@@ -381,7 +379,9 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
         }
     }
 
-    /** Single-owner bounded random reader. Each caller-owned record must carry its own checksum. */
+    /**
+     * Single-owner bounded random reader. Each caller-owned record must carry its own checksum.
+     */
     public final class RandomAccessReader implements AutoCloseable {
         private final long length;
         private boolean closed;

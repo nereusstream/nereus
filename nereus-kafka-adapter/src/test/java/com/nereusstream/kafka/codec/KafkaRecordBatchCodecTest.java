@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.kafka.common.compress.Compression;
@@ -80,8 +80,7 @@ class KafkaRecordBatchCodecTest {
                 RecordBatch.NO_PARTITION_LEADER_EPOCH);
         builder.append(new SimpleRecord(5_000, "group".getBytes(), "metadata".getBytes()));
 
-        KafkaRecordBatch batch =
-                codec.decode(KafkaRecordBatchTestSupport.bytes(builder.build()));
+        KafkaRecordBatch batch = codec.decode(KafkaRecordBatchTestSupport.bytes(builder.build()));
 
         assertThat(batch.producerId()).isEqualTo(RecordBatch.NO_PRODUCER_ID);
         assertThat(batch.producerEpoch()).isEqualTo(RecordBatch.NO_PRODUCER_EPOCH);

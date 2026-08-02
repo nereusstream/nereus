@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import com.nereusstream.api.ErrorCode;
@@ -31,9 +32,10 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-/** Stable, source-index-verified implementation of the Phase 4 logical-retention formula. */
-public final class DefaultRetentionCandidatePlanner
-        implements RetentionCandidatePlanner {
+/**
+ * Stable, source-index-verified implementation of the Phase 4 logical-retention formula.
+ */
+public final class DefaultRetentionCandidatePlanner implements RetentionCandidatePlanner {
     static final int MAX_STABLE_ATTEMPTS = 4;
 
     private final PlanningAuthority authority;
@@ -63,10 +65,7 @@ public final class DefaultRetentionCandidatePlanner
     }
 
     DefaultRetentionCandidatePlanner(
-            PlanningAuthority authority,
-            CursorOwnerSession owner,
-            NereusRetentionConfig config,
-            Clock clock) {
+            PlanningAuthority authority, CursorOwnerSession owner, NereusRetentionConfig config, Clock clock) {
         this.authority = Objects.requireNonNull(authority, "authority");
         this.owner = Objects.requireNonNull(owner, "owner");
         this.config = Objects.requireNonNull(config, "config");
@@ -74,28 +73,21 @@ public final class DefaultRetentionCandidatePlanner
     }
 
     @Override
-    public CompletableFuture<Optional<RetentionCandidate>> plan(
-            StreamId streamId,
-            RetentionPolicySnapshot policy) {
+    public CompletableFuture<Optional<RetentionCandidate>> plan(StreamId streamId, RetentionPolicySnapshot policy) {
         final StreamId exactStream;
         final RetentionPolicySnapshot exactPolicy;
         try {
-            exactStream = requireOwnerStream(
-                    Objects.requireNonNull(streamId, "streamId"));
+            exactStream = requireOwnerStream(Objects.requireNonNull(streamId, "streamId"));
             exactPolicy = Objects.requireNonNull(policy, "policy");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
         return planAttempt(exactStream, exactPolicy, 0)
-                .orTimeout(
-                        config.operationTimeout().toMillis(),
-                        TimeUnit.MILLISECONDS);
+                .orTimeout(config.operationTimeout().toMillis(), TimeUnit.MILLISECONDS);
     }
 
     @Override
-    public CompletableFuture<Void> revalidate(
-            RetentionCandidate candidate,
-            RetentionPolicySnapshot policy) {
+    public CompletableFuture<Void> revalidate(RetentionCandidate candidate, RetentionPolicySnapshot policy) {
         final RetentionCandidate exactCandidate;
         final RetentionPolicySnapshot exactPolicy;
         try {
@@ -109,35 +101,28 @@ public final class DefaultRetentionCandidatePlanner
             return CompletableFuture.failedFuture(failure);
         }
         return revalidateAttempt(exactCandidate, exactPolicy, 0)
-                .orTimeout(
-                        config.operationTimeout().toMillis(),
-                        TimeUnit.MILLISECONDS);
+                .orTimeout(config.operationTimeout().toMillis(), TimeUnit.MILLISECONDS);
     }
 
     private CompletableFuture<Optional<RetentionCandidate>> planAttempt(
-            StreamId streamId,
-            RetentionPolicySnapshot policy,
-            int attempt) {
+            StreamId streamId, RetentionPolicySnapshot policy, int attempt) {
         if (attempt >= MAX_STABLE_ATTEMPTS) {
-            return CompletableFuture.failedFuture(condition(
-                    "retention authorities did not stabilize after four attempts"));
+            return CompletableFuture.failedFuture(
+                    condition("retention authorities did not stabilize after four attempts"));
         }
         long plannedAtMillis = nonNegativeNow();
         return capture(streamId, policy, plannedAtMillis)
                 .thenCompose(first -> {
                     if (first.isEmpty()) {
-                        return CompletableFuture.completedFuture(
-                                Optional.<RetentionCandidate>empty());
+                        return CompletableFuture.completedFuture(Optional.<RetentionCandidate>empty());
                     }
                     RetentionCandidate expected = first.orElseThrow();
-                    return capture(streamId, policy, plannedAtMillis)
-                            .thenApply(second -> {
-                                if (second.isEmpty()
-                                        || !expected.equals(second.orElseThrow())) {
-                                    throw new AuthorityDriftException();
-                                }
-                                return Optional.of(expected);
-                            });
+                    return capture(streamId, policy, plannedAtMillis).thenApply(second -> {
+                        if (second.isEmpty() || !expected.equals(second.orElseThrow())) {
+                            throw new AuthorityDriftException();
+                        }
+                        return Optional.of(expected);
+                    });
                 })
                 .handle((value, failure) -> {
                     Throwable cause = failure == null ? null : unwrap(failure);
@@ -145,8 +130,7 @@ public final class DefaultRetentionCandidatePlanner
                         return planAttempt(streamId, policy, attempt + 1);
                     }
                     if (cause != null) {
-                        return CompletableFuture
-                                .<Optional<RetentionCandidate>>failedFuture(cause);
+                        return CompletableFuture.<Optional<RetentionCandidate>>failedFuture(cause);
                     }
                     return CompletableFuture.completedFuture(value);
                 })
@@ -154,27 +138,20 @@ public final class DefaultRetentionCandidatePlanner
     }
 
     private CompletableFuture<Void> revalidateAttempt(
-            RetentionCandidate candidate,
-            RetentionPolicySnapshot policy,
-            int attempt) {
+            RetentionCandidate candidate, RetentionPolicySnapshot policy, int attempt) {
         if (attempt >= MAX_STABLE_ATTEMPTS) {
-            return CompletableFuture.failedFuture(condition(
-                    "retention authorities did not stabilize during final revalidation"));
+            return CompletableFuture.failedFuture(
+                    condition("retention authorities did not stabilize during final revalidation"));
         }
         return capture(candidate.streamId(), policy, candidate.plannedAtMillis())
                 .thenCompose(first -> {
-                    if (first.isEmpty()
-                            || !candidate.equals(first.orElseThrow())) {
-                        return CompletableFuture.failedFuture(condition(
-                                "retention candidate authority changed before trim"));
+                    if (first.isEmpty() || !candidate.equals(first.orElseThrow())) {
+                        return CompletableFuture.failedFuture(
+                                condition("retention candidate authority changed before trim"));
                     }
-                    return capture(
-                                    candidate.streamId(),
-                                    policy,
-                                    candidate.plannedAtMillis())
+                    return capture(candidate.streamId(), policy, candidate.plannedAtMillis())
                             .thenAccept(second -> {
-                                if (second.isEmpty()
-                                        || !candidate.equals(second.orElseThrow())) {
+                                if (second.isEmpty() || !candidate.equals(second.orElseThrow())) {
                                     throw new AuthorityDriftException();
                                 }
                             });
@@ -193,24 +170,15 @@ public final class DefaultRetentionCandidatePlanner
     }
 
     private CompletableFuture<Optional<RetentionCandidate>> capture(
-            StreamId streamId,
-            RetentionPolicySnapshot suppliedPolicy,
-            long plannedAtMillis) {
-        return authority.policy(streamId)
-                .thenCompose(policy -> {
-                    if (!policy.equals(suppliedPolicy)) {
-                        return CompletableFuture.failedFuture(condition(
-                                "retention policy snapshot changed during planning"));
-                    }
-                    return authority.head(streamId)
-                            .thenCompose(head -> authority.cursor(owner)
-                                    .thenCompose(cursor -> captureStats(
-                                            streamId,
-                                            head,
-                                            cursor,
-                                            policy,
-                                            plannedAtMillis)));
-                });
+            StreamId streamId, RetentionPolicySnapshot suppliedPolicy, long plannedAtMillis) {
+        return authority.policy(streamId).thenCompose(policy -> {
+            if (!policy.equals(suppliedPolicy)) {
+                return CompletableFuture.failedFuture(condition("retention policy snapshot changed during planning"));
+            }
+            return authority.head(streamId).thenCompose(head -> authority
+                    .cursor(owner)
+                    .thenCompose(cursor -> captureStats(streamId, head, cursor, policy, plannedAtMillis)));
+        });
     }
 
     private CompletableFuture<Optional<RetentionCandidate>> captureStats(
@@ -222,8 +190,7 @@ public final class DefaultRetentionCandidatePlanner
         validateAuthority(streamId, head, cursor);
         long currentTrim = head.trim().trimOffset();
         long committedEnd = head.committedEnd().committedEndOffset();
-        long cursorCut = Math.min(
-                cursor.protectedFloorOffset(), committedEnd);
+        long cursorCut = Math.min(cursor.protectedFloorOffset(), committedEnd);
         if (cursor.lifecycle() != CursorRetentionView.Lifecycle.ACTIVE
                 || cursor.lastCompletedTrimOffset() != currentTrim
                 || cursorCut <= currentTrim
@@ -231,40 +198,17 @@ public final class DefaultRetentionCandidatePlanner
             return CompletableFuture.completedFuture(Optional.empty());
         }
         if (policy.disablesPostConsumeRetention()) {
-            return finishCapture(
-                    streamId,
-                    head,
-                    cursor,
-                    policy,
-                    plannedAtMillis,
-                    cursorCut,
-                    List.of());
+            return finishCapture(streamId, head, cursor, policy, plannedAtMillis, cursorCut, List.of());
         }
         long scanStart = Math.addExact(currentTrim, 1);
-        return scanAllStats(
-                        streamId,
-                        scanStart,
-                        cursorCut,
-                        Optional.empty(),
-                        new ArrayList<>(),
-                        null)
+        return scanAllStats(streamId, scanStart, cursorCut, Optional.empty(), new ArrayList<>(), null)
                 .thenCompose(scanned -> {
                     if (!scanned.complete()) {
                         return CompletableFuture.completedFuture(Optional.empty());
                     }
-                    return verifySources(
-                                    streamId,
-                                    scanned.values(),
-                                    0,
-                                    new ArrayList<>())
+                    return verifySources(streamId, scanned.values(), 0, new ArrayList<>())
                             .thenCompose(verified -> finishCapture(
-                                    streamId,
-                                    head,
-                                    cursor,
-                                    policy,
-                                    plannedAtMillis,
-                                    cursorCut,
-                                    verified));
+                                    streamId, head, cursor, policy, plannedAtMillis, cursorCut, verified));
                 });
     }
 
@@ -276,56 +220,48 @@ public final class DefaultRetentionCandidatePlanner
             long plannedAtMillis,
             long cursorCut,
             List<VersionedRangeRetentionStats> verified) {
-        CandidateCuts cuts = cuts(
-                initialHead,
-                initialPolicy,
-                cursorCut,
-                plannedAtMillis,
-                verified);
-        if (cuts.candidateTrimOffset()
-                <= initialHead.trim().trimOffset()) {
+        CandidateCuts cuts = cuts(initialHead, initialPolicy, cursorCut, plannedAtMillis, verified);
+        if (cuts.candidateTrimOffset() <= initialHead.trim().trimOffset()) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
         List<RetentionStatsToken> tokens = verified.stream()
                 .map(DefaultRetentionCandidatePlanner::token)
                 .sorted()
                 .toList();
-        return authority.policy(streamId)
-                .thenCompose(policy -> authority.head(streamId)
-                        .thenCompose(head -> authority.cursor(owner)
-                                .thenApply(cursor -> {
-                                    if (!initialPolicy.equals(policy)
-                                            || !initialHead
-                                                    .sameVersionedAuthority(head)
-                                            || !initialCursor.equals(cursor)) {
-                                        throw new AuthorityDriftException();
-                                    }
-                                    var evidence = RetentionEvidenceDigests.candidate(
-                                            streamId,
-                                            head,
-                                            cursor,
-                                            policy,
-                                            cursorCut,
-                                            cuts.timeCut(),
-                                            cuts.sizeCut(),
-                                            cuts.candidateTrimOffset(),
-                                            tokens,
-                                            plannedAtMillis);
-                                    return Optional.of(new RetentionCandidate(
-                                            streamId,
-                                            head.trim().trimOffset(),
-                                            head.committedEnd().committedEndOffset(),
-                                            cursorCut,
-                                            cuts.timeCut(),
-                                            cuts.sizeCut(),
-                                            cuts.candidateTrimOffset(),
-                                            head.metadataVersion(),
-                                            cursor.metadataVersion(),
-                                            policy.policyVersion(),
-                                            tokens,
-                                            evidence,
-                                            plannedAtMillis));
-                                })));
+        return authority.policy(streamId).thenCompose(policy -> authority
+                .head(streamId)
+                .thenCompose(head -> authority.cursor(owner).thenApply(cursor -> {
+                    if (!initialPolicy.equals(policy)
+                            || !initialHead.sameVersionedAuthority(head)
+                            || !initialCursor.equals(cursor)) {
+                        throw new AuthorityDriftException();
+                    }
+                    var evidence = RetentionEvidenceDigests.candidate(
+                            streamId,
+                            head,
+                            cursor,
+                            policy,
+                            cursorCut,
+                            cuts.timeCut(),
+                            cuts.sizeCut(),
+                            cuts.candidateTrimOffset(),
+                            tokens,
+                            plannedAtMillis);
+                    return Optional.of(new RetentionCandidate(
+                            streamId,
+                            head.trim().trimOffset(),
+                            head.committedEnd().committedEndOffset(),
+                            cursorCut,
+                            cuts.timeCut(),
+                            cuts.sizeCut(),
+                            cuts.candidateTrimOffset(),
+                            head.metadataVersion(),
+                            cursor.metadataVersion(),
+                            policy.policyVersion(),
+                            tokens,
+                            evidence,
+                            plannedAtMillis));
+                })));
     }
 
     private CompletableFuture<StatsScan> scanAllStats(
@@ -337,42 +273,29 @@ public final class DefaultRetentionCandidatePlanner
             String previousKey) {
         int remaining = RetentionCandidate.MAX_STATS_TOKENS - values.size();
         if (remaining <= 0 && continuation.isPresent()) {
-            return CompletableFuture.completedFuture(
-                    new StatsScan(List.copyOf(values), false));
+            return CompletableFuture.completedFuture(new StatsScan(List.copyOf(values), false));
         }
         int limit = Math.min(config.statsScanPageSize(), Math.max(1, remaining));
-        return authority.scanStats(
-                        streamId,
-                        minOffsetEndInclusive,
-                        maxOffsetEndInclusive,
-                        continuation,
-                        limit)
+        return authority
+                .scanStats(streamId, minOffsetEndInclusive, maxOffsetEndInclusive, continuation, limit)
                 .thenCompose(page -> {
                     String key = previousKey;
                     for (VersionedRangeRetentionStats value : page.values()) {
                         if (key != null && key.compareTo(value.key()) >= 0) {
-                            return CompletableFuture.failedFuture(invariant(
-                                    "retention stats scan is not strictly ordered across pages"));
+                            return CompletableFuture.failedFuture(
+                                    invariant("retention stats scan is not strictly ordered across pages"));
                         }
                         key = value.key();
-                        if (values.size()
-                                == RetentionCandidate.MAX_STATS_TOKENS) {
-                            return CompletableFuture.completedFuture(
-                                    new StatsScan(List.copyOf(values), false));
+                        if (values.size() == RetentionCandidate.MAX_STATS_TOKENS) {
+                            return CompletableFuture.completedFuture(new StatsScan(List.copyOf(values), false));
                         }
                         values.add(value);
                     }
                     if (page.continuation().isEmpty()) {
-                        return CompletableFuture.completedFuture(
-                                new StatsScan(List.copyOf(values), true));
+                        return CompletableFuture.completedFuture(new StatsScan(List.copyOf(values), true));
                     }
                     return scanAllStats(
-                            streamId,
-                            minOffsetEndInclusive,
-                            maxOffsetEndInclusive,
-                            page.continuation(),
-                            values,
-                            key);
+                            streamId, minOffsetEndInclusive, maxOffsetEndInclusive, page.continuation(), values, key);
                 });
     }
 
@@ -387,21 +310,14 @@ public final class DefaultRetentionCandidatePlanner
         VersionedRangeRetentionStats stats = values.get(index);
         RangeRetentionStatsRecord value = stats.value();
         if (!value.streamId().equals(streamId.value())) {
-            return CompletableFuture.failedFuture(invariant(
-                    "retention stats scan returned another stream"));
+            return CompletableFuture.failedFuture(invariant("retention stats scan returned another stream"));
         }
-        return authority.sourceIndex(streamId, value.sourceIndexKey())
-                .thenCompose(source -> {
-                    if (source.isPresent()
-                            && sourceMatches(stats, source.orElseThrow())) {
-                        verified.add(stats);
-                    }
-                    return verifySources(
-                            streamId,
-                            values,
-                            index + 1,
-                            verified);
-                });
+        return authority.sourceIndex(streamId, value.sourceIndexKey()).thenCompose(source -> {
+            if (source.isPresent() && sourceMatches(stats, source.orElseThrow())) {
+                verified.add(stats);
+            }
+            return verifySources(streamId, values, index + 1, verified);
+        });
     }
 
     private static CandidateCuts cuts(
@@ -420,8 +336,7 @@ public final class DefaultRetentionCandidatePlanner
             timeCut = trim;
             long contiguous = trim;
             List<VersionedRangeRetentionStats> byBoundary = verified.stream()
-                    .sorted(Comparator
-                            .comparingLong((VersionedRangeRetentionStats value) ->
+                    .sorted(Comparator.comparingLong((VersionedRangeRetentionStats value) ->
                                     value.value().offsetEnd())
                             .thenComparing(VersionedRangeRetentionStats::key))
                     .toList();
@@ -429,10 +344,7 @@ public final class DefaultRetentionCandidatePlanner
                 RangeRetentionStatsRecord value = wrapper.value();
                 if (value.offsetStart() != contiguous
                         || value.offsetEnd() > cursorCut
-                        || !expired(
-                                plannedAtMillis,
-                                value.maxPublishTimeMillis(),
-                                policy.retentionTimeMillis())) {
+                        || !expired(plannedAtMillis, value.maxPublishTimeMillis(), policy.retentionTimeMillis())) {
                     break;
                 }
                 contiguous = value.offsetEnd();
@@ -452,8 +364,7 @@ public final class DefaultRetentionCandidatePlanner
                 RangeRetentionStatsRecord value = wrapper.value();
                 if (value.offsetEnd() <= cursorCut
                         && value.cumulativeSizeAtEnd() <= total
-                        && total - value.cumulativeSizeAtEnd()
-                                >= policy.retentionSizeBytes()) {
+                        && total - value.cumulativeSizeAtEnd() >= policy.retentionSizeBytes()) {
                     sizeCut = Math.max(sizeCut, value.offsetEnd());
                 }
             }
@@ -462,33 +373,23 @@ public final class DefaultRetentionCandidatePlanner
         return new CandidateCuts(timeCut, sizeCut, candidate);
     }
 
-    private static boolean expired(
-            long nowMillis,
-            long maxPublishTimeMillis,
-            long retentionTimeMillis) {
-        long age = nowMillis >= maxPublishTimeMillis
-                ? nowMillis - maxPublishTimeMillis
-                : 0;
+    private static boolean expired(long nowMillis, long maxPublishTimeMillis, long retentionTimeMillis) {
+        long age = nowMillis >= maxPublishTimeMillis ? nowMillis - maxPublishTimeMillis : 0;
         return age > retentionTimeMillis;
     }
 
-    private static boolean sourceMatches(
-            VersionedRangeRetentionStats stats,
-            VersionedGenerationCandidate source) {
+    private static boolean sourceMatches(VersionedRangeRetentionStats stats, VersionedGenerationCandidate source) {
         RangeRetentionStatsRecord expected = stats.value();
         if (!source.key().equals(expected.sourceIndexKey())
-                || source.metadataVersion()
-                        != expected.sourceIndexMetadataVersion()
-                || !source.durableValueSha256().value()
-                        .equals(expected.sourceIndexIdentitySha256())) {
+                || source.metadataVersion() != expected.sourceIndexMetadataVersion()
+                || !source.durableValueSha256().value().equals(expected.sourceIndexIdentitySha256())) {
             return false;
         }
         if (source instanceof VersionedGenerationZeroIndex zero) {
             var value = zero.value();
             long cumulativeStart;
             try {
-                cumulativeStart = Math.subtractExact(
-                        value.cumulativeSize(), value.logicalBytes());
+                cumulativeStart = Math.subtractExact(value.cumulativeSize(), value.logicalBytes());
             } catch (ArithmeticException failure) {
                 return false;
             }
@@ -509,25 +410,18 @@ public final class DefaultRetentionCandidatePlanner
                 && value.offsetEnd() >= expected.offsetEnd()
                 && value.firstCommitVersion() <= expected.commitVersion()
                 && value.lastCommitVersion() >= expected.commitVersion()
-                && value.cumulativeSizeAtStart()
-                        <= expected.cumulativeSizeAtStart()
-                && value.cumulativeSizeAtEnd()
-                        >= expected.cumulativeSizeAtEnd();
+                && value.cumulativeSizeAtStart() <= expected.cumulativeSizeAtStart()
+                && value.cumulativeSizeAtEnd() >= expected.cumulativeSizeAtEnd();
     }
 
-    private void validateAuthority(
-            StreamId streamId,
-            StreamMetadataSnapshot head,
-            CursorRetentionView cursor) {
+    private void validateAuthority(StreamId streamId, StreamMetadataSnapshot head, CursorRetentionView cursor) {
         Objects.requireNonNull(head, "head");
         Objects.requireNonNull(cursor, "cursor");
         if (!head.metadata().streamId().equals(streamId.value())
                 || !cursor.ledger().equals(owner.ledger())
                 || !cursor.ownerSessionId().equals(owner.ownerSessionId())
-                || !owner.ledger().projection().streamId()
-                        .equals(streamId.value())) {
-            throw invariant(
-                    "retention head, owner session, and projection do not identify one stream");
+                || !owner.ledger().projection().streamId().equals(streamId.value())) {
+            throw invariant("retention head, owner session, and projection do not identify one stream");
         }
         String state = head.metadata().state();
         if (!state.equals("ACTIVE") && !state.equals("SEALED")) {
@@ -536,10 +430,8 @@ public final class DefaultRetentionCandidatePlanner
     }
 
     private StreamId requireOwnerStream(StreamId streamId) {
-        if (!owner.ledger().projection().streamId()
-                .equals(streamId.value())) {
-            throw new IllegalArgumentException(
-                    "retention planner stream does not match its writable owner projection");
+        if (!owner.ledger().projection().streamId().equals(streamId.value())) {
+            throw new IllegalArgumentException("retention planner stream does not match its writable owner projection");
         }
         return streamId;
     }
@@ -548,32 +440,21 @@ public final class DefaultRetentionCandidatePlanner
         return Math.max(0, clock.millis());
     }
 
-    private static RetentionStatsToken token(
-            VersionedRangeRetentionStats value) {
-        return new RetentionStatsToken(
-                value.key(),
-                value.metadataVersion(),
-                value.durableValueSha256());
+    private static RetentionStatsToken token(VersionedRangeRetentionStats value) {
+        return new RetentionStatsToken(value.key(), value.metadataVersion(), value.durableValueSha256());
     }
 
     private static NereusException condition(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_CONDITION_FAILED,
-                true,
-                message);
+        return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = Objects.requireNonNull(failure, "failure");
-        while ((current instanceof CompletionException
-                        || current instanceof ExecutionException)
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -602,9 +483,7 @@ public final class DefaultRetentionCandidatePlanner
                 Optional<F4ScanToken> continuation,
                 int limit);
 
-        CompletableFuture<Optional<VersionedGenerationCandidate>> sourceIndex(
-                StreamId streamId,
-                String key);
+        CompletableFuture<Optional<VersionedGenerationCandidate>> sourceIndex(StreamId streamId, String key);
     }
 
     private record StoreBackedPlanningAuthority(
@@ -615,22 +494,18 @@ public final class DefaultRetentionCandidatePlanner
             RetentionPolicySnapshotProvider policies)
             implements PlanningAuthority {
         @Override
-        public CompletableFuture<RetentionPolicySnapshot> policy(
-                StreamId streamId) {
+        public CompletableFuture<RetentionPolicySnapshot> policy(StreamId streamId) {
             return Objects.requireNonNull(
-                    policies.snapshot(streamId),
-                    "retention policy provider returned null future");
+                    policies.snapshot(streamId), "retention policy provider returned null future");
         }
 
         @Override
-        public CompletableFuture<StreamMetadataSnapshot> head(
-                StreamId streamId) {
+        public CompletableFuture<StreamMetadataSnapshot> head(StreamId streamId) {
             return l0.getStreamSnapshot(cluster, streamId);
         }
 
         @Override
-        public CompletableFuture<CursorRetentionView> cursor(
-                CursorOwnerSession owner) {
+        public CompletableFuture<CursorRetentionView> cursor(CursorOwnerSession owner) {
             return cursors.retentionView(owner);
         }
 
@@ -642,38 +517,24 @@ public final class DefaultRetentionCandidatePlanner
                 Optional<F4ScanToken> continuation,
                 int limit) {
             return generations.scanRangeRetentionStats(
-                    cluster,
-                    streamId,
-                    minOffsetEndInclusive,
-                    maxOffsetEndInclusive,
-                    continuation,
-                    limit);
+                    cluster, streamId, minOffsetEndInclusive, maxOffsetEndInclusive, continuation, limit);
         }
 
         @Override
-        public CompletableFuture<Optional<VersionedGenerationCandidate>>
-                sourceIndex(StreamId streamId, String key) {
-            return generations.getCandidateByKey(
-                    cluster, streamId, ReadView.COMMITTED, key);
+        public CompletableFuture<Optional<VersionedGenerationCandidate>> sourceIndex(StreamId streamId, String key) {
+            return generations.getCandidateByKey(cluster, streamId, ReadView.COMMITTED, key);
         }
     }
 
-    private record StatsScan(
-            List<VersionedRangeRetentionStats> values,
-            boolean complete) {
+    private record StatsScan(List<VersionedRangeRetentionStats> values, boolean complete) {
         private StatsScan {
             values = List.copyOf(values);
         }
     }
 
-    private record CandidateCuts(
-            long timeCut,
-            long sizeCut,
-            long candidateTrimOffset) {
-    }
+    private record CandidateCuts(long timeCut, long sizeCut, long candidateTrimOffset) {}
 
-    private static final class AuthorityDriftException
-            extends RuntimeException {
+    private static final class AuthorityDriftException extends RuntimeException {
         private AuthorityDriftException() {
             super("retention authority changed during one planning attempt");
         }

@@ -14,7 +14,9 @@
 
 package com.nereusstream.metadata.oxia;
 
-/** Typed create/version/delete condition failure for Phase 4 metadata. */
+/**
+ * Typed create/version/delete condition failure for Phase 4 metadata.
+ */
 public final class F4MetadataConditionFailedException extends RuntimeException {
     public F4MetadataConditionFailedException(String message) {
         super(message);

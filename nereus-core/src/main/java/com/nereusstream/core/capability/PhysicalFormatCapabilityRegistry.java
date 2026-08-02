@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.capability;
 
 import com.nereusstream.api.Checksum;
@@ -22,7 +23,9 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Immutable exact-format admission registry and canonical broker capability digest. */
+/**
+ * Immutable exact-format admission registry and canonical broker capability digest.
+ */
 public final class PhysicalFormatCapabilityRegistry {
     private final Map<ReadTargetReaderKey, PhysicalFormatCapability> capabilities;
     private final Checksum digestSha256;
@@ -33,9 +36,7 @@ public final class PhysicalFormatCapabilityRegistry {
             this.capabilities = capabilities.stream()
                     .map(value -> Objects.requireNonNull(value, "capability"))
                     .collect(Collectors.toUnmodifiableMap(
-                            PhysicalFormatCapability::readerKey,
-                            Function.identity(),
-                            (left, right) -> {
+                            PhysicalFormatCapability::readerKey, Function.identity(), (left, right) -> {
                                 throw new IllegalArgumentException(
                                         "duplicate exact physical format capability: " + left.readerKey());
                             }));
@@ -49,21 +50,18 @@ public final class PhysicalFormatCapabilityRegistry {
         return digestSha256;
     }
 
-    public PhysicalFormatCapability requireReadable(
-            ReadTarget target,
-            ReadView view,
-            PayloadFormat payloadFormat) {
+    public PhysicalFormatCapability requireReadable(ReadTarget target, ReadView view, PayloadFormat payloadFormat) {
         return require(ReadTargetReaderKey.from(target), view, payloadFormat, false);
     }
 
     public PhysicalFormatCapability requireWritable(
-            ReadTargetReaderKey key,
-            ReadView view,
-            PayloadFormat payloadFormat) {
+            ReadTargetReaderKey key, ReadView view, PayloadFormat payloadFormat) {
         return require(key, view, payloadFormat, true);
     }
 
-    /** Fails admission unless every exact required capability is present with at least the same access bits. */
+    /**
+     * Fails admission unless every exact required capability is present with at least the same access bits.
+     */
     public void requireSupersetOf(PhysicalFormatCapabilityRegistry required) {
         Objects.requireNonNull(required, "required");
         for (PhysicalFormatCapability expected : required.capabilities.values()) {
@@ -83,10 +81,7 @@ public final class PhysicalFormatCapabilityRegistry {
     }
 
     private PhysicalFormatCapability require(
-            ReadTargetReaderKey key,
-            ReadView view,
-            PayloadFormat payloadFormat,
-            boolean write) {
+            ReadTargetReaderKey key, ReadView view, PayloadFormat payloadFormat, boolean write) {
         PhysicalFormatCapability capability = capabilities.get(Objects.requireNonNull(key, "key"));
         if (capability == null
                 || capability.readView() != Objects.requireNonNull(view, "view")
@@ -109,7 +104,8 @@ public final class PhysicalFormatCapabilityRegistry {
                 .sorted(Comparator.naturalOrder())
                 .toList();
         update(digest, "nereus-physical-format-capabilities-v1");
-        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(identities.size()).array());
+        digest.update(
+                ByteBuffer.allocate(Integer.BYTES).putInt(identities.size()).array());
         identities.forEach(value -> update(digest, value));
         return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest()));
     }

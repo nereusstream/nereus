@@ -1,13 +1,15 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
 import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
 import java.util.ArrayList;
 
-/** Closed field-order codec for one epoch-scoped Kafka broker capability. */
-public final class KafkaBrokerCapabilityRecordCodecV1
-        extends AbstractF4RecordCodecV1<KafkaBrokerCapabilityRecord> {
+/**
+ * Closed field-order codec for one epoch-scoped Kafka broker capability.
+ */
+public final class KafkaBrokerCapabilityRecordCodecV1 extends AbstractF4RecordCodecV1<KafkaBrokerCapabilityRecord> {
     public KafkaBrokerCapabilityRecordCodecV1() {
         super(KafkaBrokerCapabilityRecord.class);
     }
@@ -83,8 +85,7 @@ public final class KafkaBrokerCapabilityRecordCodecV1
             for (int index = 0; index < profileCount; index++) {
                 profiles.add(reader.readString("supportedStorageProfile"));
             }
-            byte[] configCompatibilitySha256 = reader.readFixedBytes(
-                    "configCompatibilitySha256", 32);
+            byte[] configCompatibilitySha256 = reader.readFixedBytes("configCompatibilitySha256", 32);
             byte[] codeCapabilitySha256 = reader.readFixedBytes("codeCapabilitySha256", 32);
             byte[] providerScopeSha256 = reader.readFixedBytes("providerScopeSha256", 32);
             long startedAtMillis = reader.readLong("startedAtMillis");

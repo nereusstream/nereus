@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.metadata.oxia.BookKeeperLedgerMetadataStore;
 import com.nereusstream.metadata.oxia.BookKeeperScanToken;
 import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
-import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
 import java.time.Duration;
 import java.util.List;
@@ -39,10 +39,7 @@ public final class BookKeeperLedgerRetentionScanner {
                     Duration,
                     CompletableFuture<BookKeeperRetentionEvaluation>>
             retentionEvaluation;
-    private final BiFunction<
-                    BookKeeperLedgerRetirementCandidate,
-                    Duration,
-                    CompletableFuture<BookKeeperLedgerGcResult>>
+    private final BiFunction<BookKeeperLedgerRetirementCandidate, Duration, CompletableFuture<BookKeeperLedgerGcResult>>
             mark;
     private final BiFunction<
                     BookKeeperVersionedValue<BookKeeperLedgerRootRecord>,
@@ -91,11 +88,7 @@ public final class BookKeeperLedgerRetentionScanner {
                             Duration,
                             CompletableFuture<BookKeeperRetentionEvaluation>>
                     retentionEvaluation,
-            BiFunction<
-                            BookKeeperLedgerRetirementCandidate,
-                            Duration,
-                            CompletableFuture<BookKeeperLedgerGcResult>>
-                    mark,
+            BiFunction<BookKeeperLedgerRetirementCandidate, Duration, CompletableFuture<BookKeeperLedgerGcResult>> mark,
             BiFunction<
                             BookKeeperVersionedValue<BookKeeperLedgerRootRecord>,
                             Duration,
@@ -105,8 +98,8 @@ public final class BookKeeperLedgerRetentionScanner {
         this.configuration = Objects.requireNonNull(configuration, "configuration");
         this.gcConfiguration = Objects.requireNonNull(gcConfiguration, "gcConfiguration");
         gcConfiguration.validateAgainst(configuration);
-        this.ledgerIdNamespaceSha256 = BookKeeperWalConfiguration.sha256(
-                ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256");
+        this.ledgerIdNamespaceSha256 =
+                BookKeeperWalConfiguration.sha256(ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.materializationTrigger = Objects.requireNonNull(materializationTrigger, "materializationTrigger");
         this.referenceRetirement = Objects.requireNonNull(referenceRetirement, "referenceRetirement");
@@ -117,42 +110,32 @@ public final class BookKeeperLedgerRetentionScanner {
 
     public CompletableFuture<BookKeeperLedgerRetentionScanResult> scanOnce() {
         if (!gcConfiguration.enabled() || gcConfiguration.dryRun()) {
-            return CompletableFuture.completedFuture(new BookKeeperLedgerRetentionScanResult(
-                    false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            return CompletableFuture.completedFuture(
+                    new BookKeeperLedgerRetentionScanResult(false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         }
         Accumulator accumulator = new Accumulator();
-        return scanShard(0, Optional.empty(), accumulator)
-                .thenApply(ignored -> accumulator.result());
+        return scanShard(0, Optional.empty(), accumulator).thenApply(ignored -> accumulator.result());
     }
 
     private CompletableFuture<Void> scanShard(
-            int shard,
-            Optional<BookKeeperScanToken> continuation,
-            Accumulator accumulator) {
+            int shard, Optional<BookKeeperScanToken> continuation, Accumulator accumulator) {
         if (shard >= ROOT_SHARDS) {
             return CompletableFuture.completedFuture(null);
         }
-        BookKeeperOperationDeadline deadline =
-                new BookKeeperOperationDeadline(configuration.operationTimeout());
+        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(configuration.operationTimeout());
         return deadline.bound(metadata.scanRoots(
-                        cluster,
-                        shard,
-                        continuation,
-                        Math.min(configuration.retentionPageSize(), 1_024)))
-                .thenCompose(page -> processPage(page.values(), 0, accumulator)
-                        .thenCompose(ignored -> {
-                            if (page.continuation().isPresent()) {
-                                return scanShard(shard, page.continuation(), accumulator);
-                            }
-                            accumulator.shardsScanned++;
-                            return scanShard(shard + 1, Optional.empty(), accumulator);
-                        }));
+                        cluster, shard, continuation, Math.min(configuration.retentionPageSize(), 1_024)))
+                .thenCompose(page -> processPage(page.values(), 0, accumulator).thenCompose(ignored -> {
+                    if (page.continuation().isPresent()) {
+                        return scanShard(shard, page.continuation(), accumulator);
+                    }
+                    accumulator.shardsScanned++;
+                    return scanShard(shard + 1, Optional.empty(), accumulator);
+                }));
     }
 
     private CompletableFuture<Void> processPage(
-            List<BookKeeperVersionedValue<BookKeeperLedgerRootRecord>> roots,
-            int index,
-            Accumulator accumulator) {
+            List<BookKeeperVersionedValue<BookKeeperLedgerRootRecord>> roots, int index, Accumulator accumulator) {
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (int current = index; current < roots.size(); current++) {
             BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root = roots.get(current);
@@ -162,18 +145,18 @@ public final class BookKeeperLedgerRetentionScanner {
     }
 
     private CompletableFuture<Void> processRoot(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            Accumulator accumulator) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, Accumulator accumulator) {
         accumulator.rootsScanned++;
         if (!matchesBinding(root.value())) {
             return CompletableFuture.completedFuture(null);
         }
         accumulator.matchingRoots++;
-        CompletableFuture<Void> processed = switch (root.value().lifecycle()) {
-            case SEALED -> processSealed(root, accumulator);
-            case MARKED, DELETING -> processInFlight(root, accumulator);
-            default -> CompletableFuture.completedFuture(null);
-        };
+        CompletableFuture<Void> processed =
+                switch (root.value().lifecycle()) {
+                    case SEALED -> processSealed(root, accumulator);
+                    case MARKED, DELETING -> processInFlight(root, accumulator);
+                    default -> CompletableFuture.completedFuture(null);
+                };
         return processed.handle((ignored, failure) -> {
             if (failure != null) {
                 accumulator.rootsFailed++;
@@ -183,17 +166,15 @@ public final class BookKeeperLedgerRetentionScanner {
     }
 
     private CompletableFuture<Void> processSealed(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            Accumulator accumulator) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, Accumulator accumulator) {
         accumulator.sealedRoots++;
         CompletableFuture<Void> trigger = accumulator.materializationAttempted
                 ? CompletableFuture.completedFuture(null)
                 : triggerMaterialization(root, accumulator);
-        return trigger.thenCompose(ignored -> referenceRetirement
-                        .apply(root, configuration.operationTimeout()))
+        return trigger.thenCompose(ignored -> referenceRetirement.apply(root, configuration.operationTimeout()))
                 .thenCompose(retired -> {
-                    accumulator.protectionsRetired = Math.addExact(
-                            accumulator.protectionsRetired, retired.newlyRetiredProtections());
+                    accumulator.protectionsRetired =
+                            Math.addExact(accumulator.protectionsRetired, retired.newlyRetiredProtections());
                     return retentionEvaluation.apply(root, configuration.operationTimeout());
                 })
                 .thenCompose(evaluation -> {
@@ -201,19 +182,17 @@ public final class BookKeeperLedgerRetentionScanner {
                         accumulator.rootsBlocked++;
                         return CompletableFuture.completedFuture(null);
                     }
-                    return mark.apply(
-                                    evaluation.candidate().orElseThrow(),
-                                    configuration.operationTimeout())
+                    return mark.apply(evaluation.candidate().orElseThrow(), configuration.operationTimeout())
                             .thenAccept(result -> account(result, accumulator));
                 });
     }
 
     private CompletableFuture<Void> triggerMaterialization(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            Accumulator accumulator) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, Accumulator accumulator) {
         accumulator.materializationAttempted = true;
         accumulator.materializationTriggers++;
-        return materializationTrigger.apply(root, configuration.operationTimeout())
+        return materializationTrigger
+                .apply(root, configuration.operationTimeout())
                 .handle((ignored, failure) -> {
                     if (failure != null) {
                         accumulator.materializationTriggerFailures++;
@@ -223,8 +202,7 @@ public final class BookKeeperLedgerRetentionScanner {
     }
 
     private CompletableFuture<Void> processInFlight(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            Accumulator accumulator) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, Accumulator accumulator) {
         accumulator.inFlightRoots++;
         return converge.apply(root, configuration.operationTimeout())
                 .thenAccept(result -> account(result, accumulator));
@@ -238,9 +216,7 @@ public final class BookKeeperLedgerRetentionScanner {
                 && root.ledgerIdNamespaceSha256().equals(ledgerIdNamespaceSha256);
     }
 
-    private static void account(
-            BookKeeperLedgerGcResult result,
-            Accumulator accumulator) {
+    private static void account(BookKeeperLedgerGcResult result, Accumulator accumulator) {
         switch (result.action()) {
             case BLOCKED -> accumulator.rootsBlocked++;
             case MARKED -> accumulator.rootsMarked++;

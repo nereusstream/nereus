@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -7,7 +8,9 @@ import com.nereusstream.api.PublicationId;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-/** One canonical committed lossless generation embedded in an NRC1 publication table. */
+/**
+ * One canonical committed lossless generation embedded in an NRC1 publication table.
+ */
 public record RecoveryCheckpointPublication(
         long generation,
         PublicationId publicationId,
@@ -24,10 +27,8 @@ public record RecoveryCheckpointPublication(
             throw new IllegalArgumentException("publication coverage cannot be empty");
         }
         canonicalGenerationIndexRecord = RecoveryCheckpointValidation.immutableRecordBytes(
-                canonicalGenerationIndexRecord,
-                generationIndexRecordSha256,
-                "canonicalGenerationIndexRecord");
-        generationIndexRecordSha256 = RecoveryCheckpointValidation.requireSha256(
-                generationIndexRecordSha256, "generationIndexRecordSha256");
+                canonicalGenerationIndexRecord, generationIndexRecordSha256, "canonicalGenerationIndexRecord");
+        generationIndexRecordSha256 =
+                RecoveryCheckpointValidation.requireSha256(generationIndexRecordSha256, "generationIndexRecordSha256");
     }
 }

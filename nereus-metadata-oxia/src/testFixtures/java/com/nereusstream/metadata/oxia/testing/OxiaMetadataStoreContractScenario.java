@@ -28,11 +28,11 @@ import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
-import com.nereusstream.metadata.oxia.CommitSliceRequest;
-import com.nereusstream.metadata.oxia.CommitSliceResult;
 import com.nereusstream.metadata.oxia.AppendRecoveryAnchor;
 import com.nereusstream.metadata.oxia.AppendRecoveryCommitEncoding;
 import com.nereusstream.metadata.oxia.AppendRecoveryTailPage;
+import com.nereusstream.metadata.oxia.CommitSliceRequest;
+import com.nereusstream.metadata.oxia.CommitSliceResult;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
@@ -44,80 +44,94 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Shared fake/real operation-level contract used by M7 gates. */
+/**
+ * Shared fake/real operation-level contract used by M7 gates.
+ */
 public final class OxiaMetadataStoreContractScenario {
-    private OxiaMetadataStoreContractScenario() {
-    }
+    private OxiaMetadataStoreContractScenario() {}
 
     public static ContractResult run(OxiaMetadataStore store, String cluster) {
         String suffix = Integer.toUnsignedString(cluster.hashCode(), 36);
         StreamName name = new StreamName("contract-" + suffix);
         StreamId streamId = new StreamId(store.createOrGetStream(
-                cluster,
-                name,
-                new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of("contract", "m7")))
-                .join().streamId());
+                        cluster,
+                        name,
+                        new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of("contract", "m7")))
+                .join()
+                .streamId());
         StreamId replayedId = new StreamId(store.createOrGetStream(
-                cluster,
-                name,
-                new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
-                .join().streamId());
+                        cluster, name, new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                .join()
+                .streamId());
         require(streamId.equals(replayedId), "create-or-get must be deterministic");
 
         AppendSessionRecord acquiredSession = store.acquireAppendSession(
-                cluster,
-                streamId,
-                new AppendSessionOptions("contract-writer", Duration.ofSeconds(30), false)).join();
+                        cluster, streamId, new AppendSessionOptions("contract-writer", Duration.ofSeconds(30), false))
+                .join();
         AppendSession capturedSession = appendSession(streamId, acquiredSession);
         store.revalidateAppendSession(cluster, capturedSession).join();
         AppendSessionRecord session = store.renewAppendSession(
-                cluster,
-                streamId,
-                acquiredSession.writerId(),
-                acquiredSession.epoch(),
-                acquiredSession.fencingToken(),
-                Duration.ofSeconds(30)).join();
+                        cluster,
+                        streamId,
+                        acquiredSession.writerId(),
+                        acquiredSession.epoch(),
+                        acquiredSession.fencingToken(),
+                        Duration.ofSeconds(30))
+                .join();
         store.revalidateAppendSession(cluster, capturedSession).join();
         CommitSliceRequest request = request(streamId, session, suffix);
         store.putObjectManifest(cluster, manifest(request)).join();
         CommitSliceResult committed = store.commitStreamSlice(cluster, request).join();
         CommitSliceResult replay = store.commitStreamSlice(cluster, request).join();
         require(committed.equals(replay), "same physical slice replay must return the original commit");
-        require(store.scanOffsetIndex(cluster, streamId, 0, 10).join().size() == 1,
+        require(
+                store.scanOffsetIndex(cluster, streamId, 0, 10).join().size() == 1,
                 "successful commit must materialize one offset index");
-        require(store.repairObjectReferences(cluster, request.objectId()).join().visibleSlices().size() == 1,
+        require(
+                store.repairObjectReferences(cluster, request.objectId())
+                                .join()
+                                .visibleSlices()
+                                .size()
+                        == 1,
                 "reference repair must find the reachable commit");
         AppendRecoveryTailPage recoveryTail = store.readAppendRecoveryTail(
-                cluster,
-                streamId,
-                AppendRecoveryAnchor.genesis(streamId),
-                Optional.empty(),
-                1).join();
-        require(recoveryTail.anchorReached()
+                        cluster, streamId, AppendRecoveryAnchor.genesis(streamId), Optional.empty(), 1)
+                .join();
+        require(
+                recoveryTail.anchorReached()
                         && recoveryTail.continuation().isEmpty()
                         && recoveryTail.commitsNewestFirst().size() == 1,
                 "anchor-aware recovery walk must bridge the legacy live tail to genesis");
-        require(recoveryTail.commitsNewestFirst().get(0).sourceEncoding()
-                        == AppendRecoveryCommitEncoding.LEGACY_STREAM_COMMIT_V1
-                        && recoveryTail.commitsNewestFirst().get(0).canonicalCommit().metadataVersion() == 0,
+        require(
+                recoveryTail.commitsNewestFirst().get(0).sourceEncoding()
+                                == AppendRecoveryCommitEncoding.LEGACY_STREAM_COMMIT_V1
+                        && recoveryTail
+                                        .commitsNewestFirst()
+                                        .get(0)
+                                        .canonicalCommit()
+                                        .metadataVersion()
+                                == 0,
                 "legacy recovery evidence must be canonicalized as a generic NRC1 envelope");
         store.updateTrim(cluster, streamId, 1, "contract").join();
-        require(store.getTrim(cluster, streamId).join().trimOffset() == 1,
+        require(
+                store.getTrim(cluster, streamId).join().trimOffset() == 1,
                 "trim must persist the requested low-watermark");
-        require(store.getCommittedEndOffset(cluster, streamId).join().committedEndOffset() == 1,
+        require(
+                store.getCommittedEndOffset(cluster, streamId).join().committedEndOffset() == 1,
                 "trim must not change committed end");
-        StreamMetadataSnapshot snapshot = store.getStreamSnapshot(cluster, streamId).join();
-        require(snapshot.trim().trimOffset() == 1 && snapshot.committedEnd().committedEndOffset() == 1,
+        StreamMetadataSnapshot snapshot =
+                store.getStreamSnapshot(cluster, streamId).join();
+        require(
+                snapshot.trim().trimOffset() == 1 && snapshot.committedEnd().committedEndOffset() == 1,
                 "stream snapshot must contain trim and committed end from one head");
-        require(snapshot.metadata().metadataVersion() == snapshot.committedEnd().metadataVersion()
+        require(
+                snapshot.metadata().metadataVersion() == snapshot.committedEnd().metadataVersion()
                         && snapshot.metadataVersion() == snapshot.trim().metadataVersion(),
                 "stream snapshot views must share one head version");
         return new ContractResult(streamId, request.objectId(), committed.commitVersion());
     }
 
-    private static AppendSession appendSession(
-            StreamId streamId,
-            AppendSessionRecord record) {
+    private static AppendSession appendSession(StreamId streamId, AppendSessionRecord record) {
         return new AppendSession(
                 streamId,
                 record.writerId(),
@@ -127,10 +141,7 @@ public final class OxiaMetadataStoreContractScenario {
                 record.expiresAtMillis());
     }
 
-    private static CommitSliceRequest request(
-            StreamId streamId,
-            AppendSessionRecord session,
-            String suffix) {
+    private static CommitSliceRequest request(StreamId streamId, AppendSessionRecord session, String suffix) {
         ObjectId objectId = new ObjectId("contract-object-" + suffix);
         ObjectKey objectKey = new ObjectKey("contract-object-" + suffix + "-key");
         return new CommitSliceRequest(
@@ -215,6 +226,5 @@ public final class OxiaMetadataStoreContractScenario {
         }
     }
 
-    public record ContractResult(StreamId streamId, ObjectId objectId, long commitVersion) {
-    }
+    public record ContractResult(StreamId streamId, ObjectId objectId, long commitVersion) {}
 }

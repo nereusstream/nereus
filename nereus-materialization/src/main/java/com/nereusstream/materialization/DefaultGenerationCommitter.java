@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -42,7 +43,6 @@ import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
-
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -139,8 +139,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             GenerationMetadataStore generationStore,
             PhysicalObjectMetadataStore physicalStore,
             ObjectProtectionManager protectionManager,
-            MaterializationSourceProtectionRegistry
-                    sourceProtectionAdapters,
+            MaterializationSourceProtectionRegistry sourceProtectionAdapters,
             GenerationProtocolActivationGuard activationGuard,
             MaterializationOutputVerifier outputVerifier,
             MaterializationStreamAuthorityMode authorityMode,
@@ -188,12 +187,9 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 scheduler,
                 clock,
                 authorityMode,
-                new MaterializationSourceProtectionRegistry(
-                        List.of(
-                                new ObjectMaterializationSourceProtectionAdapter(
-                                        new MetadataPhysicalObjectIdentityResolver(
-                                                cluster, l0Store, physicalStore),
-                                        protectionManager))));
+                new MaterializationSourceProtectionRegistry(List.of(new ObjectMaterializationSourceProtectionAdapter(
+                        new MetadataPhysicalObjectIdentityResolver(cluster, l0Store, physicalStore),
+                        protectionManager))));
     }
 
     public DefaultGenerationCommitter(
@@ -221,12 +217,9 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 scheduler,
                 clock,
                 MaterializationStreamAuthorityMode.PROJECTION_REQUIRED,
-                new MaterializationSourceProtectionRegistry(
-                        List.of(
-                                new ObjectMaterializationSourceProtectionAdapter(
-                                        new MetadataPhysicalObjectIdentityResolver(
-                                                cluster, l0Store, physicalStore),
-                                        protectionManager))));
+                new MaterializationSourceProtectionRegistry(List.of(new ObjectMaterializationSourceProtectionAdapter(
+                        new MetadataPhysicalObjectIdentityResolver(cluster, l0Store, physicalStore),
+                        protectionManager))));
     }
 
     public DefaultGenerationCommitter(
@@ -255,12 +248,9 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 scheduler,
                 clock,
                 authorityMode,
-                new MaterializationSourceProtectionRegistry(
-                        List.of(
-                                new ObjectMaterializationSourceProtectionAdapter(
-                                        new MetadataPhysicalObjectIdentityResolver(
-                                                cluster, l0Store, physicalStore),
-                                        protectionManager))));
+                new MaterializationSourceProtectionRegistry(List.of(new ObjectMaterializationSourceProtectionAdapter(
+                        new MetadataPhysicalObjectIdentityResolver(cluster, l0Store, physicalStore),
+                        protectionManager))));
     }
 
     private DefaultGenerationCommitter(
@@ -290,33 +280,26 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
         this.operationTimeout = requirePositive(operationTimeout, "operationTimeout");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.sourceProtectionAdapters =
-                Objects.requireNonNull(sourceProtectionAdapters, "sourceProtectionAdapters");
-        this.taskProtectionReconciler =
-                new DefaultMaterializationTaskProtectionReconciler(
-                        this.cluster,
-                        new MaterializationTaskStore(
-                                this.cluster, this.generationStore, this.clock),
-                        this.generationStore,
-                        new MetadataPhysicalObjectIdentityResolver(
-                                this.cluster, this.l0Store, this.physicalStore),
-                        this.protectionManager,
-                        this.sourceProtectionAdapters,
-                        this.operationTimeout,
-                        this.scheduler);
+        this.sourceProtectionAdapters = Objects.requireNonNull(sourceProtectionAdapters, "sourceProtectionAdapters");
+        this.taskProtectionReconciler = new DefaultMaterializationTaskProtectionReconciler(
+                this.cluster,
+                new MaterializationTaskStore(this.cluster, this.generationStore, this.clock),
+                this.generationStore,
+                new MetadataPhysicalObjectIdentityResolver(this.cluster, this.l0Store, this.physicalStore),
+                this.protectionManager,
+                this.sourceProtectionAdapters,
+                this.operationTimeout,
+                this.scheduler);
     }
 
     @Override
-    public CompletableFuture<GenerationCommitResult> publish(
-            MaterializationTask task, MaterializationOutput output) {
+    public CompletableFuture<GenerationCommitResult> publish(MaterializationTask task, MaterializationOutput output) {
         return publish(task, output, MaterializationTaskMutationGuard.noOp());
     }
 
     @Override
     public CompletableFuture<GenerationCommitResult> publish(
-            MaterializationTask task,
-            MaterializationOutput output,
-            MaterializationTaskMutationGuard authorityGuard) {
+            MaterializationTask task, MaterializationOutput output, MaterializationTaskMutationGuard authorityGuard) {
         try {
             return new PublicationOperation(
                             Objects.requireNonNull(task, "task"),
@@ -347,51 +330,29 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
 
         private CompletableFuture<GenerationCommitResult> run() {
             return revalidateExternalAuthority("admit generation publication")
-                    .thenCompose(
-                            ignored -> verifyOutput("verify output before publication admission"))
+                    .thenCompose(ignored -> verifyOutput("verify output before publication admission"))
                     .thenCompose(ignored -> admit())
-                    .thenCompose(
-                            admission ->
-                                    loadTask()
-                                            .thenCompose(
-                                                    current -> freezePublication(current, null, 0))
-                                            .thenCompose(current -> attachGeneration(current, 0))
-                                            .thenCompose(
-                                                    current ->
-                                                            continuePublication(
-                                                                    current, admission)));
+                    .thenCompose(admission -> loadTask()
+                            .thenCompose(current -> freezePublication(current, null, 0))
+                            .thenCompose(current -> attachGeneration(current, 0))
+                            .thenCompose(current -> continuePublication(current, admission)));
         }
 
         private CompletableFuture<Admission> admit() {
             return deadline.bound(
                             () -> generationStore.getStreamRegistration(cluster, task.streamId()),
                             "load materialization stream registration")
-                    .thenCompose(
-                            registration ->
-                                    loadSnapshot()
-                                            .thenApply(
-                                                    snapshot ->
-                                                            validateAuthority(
-                                                                    registration, snapshot)))
-                    .thenCompose(
-                            subject ->
-                                    deadline.bound(
-                                                    () ->
-                                                            activationGuard.requireReady(
-                                                                    operationFor(task.view()),
-                                                                    subject.subject(),
-                                                                    false),
-                                                    "admit generation publication")
-                                            .thenApply(
-                                                    proof ->
-                                                            new Admission(
-                                                                    subject.profile(), proof)));
+                    .thenCompose(registration ->
+                            loadSnapshot().thenApply(snapshot -> validateAuthority(registration, snapshot)))
+                    .thenCompose(subject -> deadline.bound(
+                                    () -> activationGuard.requireReady(
+                                            operationFor(task.view()), subject.subject(), false),
+                                    "admit generation publication")
+                            .thenApply(proof -> new Admission(subject.profile(), proof)));
         }
 
         private CompletableFuture<VersionedMaterializationTask> freezePublication(
-                VersionedMaterializationTask current,
-                PublicationId candidatePublication,
-                int attempt) {
+                VersionedMaterializationTask current, PublicationId candidatePublication, int attempt) {
             requireTaskOutput(current);
             TaskLifecycle lifecycle = current.value().lifecycle();
             if (lifecycle == TaskLifecycle.PUBLISHING || lifecycle == TaskLifecycle.PUBLISHED) {
@@ -399,49 +360,38 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             }
             if (lifecycle != TaskLifecycle.OUTPUT_READY) {
                 return CompletableFuture.failedFuture(
-                        condition(
-                                "materialization task is not ready for publication: " + lifecycle));
+                        condition("materialization task is not ready for publication: " + lifecycle));
             }
             if (attempt >= MAX_RECOVERY_ATTEMPTS) {
                 return recoveryExhausted("freeze publication id");
             }
-            PublicationId publication =
-                    candidatePublication == null
-                            ? Objects.requireNonNull(publicationIds.next(), "publication id")
-                            : candidatePublication;
+            PublicationId publication = candidatePublication == null
+                    ? Objects.requireNonNull(publicationIds.next(), "publication id")
+                    : candidatePublication;
             return deadline.bound(
-                            () ->
-                                    generationStore.compareAndSetTask(
-                                            cluster,
-                                            MaterializationRecordMapper.publishing(
-                                                    current.value(), publication, clock.millis()),
-                                            current.metadataVersion()),
+                            () -> generationStore.compareAndSetTask(
+                                    cluster,
+                                    MaterializationRecordMapper.publishing(
+                                            current.value(), publication, clock.millis()),
+                                    current.metadataVersion()),
                             "freeze task publication id")
-                    .handle(
-                            (updated, failure) -> {
-                                if (failure == null) {
-                                    return CompletableFuture.completedFuture(updated);
-                                }
-                                Throwable original = unwrap(failure);
-                                return loadTask()
-                                        .thenCompose(
-                                                reloaded -> {
-                                                    requireTaskOutput(reloaded);
-                                                    if (reloaded.value().lifecycle()
-                                                            == TaskLifecycle.OUTPUT_READY) {
-                                                        return freezePublication(
-                                                                reloaded, publication, attempt + 1);
-                                                    }
-                                                    if (reloaded.value().lifecycle()
-                                                                    == TaskLifecycle.PUBLISHING
-                                                            || reloaded.value().lifecycle()
-                                                                    == TaskLifecycle.PUBLISHED) {
-                                                        return CompletableFuture.completedFuture(
-                                                                reloaded);
-                                                    }
-                                                    return CompletableFuture.failedFuture(original);
-                                                });
-                            })
+                    .handle((updated, failure) -> {
+                        if (failure == null) {
+                            return CompletableFuture.completedFuture(updated);
+                        }
+                        Throwable original = unwrap(failure);
+                        return loadTask().thenCompose(reloaded -> {
+                            requireTaskOutput(reloaded);
+                            if (reloaded.value().lifecycle() == TaskLifecycle.OUTPUT_READY) {
+                                return freezePublication(reloaded, publication, attempt + 1);
+                            }
+                            if (reloaded.value().lifecycle() == TaskLifecycle.PUBLISHING
+                                    || reloaded.value().lifecycle() == TaskLifecycle.PUBLISHED) {
+                                return CompletableFuture.completedFuture(reloaded);
+                            }
+                            return CompletableFuture.failedFuture(original);
+                        });
+                    })
                     .thenCompose(value -> value);
         }
 
@@ -470,165 +420,97 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
         private CompletableFuture<VersionedMaterializationTask> attachAllocated(
                 VersionedMaterializationTask current, AllocatedGeneration allocation, int attempt) {
             return deadline.bound(
-                            () ->
-                                    generationStore.compareAndSetTask(
-                                            cluster,
-                                            MaterializationRecordMapper.attachGeneration(
-                                                    current.value(),
-                                                    allocation.generation().value(),
-                                                    clock.millis()),
-                                            current.metadataVersion()),
+                            () -> generationStore.compareAndSetTask(
+                                    cluster,
+                                    MaterializationRecordMapper.attachGeneration(
+                                            current.value(),
+                                            allocation.generation().value(),
+                                            clock.millis()),
+                                    current.metadataVersion()),
                             "attach allocated generation to task")
-                    .handle(
-                            (updated, failure) -> {
-                                if (failure == null) {
-                                    return CompletableFuture.completedFuture(updated);
-                                }
-                                Throwable original = unwrap(failure);
-                                return loadTask()
-                                        .thenCompose(
-                                                reloaded -> {
-                                                    requireTaskOutput(reloaded);
-                                                    if (reloaded.value().lifecycle()
-                                                                    == TaskLifecycle.PUBLISHED
-                                                            || reloaded.value()
-                                                                    .allocatedGeneration()
-                                                                    .isPresent()) {
-                                                        requireFrozenAllocation(reloaded);
-                                                        return CompletableFuture.completedFuture(
-                                                                reloaded);
-                                                    }
-                                                    if (reloaded.value().lifecycle()
-                                                            == TaskLifecycle.PUBLISHING) {
-                                                        return attachGeneration(
-                                                                reloaded, attempt + 1);
-                                                    }
-                                                    return CompletableFuture.failedFuture(original);
-                                                });
-                            })
+                    .handle((updated, failure) -> {
+                        if (failure == null) {
+                            return CompletableFuture.completedFuture(updated);
+                        }
+                        Throwable original = unwrap(failure);
+                        return loadTask().thenCompose(reloaded -> {
+                            requireTaskOutput(reloaded);
+                            if (reloaded.value().lifecycle() == TaskLifecycle.PUBLISHED
+                                    || reloaded.value().allocatedGeneration().isPresent()) {
+                                requireFrozenAllocation(reloaded);
+                                return CompletableFuture.completedFuture(reloaded);
+                            }
+                            if (reloaded.value().lifecycle() == TaskLifecycle.PUBLISHING) {
+                                return attachGeneration(reloaded, attempt + 1);
+                            }
+                            return CompletableFuture.failedFuture(original);
+                        });
+                    })
                     .thenCompose(value -> value);
         }
 
         private CompletableFuture<GenerationCommitResult> continuePublication(
                 VersionedMaterializationTask publishingTask, Admission admission) {
             requireFrozenAllocation(publishingTask);
-            CompletableFuture<?> temporaryProtections =
-                    publishingTask.value().lifecycle() == TaskLifecycle.PUBLISHED
-                            ? CompletableFuture.completedFuture(null)
-                            : reconcileTaskProtections(publishingTask);
+            CompletableFuture<?> temporaryProtections = publishingTask.value().lifecycle() == TaskLifecycle.PUBLISHED
+                    ? CompletableFuture.completedFuture(null)
+                    : reconcileTaskProtections(publishingTask);
             return temporaryProtections
                     .thenCompose(ignored -> loadIndex(publishingTask))
-                    .thenCompose(
-                            optional -> {
-                                if (optional.isPresent()) {
-                                    VersionedGenerationIndex current = optional.orElseThrow();
-                                    requireIndexIdentity(publishingTask, current);
-                                    if (current.value().lifecycle()
-                                            == GenerationLifecycle.COMMITTED) {
-                                        return finalizeCommitted(
-                                                publishingTask,
-                                                current,
-                                                admission,
-                                                Optional.empty(),
-                                                false);
-                                    }
-                                    if (current.value().lifecycle()
-                                            == GenerationLifecycle.ABORTED) {
-                                        return recoverAborted(
-                                                publishingTask,
-                                                current,
-                                                admission,
-                                                Optional.empty());
-                                    }
-                                    if (current.value().lifecycle()
-                                            != GenerationLifecycle.PREPARED) {
-                                        return CompletableFuture.failedFuture(
-                                                unrecoverableIndex(current));
-                                    }
-                                }
-                                return acquireTaskProtection(publishingTask)
-                                        .thenCompose(
-                                                protection ->
-                                                        createOrLoadPrepared(
-                                                                publishingTask,
-                                                                admission,
-                                                                protection))
-                                        .exceptionallyCompose(
-                                                protectionFailure ->
-                                                        loadIndex(publishingTask)
-                                                                .thenCompose(
-                                                                        reloaded -> {
-                                                                            if (reloaded
-                                                                                    .isPresent()) {
-                                                                                VersionedGenerationIndex
-                                                                                        current =
-                                                                                                reloaded
-                                                                                                        .orElseThrow();
-                                                                                requireIndexIdentity(
-                                                                                        publishingTask,
-                                                                                        current);
-                                                                                if (current.value()
-                                                                                                .lifecycle()
-                                                                                        == GenerationLifecycle
-                                                                                                .COMMITTED) {
-                                                                                    return finalizeCommitted(
-                                                                                            publishingTask,
-                                                                                            current,
-                                                                                            admission,
-                                                                                            Optional
-                                                                                                    .empty(),
-                                                                                            false);
-                                                                                }
-                                                                            }
-                                                                            return CompletableFuture
-                                                                                    .failedFuture(
-                                                                                            unwrap(
-                                                                                                    protectionFailure));
-                                                                        }));
-                            });
+                    .thenCompose(optional -> {
+                        if (optional.isPresent()) {
+                            VersionedGenerationIndex current = optional.orElseThrow();
+                            requireIndexIdentity(publishingTask, current);
+                            if (current.value().lifecycle() == GenerationLifecycle.COMMITTED) {
+                                return finalizeCommitted(publishingTask, current, admission, Optional.empty(), false);
+                            }
+                            if (current.value().lifecycle() == GenerationLifecycle.ABORTED) {
+                                return recoverAborted(publishingTask, current, admission, Optional.empty());
+                            }
+                            if (current.value().lifecycle() != GenerationLifecycle.PREPARED) {
+                                return CompletableFuture.failedFuture(unrecoverableIndex(current));
+                            }
+                        }
+                        return acquireTaskProtection(publishingTask)
+                                .thenCompose(protection -> createOrLoadPrepared(publishingTask, admission, protection))
+                                .exceptionallyCompose(protectionFailure -> loadIndex(publishingTask)
+                                        .thenCompose(reloaded -> {
+                                            if (reloaded.isPresent()) {
+                                                VersionedGenerationIndex current = reloaded.orElseThrow();
+                                                requireIndexIdentity(publishingTask, current);
+                                                if (current.value().lifecycle() == GenerationLifecycle.COMMITTED) {
+                                                    return finalizeCommitted(
+                                                            publishingTask,
+                                                            current,
+                                                            admission,
+                                                            Optional.empty(),
+                                                            false);
+                                                }
+                                            }
+                                            return CompletableFuture.failedFuture(unwrap(protectionFailure));
+                                        }));
+                    });
         }
 
         private CompletableFuture<GenerationCommitResult> createOrLoadPrepared(
-                VersionedMaterializationTask publishingTask,
-                Admission admission,
-                ObjectProtection taskProtection) {
-            return loadIndex(publishingTask)
-                    .thenCompose(
-                            optional -> {
-                                if (optional.isPresent()) {
-                                    return continueWithIndex(
-                                            publishingTask,
-                                            optional.orElseThrow(),
-                                            admission,
-                                            taskProtection);
-                                }
-                                long generation =
-                                        publishingTask.value().allocatedGeneration().orElseThrow();
-                                GenerationIndexRecord prepared =
-                                        MaterializationRecordMapper.preparedIndex(
-                                                task,
-                                                output,
-                                                generation,
-                                                publishingTask.value().publicationId(),
-                                                publishingTask.value().updatedAtMillis());
-                                return loadExactPublishingTask(publishingTask)
-                                        .thenCompose(
-                                                ignored ->
-                                                        deadline.bound(
-                                                                () ->
-                                                                        generationStore
-                                                                                .createPrepared(
-                                                                                        cluster,
-                                                                                        prepared),
-                                                                "create prepared generation index"))
-                                        .thenCompose(
-                                                created ->
-                                                        continueWithIndex(
-                                                                publishingTask,
-                                                                created,
-                                                                admission,
-                                                                taskProtection));
-                            });
+                VersionedMaterializationTask publishingTask, Admission admission, ObjectProtection taskProtection) {
+            return loadIndex(publishingTask).thenCompose(optional -> {
+                if (optional.isPresent()) {
+                    return continueWithIndex(publishingTask, optional.orElseThrow(), admission, taskProtection);
+                }
+                long generation = publishingTask.value().allocatedGeneration().orElseThrow();
+                GenerationIndexRecord prepared = MaterializationRecordMapper.preparedIndex(
+                        task,
+                        output,
+                        generation,
+                        publishingTask.value().publicationId(),
+                        publishingTask.value().updatedAtMillis());
+                return loadExactPublishingTask(publishingTask)
+                        .thenCompose(ignored -> deadline.bound(
+                                () -> generationStore.createPrepared(cluster, prepared),
+                                "create prepared generation index"))
+                        .thenCompose(created -> continueWithIndex(publishingTask, created, admission, taskProtection));
+            });
         }
 
         private CompletableFuture<GenerationCommitResult> continueWithIndex(
@@ -638,12 +520,10 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 ObjectProtection taskProtection) {
             requireIndexIdentity(publishingTask, index);
             if (index.value().lifecycle() == GenerationLifecycle.COMMITTED) {
-                return finalizeCommitted(
-                        publishingTask, index, admission, Optional.of(taskProtection), false);
+                return finalizeCommitted(publishingTask, index, admission, Optional.of(taskProtection), false);
             }
             if (index.value().lifecycle() == GenerationLifecycle.ABORTED) {
-                return recoverAborted(
-                        publishingTask, index, admission, Optional.of(taskProtection));
+                return recoverAborted(publishingTask, index, admission, Optional.of(taskProtection));
             }
             if (index.value().lifecycle() != GenerationLifecycle.PREPARED) {
                 return CompletableFuture.failedFuture(unrecoverableIndex(index));
@@ -661,23 +541,14 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 return CompletableFuture.failedFuture(
                         condition("aborted-publication recovery loaded another lifecycle"));
             }
-            CompletableFuture<ObjectProtection> protection =
-                    taskProtection.isPresent()
-                            ? CompletableFuture.completedFuture(taskProtection.orElseThrow())
-                            : acquireTaskProtection(publishingTask);
+            CompletableFuture<ObjectProtection> protection = taskProtection.isPresent()
+                    ? CompletableFuture.completedFuture(taskProtection.orElseThrow())
+                    : acquireTaskProtection(publishingTask);
             return protection
-                    .thenCompose(
-                            handle ->
-                                    deadline.bound(
-                                            () ->
-                                                    protectionManager.release(
-                                                            handle,
-                                                            ignored ->
-                                                                    authorizeAbortedProtectionRemoval(
-                                                                            publishingTask,
-                                                                            aborted)),
-                                            "release aborted task-owned visible-generation"
-                                                + " protection"))
+                    .thenCompose(handle -> deadline.bound(
+                            () -> protectionManager.release(
+                                    handle, ignored -> authorizeAbortedProtectionRemoval(publishingTask, aborted)),
+                            "release aborted task-owned visible-generation" + " protection"))
                     .thenCompose(ignored -> resetAbortedTask(publishingTask, aborted, 0))
                     .thenCompose(reset -> freezePublication(reset, null, 0))
                     .thenCompose(current -> attachGeneration(current, 0))
@@ -686,92 +557,61 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
 
         private CompletableFuture<Void> authorizeAbortedProtectionRemoval(
                 VersionedMaterializationTask expectedTask, VersionedGenerationIndex expectedIndex) {
-            return loadIndexByIdentity(expectedIndex)
-                    .thenCompose(
-                            actualIndex -> {
-                                if (!sameVersionedIndex(expectedIndex, actualIndex)
-                                        || actualIndex.value().lifecycle()
-                                                != GenerationLifecycle.ABORTED) {
-                                    return CompletableFuture.failedFuture(
-                                            condition(
-                                                    "aborted index changed while protection removal"
-                                                        + " was authorized"));
-                                }
-                                return loadTask()
-                                        .thenApply(
-                                                actualTask -> {
-                                                    if (!sameVersionedTask(expectedTask, actualTask)
-                                                            || actualTask.value().lifecycle()
-                                                                    != TaskLifecycle.PUBLISHING) {
-                                                        throw condition(
-                                                                "publishing task changed while"
-                                                                    + " aborted protection removal"
-                                                                    + " was authorized");
-                                                    }
-                                                    return null;
-                                                });
-                            });
+            return loadIndexByIdentity(expectedIndex).thenCompose(actualIndex -> {
+                if (!sameVersionedIndex(expectedIndex, actualIndex)
+                        || actualIndex.value().lifecycle() != GenerationLifecycle.ABORTED) {
+                    return CompletableFuture.failedFuture(
+                            condition("aborted index changed while protection removal" + " was authorized"));
+                }
+                return loadTask().thenApply(actualTask -> {
+                    if (!sameVersionedTask(expectedTask, actualTask)
+                            || actualTask.value().lifecycle() != TaskLifecycle.PUBLISHING) {
+                        throw condition(
+                                "publishing task changed while" + " aborted protection removal" + " was authorized");
+                    }
+                    return null;
+                });
+            });
         }
 
         private CompletableFuture<VersionedMaterializationTask> resetAbortedTask(
-                VersionedMaterializationTask current,
-                VersionedGenerationIndex aborted,
-                int attempt) {
+                VersionedMaterializationTask current, VersionedGenerationIndex aborted, int attempt) {
             requireTaskMatchesIndex(current, aborted);
             if (attempt >= MAX_RECOVERY_ATTEMPTS) {
                 return recoveryExhausted("reset aborted materialization publication");
             }
             return deadline.bound(
-                            () ->
-                                    generationStore.compareAndSetTask(
-                                            cluster,
-                                            MaterializationRecordMapper.outputReadyAfterAbort(
-                                                    current.value(), clock.millis()),
-                                            current.metadataVersion()),
+                            () -> generationStore.compareAndSetTask(
+                                    cluster,
+                                    MaterializationRecordMapper.outputReadyAfterAbort(current.value(), clock.millis()),
+                                    current.metadataVersion()),
                             "reset aborted materialization publication")
-                    .handle(
-                            (reset, failure) -> {
-                                if (failure == null) {
-                                    return CompletableFuture.completedFuture(reset);
-                                }
-                                Throwable original = unwrap(failure);
-                                return loadTask()
-                                        .thenCompose(
-                                                reloaded -> {
-                                                    requireTaskOutput(reloaded);
-                                                    if (reloaded.value().lifecycle()
-                                                            == TaskLifecycle.OUTPUT_READY) {
-                                                        return CompletableFuture.completedFuture(
-                                                                reloaded);
-                                                    }
-                                                    if (reloaded.value().lifecycle()
-                                                                    == TaskLifecycle.PUBLISHING
-                                                            && reloaded.value()
-                                                                    .publicationId()
-                                                                    .equals(
-                                                                            aborted.value()
-                                                                                    .publicationId())
-                                                            && reloaded.value()
-                                                                    .allocatedGeneration()
-                                                                    .isPresent()
-                                                            && reloaded.value()
-                                                                            .allocatedGeneration()
-                                                                            .orElseThrow()
-                                                                    == aborted.value()
-                                                                            .generation()) {
-                                                        return resetAbortedTask(
-                                                                reloaded, aborted, attempt + 1);
-                                                    }
-                                                    if (reloaded.value().lifecycle()
-                                                                    == TaskLifecycle.PUBLISHING
-                                                            || reloaded.value().lifecycle()
-                                                                    == TaskLifecycle.PUBLISHED) {
-                                                        return CompletableFuture.completedFuture(
-                                                                reloaded);
-                                                    }
-                                                    return CompletableFuture.failedFuture(original);
-                                                });
-                            })
+                    .handle((reset, failure) -> {
+                        if (failure == null) {
+                            return CompletableFuture.completedFuture(reset);
+                        }
+                        Throwable original = unwrap(failure);
+                        return loadTask().thenCompose(reloaded -> {
+                            requireTaskOutput(reloaded);
+                            if (reloaded.value().lifecycle() == TaskLifecycle.OUTPUT_READY) {
+                                return CompletableFuture.completedFuture(reloaded);
+                            }
+                            if (reloaded.value().lifecycle() == TaskLifecycle.PUBLISHING
+                                    && reloaded.value()
+                                            .publicationId()
+                                            .equals(aborted.value().publicationId())
+                                    && reloaded.value().allocatedGeneration().isPresent()
+                                    && reloaded.value().allocatedGeneration().orElseThrow()
+                                            == aborted.value().generation()) {
+                                return resetAbortedTask(reloaded, aborted, attempt + 1);
+                            }
+                            if (reloaded.value().lifecycle() == TaskLifecycle.PUBLISHING
+                                    || reloaded.value().lifecycle() == TaskLifecycle.PUBLISHED) {
+                                return CompletableFuture.completedFuture(reloaded);
+                            }
+                            return CompletableFuture.failedFuture(original);
+                        });
+                    })
                     .thenCompose(value -> value);
         }
 
@@ -787,13 +627,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             requirePreparedExact(publishingTask, prepared);
             return revalidateBeforeCommit(publishingTask, prepared, admission, taskProtection)
                     .thenCompose(
-                            ignored ->
-                                    commitPreparedCas(
-                                            publishingTask,
-                                            prepared,
-                                            admission,
-                                            taskProtection,
-                                            attempt));
+                            ignored -> commitPreparedCas(publishingTask, prepared, admission, taskProtection, attempt));
         }
 
         private CompletableFuture<GenerationCommitResult> commitPreparedCas(
@@ -803,56 +637,33 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 ObjectProtection taskProtection,
                 int attempt) {
             return deadline.bound(
-                            () ->
-                                    generationStore.compareAndSetIndex(
-                                            cluster,
-                                            MaterializationRecordMapper.committedIndex(
-                                                    prepared.value(), clock.millis()),
-                                            prepared.metadataVersion()),
+                            () -> generationStore.compareAndSetIndex(
+                                    cluster,
+                                    MaterializationRecordMapper.committedIndex(prepared.value(), clock.millis()),
+                                    prepared.metadataVersion()),
                             "commit prepared generation index")
-                    .handle(
-                            (committed, failure) -> {
-                                if (failure == null) {
-                                    return finalizeCommitted(
-                                            publishingTask,
-                                            committed,
-                                            admission,
-                                            Optional.of(taskProtection),
-                                            true);
-                                }
-                                Throwable original = unwrap(failure);
-                                return loadIndex(publishingTask)
-                                        .thenCompose(
-                                                optional -> {
-                                                    if (optional.isEmpty()) {
-                                                        return CompletableFuture.failedFuture(
-                                                                original);
-                                                    }
-                                                    VersionedGenerationIndex current =
-                                                            optional.orElseThrow();
-                                                    requireIndexIdentity(publishingTask, current);
-                                                    if (current.value().lifecycle()
-                                                            == GenerationLifecycle.COMMITTED) {
-                                                        return finalizeCommitted(
-                                                                publishingTask,
-                                                                current,
-                                                                admission,
-                                                                Optional.of(taskProtection),
-                                                                false);
-                                                    }
-                                                    if (current.value().lifecycle()
-                                                            == GenerationLifecycle.PREPARED) {
-                                                        return publishPrepared(
-                                                                publishingTask,
-                                                                current,
-                                                                admission,
-                                                                taskProtection,
-                                                                attempt + 1);
-                                                    }
-                                                    return CompletableFuture.failedFuture(
-                                                            unrecoverableIndex(current));
-                                                });
-                            })
+                    .handle((committed, failure) -> {
+                        if (failure == null) {
+                            return finalizeCommitted(
+                                    publishingTask, committed, admission, Optional.of(taskProtection), true);
+                        }
+                        Throwable original = unwrap(failure);
+                        return loadIndex(publishingTask).thenCompose(optional -> {
+                            if (optional.isEmpty()) {
+                                return CompletableFuture.failedFuture(original);
+                            }
+                            VersionedGenerationIndex current = optional.orElseThrow();
+                            requireIndexIdentity(publishingTask, current);
+                            if (current.value().lifecycle() == GenerationLifecycle.COMMITTED) {
+                                return finalizeCommitted(
+                                        publishingTask, current, admission, Optional.of(taskProtection), false);
+                            }
+                            if (current.value().lifecycle() == GenerationLifecycle.PREPARED) {
+                                return publishPrepared(publishingTask, current, admission, taskProtection, attempt + 1);
+                            }
+                            return CompletableFuture.failedFuture(unrecoverableIndex(current));
+                        });
+                    })
                     .thenCompose(value -> value);
         }
 
@@ -864,32 +675,20 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             return verifyOutput("verify output immediately before generation commit")
                     .thenCompose(ignored -> loadExactPublishingTask(publishingTask))
                     .thenCompose(ignored -> loadSnapshot())
-                    .thenCompose(
-                            snapshot -> {
-                                validateSnapshot(snapshot, admission.profile());
-                                return revalidateSources(snapshot, publishingTask);
-                            })
+                    .thenCompose(snapshot -> {
+                        validateSnapshot(snapshot, admission.profile());
+                        return revalidateSources(snapshot, publishingTask);
+                    })
                     .thenCompose(ignored -> loadExactPrepared(prepared))
-                    .thenCompose(
-                            ignored ->
-                                    deadline.bound(
-                                            () ->
-                                                    protectionManager.revalidate(
-                                                            taskProtection,
-                                                            expected ->
-                                                                    revalidateTaskOwner(
-                                                                            publishingTask,
-                                                                            expected)),
-                                            "revalidate task-owned visible-generation protection"))
-                    .thenCompose(
-                            ignored ->
-                                    deadline.bound(
-                                            () -> activationGuard.revalidate(admission.proof()),
-                                            "revalidate generation activation proof"))
-                    .thenCompose(
-                            ignored ->
-                                    revalidateExternalAuthority(
-                                            "revalidate caller generation publication authority"));
+                    .thenCompose(ignored -> deadline.bound(
+                            () -> protectionManager.revalidate(
+                                    taskProtection, expected -> revalidateTaskOwner(publishingTask, expected)),
+                            "revalidate task-owned visible-generation protection"))
+                    .thenCompose(ignored -> deadline.bound(
+                            () -> activationGuard.revalidate(admission.proof()),
+                            "revalidate generation activation proof"))
+                    .thenCompose(ignored ->
+                            revalidateExternalAuthority("revalidate caller generation publication authority"));
         }
 
         private CompletableFuture<Void> revalidateExternalAuthority(String stage) {
@@ -904,23 +703,11 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 boolean committedByThisCall) {
             requireCommittedExact(publishingTask, committed);
             return ensureIndexProtection(publishingTask, committed, taskProtection)
-                    .thenCompose(
-                            protection ->
-                                    markPublished(publishingTask, committed, 0)
-                                            .thenCompose(
-                                                    ignored ->
-                                                            deadline.bound(
-                                                                    () ->
-                                                                            protectionManager
-                                                                                    .revalidate(
-                                                                                            protection,
-                                                                                            expected ->
-                                                                                                    revalidateIndexOwner(
-                                                                                                            committed,
-                                                                                                            expected)),
-                                                                    "revalidate"
-                                                                        + " committed-index-owned"
-                                                                        + " protection")))
+                    .thenCompose(protection -> markPublished(publishingTask, committed, 0)
+                            .thenCompose(ignored -> deadline.bound(
+                                    () -> protectionManager.revalidate(
+                                            protection, expected -> revalidateIndexOwner(committed, expected)),
+                                    "revalidate" + " committed-index-owned" + " protection")))
                     .thenCompose(ignored -> loadExactCommitted(committed))
                     .thenApply(exact -> commitResult(exact, committedByThisCall));
         }
@@ -939,20 +726,13 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             ObjectProtectionOwner owner = indexOwner(committed);
             if (taskProtection.isPresent()) {
                 return deadline.bound(
-                                () ->
-                                        protectionManager.transfer(
-                                                taskProtection.orElseThrow(),
-                                                owner,
-                                                expected ->
-                                                        revalidateIndexOwner(committed, expected)),
+                                () -> protectionManager.transfer(
+                                        taskProtection.orElseThrow(),
+                                        owner,
+                                        expected -> revalidateIndexOwner(committed, expected)),
                                 "transfer visible-generation protection to committed index")
-                        .exceptionallyCompose(
-                                transferFailure ->
-                                        reconcileIndexProtection(
-                                                publishingTask,
-                                                committed,
-                                                0,
-                                                unwrap(transferFailure)));
+                        .exceptionallyCompose(transferFailure ->
+                                reconcileIndexProtection(publishingTask, committed, 0, unwrap(transferFailure)));
             }
             return reconcileIndexProtection(publishingTask, committed, 0, null);
         }
@@ -963,8 +743,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 int attempt,
                 Throwable previousFailure) {
             if (attempt >= MAX_RECOVERY_ATTEMPTS) {
-                Throwable exhausted =
-                        recoveryExhaustedFailure("reconcile visible-generation protection owner");
+                Throwable exhausted = recoveryExhaustedFailure("reconcile visible-generation protection owner");
                 if (previousFailure != null) {
                     exhausted.addSuppressed(previousFailure);
                 }
@@ -973,48 +752,26 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             ObjectProtectionOwner owner = indexOwner(committed);
             ObjectProtectionRequest indexRequest = protectionRequest(publishingTask, owner);
             return deadline.bound(
-                            () ->
-                                    protectionManager.acquire(
-                                            indexRequest,
-                                            expected -> revalidateIndexOwner(committed, expected)),
+                            () -> protectionManager.acquire(
+                                    indexRequest, expected -> revalidateIndexOwner(committed, expected)),
                             "recover committed-index-owned protection")
-                    .exceptionallyCompose(
-                            indexAcquireFailure ->
-                                    acquireTaskProtection(publishingTask)
-                                            .thenCompose(
-                                                    taskOwned ->
-                                                            deadline.bound(
-                                                                    () ->
-                                                                            protectionManager
-                                                                                    .transfer(
-                                                                                            taskOwned,
-                                                                                            owner,
-                                                                                            expected ->
-                                                                                                    revalidateIndexOwner(
-                                                                                                            committed,
-                                                                                                            expected)),
-                                                                    "repair visible-generation"
-                                                                        + " protection owner"))
-                                            .exceptionallyCompose(
-                                                    repairFailure -> {
-                                                        Throwable exact =
-                                                                unwrap(indexAcquireFailure);
-                                                        exact.addSuppressed(unwrap(repairFailure));
-                                                        if (previousFailure != null) {
-                                                            exact.addSuppressed(previousFailure);
-                                                        }
-                                                        return reconcileIndexProtection(
-                                                                publishingTask,
-                                                                committed,
-                                                                attempt + 1,
-                                                                exact);
-                                                    }));
+                    .exceptionallyCompose(indexAcquireFailure -> acquireTaskProtection(publishingTask)
+                            .thenCompose(taskOwned -> deadline.bound(
+                                    () -> protectionManager.transfer(
+                                            taskOwned, owner, expected -> revalidateIndexOwner(committed, expected)),
+                                    "repair visible-generation" + " protection owner"))
+                            .exceptionallyCompose(repairFailure -> {
+                                Throwable exact = unwrap(indexAcquireFailure);
+                                exact.addSuppressed(unwrap(repairFailure));
+                                if (previousFailure != null) {
+                                    exact.addSuppressed(previousFailure);
+                                }
+                                return reconcileIndexProtection(publishingTask, committed, attempt + 1, exact);
+                            }));
         }
 
         private CompletableFuture<VersionedMaterializationTask> markPublished(
-                VersionedMaterializationTask current,
-                VersionedGenerationIndex committed,
-                int attempt) {
+                VersionedMaterializationTask current, VersionedGenerationIndex committed, int attempt) {
             requireTaskOutput(current);
             if (current.value().lifecycle() == TaskLifecycle.PUBLISHED) {
                 requireTaskMatchesIndex(current, committed);
@@ -1029,49 +786,37 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 return recoveryExhausted("mark materialization task published");
             }
             return deadline.bound(
-                            () ->
-                                    generationStore.compareAndSetTask(
-                                            cluster,
-                                            MaterializationRecordMapper.published(
-                                                    current.value(), clock.millis()),
-                                            current.metadataVersion()),
+                            () -> generationStore.compareAndSetTask(
+                                    cluster,
+                                    MaterializationRecordMapper.published(current.value(), clock.millis()),
+                                    current.metadataVersion()),
                             "mark materialization task published")
-                    .handle(
-                            (published, failure) -> {
-                                if (failure == null) {
-                                    return CompletableFuture.completedFuture(published);
-                                }
-                                Throwable original = unwrap(failure);
-                                return loadTask()
-                                        .thenCompose(
-                                                reloaded -> {
-                                                    requireTaskOutput(reloaded);
-                                                    if (reloaded.value().lifecycle()
-                                                            == TaskLifecycle.PUBLISHED) {
-                                                        requireTaskMatchesIndex(
-                                                                reloaded, committed);
-                                                        return CompletableFuture.completedFuture(
-                                                                reloaded);
-                                                    }
-                                                    if (reloaded.value().lifecycle()
-                                                            == TaskLifecycle.PUBLISHING) {
-                                                        return markPublished(
-                                                                reloaded, committed, attempt + 1);
-                                                    }
-                                                    return CompletableFuture.failedFuture(original);
-                                                });
-                            })
+                    .handle((published, failure) -> {
+                        if (failure == null) {
+                            return CompletableFuture.completedFuture(published);
+                        }
+                        Throwable original = unwrap(failure);
+                        return loadTask().thenCompose(reloaded -> {
+                            requireTaskOutput(reloaded);
+                            if (reloaded.value().lifecycle() == TaskLifecycle.PUBLISHED) {
+                                requireTaskMatchesIndex(reloaded, committed);
+                                return CompletableFuture.completedFuture(reloaded);
+                            }
+                            if (reloaded.value().lifecycle() == TaskLifecycle.PUBLISHING) {
+                                return markPublished(reloaded, committed, attempt + 1);
+                            }
+                            return CompletableFuture.failedFuture(original);
+                        });
+                    })
                     .thenCompose(value -> value);
         }
 
-        private CompletableFuture<ObjectProtection> acquireTaskProtection(
-                VersionedMaterializationTask publishingTask) {
+        private CompletableFuture<ObjectProtection> acquireTaskProtection(VersionedMaterializationTask publishingTask) {
             ObjectProtectionOwner owner = taskOwner(publishingTask);
             return deadline.bound(
-                    () ->
-                            protectionManager.acquire(
-                                    protectionRequest(publishingTask, owner),
-                                    expected -> revalidateTaskOwner(publishingTask, expected)),
+                    () -> protectionManager.acquire(
+                            protectionRequest(publishingTask, owner),
+                            expected -> revalidateTaskOwner(publishingTask, expected)),
                     "acquire task-owned visible-generation protection");
         }
 
@@ -1087,46 +832,33 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
 
         private CompletableFuture<Void> revalidateTaskOwner(
                 VersionedMaterializationTask expectedTask, ObjectProtectionOwner expectedOwner) {
-            return loadTask()
-                    .thenApply(
-                            actual -> {
-                                requireTaskOutput(actual);
-                                requireSameOwner(
-                                        expectedOwner,
-                                        taskOwner(actual),
-                                        "task protection owner changed");
-                                if (!sameVersionedTask(expectedTask, actual)
-                                        || actual.value().lifecycle() != TaskLifecycle.PUBLISHING) {
-                                    throw condition(
-                                            "task changed during visible-generation protection"
-                                                + " handshake");
-                                }
-                                return null;
-                            });
+            return loadTask().thenApply(actual -> {
+                requireTaskOutput(actual);
+                requireSameOwner(expectedOwner, taskOwner(actual), "task protection owner changed");
+                if (!sameVersionedTask(expectedTask, actual)
+                        || actual.value().lifecycle() != TaskLifecycle.PUBLISHING) {
+                    throw condition("task changed during visible-generation protection" + " handshake");
+                }
+                return null;
+            });
         }
 
         private CompletableFuture<Void> revalidateIndexOwner(
                 VersionedGenerationIndex expectedIndex, ObjectProtectionOwner expectedOwner) {
-            return loadIndexByIdentity(expectedIndex)
-                    .thenApply(
-                            actual -> {
-                                requireSameOwner(
-                                        expectedOwner,
-                                        indexOwner(actual),
-                                        "index protection owner changed");
-                                if (!sameVersionedIndex(expectedIndex, actual)
-                                        || actual.value().lifecycle()
-                                                != GenerationLifecycle.COMMITTED) {
-                                    throw condition(
-                                            "committed index changed during protection handshake");
-                                }
-                                return null;
-                            });
+            return loadIndexByIdentity(expectedIndex).thenApply(actual -> {
+                requireSameOwner(expectedOwner, indexOwner(actual), "index protection owner changed");
+                if (!sameVersionedIndex(expectedIndex, actual)
+                        || actual.value().lifecycle() != GenerationLifecycle.COMMITTED) {
+                    throw condition("committed index changed during protection handshake");
+                }
+                return null;
+            });
         }
 
         private CompletableFuture<Void> revalidateSources(
                 StreamMetadataSnapshot snapshot, VersionedMaterializationTask publishingTask) {
-            List<CompletableFuture<Void>> checks = new ArrayList<>(task.sources().size());
+            List<CompletableFuture<Void>> checks =
+                    new ArrayList<>(task.sources().size());
             for (SourceGeneration source : task.sources()) {
                 checks.add(revalidateSource(source, snapshot, publishingTask));
             }
@@ -1134,147 +866,100 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
         }
 
         private CompletableFuture<Void> revalidateSource(
-                SourceGeneration source,
-                StreamMetadataSnapshot snapshot,
-                VersionedMaterializationTask publishingTask) {
+                SourceGeneration source, StreamMetadataSnapshot snapshot, VersionedMaterializationTask publishingTask) {
             if (source.commitVersion() > snapshot.committedEnd().commitVersion()) {
-                return CompletableFuture.failedFuture(
-                        condition("materialization source is newer than committed head"));
+                return CompletableFuture.failedFuture(condition("materialization source is newer than committed head"));
             }
             return deadline.bound(
-                            () ->
-                                    generationStore.getCandidate(
-                                            cluster,
-                                            task.streamId(),
-                                            source.view(),
-                                            source.range().endOffset(),
-                                            source.generation()),
+                            () -> generationStore.getCandidate(
+                                    cluster,
+                                    task.streamId(),
+                                    source.view(),
+                                    source.range().endOffset(),
+                                    source.generation()),
                             "reload exact materialization source index")
-                    .thenCompose(
-                            optional -> {
-                                VersionedGenerationCandidate candidate =
-                                        optional.orElseThrow(
-                                                () ->
-                                                        condition(
-                                                                "materialization source index"
-                                                                    + " disappeared"));
-                                requireSourceIndex(source, candidate);
-                                return deadline.bound(
-                                                () ->
-                                                        sourceProtectionAdapters.acquireOrTransfer(
-                                                                task.streamId(),
-                                                                source,
-                                                                MaterializationProtectionIdentities
-                                                                        .sourceReferenceId(
-                                                                                cluster, task,
-                                                                                source),
-                                                                taskOwner(publishingTask),
-                                                                expected ->
-                                                                        revalidateTaskOwner(
-                                                                                publishingTask,
-                                                                                expected)),
-                                                "revalidate materialization source protection")
-                                        .thenApply(ignored -> null);
-                            });
+                    .thenCompose(optional -> {
+                        VersionedGenerationCandidate candidate =
+                                optional.orElseThrow(() -> condition("materialization source index" + " disappeared"));
+                        requireSourceIndex(source, candidate);
+                        return deadline.bound(
+                                        () -> sourceProtectionAdapters.acquireOrTransfer(
+                                                task.streamId(),
+                                                source,
+                                                MaterializationProtectionIdentities.sourceReferenceId(
+                                                        cluster, task, source),
+                                                taskOwner(publishingTask),
+                                                expected -> revalidateTaskOwner(publishingTask, expected)),
+                                        "revalidate materialization source protection")
+                                .thenApply(ignored -> null);
+                    });
         }
 
-        private CompletableFuture<Void> loadExactPublishingTask(
-                VersionedMaterializationTask expected) {
-            return loadTask()
-                    .thenApply(
-                            actual -> {
-                                if (!sameVersionedTask(expected, actual)
-                                        || actual.value().lifecycle() != TaskLifecycle.PUBLISHING) {
-                                    throw condition(
-                                            "publishing task changed before generation commit");
-                                }
-                                requireTaskOutput(actual);
-                                return null;
-                            });
+        private CompletableFuture<Void> loadExactPublishingTask(VersionedMaterializationTask expected) {
+            return loadTask().thenApply(actual -> {
+                if (!sameVersionedTask(expected, actual) || actual.value().lifecycle() != TaskLifecycle.PUBLISHING) {
+                    throw condition("publishing task changed before generation commit");
+                }
+                requireTaskOutput(actual);
+                return null;
+            });
         }
 
         private CompletableFuture<Void> loadExactPrepared(VersionedGenerationIndex expected) {
-            return loadIndexByIdentity(expected)
-                    .thenApply(
-                            actual -> {
-                                if (!sameVersionedIndex(expected, actual)
-                                        || actual.value().lifecycle()
-                                                != GenerationLifecycle.PREPARED) {
-                                    throw condition(
-                                            "prepared generation index changed before commit");
-                                }
-                                return null;
-                            });
+            return loadIndexByIdentity(expected).thenApply(actual -> {
+                if (!sameVersionedIndex(expected, actual)
+                        || actual.value().lifecycle() != GenerationLifecycle.PREPARED) {
+                    throw condition("prepared generation index changed before commit");
+                }
+                return null;
+            });
         }
 
-        private CompletableFuture<VersionedGenerationIndex> loadExactCommitted(
-                VersionedGenerationIndex expected) {
-            return loadIndexByIdentity(expected)
-                    .thenApply(
-                            actual -> {
-                                if (!sameVersionedIndex(expected, actual)
-                                        || actual.value().lifecycle()
-                                                != GenerationLifecycle.COMMITTED) {
-                                    throw condition(
-                                            "committed generation index changed before strict"
-                                                + " success");
-                                }
-                                return actual;
-                            });
+        private CompletableFuture<VersionedGenerationIndex> loadExactCommitted(VersionedGenerationIndex expected) {
+            return loadIndexByIdentity(expected).thenApply(actual -> {
+                if (!sameVersionedIndex(expected, actual)
+                        || actual.value().lifecycle() != GenerationLifecycle.COMMITTED) {
+                    throw condition("committed generation index changed before strict" + " success");
+                }
+                return actual;
+            });
         }
 
-        private CompletableFuture<VersionedGenerationIndex> loadIndexByIdentity(
-                VersionedGenerationIndex expected) {
+        private CompletableFuture<VersionedGenerationIndex> loadIndexByIdentity(VersionedGenerationIndex expected) {
             GenerationIndexRecord value = expected.value();
             GenerationIndexIdentity identity =
-                    new GenerationIndexIdentity(
-                            task.streamId(), task.view(), value.offsetEnd(), value.generation());
-            return deadline.bound(
-                            () -> generationStore.getIndex(cluster, identity),
-                            "reload exact generation index")
-                    .thenApply(
-                            optional ->
-                                    optional.orElseThrow(
-                                            () -> condition("generation index disappeared")));
+                    new GenerationIndexIdentity(task.streamId(), task.view(), value.offsetEnd(), value.generation());
+            return deadline.bound(() -> generationStore.getIndex(cluster, identity), "reload exact generation index")
+                    .thenApply(optional -> optional.orElseThrow(() -> condition("generation index disappeared")));
         }
 
         private CompletableFuture<Optional<VersionedGenerationIndex>> loadIndex(
                 VersionedMaterializationTask publishingTask) {
             long generation = publishingTask.value().allocatedGeneration().orElseThrow();
-            GenerationIndexIdentity identity =
-                    new GenerationIndexIdentity(
-                            task.streamId(), task.view(), task.coverage().endOffset(), generation);
-            return deadline.bound(
-                    () -> generationStore.getIndex(cluster, identity),
-                    "load task generation index");
+            GenerationIndexIdentity identity = new GenerationIndexIdentity(
+                    task.streamId(), task.view(), task.coverage().endOffset(), generation);
+            return deadline.bound(() -> generationStore.getIndex(cluster, identity), "load task generation index");
         }
 
         private CompletableFuture<VersionedMaterializationTask> loadTask() {
             return deadline.bound(
                             () -> generationStore.getTask(cluster, task.streamId(), task.taskId()),
                             "load materialization task")
-                    .thenApply(
-                            optional ->
-                                    optional.orElseThrow(
-                                            () -> condition("materialization task is absent")));
+                    .thenApply(optional -> optional.orElseThrow(() -> condition("materialization task is absent")));
         }
 
         private CompletableFuture<StreamMetadataSnapshot> loadSnapshot() {
             return deadline.bound(
-                    () -> l0Store.getStreamSnapshot(cluster, task.streamId()),
-                    "load committed stream head");
+                    () -> l0Store.getStreamSnapshot(cluster, task.streamId()), "load committed stream head");
         }
 
         private CompletableFuture<Void> verifyOutput(String stage) {
-            return deadline.bound(
-                    () -> outputVerifier.verify(task, output, deadline.remaining()), stage);
+            return deadline.bound(() -> outputVerifier.verify(task, output, deadline.remaining()), stage);
         }
 
-        private AdmissionSubject validateRegistration(
-                VersionedMaterializationStreamRegistration registration) {
+        private AdmissionSubject validateRegistration(VersionedMaterializationStreamRegistration registration) {
             MaterializationStreamRegistrationRecord value = registration.value();
-            String expectedKey =
-                    new F4Keyspace(cluster).materializationRegistryKey(task.streamId());
+            String expectedKey = new F4Keyspace(cluster).materializationRegistryKey(task.streamId());
             if (!registration.key().equals(expectedKey)
                     || !value.streamId().equals(task.streamId().value())) {
                 throw invariant("materialization registration key/stream identity is inconsistent");
@@ -1283,8 +968,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             try {
                 profile = StorageProfile.valueOf(value.storageProfile()).canonical();
             } catch (IllegalArgumentException failure) {
-                throw invariant(
-                        "materialization registration has an unknown storage profile", failure);
+                throw invariant("materialization registration has an unknown storage profile", failure);
             }
             if (!profile.objectMaterializationEnabled()) {
                 throw new NereusException(
@@ -1296,74 +980,54 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             try {
                 decoded = ProjectionIdentity.decode(value.projectionRef());
             } catch (IllegalArgumentException failure) {
-                throw invariant(
-                        "materialization registration projection identity is malformed", failure);
+                throw invariant("materialization registration projection identity is malformed", failure);
             }
             if (authorityMode == MaterializationStreamAuthorityMode.DIRECT_STREAM
-                    || authorityMode
-                            == MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION) {
+                    || authorityMode == MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION) {
                 Checksum expectedIdentity =
-                        DirectMaterializationStreamAuthority.identitySha256(
-                                task.streamId(), profile);
+                        DirectMaterializationStreamAuthority.identitySha256(task.streamId(), profile);
                 if (decoded.isPresent()
-                        || !value.projectionRef()
-                                .equals(DirectMaterializationStreamAuthority.encodedProjectionRef())
+                        || !value.projectionRef().equals(DirectMaterializationStreamAuthority.encodedProjectionRef())
                         || !value.projectionIdentitySha256().equals(expectedIdentity.value())
                         || output.projectionRef().isPresent()
                         || task.sources().stream()
                                 .anyMatch(source -> source.projectionRef().isPresent())) {
-                    throw invariant(
-                            "direct-stream generation publication contains projection authority");
+                    throw invariant("direct-stream generation publication contains projection authority");
                 }
-                return new AdmissionSubject(
-                        profile, new LiveStreamSubject(task.streamId(), expectedIdentity));
+                return new AdmissionSubject(profile, new LiveStreamSubject(task.streamId(), expectedIdentity));
             }
-            ProjectionRef projection =
-                    decoded.orElseThrow(
-                            () ->
-                                    invariant(
-                                            "generation publication requires a non-empty projection"
-                                                + " identity"));
+            ProjectionRef projection = decoded.orElseThrow(
+                    () -> invariant("generation publication requires a non-empty projection" + " identity"));
             if (!output.projectionRef().equals(Optional.of(projection))) {
-                throw invariant(
-                        "materialization output projection differs from stream registration");
+                throw invariant("materialization output projection differs from stream registration");
             }
             for (SourceGeneration source : task.sources()) {
                 if (source.projectionRef().isPresent()
                         && !source.projectionRef().orElseThrow().equals(projection)) {
-                    throw invariant(
-                            "materialization source projection differs from stream registration");
+                    throw invariant("materialization source projection differs from stream registration");
                 }
                 if (source.generation() > 0 && source.projectionRef().isEmpty()) {
-                    throw invariant(
-                            "higher-generation source is missing its effective projection"
-                                + " identity");
+                    throw invariant("higher-generation source is missing its effective projection" + " identity");
                 }
             }
-            LiveProjectionSubject subject =
-                    new LiveProjectionSubject(
-                            task.streamId(),
-                            projection,
-                            new Checksum(ChecksumType.SHA256, value.projectionIdentitySha256()));
+            LiveProjectionSubject subject = new LiveProjectionSubject(
+                    task.streamId(), projection, new Checksum(ChecksumType.SHA256, value.projectionIdentitySha256()));
             return new AdmissionSubject(profile, subject);
         }
 
         private AdmissionSubject validateAuthority(
-                Optional<VersionedMaterializationStreamRegistration> registration,
-                StreamMetadataSnapshot snapshot) {
+                Optional<VersionedMaterializationStreamRegistration> registration, StreamMetadataSnapshot snapshot) {
             Objects.requireNonNull(registration, "registration");
             StorageProfile snapshotProfile = snapshotProfile(snapshot);
             if (authorityMode == MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION) {
-                if (task.view() != ReadView.TOPIC_COMPACTED
-                        || task.taskKind() != TaskKind.TOPIC_KEY_COMPACTION) {
+                if (task.view() != ReadView.TOPIC_COMPACTED || task.taskKind() != TaskKind.TOPIC_KEY_COMPACTION) {
                     throw new IllegalArgumentException(
                             "Kafka topic-compaction authority admits only topic-key compaction");
                 }
                 if (snapshotProfile == StorageProfile.BOOKKEEPER_WAL_ONLY) {
                     if (registration.isPresent()) {
-                        throw invariant(
-                                "BookKeeper WAL-only Kafka compaction must not use a"
-                                    + " materialization stream registration");
+                        throw invariant("BookKeeper WAL-only Kafka compaction must not use a"
+                                + " materialization stream registration");
                     }
                     requireProjectionFreeAuthority();
                     validateSnapshot(snapshot, snapshotProfile);
@@ -1375,13 +1039,8 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                                             task.streamId(), snapshotProfile)));
                 }
             }
-            AdmissionSubject subject =
-                    validateRegistration(
-                            registration.orElseThrow(
-                                    () ->
-                                            condition(
-                                                    "materialization stream registration is"
-                                                        + " absent")));
+            AdmissionSubject subject = validateRegistration(
+                    registration.orElseThrow(() -> condition("materialization stream registration is" + " absent")));
             validateSnapshot(snapshot, subject.profile());
             return subject;
         }
@@ -1390,8 +1049,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             if (output.projectionRef().isPresent()
                     || task.sources().stream()
                             .anyMatch(source -> source.projectionRef().isPresent())) {
-                throw invariant(
-                        "direct-stream generation publication contains projection authority");
+                throw invariant("direct-stream generation publication contains projection authority");
             }
         }
 
@@ -1406,8 +1064,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             }
         }
 
-        private void validateSnapshot(
-                StreamMetadataSnapshot snapshot, StorageProfile admittedProfile) {
+        private void validateSnapshot(StreamMetadataSnapshot snapshot, StorageProfile admittedProfile) {
             if (!snapshot.metadata().streamId().equals(task.streamId().value())) {
                 throw invariant("stream snapshot belongs to another stream");
             }
@@ -1421,9 +1078,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             }
             if (state != StreamState.ACTIVE && state != StreamState.SEALED) {
                 throw new NereusException(
-                        state == StreamState.DELETED
-                                ? ErrorCode.STREAM_NOT_FOUND
-                                : ErrorCode.STREAM_NOT_ACTIVE,
+                        state == StreamState.DELETED ? ErrorCode.STREAM_NOT_FOUND : ErrorCode.STREAM_NOT_ACTIVE,
                         state == StreamState.CREATING,
                         "stream state does not admit generation publication");
             }
@@ -1439,8 +1094,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             try {
                 MaterializationRecordMapper.requireTaskAndOutput(durable, task, output);
             } catch (IllegalArgumentException failure) {
-                throw invariant(
-                        "durable task/output identity does not match publication input", failure);
+                throw invariant("durable task/output identity does not match publication input", failure);
             }
         }
 
@@ -1454,33 +1108,27 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             }
         }
 
-        private void requireIndexIdentity(
-                VersionedMaterializationTask publishingTask, VersionedGenerationIndex index) {
+        private void requireIndexIdentity(VersionedMaterializationTask publishingTask, VersionedGenerationIndex index) {
             requireFrozenAllocation(publishingTask);
-            GenerationIndexRecord expected =
-                    MaterializationRecordMapper.preparedIndex(
-                            task,
-                            output,
-                            publishingTask.value().allocatedGeneration().orElseThrow(),
-                            publishingTask.value().publicationId(),
-                            index.value().createdAtMillis());
-            String expectedKey =
-                    new F4Keyspace(cluster)
-                            .generationIndexKey(
-                                    task.streamId(),
-                                    task.view(),
-                                    task.coverage().endOffset(),
-                                    publishingTask.value().allocatedGeneration().orElseThrow());
+            GenerationIndexRecord expected = MaterializationRecordMapper.preparedIndex(
+                    task,
+                    output,
+                    publishingTask.value().allocatedGeneration().orElseThrow(),
+                    publishingTask.value().publicationId(),
+                    index.value().createdAtMillis());
+            String expectedKey = new F4Keyspace(cluster)
+                    .generationIndexKey(
+                            task.streamId(),
+                            task.view(),
+                            task.coverage().endOffset(),
+                            publishingTask.value().allocatedGeneration().orElseThrow());
             if (!index.key().equals(expectedKey)
-                    || !MaterializationRecordMapper.sameGenerationPublicationIdentity(
-                            expected, index.value())) {
-                throw invariant(
-                        "generation index does not match the frozen task publication identity");
+                    || !MaterializationRecordMapper.sameGenerationPublicationIdentity(expected, index.value())) {
+                throw invariant("generation index does not match the frozen task publication identity");
             }
         }
 
-        private void requirePreparedExact(
-                VersionedMaterializationTask publishingTask, VersionedGenerationIndex index) {
+        private void requirePreparedExact(VersionedMaterializationTask publishingTask, VersionedGenerationIndex index) {
             requireIndexIdentity(publishingTask, index);
             if (index.value().lifecycle() != GenerationLifecycle.PREPARED) {
                 throw condition("generation index is not PREPARED");
@@ -1495,8 +1143,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             }
         }
 
-        private void requireTaskMatchesIndex(
-                VersionedMaterializationTask durable, VersionedGenerationIndex committed) {
+        private void requireTaskMatchesIndex(VersionedMaterializationTask durable, VersionedGenerationIndex committed) {
             requireFrozenAllocation(durable);
             if (durable.value().allocatedGeneration().orElseThrow()
                             != committed.value().generation()
@@ -1505,8 +1152,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             }
         }
 
-        private void requireSourceIndex(
-                SourceGeneration source, VersionedGenerationCandidate actual) {
+        private void requireSourceIndex(SourceGeneration source, VersionedGenerationCandidate actual) {
             if (!actual.key().equals(source.indexKey())
                     || actual.metadataVersion() != source.indexMetadataVersion()
                     || !actual.durableValueSha256().equals(source.indexRecordSha256())) {
@@ -1519,8 +1165,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 return;
             }
             if (actual instanceof VersionedGenerationIndex higher) {
-                if (source.generation() <= 0
-                        || higher.value().lifecycle() != GenerationLifecycle.COMMITTED) {
+                if (source.generation() <= 0 || higher.value().lifecycle() != GenerationLifecycle.COMMITTED) {
                     throw condition("higher-generation materialization source is not COMMITTED");
                 }
                 return;
@@ -1529,8 +1174,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
         }
 
         private ObjectProtectionOwner taskOwner(VersionedMaterializationTask value) {
-            return new ObjectProtectionOwner(
-                    value.key(), value.metadataVersion(), value.durableValueSha256());
+            return new ObjectProtectionOwner(value.key(), value.metadataVersion(), value.durableValueSha256());
         }
 
         private ObjectProtectionOwner indexOwner(VersionedGenerationIndex value) {
@@ -1545,8 +1189,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                     publishingTask.value().publicationId());
         }
 
-        private GenerationCommitResult commitResult(
-                VersionedGenerationIndex committed, boolean committedByThisCall) {
+        private GenerationCommitResult commitResult(VersionedGenerationIndex committed, boolean committedByThisCall) {
             return new GenerationCommitResult(
                     task.streamId(),
                     task.view(),
@@ -1573,9 +1216,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
 
         private NereusException recoveryExhaustedFailure(String stage) {
             return new NereusException(
-                    ErrorCode.METADATA_CONDITION_FAILED,
-                    true,
-                    stage + " exhausted bounded CAS recovery");
+                    ErrorCode.METADATA_CONDITION_FAILED, true, stage + " exhausted bounded CAS recovery");
         }
     }
 
@@ -1589,16 +1230,14 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 : GenerationOperation.TOPIC_COMPACTED_PUBLISH;
     }
 
-    private static void requireDomainAgreement(
-            MaterializationTask task, MaterializationOutput output) {
+    private static void requireDomainAgreement(MaterializationTask task, MaterializationOutput output) {
         if (!output.taskId().equals(task.taskId())
                 || !output.streamId().equals(task.streamId())
                 || output.view() != task.view()
                 || !output.coverage().equals(task.coverage())
                 || !output.physicalFormat().equals(task.policy().targetPhysicalFormat())
                 || !output.sourceSetSha256().equals(task.sourceSetSha256())) {
-            throw new IllegalArgumentException(
-                    "materialization task/output identity does not agree");
+            throw new IllegalArgumentException("materialization task/output identity does not agree");
         }
         long records = 0;
         long entries = 0;
@@ -1606,8 +1245,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
         long cumulativeCursor = task.sources().get(0).cumulativeSizeAtStart();
         for (SourceGeneration source : task.sources()) {
             if (source.cumulativeSizeAtStart() != cumulativeCursor) {
-                throw new IllegalArgumentException(
-                        "materialization source cumulative intervals are not contiguous");
+                throw new IllegalArgumentException("materialization source cumulative intervals are not contiguous");
             }
             records = Math.addExact(records, source.recordCount());
             entries = Math.addExact(entries, source.entryCount());
@@ -1617,34 +1255,29 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
         if (records != output.sourceRecordCount()
                 || output.cumulativeSizeAtStart() != task.sources().get(0).cumulativeSizeAtStart()
                 || output.cumulativeSizeAtEnd() != cumulativeCursor) {
-            throw new IllegalArgumentException(
-                    "materialization output/source accounting does not agree");
+            throw new IllegalArgumentException("materialization output/source accounting does not agree");
         }
         if (task.view() == ReadView.COMMITTED
                 && (entries != output.entryCount() || logicalBytes != output.logicalBytes())) {
-            throw new IllegalArgumentException(
-                    "lossless materialization output accounting is not exact");
+            throw new IllegalArgumentException("lossless materialization output accounting is not exact");
         }
     }
 
-    private static boolean sameVersionedTask(
-            VersionedMaterializationTask left, VersionedMaterializationTask right) {
+    private static boolean sameVersionedTask(VersionedMaterializationTask left, VersionedMaterializationTask right) {
         return left.key().equals(right.key())
                 && left.metadataVersion() == right.metadataVersion()
                 && left.durableValueSha256().equals(right.durableValueSha256())
                 && left.value().equals(right.value());
     }
 
-    private static boolean sameVersionedIndex(
-            VersionedGenerationIndex left, VersionedGenerationIndex right) {
+    private static boolean sameVersionedIndex(VersionedGenerationIndex left, VersionedGenerationIndex right) {
         return left.key().equals(right.key())
                 && left.metadataVersion() == right.metadataVersion()
                 && left.durableValueSha256().equals(right.durableValueSha256())
                 && left.value().equals(right.value());
     }
 
-    private static void requireSameOwner(
-            ObjectProtectionOwner expected, ObjectProtectionOwner actual, String message) {
+    private static void requireSameOwner(ObjectProtectionOwner expected, ObjectProtectionOwner actual, String message) {
         if (!expected.equals(actual)) {
             throw condition(message);
         }

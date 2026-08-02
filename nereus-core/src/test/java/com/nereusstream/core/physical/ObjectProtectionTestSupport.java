@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.Checksum;
@@ -18,19 +19,11 @@ final class ObjectProtectionTestSupport {
     static final String CLUSTER = "cluster-a";
     static final long NOW = 2_000_000L;
 
-    private ObjectProtectionTestSupport() {
-    }
+    private ObjectProtectionTestSupport() {}
 
-    static DefaultObjectProtectionManager manager(
-            FakePhysicalObjectMetadataStore store,
-            Clock clock) {
+    static DefaultObjectProtectionManager manager(FakePhysicalObjectMetadataStore store, Clock clock) {
         return new DefaultObjectProtectionManager(
-                CLUSTER,
-                store,
-                Duration.ofMinutes(1),
-                Duration.ofSeconds(1),
-                Duration.ofMinutes(5),
-                clock);
+                CLUSTER, store, Duration.ofMinutes(1), Duration.ofSeconds(1), Duration.ofMinutes(5), clock);
     }
 
     static PhysicalObjectIdentity object() {
@@ -53,11 +46,7 @@ final class ObjectProtectionTestSupport {
 
     static ObjectProtectionRequest permanent(ObjectProtectionOwner owner) {
         return new ObjectProtectionRequest(
-                object(),
-                ObjectProtectionType.VISIBLE_GENERATION,
-                "generation-ref",
-                owner,
-                0);
+                object(), ObjectProtectionType.VISIBLE_GENERATION, "generation-ref", owner, 0);
     }
 
     static Throwable unwrap(Throwable supplied) {

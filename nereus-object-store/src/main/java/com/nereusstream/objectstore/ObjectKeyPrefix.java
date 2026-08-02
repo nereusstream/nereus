@@ -1,9 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import java.util.Objects;
 
-/** Canonical relative object-key prefix for bounded provider listing. */
+/**
+ * Canonical relative object-key prefix for bounded provider listing.
+ */
 public record ObjectKeyPrefix(String value) {
     public ObjectKeyPrefix {
         Objects.requireNonNull(value, "value");

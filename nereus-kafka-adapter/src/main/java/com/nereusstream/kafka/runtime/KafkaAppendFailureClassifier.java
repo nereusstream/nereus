@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.AppendOutcome;
@@ -8,7 +9,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
-/** Conservative append-outcome classifier; Kafka exception names remain owned by the fork. */
+/**
+ * Conservative append-outcome classifier; Kafka exception names remain owned by the fork.
+ */
 public final class KafkaAppendFailureClassifier {
     private KafkaAppendFailureClassifier() {}
 

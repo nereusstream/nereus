@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.AppendOutcome;
@@ -13,37 +14,29 @@ import com.nereusstream.metadata.oxia.records.StreamCommitTargetRecord;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Shared exact validation and hydration for live and NRC1 generic append records. */
+/**
+ * Shared exact validation and hydration for live and NRC1 generic append records.
+ */
 public final class AppendReplayRecords {
-    private AppendReplayRecords() {
-    }
+    private AppendReplayRecords() {}
 
     public static CommittedAppend validateAndHydrate(
-            CommitAppendRequest request,
-            StreamCommitTargetRecord record,
-            AppendOutcome mismatchOutcome) {
+            CommitAppendRequest request, StreamCommitTargetRecord record, AppendOutcome mismatchOutcome) {
         requireMatches(request, record, mismatchOutcome);
         return hydrate(record, request.projectionRef());
     }
 
     public static void requireMatches(
-            CommitAppendRequest request,
-            StreamCommitTargetRecord record,
-            AppendOutcome mismatchOutcome) {
+            CommitAppendRequest request, StreamCommitTargetRecord record, AppendOutcome mismatchOutcome) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(record, "record");
         Objects.requireNonNull(mismatchOutcome, "mismatchOutcome");
         long expectedEnd;
         try {
-            expectedEnd = Math.addExact(
-                    request.expectedStartOffset(), request.recordCount());
+            expectedEnd = Math.addExact(request.expectedStartOffset(), request.recordCount());
         } catch (ArithmeticException failure) {
             throw new NereusException(
-                    ErrorCode.INVALID_ARGUMENT,
-                    false,
-                    "generic append end offset overflows",
-                    failure,
-                    mismatchOutcome);
+                    ErrorCode.INVALID_ARGUMENT, false, "generic append end offset overflows", failure, mismatchOutcome);
         }
         if (!record.commitId().equals(request.commitId())
                 || !record.streamId().equals(request.streamId().value())
@@ -71,9 +64,7 @@ public final class AppendReplayRecords {
         }
     }
 
-    public static CommittedAppend hydrate(
-            StreamCommitTargetRecord record,
-            Optional<ProjectionRef> projectionRef) {
+    public static CommittedAppend hydrate(StreamCommitTargetRecord record, Optional<ProjectionRef> projectionRef) {
         Objects.requireNonNull(record, "record");
         Objects.requireNonNull(projectionRef, "projectionRef");
         return new CommittedAppend(

@@ -16,7 +16,6 @@ package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ReadView;
@@ -31,7 +30,8 @@ class F4KeyspaceTest {
     @Test
     void keepsCommittedAndTopicCompactedIndexesInDisjointNamespaces() {
         assertThat(keys.generationIndexKey(streamId, ReadView.COMMITTED, 12, 3))
-                .isEqualTo("/nereus/clusters/test-cluster/streams/stream-1/offset-index/0000000000000000012/0000000000000000003");
+                .isEqualTo("/nereus/clusters/test-cluster/streams/stream-1/offset-index/0000000000000000012"
+                        + "/0000000000000000003");
         assertThat(keys.generationIndexKey(streamId, ReadView.TOPIC_COMPACTED, 12, 3))
                 .isEqualTo("/nereus/clusters/test-cluster/streams/stream-1/views/v1/topic-compacted/offset-index/"
                         + "0000000000000000012/0000000000000000003");
@@ -40,29 +40,22 @@ class F4KeyspaceTest {
     @Test
     void strictGenerationIndexRouterRoundTripsEveryViewAndEncodedStream() {
         StreamId encodedStream = new StreamId("tenant/ns/stream");
-        String generationZero = keys.generationIndexKey(
-                encodedStream, ReadView.COMMITTED, 12, 0);
-        String higher = keys.generationIndexKey(
-                encodedStream, ReadView.TOPIC_COMPACTED, 12, 3);
+        String generationZero = keys.generationIndexKey(encodedStream, ReadView.COMMITTED, 12, 0);
+        String higher = keys.generationIndexKey(encodedStream, ReadView.TOPIC_COMPACTED, 12, 3);
 
         assertThat(keys.parseGenerationIndexKey(generationZero))
-                .isEqualTo(new GenerationCandidateKeyIdentity(
-                        encodedStream, ReadView.COMMITTED, 12, 0));
+                .isEqualTo(new GenerationCandidateKeyIdentity(encodedStream, ReadView.COMMITTED, 12, 0));
         assertThat(keys.parseGenerationIndexKey(higher))
-                .isEqualTo(new GenerationCandidateKeyIdentity(
-                        encodedStream, ReadView.TOPIC_COMPACTED, 12, 3));
+                .isEqualTo(new GenerationCandidateKeyIdentity(encodedStream, ReadView.TOPIC_COMPACTED, 12, 3));
 
         assertThatThrownBy(() -> keys.parseGenerationIndexKey(
                         generationZero.replace("/offset-index/", "/views/v1/topic-compacted/offset-index/")))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> keys.parseGenerationIndexKey(
-                        higher + "/extra"))
+        assertThatThrownBy(() -> keys.parseGenerationIndexKey(higher + "/extra"))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> keys.parseGenerationIndexKey(
-                        higher.replace("0000000000000000012", "12")))
+        assertThatThrownBy(() -> keys.parseGenerationIndexKey(higher.replace("0000000000000000012", "12")))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new F4Keyspace("other-cluster")
-                        .parseGenerationIndexKey(higher))
+        assertThatThrownBy(() -> new F4Keyspace("other-cluster").parseGenerationIndexKey(higher))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -77,8 +70,7 @@ class F4KeyspaceTest {
                 .isBetween(from, to);
         assertThat(keys.generationIndexScanToAfterEnd(streamId, ReadView.COMMITTED, 12))
                 .endsWith("/0000000000000000013/");
-        assertThat(keys.retentionStatsScanToAfterEnd(streamId, Long.MAX_VALUE))
-                .endsWith("/~/");
+        assertThat(keys.retentionStatsScanToAfterEnd(streamId, Long.MAX_VALUE)).endsWith("/~/");
     }
 
     @Test
@@ -91,8 +83,7 @@ class F4KeyspaceTest {
         assertThat(F4MetadataStoreSupport.fixedDepthEnd(base, 2)).isEqualTo("/root/protections/~/");
         assertThat("/root/protections/01/reference")
                 .isBetween(
-                        F4MetadataStoreSupport.fixedDepthStart(base, 2),
-                        F4MetadataStoreSupport.fixedDepthEnd(base, 2));
+                        F4MetadataStoreSupport.fixedDepthStart(base, 2), F4MetadataStoreSupport.fixedDepthEnd(base, 2));
     }
 
     @Test
@@ -100,10 +91,8 @@ class F4KeyspaceTest {
         assertThat(keys.materializationRegistryShard(streamId)).isEqualTo(51);
         assertThat(keys.materializationRegistryKey(streamId))
                 .isEqualTo("/nereus/clusters/test-cluster/materialization/v1/stream-registry/51/stream-1");
-        assertThat(keys.materializationRegistryPartitionKey(51).value())
-                .isEqualTo("materialization-registry-v1-51");
-        assertThatThrownBy(() -> keys.materializationRegistryPrefix(64))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(keys.materializationRegistryPartitionKey(51).value()).isEqualTo("materialization-registry-v1-51");
+        assertThatThrownBy(() -> keys.materializationRegistryPrefix(64)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -119,8 +108,7 @@ class F4KeyspaceTest {
         assertThat(keys.protectionKey(hash, ObjectProtectionType.VISIBLE_GENERATION, "index/1"))
                 .startsWith("/nereus/clusters/test-cluster/physical-objects/v1/246/objects/" + hash.value())
                 .endsWith("/protections/01/b32-nfxgizlyf4yq");
-        assertThat(keys.physicalObjectPartitionKey(hash).value())
-                .isEqualTo("physical-object-v1-246");
+        assertThat(keys.physicalObjectPartitionKey(hash).value()).isEqualTo("physical-object-v1-246");
     }
 
     @Test
@@ -132,16 +120,12 @@ class F4KeyspaceTest {
                 + "/gc-retirement/"
                 + attempt;
 
-        assertThat(keys.gcRetirementManifestKey(hash, attempt))
-                .isEqualTo(base + "/manifest");
-        assertThat(keys.gcRetirementProtectionPrefix(hash, attempt))
-                .isEqualTo(base + "/protections");
+        assertThat(keys.gcRetirementManifestKey(hash, attempt)).isEqualTo(base + "/manifest");
+        assertThat(keys.gcRetirementProtectionPrefix(hash, attempt)).isEqualTo(base + "/protections");
         assertThat(keys.gcRetirementProtectionKey(hash, attempt, "/protections/source"))
-                .isEqualTo(base
-                        + "/protections/1eee441a0857bd4edfa9cb787d78162970583693aae2ec2c15f34d3753852dc6");
+                .isEqualTo(base + "/protections/1eee441a0857bd4edfa9cb787d78162970583693aae2ec2c15f34d3753852dc6");
         assertThat(keys.gcRetirementRemovalKey(hash, attempt, "/source/index"))
-                .isEqualTo(base
-                        + "/removals/d7b6f51ee326a90d121524a1597870129b33425636f298a263c1ff557bab3a15");
+                .isEqualTo(base + "/removals/d7b6f51ee326a90d121524a1597870129b33425636f298a263c1ff557bab3a15");
         assertThatThrownBy(() -> keys.gcRetirementManifestKey(hash, "not/base32"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -150,7 +134,6 @@ class F4KeyspaceTest {
     void activationAndStreamKeysCannotSharePartitions() {
         assertThat(keys.generationProtocolActivationKey())
                 .isEqualTo("/nereus/clusters/test-cluster/capabilities/generation-v1/activation");
-        assertThat(keys.generationProtocolActivationPartitionKey())
-                .isNotEqualTo(keys.streamPartitionKey(streamId));
+        assertThat(keys.generationProtocolActivationPartitionKey()).isNotEqualTo(keys.streamPartitionKey(streamId));
     }
 }

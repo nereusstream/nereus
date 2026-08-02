@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
-/** Closed V1 classification of physically collectible object-store bytes. */
+/**
+ * Closed V1 classification of physically collectible object-store bytes.
+ */
 public enum PhysicalObjectKind {
     OBJECT_WAL(1),
     COMMITTED_COMPACTED(2),

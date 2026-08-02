@@ -21,57 +21,52 @@ import com.nereusstream.materialization.ExactSourceSetBatchPublisher;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 
-/** Opens the two cold, exact source streams frozen by one recovered KCP1 plan. */
+/**
+ * Opens the two cold, exact source streams frozen by one recovered KCP1 plan.
+ */
 public final class KafkaCompactionBatchSource {
-  private final ReaderFactory readers;
-  private final ReadOptions options;
-  private final Executor callbackExecutor;
+    private final ReaderFactory readers;
+    private final ReadOptions options;
+    private final Executor callbackExecutor;
 
-  public KafkaCompactionBatchSource(
-      ExactSourceRangeReader reader, ReadOptions options, Executor callbackExecutor) {
-    this(ignored -> Objects.requireNonNull(reader, "reader"), options, callbackExecutor);
-  }
-
-  public KafkaCompactionBatchSource(
-      ReaderFactory readers, ReadOptions options, Executor callbackExecutor) {
-    this.readers = Objects.requireNonNull(readers, "readers");
-    this.options = Objects.requireNonNull(options, "options");
-    this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
-  }
-
-  public PassStreams open(KafkaCompactionPlan recoveredPlan) {
-    KafkaCompactionPlan plan = Objects.requireNonNull(recoveredPlan, "recoveredPlan");
-    ExactSourceRangeReader reader =
-        Objects.requireNonNull(
-            readers.create(plan.streamId()), "Kafka exact-source reader factory returned null");
-    return new PassStreams(
-        new ExactSourceSetBatchPublisher(
-            plan.decisionSources(), reader, options, callbackExecutor, true),
-        new ExactSourceSetBatchPublisher(
-            plan.outputSources(), reader, options, callbackExecutor, true));
-  }
-
-  @FunctionalInterface
-  public interface ReaderFactory {
-    ExactSourceRangeReader create(StreamId streamId);
-  }
-
-  public record PassStreams(
-      ExactSourceSetBatchPublisher decisionHorizon, ExactSourceSetBatchPublisher outputCoverage)
-      implements AutoCloseable {
-    public PassStreams {
-      Objects.requireNonNull(decisionHorizon, "decisionHorizon");
-      Objects.requireNonNull(outputCoverage, "outputCoverage");
-      if (decisionHorizon == outputCoverage) {
-        throw new IllegalArgumentException(
-            "Kafka compaction passes require independent cold streams");
-      }
+    public KafkaCompactionBatchSource(ExactSourceRangeReader reader, ReadOptions options, Executor callbackExecutor) {
+        this(ignored -> Objects.requireNonNull(reader, "reader"), options, callbackExecutor);
     }
 
-    @Override
-    public void close() {
-      decisionHorizon.close();
-      outputCoverage.close();
+    public KafkaCompactionBatchSource(ReaderFactory readers, ReadOptions options, Executor callbackExecutor) {
+        this.readers = Objects.requireNonNull(readers, "readers");
+        this.options = Objects.requireNonNull(options, "options");
+        this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
     }
-  }
+
+    public PassStreams open(KafkaCompactionPlan recoveredPlan) {
+        KafkaCompactionPlan plan = Objects.requireNonNull(recoveredPlan, "recoveredPlan");
+        ExactSourceRangeReader reader = Objects.requireNonNull(
+                readers.create(plan.streamId()), "Kafka exact-source reader factory returned null");
+        return new PassStreams(
+                new ExactSourceSetBatchPublisher(plan.decisionSources(), reader, options, callbackExecutor, true),
+                new ExactSourceSetBatchPublisher(plan.outputSources(), reader, options, callbackExecutor, true));
+    }
+
+    @FunctionalInterface
+    public interface ReaderFactory {
+        ExactSourceRangeReader create(StreamId streamId);
+    }
+
+    public record PassStreams(ExactSourceSetBatchPublisher decisionHorizon, ExactSourceSetBatchPublisher outputCoverage)
+            implements AutoCloseable {
+        public PassStreams {
+            Objects.requireNonNull(decisionHorizon, "decisionHorizon");
+            Objects.requireNonNull(outputCoverage, "outputCoverage");
+            if (decisionHorizon == outputCoverage) {
+                throw new IllegalArgumentException("Kafka compaction passes require independent cold streams");
+            }
+        }
+
+        @Override
+        public void close() {
+            decisionHorizon.close();
+            outputCoverage.close();
+        }
+    }
 }

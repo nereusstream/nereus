@@ -17,7 +17,9 @@ package com.nereusstream.core.recovery;
 import com.nereusstream.api.ObjectId;
 import java.util.Objects;
 
-/** Result of inspecting one operationally supplied object id against metadata truth. */
+/**
+ * Result of inspecting one operationally supplied object id against metadata truth.
+ */
 public record OrphanObjectAssessment(
         ObjectId objectId,
         OrphanObjectStatus status,
@@ -27,8 +29,10 @@ public record OrphanObjectAssessment(
     public OrphanObjectAssessment {
         Objects.requireNonNull(objectId, "objectId");
         Objects.requireNonNull(status, "status");
-        if (manifestSliceCount < 0 || reachableSliceCount < 0
-                || reachableSliceCount > manifestSliceCount || orphanExpiresAtMillis < 0) {
+        if (manifestSliceCount < 0
+                || reachableSliceCount < 0
+                || reachableSliceCount > manifestSliceCount
+                || orphanExpiresAtMillis < 0) {
             throw new IllegalArgumentException("orphan assessment counts and expiry must be valid");
         }
         if (status == OrphanObjectStatus.MISSING_MANIFEST
@@ -57,7 +61,9 @@ public record OrphanObjectAssessment(
         }
     }
 
-    /** Phase 1 assessments are diagnostic only and never prove safe deletion. */
+    /**
+     * Phase 1 assessments are diagnostic only and never prove safe deletion.
+     */
     public boolean deletionAllowed() {
         return false;
     }

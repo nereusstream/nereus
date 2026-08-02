@@ -17,16 +17,15 @@ package com.nereusstream.core.trim;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.StreamId;
 
-/** Metrics hook for Phase 1 trim outcomes. */
+/**
+ * Metrics hook for Phase 1 trim outcomes.
+ */
 public interface TrimMetricsObserver {
-    default void onTrimSucceeded(StreamId streamId, long trimOffset) {
-    }
+    default void onTrimSucceeded(StreamId streamId, long trimOffset) {}
 
-    default void onTrimFailed(ErrorCode errorCode) {
-    }
+    default void onTrimFailed(ErrorCode errorCode) {}
 
     static TrimMetricsObserver noop() {
-        return new TrimMetricsObserver() {
-        };
+        return new TrimMetricsObserver() {};
     }
 }

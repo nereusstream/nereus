@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.wal.object;
 
 import com.nereusstream.api.Checksum;
@@ -12,7 +13,9 @@ import com.nereusstream.core.wal.PrimaryPhysicalIdentity;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** Exact Object-WAL slice identity exposed through the provider-neutral append seam. */
+/**
+ * Exact Object-WAL slice identity exposed through the provider-neutral append seam.
+ */
 public record ObjectPrimaryPhysicalIdentity(
         ObjectId objectId,
         ObjectKey objectKey,
@@ -20,7 +23,8 @@ public record ObjectPrimaryPhysicalIdentity(
         long objectOffset,
         long objectLength,
         Checksum sliceChecksum,
-        Checksum targetIdentity) implements PrimaryPhysicalIdentity {
+        Checksum targetIdentity)
+        implements PrimaryPhysicalIdentity {
     public ObjectPrimaryPhysicalIdentity {
         Objects.requireNonNull(objectId, "objectId");
         Objects.requireNonNull(objectKey, "objectKey");
@@ -34,11 +38,23 @@ public record ObjectPrimaryPhysicalIdentity(
     }
 
     public static ObjectPrimaryPhysicalIdentity from(ObjectSliceReadTarget target) {
-        return new ObjectPrimaryPhysicalIdentity(target.objectId(), target.objectKey(), target.objectType(),
-                target.objectOffset(), target.objectLength(), target.sliceChecksum(),
+        return new ObjectPrimaryPhysicalIdentity(
+                target.objectId(),
+                target.objectKey(),
+                target.objectType(),
+                target.objectOffset(),
+                target.objectLength(),
+                target.sliceChecksum(),
                 ReadTargetIdentities.sha256(target));
     }
 
-    @Override public ReadTargetType targetType() { return ReadTargetType.OBJECT_SLICE; }
-    @Override public byte[] canonicalIdentity() { return targetIdentity.value().getBytes(StandardCharsets.US_ASCII); }
+    @Override
+    public ReadTargetType targetType() {
+        return ReadTargetType.OBJECT_SLICE;
+    }
+
+    @Override
+    public byte[] canonicalIdentity() {
+        return targetIdentity.value().getBytes(StandardCharsets.US_ASCII);
+    }
 }

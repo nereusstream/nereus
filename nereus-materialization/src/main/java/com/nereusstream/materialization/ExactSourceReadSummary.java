@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -6,13 +7,11 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.OffsetRange;
 import java.util.Objects;
 
-/** Exact accounting proved after a complete dense source read. */
+/**
+ * Exact accounting proved after a complete dense source read.
+ */
 public record ExactSourceReadSummary(
-        OffsetRange coverage,
-        int recordCount,
-        int entryCount,
-        long logicalBytes,
-        Checksum orderedPayloadSha256) {
+        OffsetRange coverage, int recordCount, int entryCount, long logicalBytes, Checksum orderedPayloadSha256) {
     public ExactSourceReadSummary {
         Objects.requireNonNull(coverage, "coverage");
         if (coverage.isEmpty()

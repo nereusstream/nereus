@@ -18,7 +18,9 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
 import java.util.Objects;
 
-/** Immutable mapping between one managed-ledger topic incarnation and one Nereus stream. */
+/**
+ * Immutable mapping between one managed-ledger topic incarnation and one Nereus stream.
+ */
 public record VirtualLedgerProjection(
         StreamId streamId,
         String managedLedgerName,

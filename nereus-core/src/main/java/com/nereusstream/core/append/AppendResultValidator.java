@@ -23,23 +23,22 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-/** Validates that a committed result is the exact logical append accepted from the caller. */
+/**
+ * Validates that a committed result is the exact logical append accepted from the caller.
+ */
 public final class AppendResultValidator {
-    private AppendResultValidator() {
-    }
+    private AppendResultValidator() {}
 
     public static AppendResult requireExactRequest(
-            StreamId streamId,
-            AppendBatch request,
-            AppendPrecondition precondition,
-            AppendResult result) {
+            StreamId streamId, AppendBatch request, AppendPrecondition precondition, AppendResult result) {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(precondition, "precondition");
         Objects.requireNonNull(result, "result");
         long logicalBytes = logicalBytes(request);
         boolean expectedStartMatches = precondition.expectedStartOffset().isEmpty()
-                || precondition.expectedStartOffset().getAsLong() == result.range().startOffset();
+                || precondition.expectedStartOffset().getAsLong()
+                        == result.range().startOffset();
         if (!result.streamId().equals(streamId)
                 || result.payloadFormat() != request.payloadFormat()
                 || result.recordCount() != request.recordCount()

@@ -17,7 +17,9 @@ package com.nereusstream.api;
 import com.nereusstream.api.keys.DeterministicIds;
 import java.util.Objects;
 
-/** Base32lower-no-pad SHA-256 of the exact UTF-8 object key. */
+/**
+ * Base32lower-no-pad SHA-256 of the exact UTF-8 object key.
+ */
 public record ObjectKeyHash(String value) {
     private static final int SHA256_BASE32_LENGTH = 52;
 

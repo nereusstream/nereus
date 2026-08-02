@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectKey;
@@ -11,28 +11,28 @@ import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationActivationSubject;
 import com.nereusstream.core.capability.GenerationOperation;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
+import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.GcAuthorityToken;
 import com.nereusstream.core.physical.GcReferenceDomain;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
-import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
-import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
-import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.retirement.SourceRetirementMetadataStore;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.PutObjectOptions;
 import com.nereusstream.objectstore.PutObjectResult;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
+import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -51,14 +51,12 @@ import org.junit.jupiter.api.io.TempDir;
 
 class OwnerlessObjectGcExecutorTest {
     private static final String CLUSTER = "cluster-a";
-    private static final Checksum SHA =
-            new Checksum(ChecksumType.SHA256, "a".repeat(64));
+    private static final Checksum SHA = new Checksum(ChecksumType.SHA256, "a".repeat(64));
 
     @TempDir
     Path temporary;
 
-    private final ScheduledExecutorService scheduler =
-            Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     @AfterEach
     void closeScheduler() {
@@ -72,16 +70,13 @@ class OwnerlessObjectGcExecutorTest {
         ClearDomain domain = new ClearDomain();
         try (LocalFileObjectStore objects = new LocalFileObjectStore(temporary.resolve("objects"))) {
             VersionedPhysicalObjectRoot active = root(metadata, put(objects));
-            OwnerlessObjectGcExecutor executor = executor(
-                    metadata, objects, domain, clock);
+            OwnerlessObjectGcExecutor executor = executor(metadata, objects, domain, clock);
 
             OwnerlessObjectGcExecutor.ExecutionResult first =
                     executor.executeActive(active).join();
 
-            assertThat(first.mark().orElseThrow().status())
-                    .isEqualTo(PhysicalGcMarkStatus.MARKED);
-            assertThat(first.advance().orElseThrow().status())
-                    .isEqualTo(PhysicalGcAdvanceStatus.WAITING_FOR_GRACE);
+            assertThat(first.mark().orElseThrow().status()).isEqualTo(PhysicalGcMarkStatus.MARKED);
+            assertThat(first.advance().orElseThrow().status()).isEqualTo(PhysicalGcAdvanceStatus.WAITING_FOR_GRACE);
             VersionedPhysicalObjectRoot marked = metadata.getRoot(
                             CLUSTER, new ObjectKeyHash(active.value().objectKeyHash()))
                     .join()
@@ -89,18 +84,14 @@ class OwnerlessObjectGcExecutorTest {
             assertThat(marked.value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.MARKED);
 
             clock.setMillis(12_000);
-            OwnerlessObjectGcExecutor.ExecutionResult recovered = executor(
-                            metadata, objects, domain, clock)
+            OwnerlessObjectGcExecutor.ExecutionResult recovered = executor(metadata, objects, domain, clock)
                     .recoverMarked(marked)
                     .join();
 
-            assertThat(recovered.advance().orElseThrow().status())
-                    .isEqualTo(PhysicalGcAdvanceStatus.DELETE_INTENT);
-            assertThat(recovered.deletion().orElseThrow().status())
-                    .isEqualTo(PhysicalGcDeletionStatus.DELETED);
+            assertThat(recovered.advance().orElseThrow().status()).isEqualTo(PhysicalGcAdvanceStatus.DELETE_INTENT);
+            assertThat(recovered.deletion().orElseThrow().status()).isEqualTo(PhysicalGcDeletionStatus.DELETED);
             assertThat(metadata.getRoot(
-                                    CLUSTER,
-                                    new ObjectKeyHash(active.value().objectKeyHash()))
+                                    CLUSTER, new ObjectKeyHash(active.value().objectKeyHash()))
                             .join()
                             .orElseThrow()
                             .value()
@@ -116,8 +107,7 @@ class OwnerlessObjectGcExecutorTest {
         ClearDomain domain = new ClearDomain();
         try (LocalFileObjectStore objects = new LocalFileObjectStore(temporary.resolve("veto"))) {
             VersionedPhysicalObjectRoot active = root(metadata, put(objects));
-            OwnerlessObjectGcExecutor executor = executor(
-                    metadata, objects, domain, clock);
+            OwnerlessObjectGcExecutor executor = executor(metadata, objects, domain, clock);
             executor.executeActive(active).join();
             VersionedPhysicalObjectRoot marked = metadata.getRoot(
                             CLUSTER, new ObjectKeyHash(active.value().objectKeyHash()))
@@ -129,11 +119,9 @@ class OwnerlessObjectGcExecutorTest {
             OwnerlessObjectGcExecutor.ExecutionResult result =
                     executor.recoverMarked(marked).join();
 
-            assertThat(result.advance().orElseThrow().status())
-                    .isEqualTo(PhysicalGcAdvanceStatus.PLAN_DRIFT_UNMARKED);
+            assertThat(result.advance().orElseThrow().status()).isEqualTo(PhysicalGcAdvanceStatus.PLAN_DRIFT_UNMARKED);
             assertThat(metadata.getRoot(
-                                    CLUSTER,
-                                    new ObjectKeyHash(active.value().objectKeyHash()))
+                                    CLUSTER, new ObjectKeyHash(active.value().objectKeyHash()))
                             .join()
                             .orElseThrow()
                             .value()
@@ -149,22 +137,23 @@ class OwnerlessObjectGcExecutorTest {
         ClearDomain domain = new ClearDomain();
         try (LocalFileObjectStore objects = new LocalFileObjectStore(temporary.resolve("protected"))) {
             VersionedPhysicalObjectRoot active = root(metadata, put(objects));
-            metadata.createProtection(CLUSTER, new ObjectProtectionRecord(
-                            1,
-                            active.value().objectKeyHash(),
-                            ObjectProtectionType.VISIBLE_GENERATION.wireId(),
-                            "generation-one",
-                            "/owner/generation-one",
-                            1,
-                            SHA.value(),
-                            active.value().lifecycleEpoch(),
-                            1_000,
-                            0,
-                            0))
+            metadata.createProtection(
+                            CLUSTER,
+                            new ObjectProtectionRecord(
+                                    1,
+                                    active.value().objectKeyHash(),
+                                    ObjectProtectionType.VISIBLE_GENERATION.wireId(),
+                                    "generation-one",
+                                    "/owner/generation-one",
+                                    1,
+                                    SHA.value(),
+                                    active.value().lifecycleEpoch(),
+                                    1_000,
+                                    0,
+                                    0))
                     .join();
 
-            OwnerlessObjectGcExecutor.ExecutionResult result = executor(
-                            metadata, objects, domain, clock)
+            OwnerlessObjectGcExecutor.ExecutionResult result = executor(metadata, objects, domain, clock)
                     .executeActive(active)
                     .join();
 
@@ -172,8 +161,7 @@ class OwnerlessObjectGcExecutorTest {
             assertThat(result.advance()).isEmpty();
             assertThat(domain.snapshotCalls).hasValue(0);
             assertThat(metadata.getRoot(
-                                    CLUSTER,
-                                    new ObjectKeyHash(active.value().objectKeyHash()))
+                                    CLUSTER, new ObjectKeyHash(active.value().objectKeyHash()))
                             .join()
                             .orElseThrow()
                             .value()
@@ -183,10 +171,7 @@ class OwnerlessObjectGcExecutorTest {
     }
 
     private OwnerlessObjectGcExecutor executor(
-            FakePhysicalObjectMetadataStore metadata,
-            LocalFileObjectStore objects,
-            ClearDomain domain,
-            Clock clock) {
+            FakePhysicalObjectMetadataStore metadata, LocalFileObjectStore objects, ClearDomain domain, Clock clock) {
         PhysicalGcConfig config = config();
         SourceRetirementMetadataStore sources = emptySourceStore();
         ObjectProtectionManager protections = new DefaultObjectProtectionManager(
@@ -197,17 +182,9 @@ class OwnerlessObjectGcExecutorTest {
                 config.orphanGrace(),
                 clock);
         AbandonedAppendIntentPlanBuilder abandonedAppendIntents =
-                new AbandonedAppendIntentPlanBuilder(
-                        CLUSTER,
-                        metadata,
-                        sources,
-                        protections,
-                        config,
-                        scheduler);
-        GcReferenceDomainRegistry domains = new GcReferenceDomainRegistry(
-                config, scheduler, List.of(domain));
-        DefaultGcRetirementJournal journal = new DefaultGcRetirementJournal(
-                CLUSTER, metadata, config);
+                new AbandonedAppendIntentPlanBuilder(CLUSTER, metadata, sources, protections, config, scheduler);
+        GcReferenceDomainRegistry domains = new GcReferenceDomainRegistry(config, scheduler, List.of(domain));
+        DefaultGcRetirementJournal journal = new DefaultGcRetirementJournal(CLUSTER, metadata, config);
         PhysicalObjectGarbageCollector collector = new PhysicalObjectGarbageCollector(
                 CLUSTER,
                 config,
@@ -254,7 +231,7 @@ class OwnerlessObjectGcExecutorTest {
                     }
                     return switch (method.getName()) {
                         case "getCommitNodeByKey", "getCommittedMarkerByKey", "getCommittedMarker" ->
-                                CompletableFuture.completedFuture(Optional.empty());
+                            CompletableFuture.completedFuture(Optional.empty());
                         case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
                     };
@@ -269,21 +246,11 @@ class OwnerlessObjectGcExecutorTest {
                     GenerationActivationSubject subject,
                     boolean activateLiveProjectionIfAbsent) {
                 return CompletableFuture.completedFuture(
-                        GenerationActivationProof.create(
-                                operation,
-                                subject,
-                                0,
-                                1,
-                                1,
-                                SHA,
-                                false,
-                                true,
-                                1_000));
+                        GenerationActivationProof.create(operation, subject, 0, 1, 1, SHA, false, true, 1_000));
             }
 
             @Override
-            public CompletableFuture<Void> revalidate(
-                    GenerationActivationProof proof) {
+            public CompletableFuture<Void> revalidate(GenerationActivationProof proof) {
                 return CompletableFuture.completedFuture(null);
             }
         };
@@ -303,33 +270,34 @@ class OwnerlessObjectGcExecutorTest {
                 .join();
     }
 
-    private static VersionedPhysicalObjectRoot root(
-            FakePhysicalObjectMetadataStore metadata, PutObjectResult object) {
-        return metadata.createRoot(CLUSTER, new PhysicalObjectRootRecord(
-                        1,
-                        ObjectKeyHash.from(object.key()).value(),
-                        object.key().value(),
-                        "",
-                        PhysicalObjectKind.COMMITTED_COMPACTED.wireId(),
-                        object.objectLength(),
-                        object.checksum().type().name(),
-                        object.checksum().value(),
-                        "",
-                        object.etag(),
-                        PhysicalObjectLifecycle.ACTIVE,
-                        1,
-                        100,
-                        100,
-                        "",
-                        "",
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        "",
-                        "",
-                        0))
+    private static VersionedPhysicalObjectRoot root(FakePhysicalObjectMetadataStore metadata, PutObjectResult object) {
+        return metadata.createRoot(
+                        CLUSTER,
+                        new PhysicalObjectRootRecord(
+                                1,
+                                ObjectKeyHash.from(object.key()).value(),
+                                object.key().value(),
+                                "",
+                                PhysicalObjectKind.COMMITTED_COMPACTED.wireId(),
+                                object.objectLength(),
+                                object.checksum().type().name(),
+                                object.checksum().value(),
+                                "",
+                                object.etag(),
+                                PhysicalObjectLifecycle.ACTIVE,
+                                1,
+                                100,
+                                100,
+                                "",
+                                "",
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                "",
+                                "",
+                                0))
                 .join();
     }
 
@@ -370,8 +338,7 @@ class OwnerlessObjectGcExecutorTest {
         }
 
         @Override
-        public CompletableFuture<GcReferenceSnapshot> snapshot(
-                GcReferenceQuery query) {
+        public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
             snapshotCalls.incrementAndGet();
             return CompletableFuture.completedFuture(GcReferenceSnapshot.create(
                     domainId(),
@@ -386,8 +353,7 @@ class OwnerlessObjectGcExecutorTest {
         }
 
         @Override
-        public CompletableFuture<Boolean> stillMatches(
-                GcReferenceQuery query, GcReferenceSnapshot snapshot) {
+        public CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot) {
             return CompletableFuture.completedFuture(!veto);
         }
     }

@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
@@ -36,73 +36,57 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 
 class DefaultCursorSnapshotStoreLocalStackIntegrationTest {
-    private static final DockerImageName IMAGE =
-            DockerImageName.parse("localstack/localstack:4.14.0");
+    private static final DockerImageName IMAGE = DockerImageName.parse("localstack/localstack:4.14.0");
     private static final String BUCKET = "nereus-cursor-test";
     private static final String COLLISION_RETRY_ID = "00110011001100110011001100110011";
 
     @Test
     void immutableSnapshotCollisionAndRestartRoundTripAgainstRealS3Provider() throws Exception {
-        try (LocalStackContainer localstack = new LocalStackContainer(IMAGE)
-                .withServices(LocalStackContainer.Service.S3)) {
+        try (LocalStackContainer localstack =
+                new LocalStackContainer(IMAGE).withServices(LocalStackContainer.Service.S3)) {
             localstack.start();
             createBucket(localstack);
             ObjectStoreConfiguration configuration = configuration(localstack);
             CursorSnapshotReference reference;
             CursorAckState expected = ackState();
-            CursorSnapshotWriteRequest request = new CursorSnapshotWriteRequest(
-                    identity(), 7, expected, 100);
+            CursorSnapshotWriteRequest request = new CursorSnapshotWriteRequest(identity(), 7, expected, 100);
             Clock clock = Clock.systemUTC();
 
-            try (ProtocolFixture protocol = new ProtocolFixture(
-                    "cluster/s3-integration", identity(), clock)) {
-                S3CompatibleObjectStoreProvider firstProvider =
-                        new S3CompatibleObjectStoreProvider();
-                ObjectStore firstObjectStore =
-                        firstProvider.create(configuration, secrets(localstack));
-                try (DefaultCursorSnapshotStore first =
-                        protocol.newStore(firstObjectStore)) {
-                    CursorSnapshotPublication original =
-                            first.prepareWrite(request, protocol.authority(request)).join();
-                    CursorSnapshotReference originalReference =
-                            protocol.publish(first, original, expected);
-                    assertThat(first.read(originalReference, identity()).join())
-                            .isEqualTo(expected);
+            try (ProtocolFixture protocol = new ProtocolFixture("cluster/s3-integration", identity(), clock)) {
+                S3CompatibleObjectStoreProvider firstProvider = new S3CompatibleObjectStoreProvider();
+                ObjectStore firstObjectStore = firstProvider.create(configuration, secrets(localstack));
+                try (DefaultCursorSnapshotStore first = protocol.newStore(firstObjectStore)) {
+                    CursorSnapshotPublication original = first.prepareWrite(request, protocol.authority(request))
+                            .join();
+                    CursorSnapshotReference originalReference = protocol.publish(first, original, expected);
+                    assertThat(first.read(originalReference, identity()).join()).isEqualTo(expected);
 
                     CursorSnapshotWriteRequest nextRequest =
-                            new CursorSnapshotWriteRequest(
-                                    identity(), 8, expected, 101);
-                    ArrayDeque<String> ids = new ArrayDeque<>(List.of(
-                            original.reference().snapshotId(),
-                            COLLISION_RETRY_ID));
-                    try (DefaultCursorSnapshotStore exactCollisionRetry =
-                            protocol.newStore(firstObjectStore, ids)) {
-                        CursorSnapshotPublication retried =
-                                exactCollisionRetry.prepareWrite(
-                                        nextRequest,
-                                        protocol.authority(nextRequest)).join();
-                        reference = protocol.publish(
-                                exactCollisionRetry, retried, expected);
-                        assertThat(reference.snapshotId())
-                                .isEqualTo(COLLISION_RETRY_ID);
+                            new CursorSnapshotWriteRequest(identity(), 8, expected, 101);
+                    ArrayDeque<String> ids =
+                            new ArrayDeque<>(List.of(original.reference().snapshotId(), COLLISION_RETRY_ID));
+                    try (DefaultCursorSnapshotStore exactCollisionRetry = protocol.newStore(firstObjectStore, ids)) {
+                        CursorSnapshotPublication retried = exactCollisionRetry
+                                .prepareWrite(nextRequest, protocol.authority(nextRequest))
+                                .join();
+                        reference = protocol.publish(exactCollisionRetry, retried, expected);
+                        assertThat(reference.snapshotId()).isEqualTo(COLLISION_RETRY_ID);
                         assertThat(reference.objectKey())
                                 .isNotEqualTo(original.reference().objectKey());
-                        assertThat(exactCollisionRetry.read(
-                                reference, identity()).join()).isEqualTo(expected);
+                        assertThat(exactCollisionRetry
+                                        .read(reference, identity())
+                                        .join())
+                                .isEqualTo(expected);
                     }
                 } finally {
                     firstObjectStore.close();
                     firstProvider.close();
                 }
 
-                S3CompatibleObjectStoreProvider restartedProvider =
-                        new S3CompatibleObjectStoreProvider();
-                ObjectStore restartedObjectStore =
-                        restartedProvider.create(configuration, secrets(localstack));
-                try (DefaultCursorSnapshotStore restarted =
-                        protocol.newStore(restartedObjectStore)) {
-                    assertThat(restarted.read(reference, identity()).join())
-                            .isEqualTo(expected);
+                S3CompatibleObjectStoreProvider restartedProvider = new S3CompatibleObjectStoreProvider();
+                ObjectStore restartedObjectStore = restartedProvider.create(configuration, secrets(localstack));
+                try (DefaultCursorSnapshotStore restarted = protocol.newStore(restartedObjectStore)) {
+                    assertThat(restarted.read(reference, identity()).join()).isEqualTo(expected);
                 } finally {
                     restartedObjectStore.close();
                     restartedProvider.close();
@@ -112,41 +96,28 @@ class DefaultCursorSnapshotStoreLocalStackIntegrationTest {
     }
 
     private static final class ProtocolFixture implements AutoCloseable {
-        private static final String OWNER =
-                "0123456789abcdef0123456789abcdef";
-        private static final String PROTECTION_ATTEMPT =
-                "abcdef0123456789abcdef0123456789";
+        private static final String OWNER = "0123456789abcdef0123456789abcdef";
+        private static final String PROTECTION_ATTEMPT = "abcdef0123456789abcdef0123456789";
         private static final Duration PENDING = Duration.ofMinutes(5);
 
         private final String cluster;
         private final CursorIdentity identity;
         private final Clock clock;
         private final CursorStorageConfig config = CursorStorageConfig.defaults();
-        private final FakeCursorMetadataStore cursorStore =
-                new FakeCursorMetadataStore();
-        private final FakePhysicalObjectMetadataStore physicalStore =
-                new FakePhysicalObjectMetadataStore();
+        private final FakeCursorMetadataStore cursorStore = new FakeCursorMetadataStore();
+        private final FakePhysicalObjectMetadataStore physicalStore = new FakePhysicalObjectMetadataStore();
         private final ObjectProtectionManager protections;
         private final ObjectReadPinManager readPins;
         private final CursorStatePersistencePlanner planner;
-        private final List<DefaultCursorSnapshotStore> stores =
-                new ArrayList<>();
+        private final List<DefaultCursorSnapshotStore> stores = new ArrayList<>();
         private VersionedCursorState currentRoot;
 
-        private ProtocolFixture(
-                String cluster,
-                CursorIdentity identity,
-                Clock clock) {
+        private ProtocolFixture(String cluster, CursorIdentity identity, Clock clock) {
             this.cluster = cluster;
             this.identity = identity;
             this.clock = clock;
             protections = new DefaultObjectProtectionManager(
-                    cluster,
-                    physicalStore,
-                    PENDING,
-                    Duration.ofSeconds(1),
-                    Duration.ofHours(1),
-                    clock);
+                    cluster, physicalStore, PENDING, Duration.ofSeconds(1), Duration.ofHours(1), clock);
             readPins = new DefaultObjectReadPinManager(
                     cluster,
                     "r".repeat(26),
@@ -156,59 +127,47 @@ class DefaultCursorSnapshotStoreLocalStackIntegrationTest {
                     Duration.ofHours(1),
                     clock);
             planner = new CursorStatePersistencePlanner(cluster, config);
-            currentRoot = cursorStore.createCursor(
-                    cluster,
-                    planner.recordWithoutSnapshot(state(
-                            6,
-                            CursorAckState.empty(4),
-                            99,
-                            0))).join();
+            currentRoot = cursorStore
+                    .createCursor(cluster, planner.recordWithoutSnapshot(state(6, CursorAckState.empty(4), 99, 0)))
+                    .join();
         }
 
         private DefaultCursorSnapshotStore newStore(ObjectStore objectStore) {
-            DefaultCursorSnapshotStore created =
-                    new DefaultCursorSnapshotStore(
-                            cluster,
-                            objectStore,
-                            cursorStore,
-                            physicalStore,
-                            protections,
-                            readPins,
-                            config,
-                            Duration.ofSeconds(10),
-                            PENDING,
-                            clock);
+            DefaultCursorSnapshotStore created = new DefaultCursorSnapshotStore(
+                    cluster,
+                    objectStore,
+                    cursorStore,
+                    physicalStore,
+                    protections,
+                    readPins,
+                    config,
+                    Duration.ofSeconds(10),
+                    PENDING,
+                    clock);
             stores.add(created);
             return created;
         }
 
-        private DefaultCursorSnapshotStore newStore(
-                ObjectStore objectStore,
-                ArrayDeque<String> ids) {
-            DefaultCursorSnapshotStore created =
-                    new DefaultCursorSnapshotStore(
-                            cluster,
-                            objectStore,
-                            cursorStore,
-                            physicalStore,
-                            protections,
-                            readPins,
-                            config,
-                            Duration.ofSeconds(10),
-                            PENDING,
-                            clock,
-                            ids::removeFirst,
-                            System::nanoTime);
+        private DefaultCursorSnapshotStore newStore(ObjectStore objectStore, ArrayDeque<String> ids) {
+            DefaultCursorSnapshotStore created = new DefaultCursorSnapshotStore(
+                    cluster,
+                    objectStore,
+                    cursorStore,
+                    physicalStore,
+                    protections,
+                    readPins,
+                    config,
+                    Duration.ofSeconds(10),
+                    PENDING,
+                    clock,
+                    ids::removeFirst,
+                    System::nanoTime);
             stores.add(created);
             return created;
         }
 
-        private CursorSnapshotWriteAuthority authority(
-                CursorSnapshotWriteRequest request) {
-            return new CursorSnapshotWriteAuthority(
-                    currentRoot,
-                    OWNER,
-                    request.sourceMutationSequence());
+        private CursorSnapshotWriteAuthority authority(CursorSnapshotWriteRequest request) {
+            return new CursorSnapshotWriteAuthority(currentRoot, OWNER, request.sourceMutationSequence());
         }
 
         private CursorSnapshotReference publish(
@@ -220,19 +179,18 @@ class DefaultCursorSnapshotStoreLocalStackIntegrationTest {
                     acknowledgements,
                     publication.request().createdAtMillis(),
                     currentRoot.metadataVersion());
-            currentRoot = cursorStore.compareAndSetCursor(
-                    cluster,
-                    planner.afterSnapshot(candidate, publication.reference()),
-                    currentRoot.metadataVersion()).join();
+            currentRoot = cursorStore
+                    .compareAndSetCursor(
+                            cluster,
+                            planner.afterSnapshot(candidate, publication.reference()),
+                            currentRoot.metadataVersion())
+                    .join();
             store.completeWrite(publication, currentRoot).join();
             return publication.reference();
         }
 
         private CursorState state(
-                long mutationSequence,
-                CursorAckState acknowledgements,
-                long updatedAtMillis,
-                long metadataVersion) {
+                long mutationSequence, CursorAckState acknowledgements, long updatedAtMillis, long metadataVersion) {
             return new CursorState(
                     identity,
                     OWNER,
@@ -267,12 +225,9 @@ class DefaultCursorSnapshotStoreLocalStackIntegrationTest {
                 ManagedLedgerProjectionNames.streamId(managedLedgerName, 1).value(),
                 ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID + 17);
         CursorLedgerIdentity ledger = new CursorLedgerIdentity(
-                managedLedgerName,
-                ManagedLedgerProjectionNames.managedLedgerNameHash(managedLedgerName),
-                projection);
+                managedLedgerName, ManagedLedgerProjectionNames.managedLedgerNameHash(managedLedgerName), projection);
         String cursorName = "subscription-s3";
-        return new CursorIdentity(
-                ledger, cursorName, CursorNames.cursorNameHash(cursorName), 1);
+        return new CursorIdentity(ledger, cursorName, CursorNames.cursorNameHash(cursorName), 1);
     }
 
     private static CursorAckState ackState() {
@@ -283,7 +238,8 @@ class DefaultCursorSnapshotStoreLocalStackIntegrationTest {
 
     private static void createBucket(LocalStackContainer localstack) {
         try (S3AsyncClient admin = client(localstack)) {
-            admin.createBucket(CreateBucketRequest.builder().bucket(BUCKET).build()).join();
+            admin.createBucket(CreateBucketRequest.builder().bucket(BUCKET).build())
+                    .join();
         }
     }
 
@@ -291,7 +247,8 @@ class DefaultCursorSnapshotStoreLocalStackIntegrationTest {
         return S3AsyncClient.builder()
                 .endpointOverride(localstack.getEndpointOverride(LocalStackContainer.Service.S3))
                 .region(Region.of(localstack.getRegion()))
-                .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+                .serviceConfiguration(
+                        S3Configuration.builder().pathStyleAccessEnabled(true).build())
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(localstack.getAccessKey(), localstack.getSecretKey())))
                 .build();
@@ -313,8 +270,7 @@ class DefaultCursorSnapshotStoreLocalStackIntegrationTest {
     }
 
     private static ObjectStoreSecretResolver secrets(LocalStackContainer localstack) {
-        return reference -> Optional.of(("access".equals(reference)
-                ? localstack.getAccessKey()
-                : localstack.getSecretKey()).toCharArray());
+        return reference -> Optional.of(
+                ("access".equals(reference) ? localstack.getAccessKey() : localstack.getSecretKey()).toCharArray());
     }
 }

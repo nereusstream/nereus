@@ -32,19 +32,17 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 
-/** Strict big-endian V1 codec for NKC1 sections 1, 2, and 7. */
+/**
+ * Strict big-endian V1 codec for NKC1 sections 1, 2, and 7.
+ */
 public final class KafkaProducerTransactionStateCodecV1 {
     private static final int PAYLOAD_VERSION = 1;
-    private static final int MIN_PRODUCER_BYTES =
-            Long.BYTES + Short.BYTES + Integer.BYTES + Long.BYTES + 1 + 1;
-    private static final int BATCH_BYTES =
-            Integer.BYTES + Long.BYTES + Integer.BYTES + Long.BYTES;
+    private static final int MIN_PRODUCER_BYTES = Long.BYTES + Short.BYTES + Integer.BYTES + Long.BYTES + 1 + 1;
+    private static final int BATCH_BYTES = Integer.BYTES + Long.BYTES + Integer.BYTES + Long.BYTES;
     private static final int MIN_OPEN_TRANSACTION_BYTES = Long.BYTES + Long.BYTES + 1;
-    private static final int ABORTED_TRANSACTION_BYTES =
-            Short.BYTES + Long.BYTES * 4;
+    private static final int ABORTED_TRANSACTION_BYTES = Short.BYTES + Long.BYTES * 4;
 
-    public List<KafkaCheckpointSection> encodeSections(
-            KafkaProducerTransactionState state, long checkpointOffset) {
+    public List<KafkaCheckpointSection> encodeSections(KafkaProducerTransactionState state, long checkpointOffset) {
         KafkaProducerTransactionState exact = Objects.requireNonNull(state, "state");
         exact.requireCheckpointOffset(checkpointOffset);
         return List.of(
@@ -57,20 +55,15 @@ public final class KafkaProducerTransactionStateCodecV1 {
                         encodeOpenTransactions(exact.openTransactions())));
     }
 
-    public KafkaProducerTransactionState decodeSections(
-            List<KafkaCheckpointSection> sections, long checkpointOffset) {
+    public KafkaProducerTransactionState decodeSections(List<KafkaCheckpointSection> sections, long checkpointOffset) {
         if (checkpointOffset < 0) {
             throw new IllegalArgumentException("checkpointOffset must be non-negative");
         }
         try {
-            List<KafkaCheckpointSection> exact =
-                    List.copyOf(Objects.requireNonNull(sections, "sections"));
-            KafkaCheckpointSection producer =
-                    locate(exact, KafkaCheckpointSectionType.PRODUCER_STATE);
-            KafkaCheckpointSection aborted =
-                    locate(exact, KafkaCheckpointSectionType.ABORTED_TRANSACTION_INDEX);
-            KafkaCheckpointSection open =
-                    locate(exact, KafkaCheckpointSectionType.OPEN_TRANSACTION_SUMMARY);
+            List<KafkaCheckpointSection> exact = List.copyOf(Objects.requireNonNull(sections, "sections"));
+            KafkaCheckpointSection producer = locate(exact, KafkaCheckpointSectionType.PRODUCER_STATE);
+            KafkaCheckpointSection aborted = locate(exact, KafkaCheckpointSectionType.ABORTED_TRANSACTION_INDEX);
+            KafkaCheckpointSection open = locate(exact, KafkaCheckpointSectionType.OPEN_TRANSACTION_SUMMARY);
             ProducerPayload producerPayload = decodeProducerState(producer.payload());
             KafkaProducerTransactionState state = new KafkaProducerTransactionState(
                     producerPayload.mapEndOffset(),
@@ -82,13 +75,11 @@ public final class KafkaProducerTransactionStateCodecV1 {
         } catch (KafkaCheckpointFormatException failure) {
             throw failure;
         } catch (IllegalArgumentException failure) {
-            throw new KafkaCheckpointFormatException(
-                    "malformed NKC1 producer/transaction state", failure);
+            throw new KafkaCheckpointFormatException("malformed NKC1 producer/transaction state", failure);
         }
     }
 
-    private static KafkaCheckpointSection required(
-            KafkaCheckpointSectionType type, byte[] payload) {
+    private static KafkaCheckpointSection required(KafkaCheckpointSectionType type, byte[] payload) {
         return KafkaCheckpointSection.required(type, payload);
     }
 
@@ -97,7 +88,9 @@ public final class KafkaProducerTransactionStateCodecV1 {
         KafkaCheckpointSection found = null;
         for (KafkaCheckpointSection section : sections) {
             Objects.requireNonNull(section, "section");
-            if (section.sectionType() != type.wireId()) continue;
+            if (section.sectionType() != type.wireId()) {
+                continue;
+            }
             if (found != null) {
                 throw malformed("duplicate NKC1 " + type + " section");
             }
@@ -150,8 +143,8 @@ public final class KafkaProducerTransactionStateCodecV1 {
             short producerEpoch = input.readShort("producerEpoch");
             int coordinatorEpoch = input.readInt("coordinatorEpoch");
             long lastTimestamp = input.readLong("lastTimestamp");
-            OptionalLong currentTransactionFirstOffset = input.readOptionalLong(
-                    "hasCurrentTxn", "currentTxnFirstOffset");
+            OptionalLong currentTransactionFirstOffset =
+                    input.readOptionalLong("hasCurrentTxn", "currentTxnFirstOffset");
             int batchCount = input.readUnsignedByte("batchCount");
             if (batchCount > KafkaProducerTransactionState.RETAINED_BATCH_LIMIT
                     || input.remaining() < (long) batchCount * BATCH_BYTES) {
@@ -195,10 +188,8 @@ public final class KafkaProducerTransactionStateCodecV1 {
     private static List<OpenTransaction> decodeOpenTransactions(byte[] payload) {
         Reader input = new Reader(payload);
         input.requireVersion();
-        int transactionCount =
-                input.readCount("transactionCount", MIN_OPEN_TRANSACTION_BYTES);
-        ArrayList<OpenTransaction> transactions =
-                new ArrayList<>(boundedInitialCapacity(transactionCount));
+        int transactionCount = input.readCount("transactionCount", MIN_OPEN_TRANSACTION_BYTES);
+        ArrayList<OpenTransaction> transactions = new ArrayList<>(boundedInitialCapacity(transactionCount));
         for (int index = 0; index < transactionCount; index++) {
             transactions.add(new OpenTransaction(
                     input.readLong("producerId"),
@@ -227,8 +218,7 @@ public final class KafkaProducerTransactionStateCodecV1 {
         Reader input = new Reader(payload);
         input.requireVersion();
         int entryCount = input.readCount("entryCount", ABORTED_TRANSACTION_BYTES);
-        ArrayList<AbortedTransaction> transactions =
-                new ArrayList<>(boundedInitialCapacity(entryCount));
+        ArrayList<AbortedTransaction> transactions = new ArrayList<>(boundedInitialCapacity(entryCount));
         for (int index = 0; index < entryCount; index++) {
             transactions.add(new AbortedTransaction(
                     input.readShort("kafkaAbortedTxnVersion"),
@@ -253,13 +243,14 @@ public final class KafkaProducerTransactionStateCodecV1 {
             }
             return payload;
         } catch (IOException failure) {
-            throw new KafkaCheckpointFormatException(
-                    "failed to encode NKC1 producer/transaction state", failure);
+            throw new KafkaCheckpointFormatException("failed to encode NKC1 producer/transaction state", failure);
         }
     }
 
     private static void writeCount(DataOutputStream output, int count) throws IOException {
-        if (count < 0) throw new IllegalArgumentException("count must be non-negative");
+        if (count < 0) {
+            throw new IllegalArgumentException("count must be non-negative");
+        }
         output.writeInt(count);
     }
 
@@ -276,7 +267,7 @@ public final class KafkaProducerTransactionStateCodecV1 {
         void write(DataOutputStream output) throws IOException;
     }
 
-    private record ProducerPayload(long mapEndOffset, List<ProducerState> producers) { }
+    private record ProducerPayload(long mapEndOffset, List<ProducerState> producers) {}
 
     private static final class Reader {
         private final ByteBuffer input;
@@ -297,8 +288,7 @@ public final class KafkaProducerTransactionStateCodecV1 {
 
         private int readCount(String field, int minimumEntryBytes) {
             long count = Integer.toUnsignedLong(readInt(field));
-            if (count > Integer.MAX_VALUE
-                    || count > remaining() / minimumEntryBytes) {
+            if (count > Integer.MAX_VALUE || count > remaining() / minimumEntryBytes) {
                 throw malformed("invalid NKC1 " + field);
             }
             return (int) count;
@@ -306,8 +296,12 @@ public final class KafkaProducerTransactionStateCodecV1 {
 
         private OptionalLong readOptionalLong(String flagField, String valueField) {
             int flag = readUnsignedByte(flagField);
-            if (flag == 0) return OptionalLong.empty();
-            if (flag != 1) throw malformed("invalid NKC1 " + flagField);
+            if (flag == 0) {
+                return OptionalLong.empty();
+            }
+            if (flag != 1) {
+                throw malformed("invalid NKC1 " + flagField);
+            }
             return OptionalLong.of(readLong(valueField));
         }
 

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -17,74 +18,69 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Exact completed-L0-trim proof for source retirement in either read view. */
+/**
+ * Exact completed-L0-trim proof for source retirement in either read view.
+ */
 final class CompletedTrimRetirementVerifier {
     private final String cluster;
     private final OxiaMetadataStore l0;
     private final GenerationMetadataStore generations;
     private final F4Keyspace keys;
 
-    CompletedTrimRetirementVerifier(
-            String cluster,
-            OxiaMetadataStore l0,
-            GenerationMetadataStore generations) {
+    CompletedTrimRetirementVerifier(String cluster, OxiaMetadataStore l0, GenerationMetadataStore generations) {
         this.cluster = requireText(cluster, "cluster");
         this.l0 = Objects.requireNonNull(l0, "l0");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.keys = new F4Keyspace(cluster);
     }
 
-    CompletableFuture<Optional<CompletedTrimProof>> proveIfCompleted(
-            VersionedGenerationCandidate source) {
+    CompletableFuture<Optional<CompletedTrimProof>> proveIfCompleted(VersionedGenerationCandidate source) {
         SourceIdentity identity = identify(Objects.requireNonNull(source, "source"));
         return l0.getStreamSnapshot(cluster, identity.stream()).thenCompose(snapshot -> {
             requireSnapshotIdentity(identity, snapshot);
             if (snapshot.trim().trimOffset() < identity.offsetEnd()) {
                 return CompletableFuture.completedFuture(Optional.empty());
             }
-            return generations.getRecoveryRoot(cluster, identity.stream())
-                    .thenCompose(root -> {
-                        requireRootIdentity(identity.stream(), root);
-                        CompletedTrimProof proof = new CompletedTrimProof(
-                                source, identity, snapshot, root);
-                        return revalidate(proof).thenApply(ignored -> Optional.of(proof));
-                    });
+            return generations.getRecoveryRoot(cluster, identity.stream()).thenCompose(root -> {
+                requireRootIdentity(identity.stream(), root);
+                CompletedTrimProof proof = new CompletedTrimProof(source, identity, snapshot, root);
+                return revalidate(proof).thenApply(ignored -> Optional.of(proof));
+            });
         });
     }
 
     CompletableFuture<Void> revalidate(CompletedTrimProof expected) {
         Objects.requireNonNull(expected, "expected");
         SourceIdentity identity = expected.identity();
-        return generations.getCandidateByKey(
+        return generations
+                .getCandidateByKey(
                         cluster,
                         identity.stream(),
                         identity.view(),
                         expected.source().key())
                 .thenCompose(source -> {
                     if (!source.equals(Optional.of(expected.source()))) {
-                        return CompletableFuture.failedFuture(condition(
-                                "below-trim source changed while retirement facts were frozen"));
+                        return CompletableFuture.failedFuture(
+                                condition("below-trim source changed while retirement facts were frozen"));
                     }
                     return l0.getStreamSnapshot(cluster, identity.stream());
                 })
                 .thenCompose(snapshot -> {
-                    if (!snapshot.sameVersionedAuthority(
-                            expected.snapshot())) {
-                        return CompletableFuture.failedFuture(condition(
-                                "completed trim changed while retirement facts were frozen"));
+                    if (!snapshot.sameVersionedAuthority(expected.snapshot())) {
+                        return CompletableFuture.failedFuture(
+                                condition("completed trim changed while retirement facts were frozen"));
                     }
                     requireSnapshotIdentity(identity, snapshot);
                     if (snapshot.trim().trimOffset() < identity.offsetEnd()) {
-                        return CompletableFuture.failedFuture(condition(
-                                "source range is no longer below completed trim"));
+                        return CompletableFuture.failedFuture(
+                                condition("source range is no longer below completed trim"));
                     }
                     return generations.getRecoveryRoot(cluster, identity.stream());
                 })
                 .thenAccept(root -> {
                     requireRootIdentity(identity.stream(), root);
                     if (!root.equals(expected.recoveryRoot())) {
-                        throw condition(
-                                "recovery root changed while below-trim facts were frozen");
+                        throw condition("recovery root changed while below-trim facts were frozen");
                     }
                 });
     }
@@ -93,10 +89,7 @@ final class CompletedTrimRetirementVerifier {
         if (source instanceof VersionedGenerationZeroIndex zero) {
             StreamId stream = zero.value().streamId();
             String expectedKey = keys.generationIndexKey(
-                    stream,
-                    ReadView.COMMITTED,
-                    zero.value().offsetEnd(),
-                    0);
+                    stream, ReadView.COMMITTED, zero.value().offsetEnd(), 0);
             if (!source.key().equals(expectedKey)) {
                 throw invariant("generation-zero below-trim source key is non-canonical");
             }
@@ -116,10 +109,7 @@ final class CompletedTrimRetirementVerifier {
             }
             StreamId stream = new StreamId(higher.value().streamId());
             String expectedKey = keys.generationIndexKey(
-                    stream,
-                    view,
-                    higher.value().offsetEnd(),
-                    higher.value().generation());
+                    stream, view, higher.value().offsetEnd(), higher.value().generation());
             if (!source.key().equals(expectedKey)) {
                 throw invariant("higher-generation below-trim source key is non-canonical");
             }
@@ -133,23 +123,18 @@ final class CompletedTrimRetirementVerifier {
         throw invariant("unknown generation source type for completed-trim proof");
     }
 
-    private static void requireSnapshotIdentity(
-            SourceIdentity identity,
-            StreamMetadataSnapshot snapshot) {
+    private static void requireSnapshotIdentity(SourceIdentity identity, StreamMetadataSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
         String stream = identity.stream().value();
         if (!snapshot.metadata().streamId().equals(stream)
                 || !snapshot.committedEnd().streamId().equals(stream)
                 || !snapshot.trim().streamId().equals(stream)
-                || snapshot.trim().trimOffset()
-                        > snapshot.committedEnd().committedEndOffset()) {
+                || snapshot.trim().trimOffset() > snapshot.committedEnd().committedEndOffset()) {
             throw invariant("completed-trim snapshot belongs to another stream or is contradictory");
         }
     }
 
-    private void requireRootIdentity(
-            StreamId stream,
-            Optional<VersionedRecoveryCheckpointRoot> root) {
+    private void requireRootIdentity(StreamId stream, Optional<VersionedRecoveryCheckpointRoot> root) {
         if (root.isPresent()) {
             VersionedRecoveryCheckpointRoot exact = root.orElseThrow();
             if (!exact.key().equals(keys.recoveryRootKey(stream))
@@ -168,8 +153,7 @@ final class CompletedTrimRetirementVerifier {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static NereusException condition(String message) {
@@ -187,18 +171,12 @@ final class CompletedTrimRetirementVerifier {
             Objects.requireNonNull(snapshot, "snapshot");
             recoveryRoot = Objects.requireNonNull(recoveryRoot, "recoveryRoot");
             if (snapshot.trim().trimOffset() < identity.offsetEnd()) {
-                throw new IllegalArgumentException(
-                        "completed-trim proof does not cover its source");
+                throw new IllegalArgumentException("completed-trim proof does not cover its source");
             }
         }
     }
 
-    record SourceIdentity(
-            StreamId stream,
-            ReadView view,
-            long offsetStart,
-            long offsetEnd,
-            long generation) {
+    record SourceIdentity(StreamId stream, ReadView view, long offsetStart, long offsetEnd, long generation) {
         SourceIdentity {
             Objects.requireNonNull(stream, "stream");
             Objects.requireNonNull(view, "view");
@@ -206,8 +184,7 @@ final class CompletedTrimRetirementVerifier {
                     || offsetEnd <= offsetStart
                     || generation < 0
                     || (generation == 0 && view != ReadView.COMMITTED)) {
-                throw new IllegalArgumentException(
-                        "completed-trim source identity is invalid");
+                throw new IllegalArgumentException("completed-trim source identity is invalid");
             }
         }
     }

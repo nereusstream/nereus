@@ -88,27 +88,27 @@ The accepted delivery/compatibility decision is
 
 ## 4. Document Map
 
-| Document | Authority |
-| --- | --- |
-| `01-api-and-read-target-contract.md` | exact public value/API shape, validation and compatibility |
-| `02-metadata-schema-and-compatibility.md` | generic target codecs, new records/keys, dual-read/new-write and repair |
-| `03-append-recovery-and-lifecycle.md` | retained attempts, paged recovery, seal/delete and mutation ordering |
-| `04-core-abstractions-and-state-machines.md` | primary-WAL adapter seam, strict append/read dispatch, resources and close |
-| `05-implementation-plan-and-gates.md` | P15-M1 through M5 implementation plus P15-M6 follow-up files, tests, release gates and stop conditions |
+| Document                                     | Authority                                                                                              |
+|----------------------------------------------|--------------------------------------------------------------------------------------------------------|
+| `01-api-and-read-target-contract.md`         | exact public value/API shape, validation and compatibility                                             |
+| `02-metadata-schema-and-compatibility.md`    | generic target codecs, new records/keys, dual-read/new-write and repair                                |
+| `03-append-recovery-and-lifecycle.md`        | retained attempts, paged recovery, seal/delete and mutation ordering                                   |
+| `04-core-abstractions-and-state-machines.md` | primary-WAL adapter seam, strict append/read dispatch, resources and close                             |
+| `05-implementation-plan-and-gates.md`        | P15-M1 through M5 implementation plus P15-M6 follow-up files, tests, release gates and stop conditions |
 
 The implemented Phase 1 contract in `../phase-1-core-stream-storage/` remains the legacy compatibility baseline；
 this directory is authoritative for the implemented Phase 1.5 evolution and its preserved compatibility rules。
 
 ## 5. Delivery Milestones
 
-| Milestone | State | Exit |
-| --- | --- | --- |
-| P15-M0 code-level design | Complete | Documents 01-05 plus overall/roadmap/F2 handoff alignment |
-| P15-M1 target API | Complete | generic target/result values, validation and repository caller migration |
-| P15-M2 metadata evolution | Complete | legacy/new mixed-chain fake/real Oxia parity and lazy repair |
-| P15-M3 core adapter split | Complete | Object WAL sync behavior through registry/adapters and split committer/materializer |
-| P15-M4 recovery/lifecycle | Complete | retained exact attempts, multi-page recovery, seal/delete and race gates |
-| P15-M5 final acceptance | Complete | Phase 1 regression + production Oxia/Object WAL restart + F2 prerequisite gate |
+| Milestone                         | State    | Exit                                                                                                                                 |
+|-----------------------------------|----------|--------------------------------------------------------------------------------------------------------------------------------------|
+| P15-M0 code-level design          | Complete | Documents 01-05 plus overall/roadmap/F2 handoff alignment                                                                            |
+| P15-M1 target API                 | Complete | generic target/result values, validation and repository caller migration                                                             |
+| P15-M2 metadata evolution         | Complete | legacy/new mixed-chain fake/real Oxia parity and lazy repair                                                                         |
+| P15-M3 core adapter split         | Complete | Object WAL sync behavior through registry/adapters and split committer/materializer                                                  |
+| P15-M4 recovery/lifecycle         | Complete | retained exact attempts, multi-page recovery, seal/delete and race gates                                                             |
+| P15-M5 final acceptance           | Complete | Phase 1 regression + production Oxia/Object WAL restart + F2 prerequisite gate                                                       |
 | P15-M6 F2 result-snapshot handoff | Complete | Protocol-neutral `AppendResult.cumulativeSize` from existing committed truth；constructor/normal/later-head-recovery/regression gates |
 
 P15-M5 remains passed for its original generic-target/recovery/lifecycle scope。F2-M0R2 subsequently proved that
@@ -118,19 +118,19 @@ must not create a second temporary L0 API。
 
 ## 6. Support Matrix at Exit
 
-| Capability | Phase 1.5 exit state |
-| --- | --- |
-| legacy Phase 1 Object WAL records | readable/repairable |
-| new generic-target Object WAL records | implemented/new-write |
-| `OBJECT_WAL_SYNC_OBJECT` strict append/read | implemented and regression-gated |
-| exact in-process append recovery | implemented |
-| seal/logical delete | implemented |
-| `AppendResult.cumulativeSize` public handoff | implemented/final-gated |
-| BookKeeper target value/codec | implemented；later F1-BK adds exact writer/reader and BK-M3 task/source support |
-| BookKeeper profiles | production reserved/rejected before IO；BK_ONLY module-local M2 runtime and BK async M3 first real publication/read/proof checkpoint now exist |
-| `WAL_DURABLE` success | reserved/rejected by Phase 1.5；later implemented/final-gated for F4 `OBJECT_WAL_ASYNC_OBJECT` only |
-| async materialization/higher generation | reserved at Phase 1.5 exit；later F4 `OBJECT_WAL_ASYNC_OBJECT` implemented/final-gated；BookKeeper primary variants reserved |
-| physical object deletion | absent at Phase 1.5 exit；later F4 implementation is final-gated and exact-activation-only with safe defaults closed |
+| Capability                                   | Phase 1.5 exit state                                                                                                                          |
+|----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| legacy Phase 1 Object WAL records            | readable/repairable                                                                                                                           |
+| new generic-target Object WAL records        | implemented/new-write                                                                                                                         |
+| `OBJECT_WAL_SYNC_OBJECT` strict append/read  | implemented and regression-gated                                                                                                              |
+| exact in-process append recovery             | implemented                                                                                                                                   |
+| seal/logical delete                          | implemented                                                                                                                                   |
+| `AppendResult.cumulativeSize` public handoff | implemented/final-gated                                                                                                                       |
+| BookKeeper target value/codec                | implemented；later F1-BK adds exact writer/reader and BK-M3 task/source support                                                                |
+| BookKeeper profiles                          | production reserved/rejected before IO；BK_ONLY module-local M2 runtime and BK async M3 first real publication/read/proof checkpoint now exist |
+| `WAL_DURABLE` success                        | reserved/rejected by Phase 1.5；later implemented/final-gated for F4 `OBJECT_WAL_ASYNC_OBJECT` only                                            |
+| async materialization/higher generation      | reserved at Phase 1.5 exit；later F4 `OBJECT_WAL_ASYNC_OBJECT` implemented/final-gated；BookKeeper primary variants reserved                    |
+| physical object deletion                     | absent at Phase 1.5 exit；later F4 implementation is final-gated and exact-activation-only with safe defaults closed                           |
 
 Phase 1.5 之后的 BookKeeper primary-WAL 实现合同已单独冻结为 F1-BK：
 `../phase-bk-bookkeeper-primary-wal/README.md`。它复用这里的 tagged target、registry、stable-head/gen0 split 和

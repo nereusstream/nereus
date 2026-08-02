@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.append;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendSession;
@@ -91,15 +91,17 @@ class ObjectWalGuardedUploadTest {
             PreparedWalObject stale = fixture.prepare(expiredSession);
             PhysicalObjectIdentity staleObject = identity(stale);
             fixture.transitionToDeleted(staleObject, true);
-            assertThat(fixture.physical.getRoot(CLUSTER, staleObject.objectKeyHash()).join()).isEmpty();
+            assertThat(fixture.physical
+                            .getRoot(CLUSTER, staleObject.objectKeyHash())
+                            .join())
+                    .isEmpty();
 
             fixture.clock.advance(Duration.ofMillis(101));
             fixture.objectStore.singleAttempt();
             assertThatThrownBy(() -> fixture.writer
                             .upload(stale, fixture.guard(expiredSession, staleObject))
                             .join())
-                    .satisfies(failure -> assertNereusFailure(
-                            failure, ErrorCode.APPEND_SESSION_EXPIRED, true));
+                    .satisfies(failure -> assertNereusFailure(failure, ErrorCode.APPEND_SESSION_EXPIRED, true));
             assertThat(fixture.objectStore.authorizationAttempts()).containsExactly(1);
             assertThat(fixture.objectStore.providerTransmissions()).isZero();
 
@@ -110,7 +112,9 @@ class ObjectWalGuardedUploadTest {
             assertThat(freshSession.fencingToken()).isNotEqualTo(expiredSession.fencingToken());
             assertThat(fresh.result().objectKey()).isNotEqualTo(stale.result().objectKey());
 
-            fixture.writer.upload(fresh, fixture.guard(freshSession, freshObject)).join();
+            fixture.writer
+                    .upload(fresh, fixture.guard(freshSession, freshObject))
+                    .join();
 
             assertThat(fixture.objectStore.authorizationAttempts()).containsExactly(1, 1);
             assertThat(fixture.objectStore.providerTransmissions()).isEqualTo(1);
@@ -128,10 +132,7 @@ class ObjectWalGuardedUploadTest {
                 Optional.empty());
     }
 
-    private static void assertNereusFailure(
-            Throwable failure,
-            ErrorCode expectedCode,
-            boolean expectedRetriable) {
+    private static void assertNereusFailure(Throwable failure, ErrorCode expectedCode, boolean expectedRetriable) {
         Throwable exact = unwrap(failure);
         assertThat(exact).isInstanceOf(NereusException.class);
         NereusException nereus = (NereusException) exact;
@@ -141,8 +142,7 @@ class ObjectWalGuardedUploadTest {
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while ((current instanceof CompletionException
-                        || current instanceof java.util.concurrent.ExecutionException)
+        while ((current instanceof CompletionException || current instanceof java.util.concurrent.ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -154,15 +154,9 @@ class ObjectWalGuardedUploadTest {
         private final FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
         private final FakePhysicalObjectMetadataStore physical = new FakePhysicalObjectMetadataStore();
         private final ObjectProtectionManager protections = new DefaultObjectProtectionManager(
-                CLUSTER,
-                physical,
-                Duration.ofMinutes(10),
-                Duration.ZERO,
-                Duration.ofHours(1),
-                clock);
+                CLUSTER, physical, Duration.ofMinutes(10), Duration.ZERO, Duration.ofHours(1), clock);
         private final DefaultGenerationZeroPhysicalReferencePublisher publisher =
-                new DefaultGenerationZeroPhysicalReferencePublisher(
-                        CLUSTER, metadata, physical, protections);
+                new DefaultGenerationZeroPhysicalReferencePublisher(CLUSTER, metadata, physical, protections);
         private final GuardedRetryObjectStore objectStore = new GuardedRetryObjectStore();
         private final DefaultWalObjectWriter writer = new DefaultWalObjectWriter(
                 objectStore,
@@ -181,9 +175,7 @@ class ObjectWalGuardedUploadTest {
 
         private AppendSession acquireSession(Duration ttl) {
             AppendSessionRecord record = metadata.acquireAppendSession(
-                            CLUSTER,
-                            streamId,
-                            new AppendSessionOptions(WRITER_ID, ttl, false))
+                            CLUSTER, streamId, new AppendSessionOptions(WRITER_ID, ttl, false))
                     .join();
             return new AppendSession(
                     streamId,
@@ -198,11 +190,7 @@ class ObjectWalGuardedUploadTest {
             long eventTime = clock.millis();
             AppendBatch batch = new AppendBatch(
                     PayloadFormat.OPAQUE_RECORD_BATCH,
-                    List.of(new AppendEntry(
-                            "value".getBytes(StandardCharsets.UTF_8),
-                            1,
-                            eventTime,
-                            Map.of())),
+                    List.of(new AppendEntry("value".getBytes(StandardCharsets.UTF_8), 1, eventTime, Map.of())),
                     1,
                     1,
                     eventTime,
@@ -216,29 +204,21 @@ class ObjectWalGuardedUploadTest {
                     "guardedrunhash",
                     session.epoch(),
                     List.of(new WalStreamSliceInput(streamId, batch)),
-                    new WalWriteOptions(
-                            CompressionType.NONE,
-                            1 << 20,
-                            1 << 20,
-                            UPLOAD_TIMEOUT,
-                            true)));
+                    new WalWriteOptions(CompressionType.NONE, 1 << 20, 1 << 20, UPLOAD_TIMEOUT, true)));
         }
 
-        private PutObjectAttemptGuard guard(
-                AppendSession session,
-                PhysicalObjectIdentity object) {
+        private PutObjectAttemptGuard guard(AppendSession session, PhysicalObjectIdentity object) {
             return (key, ignoredAttempt) -> {
                 if (!key.equals(object.objectKey())) {
-                    return CompletableFuture.failedFuture(new AssertionError(
-                            "provider guard received a different Object-WAL key"));
+                    return CompletableFuture.failedFuture(
+                            new AssertionError("provider guard received a different Object-WAL key"));
                 }
                 return publisher.authorizeUpload(session, object, UPLOAD_TIMEOUT);
             };
         }
 
         private void transitionToDeleted(PhysicalObjectIdentity object, boolean retireRoot) {
-            VersionedPhysicalObjectRoot active = physical.createRoot(
-                            CLUSTER, activeRoot(object, clock.millis()))
+            VersionedPhysicalObjectRoot active = physical.createRoot(CLUSTER, activeRoot(object, clock.millis()))
                     .join();
             VersionedPhysicalObjectRoot marked = physical.compareAndSetRoot(
                             CLUSTER,
@@ -264,10 +244,7 @@ class ObjectWalGuardedUploadTest {
                             deleted.metadataVersion())
                     .join();
             physical.deleteRoot(
-                            CLUSTER,
-                            object.objectKeyHash(),
-                            observed.metadataVersion(),
-                            observed.durableValueSha256())
+                            CLUSTER, object.objectKeyHash(), observed.metadataVersion(), observed.durableValueSha256())
                     .join();
         }
 
@@ -280,9 +257,7 @@ class ObjectWalGuardedUploadTest {
         }
     }
 
-    private static PhysicalObjectRootRecord activeRoot(
-            PhysicalObjectIdentity object,
-            long now) {
+    private static PhysicalObjectRootRecord activeRoot(PhysicalObjectIdentity object, long now) {
         return new PhysicalObjectRootRecord(
                 1,
                 object.objectKeyHash().value(),
@@ -347,7 +322,7 @@ class ObjectWalGuardedUploadTest {
         private final List<Integer> authorizationAttempts = new ArrayList<>();
         private int providerTransmissions;
         private boolean retry;
-        private Runnable afterFirstTransmission = () -> { };
+        private Runnable afterFirstTransmission = () -> {};
 
         private void retryAfterFirstTransmission(Runnable cut) {
             retry = true;
@@ -356,7 +331,7 @@ class ObjectWalGuardedUploadTest {
 
         private void singleAttempt() {
             retry = false;
-            afterFirstTransmission = () -> { };
+            afterFirstTransmission = () -> {};
         }
 
         private List<Integer> authorizationAttempts() {
@@ -390,43 +365,28 @@ class ObjectWalGuardedUploadTest {
 
         @Override
         public CompletableFuture<PutObjectResult> putObject(
-                ObjectKey key,
-                ReplayableObjectUpload source,
-                PutObjectOptions options) {
-            return CompletableFuture.failedFuture(new AssertionError(
-                    "DefaultWalObjectWriter bypassed the provider-attempt guard"));
+                ObjectKey key, ReplayableObjectUpload source, PutObjectOptions options) {
+            return CompletableFuture.failedFuture(
+                    new AssertionError("DefaultWalObjectWriter bypassed the provider-attempt guard"));
         }
 
-        private static PutObjectResult result(
-                ObjectKey key,
-                ReplayableObjectUpload source,
-                PutObjectOptions options) {
-            return new PutObjectResult(
-                    key,
-                    source.contentLength(),
-                    options.expectedChecksum(),
-                    "guarded-etag");
+        private static PutObjectResult result(ObjectKey key, ReplayableObjectUpload source, PutObjectOptions options) {
+            return new PutObjectResult(key, source.contentLength(), options.expectedChecksum(), "guarded-etag");
         }
 
         @Override
         public CompletableFuture<RangeReadResult> readRange(
-                ObjectKey key,
-                long offset,
-                long length,
-                RangeReadOptions options) {
+                ObjectKey key, long offset, long length, RangeReadOptions options) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException("readRange"));
         }
 
         @Override
-        public CompletableFuture<HeadObjectResult> headObject(
-                ObjectKey key,
-                HeadObjectOptions options) {
+        public CompletableFuture<HeadObjectResult> headObject(ObjectKey key, HeadObjectOptions options) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException("headObject"));
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 
     private static final class MutableClock extends Clock {

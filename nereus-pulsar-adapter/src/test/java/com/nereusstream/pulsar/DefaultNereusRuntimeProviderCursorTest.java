@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.core.capability.GenerationCapabilityReadinessProvider;
 import com.nereusstream.managedledger.cursor.CursorLedgerIdentity;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
@@ -36,8 +36,7 @@ class DefaultNereusRuntimeProviderCursorTest {
                 reference -> Optional.empty(),
                 getClass().getClassLoader());
 
-        CursorProtocolActivationGuard selected =
-                DefaultNereusRuntimeProvider.cursorProtocolActivationGuard(context);
+        CursorProtocolActivationGuard selected = DefaultNereusRuntimeProvider.cursorProtocolActivationGuard(context);
         assertThat(selected).isSameAs(guard);
         assertThat(context.generationProtocolActivationEnabled()).isFalse();
         selected.acquireFirstActivationPermit(ledger()).join();
@@ -63,9 +62,7 @@ class DefaultNereusRuntimeProviderCursorTest {
     @Test
     void canonicalContextCarriesTheExactBorrowedBookKeeperClient() {
         BookKeeper bookKeeper = (BookKeeper) Proxy.newProxyInstance(
-                BookKeeper.class.getClassLoader(),
-                new Class<?>[] {BookKeeper.class},
-                (instance, method, arguments) -> {
+                BookKeeper.class.getClassLoader(), new Class<?>[] {BookKeeper.class}, (instance, method, arguments) -> {
                     throw new AssertionError("borrowed BookKeeper client is not used by this wiring test");
                 });
         NereusRuntimeContext context = new NereusRuntimeContext(
@@ -91,8 +88,7 @@ class DefaultNereusRuntimeProviderCursorTest {
                 reference -> Optional.empty(),
                 getClass().getClassLoader());
 
-        CompletableFuture<Void> permit = DefaultNereusRuntimeProvider
-                .cursorProtocolActivationGuard(context)
+        CompletableFuture<Void> permit = DefaultNereusRuntimeProvider.cursorProtocolActivationGuard(context)
                 .acquireFirstActivationPermit(ledger());
         assertThatThrownBy(permit::join)
                 .isInstanceOf(CompletionException.class)
@@ -101,8 +97,8 @@ class DefaultNereusRuntimeProviderCursorTest {
     }
 
     private static NereusCreationGuard creationGuard() {
-        return name -> CompletableFuture.failedFuture(
-                new AssertionError("creation guard is not used by this wiring test"));
+        return name ->
+                CompletableFuture.failedFuture(new AssertionError("creation guard is not used by this wiring test"));
     }
 
     private static EventLoopGroup eventLoopGroup() {

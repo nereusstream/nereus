@@ -17,10 +17,7 @@ package com.nereusstream.objectstore.wal;
 import java.util.List;
 import java.util.Objects;
 
-public record EntryIndex(
-        int entryCount,
-        int recordCount,
-        List<EntryIndexItem> entries) {
+public record EntryIndex(int entryCount, int recordCount, List<EntryIndexItem> entries) {
     public EntryIndex {
         entries = List.copyOf(Objects.requireNonNull(entries, "entries"));
         if (entryCount != entries.size() || entryCount <= 0 || recordCount <= 0) {

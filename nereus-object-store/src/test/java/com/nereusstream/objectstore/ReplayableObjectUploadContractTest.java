@@ -16,7 +16,6 @@ package com.nereusstream.objectstore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.objectstore.staging.PrivateStagedObjectFile;
 import com.nereusstream.objectstore.staging.StagingFileManager;
 import java.io.ByteArrayOutputStream;

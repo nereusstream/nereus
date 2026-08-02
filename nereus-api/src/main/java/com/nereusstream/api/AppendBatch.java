@@ -21,7 +21,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.zip.CRC32C;
 
-/** A batch of entries submitted through the L0 append API. */
+/**
+ * A batch of entries submitted through the L0 append API.
+ */
 public record AppendBatch(
         PayloadFormat payloadFormat,
         List<AppendEntry> entries,
@@ -36,10 +38,8 @@ public record AppendBatch(
         Objects.requireNonNull(payloadFormat, "payloadFormat");
         entries = List.copyOf(Objects.requireNonNull(entries, "entries"));
         schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
-        projectionHints = MetadataCanonicalizer.canonicalStringMap(
-                projectionHints,
-                Integer.MAX_VALUE,
-                "projectionHints");
+        projectionHints =
+                MetadataCanonicalizer.canonicalStringMap(projectionHints, Integer.MAX_VALUE, "projectionHints");
         checksum = Objects.requireNonNull(checksum, "checksum");
         if (!projectionHints.isEmpty()) {
             throw new IllegalArgumentException("executable append formats do not accept projectionHints");
@@ -59,8 +59,7 @@ public record AppendBatch(
         if (minEventTimeMillis < 0 || maxEventTimeMillis < minEventTimeMillis) {
             throw new IllegalArgumentException("invalid event time range");
         }
-        if (payloadFormat != PayloadFormat.OPAQUE_RECORD_BATCH
-                && payloadFormat != PayloadFormat.KAFKA_RECORD_BATCH) {
+        if (payloadFormat != PayloadFormat.OPAQUE_RECORD_BATCH && payloadFormat != PayloadFormat.KAFKA_RECORD_BATCH) {
             throw new IllegalArgumentException("payload format is reserved and not executable: " + payloadFormat);
         }
         int sum = 0;

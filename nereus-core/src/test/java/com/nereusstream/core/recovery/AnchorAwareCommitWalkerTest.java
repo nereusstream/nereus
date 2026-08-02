@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.recovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.StreamId;
@@ -36,20 +36,15 @@ class AnchorAwareCommitWalkerTest {
         AppendRecoveryCommit second = commit("commit-2", "commit-1", 1, 2, 20, 2);
         AppendRecoveryAnchor anchor = AppendRecoveryAnchor.genesis(STREAM);
         AppendRecoveryHead head = new AppendRecoveryHead(STREAM, "commit-2", 2, 20, 2, 9);
-        AppendRecoveryTailCursor cursor = new AppendRecoveryTailCursor(
-                STREAM, anchor, head, "commit-1", 1, 10, 1);
+        AppendRecoveryTailCursor cursor = new AppendRecoveryTailCursor(STREAM, anchor, head, "commit-1", 1, 10, 1);
         List<AppendRecoveryTailPage> pages = List.of(
-                new AppendRecoveryTailPage(
-                        anchor, head, List.of(second), false, Optional.of(cursor)),
-                new AppendRecoveryTailPage(
-                        anchor, head, List.of(first), true, Optional.empty()));
+                new AppendRecoveryTailPage(anchor, head, List.of(second), false, Optional.of(cursor)),
+                new AppendRecoveryTailPage(anchor, head, List.of(first), true, Optional.empty()));
         AtomicInteger pageReads = new AtomicInteger();
         AtomicInteger rootReads = new AtomicInteger();
 
-        AnchorAwareCommitWalker walker = new AnchorAwareCommitWalker(
-                "cluster",
-                l0(pages, pageReads),
-                generation(rootReads));
+        AnchorAwareCommitWalker walker =
+                new AnchorAwareCommitWalker("cluster", l0(pages, pageReads), generation(rootReads));
 
         AnchorAwareCommitWalk result = walker.walk(STREAM, 10, 1).join();
 
@@ -67,15 +62,16 @@ class AnchorAwareCommitWalkerTest {
         AppendRecoveryCommit second = commit("commit-2", "commit-1", 1, 2, 20, 2);
         AppendRecoveryAnchor anchor = AppendRecoveryAnchor.genesis(STREAM);
         AppendRecoveryHead head = new AppendRecoveryHead(STREAM, "commit-2", 2, 20, 2, 9);
-        AppendRecoveryTailCursor cursor = new AppendRecoveryTailCursor(
-                STREAM, anchor, head, "commit-1", 1, 10, 1);
+        AppendRecoveryTailCursor cursor = new AppendRecoveryTailCursor(STREAM, anchor, head, "commit-1", 1, 10, 1);
         AtomicInteger pageReads = new AtomicInteger();
 
         AnchorAwareCommitWalk result = new AnchorAwareCommitWalker(
-                "cluster",
-                l0(List.of(new AppendRecoveryTailPage(
-                        anchor, head, List.of(second), false, Optional.of(cursor))), pageReads),
-                generation(new AtomicInteger()))
+                        "cluster",
+                        l0(
+                                List.of(new AppendRecoveryTailPage(
+                                        anchor, head, List.of(second), false, Optional.of(cursor))),
+                                pageReads),
+                        generation(new AtomicInteger()))
                 .walk(STREAM, 1, 1)
                 .join();
 
@@ -85,9 +81,7 @@ class AnchorAwareCommitWalkerTest {
         assertThat(pageReads).hasValue(1);
     }
 
-    private static OxiaMetadataStore l0(
-            List<AppendRecoveryTailPage> pages,
-            AtomicInteger reads) {
+    private static OxiaMetadataStore l0(List<AppendRecoveryTailPage> pages, AtomicInteger reads) {
         List<AppendRecoveryTailPage> mutable = new ArrayList<>(pages);
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
@@ -119,12 +113,7 @@ class AnchorAwareCommitWalkerTest {
     }
 
     private static AppendRecoveryCommit commit(
-            String commitId,
-            String previousCommitId,
-            long start,
-            long end,
-            long cumulativeSize,
-            long commitVersion) {
+            String commitId, String previousCommitId, long start, long end, long cumulativeSize, long commitVersion) {
         StreamCommitTargetRecord value = new StreamCommitTargetRecord(
                 STREAM.value(),
                 commitId,
@@ -155,8 +144,7 @@ class AnchorAwareCommitWalkerTest {
                 1,
                 1,
                 0);
-        byte[] canonical = MetadataRecordCodecFactory.encodeEnvelope(
-                value, StreamCommitTargetRecord.class);
+        byte[] canonical = MetadataRecordCodecFactory.encodeEnvelope(value, StreamCommitTargetRecord.class);
         Checksum digest = sha256(canonical);
         return new AppendRecoveryCommit(
                 "/commit/" + commitId,
@@ -172,7 +160,8 @@ class AnchorAwareCommitWalkerTest {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (Exception failure) {
             throw new AssertionError(failure);
         }

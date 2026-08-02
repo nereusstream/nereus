@@ -1,11 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.KafkaPartitionRegistryRecord;
 
-/** Closed explicit field-order codec for a hint-only Kafka registry entry. */
-public final class KafkaPartitionRegistryRecordCodecV1
-        extends AbstractF4RecordCodecV1<KafkaPartitionRegistryRecord> {
+/**
+ * Closed explicit field-order codec for a hint-only Kafka registry entry.
+ */
+public final class KafkaPartitionRegistryRecordCodecV1 extends AbstractF4RecordCodecV1<KafkaPartitionRegistryRecord> {
     public KafkaPartitionRegistryRecordCodecV1() {
         super(KafkaPartitionRegistryRecord.class);
     }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -16,14 +17,15 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-/** Shared Oxia adapter; brokers consume its read view while explicit administration owns mutations. */
+/**
+ * Shared Oxia adapter; brokers consume its read view while explicit administration owns mutations.
+ */
 public final class OxiaBookKeeperLedgerIdNamespaceReservationStore
         implements BookKeeperLedgerIdNamespaceReservationAdminStore {
     private final CapabilityMetadataClient client;
 
     public OxiaBookKeeperLedgerIdNamespaceReservationStore(
-            OxiaClientConfiguration configuration,
-            SharedOxiaClientRuntime runtime) {
+            OxiaClientConfiguration configuration, SharedOxiaClientRuntime runtime) {
         this(Objects.requireNonNull(runtime, "runtime")
                 .capabilityMetadataClient(Objects.requireNonNull(configuration, "configuration")));
     }
@@ -34,72 +36,48 @@ public final class OxiaBookKeeperLedgerIdNamespaceReservationStore
 
     @Override
     public CompletableFuture<Optional<BookKeeperLedgerIdNamespaceReservation>> read(
-            String providerScopeSha256,
-            int prefixBits,
-            long prefixValue,
-            Duration timeout) {
+            String providerScopeSha256, int prefixBits, long prefixValue, Duration timeout) {
         BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(timeout);
-        String key = BookKeeperLedgerIdNamespaceReservationKeys.key(
-                providerScopeSha256,
-                prefixBits,
-                prefixValue);
-        return deadline.bound(client.get(
-                        key,
-                        BookKeeperLedgerIdNamespaceReservationKeys.partitionKey(providerScopeSha256)))
+        String key = BookKeeperLedgerIdNamespaceReservationKeys.key(providerScopeSha256, prefixBits, prefixValue);
+        return deadline.bound(
+                        client.get(key, BookKeeperLedgerIdNamespaceReservationKeys.partitionKey(providerScopeSha256)))
                 .thenApply(optional -> optional.map(stored -> materialize(key, stored)));
     }
 
     @Override
     public CompletableFuture<BookKeeperLedgerIdNamespaceReservation> create(
-            BookKeeperLedgerIdNamespaceReservationValue value,
-            Duration timeout) {
+            BookKeeperLedgerIdNamespaceReservationValue value, Duration timeout) {
         BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(timeout);
         BookKeeperLedgerIdNamespaceReservationValue exact = Objects.requireNonNull(value, "value");
         String key = BookKeeperLedgerIdNamespaceReservationKeys.key(
-                exact.bookKeeperProviderScopeSha256(),
-                exact.ledgerIdPrefixBits(),
-                exact.ledgerIdPrefixValue());
-        String partition = BookKeeperLedgerIdNamespaceReservationKeys.partitionKey(
-                exact.bookKeeperProviderScopeSha256());
+                exact.bookKeeperProviderScopeSha256(), exact.ledgerIdPrefixBits(), exact.ledgerIdPrefixValue());
+        String partition =
+                BookKeeperLedgerIdNamespaceReservationKeys.partitionKey(exact.bookKeeperProviderScopeSha256());
         byte[] encoded = BookKeeperLedgerIdNamespaceReservationCodecV1.encode(exact);
-        CompletableFuture<BookKeeperLedgerIdNamespaceReservation> write = deadline
-                .bound(client.putIfAbsent(key, encoded, partition))
+        CompletableFuture<BookKeeperLedgerIdNamespaceReservation> write = deadline.bound(
+                        client.putIfAbsent(key, encoded, partition))
                 .thenApply(stored -> materialize(key, stored));
-        return recoverWrite(
-                write,
-                () -> deadline.bound(client.get(key, partition)),
-                key,
-                encoded,
-                -1);
+        return recoverWrite(write, () -> deadline.bound(client.get(key, partition)), key, encoded, -1);
     }
 
     @Override
     public CompletableFuture<BookKeeperLedgerIdNamespaceReservation> compareAndSet(
-            BookKeeperLedgerIdNamespaceReservationValue replacement,
-            long expectedMetadataVersion,
-            Duration timeout) {
+            BookKeeperLedgerIdNamespaceReservationValue replacement, long expectedMetadataVersion, Duration timeout) {
         BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(timeout);
         if (expectedMetadataVersion < 0) {
             throw new IllegalArgumentException("expectedMetadataVersion must be non-negative");
         }
-        BookKeeperLedgerIdNamespaceReservationValue exact = Objects.requireNonNull(
-                replacement, "replacement");
+        BookKeeperLedgerIdNamespaceReservationValue exact = Objects.requireNonNull(replacement, "replacement");
         String key = BookKeeperLedgerIdNamespaceReservationKeys.key(
-                exact.bookKeeperProviderScopeSha256(),
-                exact.ledgerIdPrefixBits(),
-                exact.ledgerIdPrefixValue());
-        String partition = BookKeeperLedgerIdNamespaceReservationKeys.partitionKey(
-                exact.bookKeeperProviderScopeSha256());
+                exact.bookKeeperProviderScopeSha256(), exact.ledgerIdPrefixBits(), exact.ledgerIdPrefixValue());
+        String partition =
+                BookKeeperLedgerIdNamespaceReservationKeys.partitionKey(exact.bookKeeperProviderScopeSha256());
         byte[] encoded = BookKeeperLedgerIdNamespaceReservationCodecV1.encode(exact);
-        CompletableFuture<BookKeeperLedgerIdNamespaceReservation> write = deadline
-                .bound(client.putIfVersion(key, encoded, expectedMetadataVersion, partition))
+        CompletableFuture<BookKeeperLedgerIdNamespaceReservation> write = deadline.bound(
+                        client.putIfVersion(key, encoded, expectedMetadataVersion, partition))
                 .thenApply(stored -> materialize(key, stored));
         return recoverWrite(
-                write,
-                () -> deadline.bound(client.get(key, partition)),
-                key,
-                encoded,
-                expectedMetadataVersion);
+                write, () -> deadline.bound(client.get(key, partition)), key, encoded, expectedMetadataVersion);
     }
 
     private CompletableFuture<BookKeeperLedgerIdNamespaceReservation> recoverWrite(
@@ -109,29 +87,28 @@ public final class OxiaBookKeeperLedgerIdNamespaceReservationStore
             byte[] desired,
             long expectedVersion) {
         return write.handle((result, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(result);
-            }
-            Throwable original = unwrap(failure);
-            return reload.get().thenCompose(optional -> {
-                if (optional.isPresent()) {
-                    CapabilityMetadataValue stored = optional.orElseThrow();
-                    if (java.util.Arrays.equals(stored.value(), desired)
-                            && (expectedVersion < 0 || stored.version() > expectedVersion)) {
-                        return CompletableFuture.completedFuture(materialize(key, stored));
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(result);
                     }
-                }
-                return CompletableFuture.failedFuture(original);
-            });
-        }).thenCompose(java.util.function.Function.identity());
+                    Throwable original = unwrap(failure);
+                    return reload.get().thenCompose(optional -> {
+                        if (optional.isPresent()) {
+                            CapabilityMetadataValue stored = optional.orElseThrow();
+                            if (java.util.Arrays.equals(stored.value(), desired)
+                                    && (expectedVersion < 0 || stored.version() > expectedVersion)) {
+                                return CompletableFuture.completedFuture(materialize(key, stored));
+                            }
+                        }
+                        return CompletableFuture.failedFuture(original);
+                    });
+                })
+                .thenCompose(java.util.function.Function.identity());
     }
 
     private static BookKeeperLedgerIdNamespaceReservation materialize(
-            String expectedKey,
-            CapabilityMetadataValue stored) {
+            String expectedKey, CapabilityMetadataValue stored) {
         if (!stored.key().equals(expectedKey)) {
-            throw new IllegalArgumentException(
-                    "namespace reservation metadata returned a non-canonical key");
+            throw new IllegalArgumentException("namespace reservation metadata returned a non-canonical key");
         }
         BookKeeperLedgerIdNamespaceReservationValue value =
                 BookKeeperLedgerIdNamespaceReservationCodecV1.decode(stored.value());
@@ -140,16 +117,12 @@ public final class OxiaBookKeeperLedgerIdNamespaceReservationStore
                 value.bookKeeperProviderScopeSha256(),
                 value.ledgerIdPrefixBits(),
                 value.ledgerIdPrefixValue());
-        return value.materialize(
-                stored.key(),
-                stored.version(),
-                sha256(stored.value()));
+        return value.materialize(stored.key(), stored.version(), sha256(stored.value()));
     }
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while ((current instanceof CompletionException
-                        || current instanceof java.util.concurrent.ExecutionException)
+        while ((current instanceof CompletionException || current instanceof java.util.concurrent.ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -160,7 +133,8 @@ public final class OxiaBookKeeperLedgerIdNamespaceReservationStore
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }
